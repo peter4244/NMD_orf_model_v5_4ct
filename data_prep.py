@@ -726,7 +726,7 @@ def build_dataset(results_dir, n_workers=8):
 # =============================================================================
 def main():
     parser = argparse.ArgumentParser(description="Build HDF5 dataset for NMD ORF model")
-    parser.add_argument("--results-dir", type=Path, default=Path("results"))
+    parser.add_argument("--results-dir", type=Path, default=Path("results_4ct"))
     parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args()
 

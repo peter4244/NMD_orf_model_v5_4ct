@@ -5,13 +5,13 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=v5_rest
-#SBATCH --output=results/train_v5_rest_%a_%j.log
+#SBATCH --output=results_4ct/train_v5_rest_%a_%j.log
 #SBATCH --array=1-9
 
 # v5 remaining models (ATG ∈ {100,500,1000} × STOP ∈ {100,500,1000,2000})
 # Minus the 3 already running: 100/1000, 500/1000, 1000/2000
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5
+cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

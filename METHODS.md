@@ -1,4 +1,33 @@
-# NMD ORF Model — Methods
+# NMD ORF Model — Methods (4 Cell Type Retrain)
+
+## NMD/Non-NMD Classification (4 Cell Types)
+
+### Cell type selection
+The model is trained using NMD classifications derived from 4 primary lung cell types: AT (alveolar type II), DD (day differentiated), FB (fibroblast), and MV (microvascular endothelial). Two cell types from the original 6-cell-type experiment were excluded:
+- **DD_ALI** (air-liquid interface differentiated): Excluded due to near-zero logFC correlation between short-read and long-read DGE (r = 0.002), indicating unreliable treatment effect estimates.
+- **DO** (day organoid): Excluded due to insufficient statistical power (n=2 donors after outlier removal of DD029T), weakest pairwise effect-size correlations with other cell types.
+
+### mashr differential isoform expression
+Multivariate adaptive shrinkage (mashr) was re-run using only the 4 retained cell types. Because mashr jointly estimates effect sizes and borrows strength across conditions, removing 2 cell types changes the shrinkage estimates for all remaining cell types. The new mashr results are at `/projects/talisman/shared-data/nmd/mashr/` (original 6-cell-type results archived in `old_6celltype/` subfolder).
+
+### NMD classification criteria
+- **NMD-responsive:** Union across 4 cell types of isoforms with `nmd_responsive == TRUE` (lfsr < 0.05 and posterior mean logFC > 0 in mashr).
+- **Non-NMD:** Intersection across all 4 cell types of isoforms with `adj.P.Val > 0.30`.
+- The non-NMD threshold was lowered from 0.50 (used in the 6-cell-type model) to 0.30 to account for changed p-value distributions under 4-cell-type mashr. With fewer cell types, the mashr shrinkage is more aggressive, shifting adj.P.Val distributions and causing the 0.50 threshold to be overly restrictive (yielding only ~1,890 non-NMD isoforms in the training set). The 0.30 threshold recovers a comparable non-NMD set size (~31,098) with a class ratio of 1:3.5 (NMD:non-NMD).
+- Isoforms classified as both NMD and non-NMD (none observed) would be excluded.
+- Isoforms in neither set are excluded from training.
+
+### Dataset summary
+- **Total isoforms:** 39,938 (vs 61,669 in original v5)
+- **NMD:** 8,840 (vs 9,274)
+- **Non-NMD:** 31,098 (vs 52,395)
+- **Class ratio:** 1:3.5 NMD:non-NMD (vs 1:5.6)
+- **Label changes from original:** 15 isoforms dropped (NMD → neither), 2 flipped (NMD → non-NMD), 10 flipped (non-NMD → NMD), 21,731 dropped (non-NMD → neither due to stricter intersection)
+
+### Relabeling procedure
+The relabeling is performed by `relabel_tx_summary_4ct.R`, which reads the 4 per-cell-type mashr CSVs, computes the union/intersection aggregate, and updates the `is_nmd` column in `tx_summary.tsv`. ORF features, junction positions, and other structural data are unchanged from the original v5 pipeline.
+
+---
 
 ## Model Training and Window Size Sweep
 

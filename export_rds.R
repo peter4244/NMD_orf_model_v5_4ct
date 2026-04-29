@@ -16,7 +16,7 @@
 library(jsonlite)
 
 cache_dir <- "/projects/talisman/shared-data/nmd/isoform_transitions/Version_6.0/isopair_wrapper/data_mashr/analysis_cache"
-out_dir   <- "results"
+out_dir   <- "results_4ct"
 dir.create(out_dir, showWarnings = FALSE)
 
 # Helper: convert logical columns to 0/1 integers for clean Python consumption

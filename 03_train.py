@@ -148,7 +148,7 @@ def train(config_path="config.yaml", atg_window=None, stop_window=None):
     print(f"Mixed precision: {use_amp}")
 
     # Logging
-    results_dir = Path("results")
+    results_dir = Path("results_4ct")
     results_dir.mkdir(exist_ok=True)
     tag = f"atg{ws_atg}_stop{ws_stop}"
     log_path = results_dir / f"training_log_{tag}.csv"

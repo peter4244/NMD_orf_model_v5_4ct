@@ -4,9 +4,9 @@
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=v5_motif
-#SBATCH --output=results/export_motif_v5_%j.log
+#SBATCH --output=results_4ct/export_motif_v5_%j.log
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5
+cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

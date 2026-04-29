@@ -5,16 +5,16 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=v5_interp
-#SBATCH --output=results/interpret_v5_%j.log
+#SBATCH --output=results_4ct/interpret_v5_%j.log
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5
+cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 
 TAG="atg500_stop500"
 
 echo "=== Attention interpretation ==="
-python 04_interpret_attention.py --results-dir results --tag $TAG
+python 04_interpret_attention.py --results-dir results_4ct --tag $TAG
 
 echo ""
 echo "=== Structural interpretation ==="

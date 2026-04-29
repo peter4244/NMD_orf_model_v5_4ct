@@ -16,8 +16,8 @@ import pandas as pd
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tag", required=True)
-    parser.add_argument("--results-dir", default="results")
-    parser.add_argument("--hdf5-path", default="results/nmd_orf_data.h5")
+    parser.add_argument("--results-dir", default="results_4ct")
+    parser.add_argument("--hdf5-path", default="results_4ct/nmd_orf_data.h5")
     args = parser.parse_args()
 
     results_dir = Path(args.results_dir)

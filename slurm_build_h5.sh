@@ -3,20 +3,20 @@
 #SBATCH --time=02:00:00
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
-#SBATCH --job-name=v5_h5
-#SBATCH --output=results/build_h5_%j.log
+#SBATCH --job-name=4ct_h5
+#SBATCH --output=results_4ct/build_h5_%j.log
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5
+cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 
-echo "=== Building v5 HDF5 dataset ==="
-python data_prep.py --results-dir results --workers 8
+echo "=== Building 4ct HDF5 dataset ==="
+python data_prep.py --results-dir results_4ct --workers 8
 
 echo "=== Verifying ==="
 python -c "
 import h5py, json
-with h5py.File('results/nmd_orf_data.h5','r') as f:
+with h5py.File('results_4ct/nmd_orf_data.h5','r') as f:
     print('Keys:', list(f.keys()))
     print('orf_features:', f['orf_features'].shape)
     print('orf_mask:', f['orf_mask'].shape)

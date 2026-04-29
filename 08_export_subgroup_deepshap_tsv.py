@@ -332,7 +332,7 @@ def main():
     parser.add_argument("--atg", type=int, default=500)
     parser.add_argument("--stop", type=int, default=500)
     parser.add_argument("--n-runs", type=int, default=5)
-    parser.add_argument("--results-dir", type=str, default="results")
+    parser.add_argument("--results-dir", type=str, default="results_4ct")
     args = parser.parse_args()
 
     tag = f"atg{args.atg}_stop{args.stop}"

@@ -5,14 +5,14 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=v5_joint
-#SBATCH --output=results/deepshap_joint_run%a_%j.log
+#SBATCH --output=results_4ct/deepshap_joint_run%a_%j.log
 #SBATCH --array=1-5
 
 # v5 joint DeepSHAP: all rank-0 inputs varied simultaneously
 # All test samples, 500 background, 5 replicates
 # Gives additive SHAP decomposition across ATG + stop + structural
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5
+cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

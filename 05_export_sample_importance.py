@@ -44,7 +44,7 @@ def main():
     ws_atg = args.atg_window or config["data"]["window_size_atg"]
     ws_stop = args.stop_window or config["data"]["window_size_stop"]
     tag = args.tag
-    results_dir = Path("results")
+    results_dir = Path("results_4ct")
     h5_path = config["data"]["hdf5_path"]
 
     # Load feature names

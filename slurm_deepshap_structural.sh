@@ -5,12 +5,12 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=v5_struct
-#SBATCH --output=results/deepshap_structural_run%a_%j.log
+#SBATCH --output=results_4ct/deepshap_structural_run%a_%j.log
 #SBATCH --array=1-5
 
 # v5 structural DeepSHAP: all test samples, 500 background, 5 replicates
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5
+cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

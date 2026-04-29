@@ -28,7 +28,7 @@ def evaluate(config_path="config.yaml", atg_window=None, stop_window=None):
     ws_atg = atg_window or config["data"]["window_size_atg"]
     ws_stop = stop_window or config["data"]["window_size_stop"]
     tag = f"atg{ws_atg}_stop{ws_stop}"
-    results_dir = Path("results")
+    results_dir = Path("results_4ct")
 
     # Load best checkpoint
     ckpt_path = results_dir / f"best_model_{tag}.pt"

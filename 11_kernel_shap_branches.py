@@ -258,7 +258,7 @@ def main():
 
     ws_atg = int(args.tag.split("_")[0].replace("atg", ""))
     ws_stop = int(args.tag.split("_")[1].replace("stop", ""))
-    results_dir = Path("results")
+    results_dir = Path("results_4ct")
     h5_path = config["data"]["hdf5_path"]
 
     print(f"=== KernelSHAP Branch Decomposition ===")

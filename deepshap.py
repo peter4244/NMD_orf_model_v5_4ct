@@ -178,7 +178,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     tag = f"atg{ws_atg}_stop{ws_stop}"
     run_suffix = f"_run{run_id}" if run_id is not None else ""
     orf_suffix = f"_orf{orf_index}" if orf_index != 0 else ""
-    results_dir = Path("results")
+    results_dir = Path("results_4ct")
     h5_path = config["data"]["hdf5_path"]
 
     # Load model

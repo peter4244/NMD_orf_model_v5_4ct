@@ -5,13 +5,13 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=v5_seq500
-#SBATCH --output=results/deepshap_seq500bg_run%a_%j.log
+#SBATCH --output=results_4ct/deepshap_seq500bg_run%a_%j.log
 #SBATCH --array=1-5
 
 # v5 sequence DeepSHAP: 2000 samples, 500 background, ATG+stop branches
 # ~5x longer than 100 background due to larger reference set
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5
+cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

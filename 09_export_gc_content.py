@@ -26,7 +26,7 @@ def main():
                         help="Step size for sliding window")
     args = parser.parse_args()
 
-    results_dir = Path("results")
+    results_dir = Path("results_4ct")
     run_tag = f"{args.tag}_run{args.run}"
 
     # Load stop branch inputs

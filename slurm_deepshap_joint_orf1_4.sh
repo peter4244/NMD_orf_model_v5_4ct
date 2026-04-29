@@ -5,14 +5,14 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=v5_joint_orf
-#SBATCH --output=results/deepshap_joint_orf%a_%j.log
+#SBATCH --output=results_4ct/deepshap_joint_orf%a_%j.log
 #SBATCH --array=2-4
 
 # v5 joint DeepSHAP for ORF ranks 2-4 (ranks 0-1 already completed)
 # SLURM_ARRAY_TASK_ID maps directly to orf_index (2,3,4)
 # All test samples, 500 background (matching ORF 1 run), single run per ORF
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5
+cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

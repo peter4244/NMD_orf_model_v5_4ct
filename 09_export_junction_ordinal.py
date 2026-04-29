@@ -24,7 +24,7 @@ def main():
     parser.add_argument("--run", type=int, default=1)
     args = parser.parse_args()
 
-    results_dir = Path("results")
+    results_dir = Path("results_4ct")
     run_tag = f"{args.tag}_run{args.run}"
 
     # Load stop branch DeepSHAP

@@ -8,7 +8,7 @@
 #
 
 mashr_dir <- "/projects/talisman/shared-data/nmd/mashr"
-results_dir <- "/home/p.castaldi/cc/nmd_orf_model_v5/results"
+results_dir <- "/home/p.castaldi/cc/nmd_orf_model_v5_4ct/results_4ct"
 de_date <- "2026.3.10"
 
 cts <- c("at", "dd", "fb", "mv")

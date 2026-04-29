@@ -21,7 +21,7 @@ def main():
                         default="/projects/talisman/shared-data/nmd/sqanti/results/nmd_lungcells_classification.txt")
     args = parser.parse_args()
 
-    results_dir = Path("results")
+    results_dir = Path("results_4ct")
 
     # Load predictions (test set)
     preds = pd.read_csv(results_dir / f"predictions_{args.tag}.tsv", sep="\t",
