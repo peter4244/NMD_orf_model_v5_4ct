@@ -3,14 +3,14 @@
 01_data_prep.py — Build HDF5 dataset for ORF-centric NMD model.
 
 Reads exported TSVs (from export_rds.R) and full-length sequences from
-SQANTI FASTA, extracts per-ORF sequence windows with 10-channel
+SQANTI FASTA, extracts per-ORF sequence windows with 9-channel
 encoding, assembles structural features, assigns train/val/test splits,
 computes normalization stats, and writes a single HDF5.
 
-Also produces ORF coverage diagnostics to validate K=10 cutoff.
+Also produces ORF coverage diagnostics to validate K=5 cutoff.
 
 Usage:
-    python 01_data_prep.py [--results-dir results]
+    python data_prep.py [--results-dir results_4ct]
 """
 
 import argparse
