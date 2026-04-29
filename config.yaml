@@ -1,0 +1,35 @@
+data:
+  hdf5_path: results/nmd_orf_data.h5
+  max_orfs_per_tx: 5
+  window_size_atg: 100   # sweep over {100, 500, 1000}
+  window_size_stop: 1000 # sweep over {100, 500, 1000, 2000}
+
+model:
+  n_seq_channels: 9       # v5: 4 nuc + junction + rolling GC + 3 frame position
+  conv_channels: 32
+  seq_embed_dim: 32
+  n_orf_features: 5       # v5: frac_start, frac_stop, is_ref_cds, is_sqanti_cds, n_downstream_ejc
+  orf_embed_dim: 64
+  head_hidden: 32
+  dropout_orf: 0.2
+  dropout_head: 0.3
+
+training:
+  batch_size: 256
+  lr: 0.001
+  weight_decay_cnn: 0.001
+  weight_decay_other: 0.0001
+  epochs: 100
+  patience: 10
+  scheduler_patience: 5
+  scheduler_factor: 0.5
+  mixed_precision: true
+  seed: 42
+  overfit_gap_threshold: 0.05
+
+slurm:
+  partition: gpu
+  gres: "gpu:1"
+  time: "08:00:00"
+  mem: "32G"
+  cpus_per_task: 8
