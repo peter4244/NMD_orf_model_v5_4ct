@@ -391,39 +391,32 @@ p_auprc <- all_metrics %>%
 save_fig(p_auprc, "fig1a_auprc_heatmap", width = 7, height = 5)
 ```
 
+```{r fig1b-auc-heatmap, fig.width=7, fig.height=5}
+# ── Data provenance ──
+# Source: metrics_atg{A}_stop{S}.json — produced by evaluate.py
+# Population: 12 models tested on the same holdout set
+
+p_auc <- all_metrics %>%
+  ggplot(aes(x = factor(stop_window), y = factor(atg_window), fill = auc)) +
+  geom_tile(color = "white", linewidth = 1) +
+  geom_text(aes(label = sprintf("%.4f", auc)), size = 4, fontface = "bold") +
+  scale_fill_gradient2(low = "#67a9cf", mid = "#f7f7f7", high = "#ef8a62",
+                       midpoint = median(all_metrics$auc), name = "Test AUC") +
+  labs(title = sprintf("Test AUC by Window Size (3x4 sweep, n=%s)", format(n_test, big.mark = ",")),
+       subtitle = sprintf("AUC: area under ROC curve. Higher = better. %s NMD (%s%% prevalence).",
+                          format(n_nmd, big.mark = ","), nmd_pct),
+       x = "Stop codon window (bp)", y = "ATG window (bp)") +
+  coord_equal()
+
+save_fig(p_auc, "fig1b_auc_heatmap", width = 7, height = 5)
+```
+
 **Variable definitions:**
 
 - **ATG window:** Sequence context (bp) extracted around each ORF's start codon, encoded with 9 channels (4 nucleotide one-hot + splice junction + rolling GC + 3 reading-frame one-hot).
 - **Stop window:** Same 9-channel encoding around each ORF's stop codon.
 - **AUPRC:** Area under the precision-recall curve. More informative than AUC for imbalanced classes (NMD prevalence = `r nmd_pct`%).
-
-```{r fig1b-extended-sweep, fig.width=8, fig.height=5}
-# ── Data provenance ──
-# Source: metrics_atg500_stop{S}.json — produced by evaluate.py
-# Population: 4 ATG=500 models on same holdout set
-ext_metrics <- all_metrics %>%
-  filter(atg_window == 500) %>%
-  arrange(stop_window)
-
-ext_long <- ext_metrics %>%
-  select(stop_window, auc, auprc) %>%
-  pivot_longer(cols = c(auc, auprc), names_to = "metric", values_to = "value") %>%
-  mutate(metric = toupper(metric))
-
-p_ext <- ext_long %>%
-  ggplot(aes(x = factor(stop_window), y = value, fill = metric)) +
-  geom_col(position = "dodge", width = 0.6) +
-  geom_text(aes(label = sprintf("%.4f", value)),
-            position = position_dodge(width = 0.6), vjust = -0.3, size = 3) +
-  scale_fill_manual(values = c(AUC = "#67a9cf", AUPRC = "#ef8a62")) +
-  scale_y_continuous(limits = c(0, 1.02)) +
-  labs(title = sprintf("Performance vs Stop Window Size (ATG=500 fixed, n=%s)", format(n_test, big.mark = ",")),
-       subtitle = "STOP=500 is optimal by AUPRC. Performance declines at larger stop windows.",
-       x = "Stop codon window (bp)", y = "Performance", fill = NULL) +
-  theme(legend.position = "top")
-
-save_fig(p_ext, "fig1b_extended_sweep", width = 8, height = 5)
-```
+- **AUC:** Area under the ROC curve.
 
 <details><summary>Table 1: All model metrics</summary>
 
@@ -955,10 +948,10 @@ stop_pos_labels[stop_positions == 0]  <- "+2"
 stop_pos_labels[stop_positions == 1]  <- "+3"
 
 # Shared y-axis limits — ggseqlogo letters can extend beyond the data value,
-# so use generous padding (1.4x) to avoid clipping
+# so use generous padding (1.8x) to avoid clipping the tall variable-position letters.
 sc_ylim <- range(c(nmd_stop_mat, ctrl_stop_mat))
 sc_ylim <- c(min(sc_ylim[1], 0), max(sc_ylim[2], 0))
-sc_ylim <- sc_ylim * 1.4
+sc_ylim <- sc_ylim * 1.8
 
 p_sc_nmd <- ggseqlogo(nmd_stop_mat, method = "custom", seq_type = "dna") +
   geom_hline(yintercept = 0, linewidth = 0.5, color = "black") +
@@ -1919,9 +1912,11 @@ if (nrow(junc_sub) > 0) {
   n_nmd_junc <- junc_sub$n_nmd[1]
   jxn_x <- which(junc_positions == 0)
 
-  # Compute shared y-axis limits across both panels
+  # Compute shared y-axis limits across both panels (1.8x padding to avoid
+  # ggseqlogo letter clipping at tall variable positions, matching Kozak/stop logos).
   junc_ylim <- range(c(junc_nmd_mat, junc_ctrl_mat))
   junc_ylim <- c(min(junc_ylim[1], 0), max(junc_ylim[2], 0))
+  junc_ylim <- junc_ylim * 1.8
 
   p_junc_nmd <- ggseqlogo(junc_nmd_mat, method = "custom", seq_type = "dna") +
     geom_hline(yintercept = 0, linewidth = 0.5, color = "black") +
