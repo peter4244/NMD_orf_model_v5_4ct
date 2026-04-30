@@ -42,10 +42,9 @@ nuc_colors <- c(A = "#109648", C = "#255C99", G = "#F7B32B", T = "#D62839")
 pal_type <- c(`ORF structural` = "#d95f02", Sequence = "#7570b3")
 ejc_pal <- c("EJC 1" = "#e41a1c", "EJC 2" = "#377eb8", "EJC 3" = "#4daf4a",
              "EJC 4" = "#984ea3", "EJC 5+" = "#ff7f00")
-subgroup_pal_short <- c("NMD PTC+" = "#ef8a62",
-                         "NMD PTC-, ref ATG retained" = "#fdd49e",
-                         "NMD PTC-, ref ATG lost" = "#fdbb84",
-                         "Control" = "#67a9cf")
+subgroup_pal <- c("Control" = "#67a9cf", "NMD PTC+" = "#ef8a62",
+                  "NMD PTC-, ref ATG retained" = "#d95f02",
+                  "NMD PTC-, ref ATG lost" = "#8c510a")
 
 # ---------------------------------------------------------------------------
 # Helper functions
@@ -690,7 +689,7 @@ render_dt(ks_branch %>% mutate(mean_abs_shap = round(mean_abs_shap, 4)),
 
 ## 2.2 Structural Feature Importance {#sec2-structural}
 
-Within the structural branch (61% of total attribution), the 5 ORF features are ranked by per-feature DeepSHAP (marginal, 500 background, 5 replicates, all test samples):
+Within the structural branch (60.7% of total attribution; see §2.1), the 5 ORF features are ranked by per-feature DeepSHAP (marginal, 500 background, 5 replicates, all test samples):
 
 ```{r fig2b-structural-importance, eval=has_kernel_shap, fig.width=8, fig.height=4}
 # Within-structural breakdown from marginal DeepSHAP (per-feature detail)
@@ -942,7 +941,7 @@ kz_G_m1_ctrl <- kz_val(-2, "G", "ctrl")
 
 **Observations:**
 
-- **(Data)** At the canonical Kozak landmark positions, model attribution concentrates in the consensus residues. **G at position -3** carries the largest single-channel positive signal (`r kz_G_m3_nmd` in NMD, `r kz_G_m3_ctrl` in controls); **G at position +4** is similarly dominant (`r kz_G_p4_nmd` in NMD, `r kz_G_p4_ctrl` in controls). Non-purine residues at -3 and non-G residues at +4 contribute small, predominantly negative signals (e.g., A at -3: `r kz_A_m3_nmd` in NMD).
+- **(Data)** At the canonical Kozak landmark positions, model attribution concentrates in the consensus residues. **G at positions -3 and +4** carries comparable, dominant positive signals (G(-3): `r kz_G_m3_nmd` NMD / `r kz_G_m3_ctrl` Control; G(+4): `r kz_G_p4_nmd` NMD / `r kz_G_p4_ctrl` Control). Non-purine residues at -3 and non-G residues at +4 contribute small, predominantly negative signals (e.g., A at -3: `r kz_A_m3_nmd` in NMD).
 - **(Data)** At position -1, the canonical C contributes a small negative signal in Controls (`r kz_C_m1_ctrl`) and is near-zero in NMD (`r kz_C_m1_nmd`), while G contributes a small positive signal in NMD (`r kz_G_m1_nmd`). Signals at -1 are weaker than at -3 or +4.
 - **(Data)** At positions -3 and +4 (the strongest Kozak landmarks), the magnitude of the G signal is several-fold larger in NMD than Control (NMD/Control ratios of approximately 4x). The model recognizes Kozak-consensus residues in both classes but assigns higher attribution to those features when classifying NMD.
 - **(Hypothesis)** The amplified Kozak-consensus signal in NMD may reflect the model leveraging strong Kozak context to identify genuine start codons among candidate-ORF ATGs — a signal especially relevant for NMD subtypes that depend on alternative start codon usage (see Section 9.7).
@@ -1203,7 +1202,7 @@ p_sc_class <- ggplot(sg_sc_subgroup,
                      aes(x = stop_codon, y = mean_signed_shap_mean, fill = subgroup)) +
   geom_col(position = position_dodge(width = 0.8), width = 0.7) +
   geom_hline(yintercept = 0, linewidth = 0.3) +
-  scale_fill_manual(values = subgroup_pal_short) +
+  scale_fill_manual(values = subgroup_pal) +
   labs(title = "Stop Codon Signed SHAP by Subgroup",
        subtitle = "Mean signed SHAP at stop codon variable positions (5-run pooled). PTC+ carries the largest NMD signal.",
        x = "Stop codon", y = "Signed SHAP (variable positions)", fill = NULL) +
@@ -1224,7 +1223,7 @@ render_dt(
 
 **Observations:**
 
-- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. Weighted by subgroup size, the NMD aggregate TGA SHAP is slightly larger than Control (≈+0.009 vs +0.008, ratio 1.15x); the canonical NMD PTC+ subgroup carries the largest TGA contribution (≈+0.010, ratio 1.3x vs Control). The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism. Frequency analysis (Section 4.1) confirms the same direction at the population level: TGA is enriched in NMD (55.9% vs 48.1% in Control).
+- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. The canonical NMD PTC+ subgroup carries the largest TGA contribution (≈+0.010, ratio 1.3x vs Control's ≈+0.008); the PTC- subgroups have weaker stop-codon attribution. The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism. Frequency analysis (Section 4.1) confirms the same direction at the population level: TGA is enriched in NMD (55.9% vs 48.1% in Control).
 - **(Data)** The TGA-positive / TAA,TAG-negative pattern is sign-consistent across all 5 DeepSHAP replicates.
 
 ---
@@ -1357,7 +1356,7 @@ render_dt(rank01_comp,
 **Observations:**
 
 - **(Data)** The model strongly favors a **dominant ORF**: rank 0 is the most-attended ORF in `r ent_stats$pct_rank0_dominant[ent_stats$class == "NMD"]`% of NMD transcripts and `r ent_stats$pct_rank0_dominant[ent_stats$class == "Control"]`% of controls.
-- **(Data)** Entropy is similar between classes (NMD: `r ent_stats$mean_entropy[ent_stats$class == "NMD"]` bits, Control: `r ent_stats$mean_entropy[ent_stats$class == "Control"]` bits).
+- **(Data)** Mean entropy is similar between classes (NMD: `r ent_stats$mean_entropy[ent_stats$class == "NMD"]` bits, Control: `r ent_stats$mean_entropy[ent_stats$class == "Control"]` bits); see the §5 paragraph above for the median direction (NMD higher) and KS distributional difference.
 - **(Hypothesis)** The low entropy and rank-0 dominance suggest the model treats NMD prediction primarily as a single-ORF problem, rather than integrating signals across multiple ORFs.
 
 
@@ -1589,10 +1588,6 @@ subgroup_order <- c("Control", "NMD PTC+", "NMD PTC-, ref ATG retained",
                     "NMD PTC-, ref ATG lost")
 sec8_data$subgroup <- factor(sec8_data$subgroup, levels = subgroup_order)
 stopifnot("Unclassified transcripts detected" = !any(is.na(sec8_data$subgroup)))
-
-subgroup_pal <- c("Control" = "#67a9cf", "NMD PTC+" = "#ef8a62",
-                  "NMD PTC-, ref ATG retained" = "#d95f02",
-                  "NMD PTC-, ref ATG lost" = "#8c510a")
 ```
 
 ```{r sec6-derived-vars, include=FALSE}
@@ -1760,7 +1755,7 @@ shap_ref_noref <- attr_summary %>%
 ```{r sec6-attribution-obs, eval=exists("shap_ejc_ptcpos"), results='asis'}
 cat("**Observations:**\n\n")
 cat(sprintf("- **(Data)** `n_downstream_ejc` is the dominant feature for **NMD PTC+** (%.3f), consistent with the canonical PTC + EJC mechanism. Its importance drops for **PTC- ref ATG retained** (%.3f) and **PTC- ref ATG lost** (%.3f).\n", shap_ejc_ptcpos, shap_ejc_ptcneg, shap_ejc_noref))
-cat(sprintf("- **(Data)** `is_ref_cds` importance is %.3f for PTC+ (confirming the model values ORFs that match the reference reading frame) but drops to %.3f for ref-ATG-lost (where it is always 0).\n", shap_ref_ptcpos, shap_ref_noref))
+cat(sprintf("- **(Data)** `is_ref_cds` importance is %.3f for PTC+ (confirming the model values ORFs that match the reference reading frame) and is somewhat larger (%.3f) for ref-ATG-lost — where the feature is always 0, and the model has learned to interpret that absence itself as evidence for NMD (see Panel H interpretation above).\n", shap_ref_ptcpos, shap_ref_noref))
 cat("- **(Data)** The positional features (`frac_start`, `frac_stop`) show modest importance across all subgroups, reflecting the model's use of ORF position within the transcript as a secondary signal.\n")
 ```
 
@@ -1963,7 +1958,7 @@ render_dt(perf_by_subgroup %>%
 
 **Observations:**
 
-- **(Data)** NMD PTC+ sensitivity (`r round(100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC+"], 1)`%) is substantially higher than PTC-, ref ATG retained (`r round(100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC-, ref ATG retained"], 1)`%) and PTC-, ref ATG lost (`r round(100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC-, ref ATG lost"], 1)`%).
+- **(Data)** NMD PTC+ sensitivity (`r sprintf("%.1f", 100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC+"])`%) is substantially higher than PTC-, ref ATG retained (`r sprintf("%.1f", 100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC-, ref ATG retained"])`%) and PTC-, ref ATG lost (`r sprintf("%.1f", 100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC-, ref ATG lost"])`%).
 - **(Data)** Both PTC- subgroups have lower mean P(NMD) and more predictions near the decision boundary, consistent with the model having weaker evidence for non-canonical NMD transcripts.
 - **(Data)** AUC and AUPRC (one-vs-rest against Controls) confirm the subgroup hierarchy: PTC+ has the highest discriminative performance, while PTC- ref ATG retained and ref ATG lost show substantially lower AUPRC, reflecting the difficulty of identifying non-canonical NMD transcripts.
 
@@ -2258,7 +2253,7 @@ p_junc_class <- ggplot(sg_junc_subgroup,
                     ymax = mean_junction_shap_ci_hi),
                 width = 0.15, linewidth = 0.3) +
   geom_hline(yintercept = 0, linewidth = 0.3) +
-  scale_fill_manual(values = subgroup_pal_short) +
+  scale_fill_manual(values = subgroup_pal) +
   labs(title = "Junction Channel SHAP Downstream of Stop, by Subgroup",
        subtitle = "Mean signed SHAP in 3'UTR region (5-run pooled, 95% CI)",
        x = NULL, y = "Mean junction SHAP", fill = NULL) +
@@ -2269,7 +2264,7 @@ save_fig(p_junc_class, "fig4f_junction_subgroup", width = 9, height = 5)
 
 **Observations:**
 
-- **(Data)** The NMD PTC+ subgroup carries the dominant downstream junction SHAP signal, with PTC- subgroups showing weak or near-zero junction attribution. The junction channel is the primary sequence-level EJC signature in the stop branch — and it operates almost entirely through the canonical PTC+EJC mechanism.
+- **(Data)** The NMD PTC+ subgroup carries the dominant downstream junction SHAP signal; Control transcripts show a small positive signal (~10× smaller than PTC+); the PTC- subgroups are near-zero. The junction channel is the primary sequence-level EJC signature in the stop branch and operates almost entirely through the canonical PTC+EJC mechanism.
 - **(Data)** The NMD PTC+ junction signal reflects exon-exon junctions downstream of the stop codon, which are the physical basis for canonical NMD (EJC-mediated recognition of premature termination).
 
 ---
@@ -2439,16 +2434,16 @@ has_sg_profiles <- file.exists(atg_sg_profile_path) && file.exists(stop_sg_profi
 if (has_sg_profiles) {
   atg_sg_prof <- read.delim(atg_sg_profile_path) %>%
     filter(subgroup != "NMD other") %>%
-    mutate(subgroup = factor(subgroup, levels = names(subgroup_pal_short)))
+    mutate(subgroup = factor(subgroup, levels = names(subgroup_pal)))
   stop_sg_prof <- read.delim(stop_sg_profile_path) %>%
     filter(subgroup != "NMD other") %>%
-    mutate(subgroup = factor(subgroup, levels = names(subgroup_pal_short)))
+    mutate(subgroup = factor(subgroup, levels = names(subgroup_pal)))
 
   p_atg_sg <- atg_sg_prof %>%
     ggplot(aes(x = relative_position, y = total_nuc_abs_shap, color = subgroup)) +
     geom_smooth(method = "loess", span = 0.15, se = TRUE, alpha = 0.1, linewidth = 0.8) +
     geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
-    scale_color_manual(values = subgroup_pal_short) +
+    scale_color_manual(values = subgroup_pal) +
     annotate("text", x = -100, y = Inf, label = "5'UTR", size = 3, color = "grey40", vjust = 2) +
     annotate("text", x = 100, y = Inf, label = "ORF body", size = 3, color = "grey40", vjust = 2) +
     labs(title = "E. ATG Branch: Nucleotide |SHAP| by Subgroup",
@@ -2465,7 +2460,7 @@ p_stop_sg <- stop_sg_prof %>%
   ggplot(aes(x = relative_position, y = total_nuc_abs_shap, color = subgroup)) +
   geom_smooth(method = "loess", span = 0.15, se = TRUE, alpha = 0.1, linewidth = 0.8) +
   geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
-  scale_color_manual(values = subgroup_pal_short) +
+  scale_color_manual(values = subgroup_pal) +
   annotate("text", x = -150, y = Inf, label = "ORF body", size = 3, color = "grey40", vjust = 2) +
   annotate("text", x = 150, y = Inf, label = "3'UTR", size = 3, color = "grey40", vjust = 2) +
   labs(title = "F. Stop Branch: Nucleotide |SHAP| by Subgroup",
@@ -2505,11 +2500,12 @@ if (has_atg_sg) {
   pos_labels[positions == 0]  <- "T(+2)"
   pos_labels[positions == 1]  <- "G(+3)"
 
-  # Build per-subgroup logo matrices and plot
-  sg_plots <- list()
+  # First pass: build all matrices (for shared y-limit)
+  sg_mats <- list()
+  sg_n <- list()
   for (sg in c("NMD PTC+", "NMD PTC-, ref ATG retained", "NMD PTC-, ref ATG lost", "Control")) {
     sg_data <- atg_sg %>% filter(subgroup == sg)
-    n_sg <- sg_data$n_samples[1]
+    sg_n[[sg]] <- sg_data$n_samples[1]
     mat <- matrix(0, nrow = 4, ncol = length(positions),
                   dimnames = list(c("A","C","G","T"), positions))
     for (i in seq_along(positions)) {
@@ -2519,14 +2515,23 @@ if (has_atg_sg) {
         if (length(v) == 1) mat[j, i] <- v
       }
     }
+    sg_mats[[sg]] <- mat
+  }
+  # Shared y-limit across the 4 panels (1.4x padding for ggseqlogo)
+  atg_sg_ylim <- range(unlist(sg_mats))
+  atg_sg_ylim <- c(min(atg_sg_ylim[1], 0), max(atg_sg_ylim[2], 0)) * 1.4
 
-    sg_plots[[sg]] <- ggseqlogo(mat, method = "custom", seq_type = "dna") +
+  # Second pass: build plots with shared y-axis
+  sg_plots <- list()
+  for (sg in c("NMD PTC+", "NMD PTC-, ref ATG retained", "NMD PTC-, ref ATG lost", "Control")) {
+    sg_plots[[sg]] <- ggseqlogo(sg_mats[[sg]], method = "custom", seq_type = "dna") +
       geom_hline(yintercept = 0, linewidth = 0.3) +
       scale_x_continuous(breaks = 1:length(positions), labels = pos_labels) +
+      coord_cartesian(ylim = atg_sg_ylim) +
       annotate("rect", xmin = which(positions == -1) - 0.5,
                xmax = which(positions == 1) + 0.5,
                ymin = -Inf, ymax = Inf, fill = "grey90", alpha = 0.3) +
-      labs(title = sprintf("%s (n=%s)", sg, format(n_sg, big.mark = ",")),
+      labs(title = sprintf("%s (n=%s)", sg, format(sg_n[[sg]], big.mark = ",")),
            x = NULL, y = "SHAP × input") +
       theme(axis.text.x = element_text(size = 7),
             plot.title = element_text(size = 10))
@@ -2564,10 +2569,12 @@ if (has_stop_sg) {
   stop_labels[positions == 0]  <- "+2"
   stop_labels[positions == 1]  <- "+3"
 
-  sg_plots_stop <- list()
+  # First pass: build all matrices for shared y-limit
+  sg_stop_mats <- list()
+  sg_stop_n <- list()
   for (sg in c("NMD PTC+", "NMD PTC-, ref ATG retained", "NMD PTC-, ref ATG lost", "Control")) {
     sg_data <- stop_sg %>% filter(subgroup == sg)
-    n_sg <- sg_data$n_samples[1]
+    sg_stop_n[[sg]] <- sg_data$n_samples[1]
     mat <- matrix(0, nrow = 4, ncol = length(positions),
                   dimnames = list(c("A","C","G","T"), positions))
     for (i in seq_along(positions)) {
@@ -2577,14 +2584,22 @@ if (has_stop_sg) {
         if (length(v) == 1) mat[j, i] <- v
       }
     }
+    sg_stop_mats[[sg]] <- mat
+  }
+  # Shared y-limit across the 4 panels (1.4x padding for ggseqlogo)
+  stop_sg_ylim <- range(unlist(sg_stop_mats))
+  stop_sg_ylim <- c(min(stop_sg_ylim[1], 0), max(stop_sg_ylim[2], 0)) * 1.4
 
-    sg_plots_stop[[sg]] <- ggseqlogo(mat, method = "custom", seq_type = "dna") +
+  sg_plots_stop <- list()
+  for (sg in c("NMD PTC+", "NMD PTC-, ref ATG retained", "NMD PTC-, ref ATG lost", "Control")) {
+    sg_plots_stop[[sg]] <- ggseqlogo(sg_stop_mats[[sg]], method = "custom", seq_type = "dna") +
       geom_hline(yintercept = 0, linewidth = 0.3) +
       scale_x_continuous(breaks = 1:length(positions), labels = stop_labels) +
+      coord_cartesian(ylim = stop_sg_ylim) +
       annotate("rect", xmin = which(positions == -1) - 0.5,
                xmax = which(positions == 1) + 0.5,
                ymin = -Inf, ymax = Inf, fill = "grey90", alpha = 0.3) +
-      labs(title = sprintf("%s (n=%s)", sg, format(n_sg, big.mark = ",")),
+      labs(title = sprintf("%s (n=%s)", sg, format(sg_stop_n[[sg]], big.mark = ",")),
            x = NULL, y = "SHAP × input") +
       theme(axis.text.x = element_text(size = 7),
             plot.title = element_text(size = 10))
@@ -2633,7 +2648,7 @@ attn_sg <- attn_weights %>%
     TRUE ~ "NMD other"
   )) %>%
   filter(subgroup != "NMD other") %>%
-  mutate(subgroup = factor(subgroup, levels = names(subgroup_pal_short)))
+  mutate(subgroup = factor(subgroup, levels = names(subgroup_pal)))
 ```
 
 ```{r fig6d-attn-subgroup, eval=has_subgroup_shap, fig.width=10, fig.height=8}
@@ -2661,7 +2676,7 @@ p_rank0_dom <- ggplot(max_attn, aes(x = subgroup, y = pct_rank0_dom, fill = subg
   geom_col(width = 0.6) +
   geom_text(aes(label = sprintf("%.1f%%\n(n=%s)", pct_rank0_dom, format(n_tx, big.mark = ","))),
             vjust = -0.2, size = 3) +
-  scale_fill_manual(values = subgroup_pal_short) +
+  scale_fill_manual(values = subgroup_pal) +
   scale_y_continuous(limits = c(0, 105)) +
   labs(title = "J. Rank-0 ORF Dominance by Subgroup",
        subtitle = "% of transcripts where rank-0 ORF receives highest attention",
@@ -2678,7 +2693,7 @@ p_attn_rank_sg <- ggplot(attn_by_rank_sg, aes(x = factor(orf_rank), y = mean_att
                                                 fill = subgroup)) +
   geom_col(width = 0.7) +
   facet_wrap(~subgroup, nrow = 1) +
-  scale_fill_manual(values = subgroup_pal_short) +
+  scale_fill_manual(values = subgroup_pal) +
   labs(title = "K. Attention Distribution Across ORF Ranks by Subgroup",
        subtitle = "Mean attention weight per rank (all test transcripts)",
        x = "ORF rank", y = "Mean attention") +
@@ -2742,7 +2757,7 @@ if (has_sg_profiles) {
     ggplot(aes(x = relative_position, y = total_nuc_abs_shap, color = subgroup)) +
     geom_smooth(method = "loess", span = 0.25, se = TRUE, alpha = 0.1, linewidth = 1) +
     geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
-    scale_color_manual(values = subgroup_pal_short) +
+    scale_color_manual(values = subgroup_pal) +
     annotate("text", x = -25, y = Inf, label = "5'UTR", size = 3, color = "grey40", vjust = 2) +
     annotate("text", x = 25, y = Inf, label = "ORF body", size = 3, color = "grey40", vjust = 2) +
     annotate("rect", xmin = -3, xmax = 3, ymin = -Inf, ymax = Inf,
@@ -2919,7 +2934,7 @@ orf_by_sg <- all_orfs_sg %>%
 p_orf_sg <- orf_by_sg %>%
   ggplot(aes(x = factor(orf_rank), y = mean_shap, fill = subgroup)) +
   geom_col(position = "dodge", width = 0.7) +
-  scale_fill_manual(values = subgroup_pal_short) +
+  scale_fill_manual(values = subgroup_pal) +
   labs(title = "Q. Joint DeepSHAP by ORF Rank and NMD Subgroup",
        subtitle = "PTC+ concentrates importance on ORF 0; PTC- subgroups distribute more to secondary ORFs.",
        x = "ORF rank", y = "Mean total |SHAP|", fill = NULL) +
@@ -2967,7 +2982,7 @@ The subgroup analyses in this section converge on a consistent picture. NMD tran
 
 5. **Higher attention uncertainty (Sections 9.9–9.10):** Both PTC- subgroups have higher attention entropy and lower accuracy, reflecting ambiguous ORF landscapes.
 
-6. **Reduced model performance (Section 8):** The model achieves `r round(100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC+"], 1)`% sensitivity on PTC+ but only `r round(100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC-, ref ATG retained"], 1)`% on PTC- ref ATG retained and `r round(100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC-, ref ATG lost"], 1)`% on PTC- ref ATG lost, with predictions clustering near the decision boundary.
+6. **Reduced model performance (Section 8):** The model achieves `r sprintf("%.1f", 100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC+"])`% sensitivity on PTC+ but only `r sprintf("%.1f", 100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC-, ref ATG retained"])`% on PTC- ref ATG retained and `r sprintf("%.1f", 100*perf_by_subgroup$sensitivity[perf_by_subgroup$subgroup == "NMD PTC-, ref ATG lost"])`% on PTC- ref ATG lost, with predictions clustering near the decision boundary.
 
 **Implications:**
 
@@ -3049,8 +3064,10 @@ ece_decile  <- cal_data %>%
   mutate(abs_err = abs(mean_pred - obs_rate),
          w = n / sum(n)) %>%
   summarise(ece = sum(abs_err * w)) %>% pull(ece)
-cat(sprintf("**Observations:**\n\n- **(Data)** The model is well-calibrated at the extremes (P<0.1 and P>0.9, |pred − obs| ≤ 0.05) but **systematically overconfident in middle bins** (P=0.4–0.8, |pred − obs| ≈ 0.14–0.22). Decile-weighted expected calibration error = %.3f; Brier score = %.3f. Most test transcripts (60%%) fall in the well-calibrated extremes, so this overconfidence affects ~25%% of the test set in the boundary region.\n\n",
-    ece_decile, brier_score))
+pct_extreme <- 100 * mean(preds$prob < 0.1 | preds$prob > 0.9)
+pct_middle  <- 100 * mean(preds$prob >= 0.4 & preds$prob <= 0.8)
+cat(sprintf("**Observations:**\n\n- **(Data)** The model is well-calibrated at the extremes (P<0.1 and P>0.9, |pred − obs| ≤ 0.05) but **systematically overconfident in middle bins** (P=0.4–0.8, |pred − obs| ≈ 0.14–0.22). Decile-weighted expected calibration error = %.3f; Brier score = %.3f. Half the test set (%.0f%%) falls in the well-calibrated extremes; the boundary-region overconfidence affects %.0f%% of the test set.\n\n",
+    ece_decile, brier_score, pct_extreme, pct_middle))
 ```
 
 <details><summary>Table 7a: False Negative characterization</summary>

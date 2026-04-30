@@ -71,10 +71,24 @@ Each step is a focused, dimension-specific pass over the entire report. Steps ru
 
 ## Step 3: Documentation accuracy
 
-**Status:** pending
+**Status:** Complete (2026-04-30). 11 fixes applied. Rendered cleanly (job 6434900, 1m47s, 171 chunks).
 
-| # | Section | Prose claim | Table/figure shows | Fix |
-|---|---------|-------------|--------------------|-----|
+**Headline:** Step-1/2 substantive rewrites had propagated correctly. Step 3 caught hand-written prose that disagreed with values it cited, plus per-panel y-axis issues that masked subgroup magnitude differences.
+
+| # | Section | Issue | Fix applied |
+|---|---------|-------|-------------|
+| 1 | §7.2 (L1763) | "is_ref_cds importance is 0.104 ... but **drops** to 0.135" — wrong direction | Rewrote: "is somewhat larger (0.135) for ref-ATG-lost — where the feature is always 0, and the model has learned to interpret that absence itself as evidence for NMD" |
+| 2 | §9.13 (L3052) | Hardcoded "60% in extremes, ~25% in middle" — actually 50.1% / 9.3% | Replaced with inline R `pct_extreme` and `pct_middle` computed from preds |
+| 3 | §9.7 / §9.8 | Per-panel y-axes (PTC+ ±0.0025, PTC- ret ±0.001 etc) masked the magnitude prose | Two-pass build: compute shared `atg_sg_ylim` / `stop_sg_ylim` across all 4 subgroup matrices, apply via `coord_cartesian` |
+| 4 | §4.1.1 (L1227) | Weighted-aggregate "1.15x" claim not derivable from figure | Dropped sentence; rely on per-subgroup figure + PTC+ specific (1.3x) |
+| 5 | §5 (L1360) | Bullet quoted mean entropy (NMD lower) without labeling, contradicting paragraph above (median, NMD higher) | Changed to "Mean entropy is similar between classes... see paragraph above for the median direction" |
+| 6 | Cross-cutting | Two subgroup palettes (`subgroup_pal_short` pastel; `subgroup_pal` saturated) used in different sections | Unified on `subgroup_pal` (saturated). Defined globally at §0; removed late definition; replaced all `subgroup_pal_short` references |
+| 7 | §2.2 (L693) | "Within the structural branch (61%)" rounds 60.7% to 61% within one sentence | Use 60.7% with reference to §2.1 |
+| 8 | §3.1 (L935) | "G at -3 carries the largest" but G at +4 has same value (tie) | Rewrote: "G at positions -3 and +4 carries comparable, dominant positive signals" |
+| 9 | §9.4 (L2272) | Prose silent on Control's non-zero junction SHAP | Added: "Control transcripts show a small positive signal (~10× smaller than PTC+); the PTC- subgroups are near-zero" |
+| 10 | §8 (L1966), §9.12 (L2970) | "92%" rendered without trailing decimal because `round(92.04, 1)=92` | Replaced with `sprintf("%.1f", ...)` to force "92.0%", "33.0%", "35.1%" |
+
+**Verified-correct list (high-confidence, no fix needed):** §0 data status panel + n_test; §1 AUC/AUPRC heatmap values vs prose; §2.1 branch percentages (60.7/28.8/10.5); §3.1 Kozak inline values match figure; §4.1 stop codon frequency figure (Chi-sq 46.6, p=7.5e-11, per-codon Fisher); §4.1.1 PTC+ TGA largest in figure; §5 mean/median/max-attn values; §6 GC trajectory; §7.3 branch decomposition by subgroup; §8 sensitivity; §9.5 5'UTR by subgroup; §9.9 attention rank-0 dominance; §9.10 entropy quartile accuracy; §9.13 confusion matrix, ECE, Brier, no-PTC.
 
 ---
 
