@@ -38,10 +38,34 @@ Each step is a focused, dimension-specific pass over the entire report. Steps ru
 
 ## Step 2: Result correctness
 
-**Status:** pending
+**Status:** Complete (2026-04-30). All identified issues fixed. Findings in `step2_findings.md`.
 
-| # | Section | Result | Issue | Fix |
-|---|---------|--------|-------|-----|
+**Headline:** Population-level analyses correct (predictions, calibration, confusion matrix, EJC dose-response, 5'UTR features, KernelSHAP additivity, subgroup branch decomposition all verified). Bigger-than-expected discoveries during the pass: §4.1 chi-squared p-value flipped (NS → p=7.5e-11) once the stop-codon bug was identified; §3.1/§4.1 motif logos switched from run-1 marginal SHAP (n=444 NMD) to joint 5-run pooled SHAP across the full test set (n=2,268 NMD).
+
+**Most consequential discovery — stop-codon column bug propagated to 4ct.** `selected_orfs.tsv` carried the buggy column documented in BUGFIX_STOP_CODON_2026-03-31.md (reading post-stop nucleotides instead of stop codon). When my Step 2 review used this column to compute marginal stop-codon frequencies, it produced a misleading "TAG enriched in NMD" finding (an artifact of post-stop sequence). Resolved by patching `selected_orfs.tsv` from HDF5 one-hot encoding (`scripts/patch_stop_codon.py`); now 100% canonical stops. With clean data, the model's SHAP and the population frequencies are directionally consistent (TGA enriched in NMD; TAA depleted; TAG slightly depleted).
+
+**Fixes applied:**
+
+| # | Issue | Fix |
+|---|-------|-----|
+| 1 | §5 attention entropy: L1302 said NMD has "higher" entropy (mean is lower) | Rewrote with median direction, mean direction, KS distributional difference, Mann-Whitney NS |
+| 2 | §4.1 chi-squared from SHAP-subset reconstructed counts (p=0.86) | Rewrote chunk to compute from `predictions × selected_orfs` (full test set; χ²=46.6, p=7.5e-11) |
+| 3 | §4.1 prose: "TGA enriched in NMD" had been numerically contradicted | Updated with correct direction matching figure (still TGA-enriched, but now consistent across data and SHAP) |
+| 4 | §4.1.1 prose: Step 1's "0.7x" was unweighted aggregate | Updated to weighted aggregate (1.15x) + PTC+ specific (1.3x) |
+| 5 | §4.1.1 figure: unweighted aggregation hid PTC+ dominance | Changed to per-subgroup view (all 4 subgroups as separate bars) |
+| 6 | §9.4 junction SHAP: same unweighted aggregation issue | Same per-subgroup figure restructure |
+| 7 | §3.1/§4.1 motif logos: used run-1 marginal SHAP (n=444 NMD) instead of joint | Wrote `scripts/export_joint_motif_logos.py`; joint TSVs now exist (n=2,268 NMD), Rmd auto-falls-through |
+| 8 | §3.1 ratios re-derived: joint NMD/Ctrl is ~4x not ~7-8x | Updated prose to "approximately 4x"; rewrote -1 bullet to reflect joint values |
+| 9 | §9.9: median attention metric was ambiguous | Standardized to "median max-attention" with values for all 3 subgroups |
+| 10 | §9.13 calibration plot rendered without commentary | Added (Data) bullet with ECE+Brier and overconfidence note |
+| 11 | `selected_orfs.tsv`: 6ct legacy rows + buggy stop_codon | Patched + filtered to 4ct (198,816 rows, 100% canonical stops) |
+| 12 | Bug fix doc | Added 2026-04-30 4ct addendum to BUGFIX_STOP_CODON_2026-03-31.md |
+
+**Verified-correct (high-confidence, no fix needed):** AUC/AUPRC heatmap cells; KernelSHAP additivity; NMD branch percentages; subgroup branch percentages sum to 100%; subgroup counts sum to n_test; confusion matrix; subgroup AUC/AUPRC one-vs-rest; EJC dose-response; 5'UTR length/coverage by subgroup; junction motif position frequencies; calibration deciles; strict no-PTC count; attention rank-0 dominance per subgroup; entropy quartile accuracy; PolyA Fisher test; GC trajectory endpoints; ATG-dominated PTC- ret count.
+
+**New scripts checked into repo:**
+- `scripts/patch_stop_codon.py` (fixes selected_orfs.tsv from HDF5; reproducible)
+- `scripts/export_joint_motif_logos.py` (pools 5 joint DeepSHAP NPZs to motif logo TSVs)
 
 ---
 

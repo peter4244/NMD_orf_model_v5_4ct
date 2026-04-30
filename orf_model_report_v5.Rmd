@@ -204,20 +204,30 @@ motif_stop_joint_path <- file.path(results_dir, paste0("motif_logo_stop_joint_",
 motif_stop_path <- file.path(results_dir, paste0("motif_logos_stop_", shap_run_tag, ".tsv"))
 motif_atg_path  <- file.path(results_dir, paste0("motif_logo_atg_", shap_run_tag, ".tsv"))
 
-if (file.exists(motif_atg_joint_path) && file.exists(motif_stop_joint_path)) {
+# Joint = full test set, 5-run pooled (single-landmark, stop_codon).
+# Marginal = run 1 subsample (multi-landmark: stop_codon, first_3utr_junction, etc).
+# Section 9.1 needs the first_3utr_junction landmark, which only the marginal file
+# provides — so we always load marginal when present and put it in motif_stop_multi.
+has_motif_atg_joint  <- file.exists(motif_atg_joint_path)
+has_motif_stop_joint <- file.exists(motif_stop_joint_path)
+has_motif_marginal   <- file.exists(motif_stop_path) && file.exists(motif_atg_path)
+
+if (has_motif_marginal) {
+  motif_stop_multi <- read.delim(motif_stop_path)  # multi-landmark, used by §9.1
+}
+
+if (has_motif_atg_joint && has_motif_stop_joint) {
   motif_atg  <- read.delim(motif_atg_joint_path)
   motif_stop <- read.delim(motif_stop_joint_path)
   has_motif_logos <- TRUE
-  cat("Using joint SHAP motif logos (all test samples)\n")
-} else if (file.exists(motif_stop_path) && file.exists(motif_atg_path)) {
-  motif_stop <- read.delim(motif_stop_path)
+  cat("Using joint SHAP motif logos for ATG/stop windows (all test samples)\n")
+} else if (has_motif_marginal) {
+  motif_stop <- motif_stop_multi
   motif_atg  <- read.delim(motif_atg_path)
   has_motif_logos <- TRUE
   cat("Using marginal SHAP motif logos (run 1 subsample)\n")
 } else {
   has_motif_logos <- FALSE
-}
-if (has_motif_logos) {
 }
 
 # Additional analysis TSVs
@@ -933,8 +943,8 @@ kz_G_m1_ctrl <- kz_val(-2, "G", "ctrl")
 **Observations:**
 
 - **(Data)** At the canonical Kozak landmark positions, model attribution concentrates in the consensus residues. **G at position -3** carries the largest single-channel positive signal (`r kz_G_m3_nmd` in NMD, `r kz_G_m3_ctrl` in controls); **G at position +4** is similarly dominant (`r kz_G_p4_nmd` in NMD, `r kz_G_p4_ctrl` in controls). Non-purine residues at -3 and non-G residues at +4 contribute small, predominantly negative signals (e.g., A at -3: `r kz_A_m3_nmd` in NMD).
-- **(Data)** At position -1, the canonical C contributes a negative signal (`r kz_C_m1_nmd` in NMD, `r kz_C_m1_ctrl` in controls), while G again contributes a positive signal (`r kz_G_m1_nmd` in NMD).
-- **(Data)** At all three Kozak landmark positions (-3, -1, +4), the magnitude of the G signal is substantially larger in NMD than Control — NMD/Control ratios of approximately 7-8x. The model recognizes Kozak-consensus residues in both classes but assigns much higher attribution to those features when classifying NMD.
+- **(Data)** At position -1, the canonical C contributes a small negative signal in Controls (`r kz_C_m1_ctrl`) and is near-zero in NMD (`r kz_C_m1_nmd`), while G contributes a small positive signal in NMD (`r kz_G_m1_nmd`). Signals at -1 are weaker than at -3 or +4.
+- **(Data)** At positions -3 and +4 (the strongest Kozak landmarks), the magnitude of the G signal is several-fold larger in NMD than Control (NMD/Control ratios of approximately 4x). The model recognizes Kozak-consensus residues in both classes but assigns higher attribution to those features when classifying NMD.
 - **(Hypothesis)** The amplified Kozak-consensus signal in NMD may reflect the model leveraging strong Kozak context to identify genuine start codons among candidate-ORF ATGs — a signal especially relevant for NMD subtypes that depend on alternative start codon usage (see Section 9.7).
 
 ---
@@ -1070,61 +1080,55 @@ save_fig(p_sc_nmd / p_sc_ctrl, "fig4a_stop_logo", width = 12, height = 8)
 - **(Data)** Positions immediately upstream of the stop codon (CDS-proximal) show weak, mixed SHAP — the model does not strongly attend to the last few coding nucleotides.
 - **(Data)** Positions downstream of the stop codon (+2 onward, 3'UTR) show the beginning of the junction/nucleotide signals analyzed in detail in Sections 9.1–9.4 and Section 6.
 
-```{r fig4a-stop-codon-freq, eval=has_subgroup_shap, fig.width=7, fig.height=6}
+```{r fig4a-stop-codon-freq, fig.width=7, fig.height=6}
 # ── Data provenance ──
-# Source: subgroup_stop_codon_shap_{tag}.tsv — produced by 08_export_subgroup_deepshap_tsv.py
-# Methods: METHODS.md § "Subgroup-Specific DeepSHAP Analysis"
-# Population: ~2,000 DeepSHAP samples per replicate, pooled across 5 runs.
-# Stop codon identity decoded from one-hot encoding at the window center.
+# Source: predictions_{tag}.tsv × selected_orfs.tsv (rank-0 ORFs of test set).
+# Stop codon identity is taken from the corrected stop_codon column of
+# selected_orfs.tsv. NOTE: an off-by-one bug (BUGFIX_STOP_CODON_2026-03-31.md)
+# in the upstream ORFik scan was historically writing post-stop sequence into
+# this column; the column was patched on 2026-04-30 from the HDF5 one-hot
+# encoding (see scripts/patch_stop_codon.py).
+# Population: full test set rank-0 ORFs with canonical TGA/TAA/TAG (effectively
+# all test transcripts; n_test=10,131).
 
-# Aggregate subgroups into NMD vs Control
-# Weight NMD subgroups equally (each run samples proportionally; subgroup sizes
-# within DeepSHAP runs are already proportional to test prevalence)
-sc_pop <- sg_stop_cd %>%
-  mutate(class = ifelse(subgroup == "Control", "Control", "NMD")) %>%
-  group_by(class, stop_codon) %>%
-  summarise(pct = mean(pct_mean),
-            mean_shap = mean(mean_signed_shap_mean),
-            .groups = "drop")
+sc_data <- preds %>%
+  inner_join(all_orfs %>% filter(orf_rank == 0) %>% select(isoform_id, stop_codon),
+             by = "isoform_id") %>%
+  filter(stop_codon %in% c("TGA", "TAA", "TAG")) %>%
+  mutate(class = ifelse(label == 1, "NMD", "Control"))
 
-# Reconstruct approximate counts for chi-squared test
-# (based on DeepSHAP subsample of ~2,000 transcripts per run)
-n_shap_nmd <- shap_n_nmd
-n_shap_ctrl <- 2000 - shap_n_nmd
-sc_pop$approx_n <- ifelse(sc_pop$class == "NMD",
-                           round(sc_pop$pct * n_shap_nmd),
-                           round(sc_pop$pct * n_shap_ctrl))
-
-# Approximate chi-squared from reconstructed counts
-cont_table <- sc_pop %>%
-  select(class, stop_codon, approx_n) %>%
-  pivot_wider(names_from = class, values_from = approx_n) %>%
-  tibble::column_to_rownames("stop_codon") %>%
-  as.matrix()
+# Contingency table (rows = stop codon, cols = class) and chi-squared
+cont_table <- table(factor(sc_data$stop_codon, levels = c("TGA", "TAA", "TAG")),
+                    factor(sc_data$class,      levels = c("Control", "NMD")))
 chi_test <- chisq.test(cont_table)
-
-sc_pop$stop_codon <- factor(sc_pop$stop_codon, levels = c("TGA", "TAA", "TAG"))
 
 # Pairwise Fisher exact tests for each stop codon (NMD vs Control)
 pairwise_p <- sapply(c("TGA", "TAA", "TAG"), function(sc) {
-  n_nmd_sc <- cont_table[sc, "NMD"]
-  n_ctrl_sc <- cont_table[sc, "Control"]
-  n_nmd_other <- sum(cont_table[, "NMD"]) - n_nmd_sc
+  n_nmd_sc     <- cont_table[sc, "NMD"]
+  n_ctrl_sc    <- cont_table[sc, "Control"]
+  n_nmd_other  <- sum(cont_table[, "NMD"])     - n_nmd_sc
   n_ctrl_other <- sum(cont_table[, "Control"]) - n_ctrl_sc
   fisher.test(matrix(c(n_nmd_sc, n_ctrl_sc, n_nmd_other, n_ctrl_other), nrow = 2))$p.value
 })
 
-# Annotation data frame for pairwise p-values
+# Frequencies (within-class) for plotting
+sc_freq <- sc_data %>%
+  count(class, stop_codon) %>%
+  group_by(class) %>%
+  mutate(pct = n / sum(n)) %>%
+  ungroup() %>%
+  mutate(stop_codon = factor(stop_codon, levels = c("TGA", "TAA", "TAG")))
+
 sc_annot <- data.frame(
   stop_codon = factor(c("TGA", "TAA", "TAG"), levels = c("TGA", "TAA", "TAG")),
-  y = c(max(sc_pop$pct[sc_pop$stop_codon == "TGA"]),
-        max(sc_pop$pct[sc_pop$stop_codon == "TAA"]),
-        max(sc_pop$pct[sc_pop$stop_codon == "TAG"])) + 0.06,
+  y = c(max(sc_freq$pct[sc_freq$stop_codon == "TGA"]),
+        max(sc_freq$pct[sc_freq$stop_codon == "TAA"]),
+        max(sc_freq$pct[sc_freq$stop_codon == "TAG"])) + 0.04,
   label = sprintf("p=%s", ifelse(pairwise_p < 0.001, formatC(pairwise_p, format = "e", digits = 1),
                                   formatC(pairwise_p, format = "f", digits = 3)))
 )
 
-p_sc <- sc_pop %>%
+p_sc <- sc_freq %>%
   ggplot(aes(x = stop_codon, y = pct, fill = class)) +
   geom_col(position = "dodge", width = 0.6) +
   geom_text(aes(label = sprintf("%.1f%%", 100*pct)),
@@ -1133,7 +1137,8 @@ p_sc <- sc_pop %>%
             inherit.aes = FALSE, size = 3, color = "grey30") +
   scale_fill_manual(values = pal) +
   scale_y_continuous(labels = percent_format(), limits = c(0, 0.78)) +
-  labs(title = "Stop Codon Usage: NMD vs Control (rank-0 ORF)",
+  labs(title = sprintf("Stop Codon Usage: NMD vs Control (rank-0 ORF, n=%s)",
+                       format(nrow(sc_data), big.mark = ",")),
        subtitle = sprintf("Chi-sq = %.1f, p = %.1e (overall); pairwise Fisher exact tests shown per codon.",
                           as.numeric(chi_test$statistic), chi_test$p.value),
        x = "Stop codon", y = "Frequency", fill = NULL) +
@@ -1142,56 +1147,84 @@ p_sc <- sc_pop %>%
 save_fig(p_sc, "fig4a_stop_codon", width = 7, height = 6)
 ```
 
-**Variable definitions:** TGA, TAA, TAG are the three standard stop codons. TGA has the highest readthrough rate; TAA is the most efficient **(literature: Cridge et al., 2018)**. Bars show frequency among rank-0 ORFs in the DeepSHAP sample set. Chi-squared test is approximate (computed from reconstructed counts based on subgroup-weighted frequencies).
+**Variable definitions:** TGA, TAA, TAG are the three standard stop codons. TGA has the highest readthrough rate; TAA is the most efficient **(literature: Cridge et al., 2018)**. Bars show within-class frequency among rank-0 ORFs of the full test set (effectively all test transcripts have a canonical stop after the bug fix). Chi-squared and Fisher tests are computed from actual test-set counts.
 
 **Observations:**
 
 ```{r sec4-stop-codon-shap, eval=has_subgroup_shap, include=FALSE}
-tga_nmd <- sc_pop %>% filter(class == "NMD", stop_codon == "TGA")
-taa_nmd <- sc_pop %>% filter(class == "NMD", stop_codon == "TAA")
-tag_nmd <- sc_pop %>% filter(class == "NMD", stop_codon == "TAG")
-tga_ctrl <- sc_pop %>% filter(class == "Control", stop_codon == "TGA")
+# Per-class within-class frequencies (from corrected selected_orfs.tsv, fig4a chunk).
+get_pct <- function(cls, sc) sc_freq$pct[sc_freq$class == cls & sc_freq$stop_codon == sc]
+tga_nmd_pct  <- get_pct("NMD",     "TGA"); tga_ctrl_pct <- get_pct("Control", "TGA")
+taa_nmd_pct  <- get_pct("NMD",     "TAA"); taa_ctrl_pct <- get_pct("Control", "TAA")
+tag_nmd_pct  <- get_pct("NMD",     "TAG"); tag_ctrl_pct <- get_pct("Control", "TAG")
+
+# Mean signed SHAP at stop codon, taken from the NMD PTC+ subgroup specifically.
+# PTC+ is where the canonical EJC-dependent NMD mechanism dominates (n=1,798);
+# SHAP signals here best reflect the model's TGA-positive bias. Aggregating
+# across all NMD subgroups dilutes the signal because PTC- subgroups have weak
+# stop-codon attribution (see Section 7.3 branch decomposition).
+get_shap_ptcpos <- function(sc) {
+  sg_stop_cd$mean_signed_shap_mean[
+    sg_stop_cd$subgroup == "NMD PTC+" & sg_stop_cd$stop_codon == sc]
+}
+tga_shap_ptcpos <- get_shap_ptcpos("TGA")
+taa_shap_ptcpos <- get_shap_ptcpos("TAA")
+tag_shap_ptcpos <- get_shap_ptcpos("TAG")
 ```
 
 ```{r sec4-stop-obs, eval=has_subgroup_shap, results='asis'}
-cat(sprintf("- **(Data)** TGA is enriched in NMD (%.1f%% vs %.1f%% in Control). TAA and TAG are both depleted in NMD. Mean signed SHAP (NMD): TGA = %.4f, TAA = %.4f, TAG = %.4f — confirming TGA pushes toward NMD while TAA and TAG push away.\n",
-    100*tga_nmd$pct, 100*tga_ctrl$pct, tga_nmd$mean_shap, taa_nmd$mean_shap, tag_nmd$mean_shap))
+cat(sprintf("- **(Data)** TGA is enriched in NMD (%.1f%% vs %.1f%% in Control); TAA is depleted (%.1f%% vs %.1f%%); TAG is slightly depleted (%.1f%% vs %.1f%%). Mean signed SHAP at the stop codon for the canonical NMD PTC+ subgroup: TGA = %+.4f, TAA = %+.4f, TAG = %+.4f — consistent with TGA pushing toward NMD while TAA and TAG push away. The frequency direction and SHAP-sign direction agree for all three codons.\n",
+    100*tga_nmd_pct, 100*tga_ctrl_pct,
+    100*taa_nmd_pct, 100*taa_ctrl_pct,
+    100*tag_nmd_pct, 100*tag_ctrl_pct,
+    tga_shap_ptcpos, taa_shap_ptcpos, tag_shap_ptcpos))
 ```
 
 ### 4.1.1 Stop Codon SHAP: NMD vs Control {#sec4-stop-codon-nmd-ctrl}
 
-```{r fig4a-stop-codon-nmd-ctrl, eval=has_subgroup_shap, fig.width=8, fig.height=5}
+```{r fig4a-stop-codon-nmd-ctrl, eval=has_subgroup_shap, fig.width=9, fig.height=5}
 # ── Data provenance ──
 # Source: subgroup_stop_codon_shap_{tag}.tsv — produced by 08_export_subgroup_deepshap_tsv.py
-# Aggregated to NMD vs Control for population-level view.
+# Population: 5-run pooled DeepSHAP at the stop codon's variable positions.
+# Shown by subgroup to avoid the aggregation pitfall: PTC+ dominates the NMD
+# signal because the canonical PTC+EJC mechanism is where the stop branch
+# expresses its strongest opinion. Aggregating across NMD subgroups (which
+# are highly imbalanced — n=1798/194/276) dilutes the PTC+ signal with the
+# small PTC- subgroups.
 
-sg_sc_class <- sg_stop_cd %>%
-  mutate(class = ifelse(subgroup == "Control", "Control", "NMD")) %>%
-  group_by(class, stop_codon) %>%
-  summarise(signed_shap = mean(mean_signed_shap_mean),
-            pct = mean(pct_mean),
-            .groups = "drop")
+sg_subgroup_levels <- c("Control", "NMD PTC+",
+                        "NMD PTC-, ref ATG retained", "NMD PTC-, ref ATG lost")
 
-p_sc_class <- ggplot(sg_sc_class, aes(x = stop_codon, y = signed_shap, fill = class)) +
-  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+sg_sc_subgroup <- sg_stop_cd %>%
+  mutate(stop_codon = factor(stop_codon, levels = c("TGA", "TAA", "TAG")),
+         subgroup   = factor(subgroup,   levels = sg_subgroup_levels))
+
+p_sc_class <- ggplot(sg_sc_subgroup,
+                     aes(x = stop_codon, y = mean_signed_shap_mean, fill = subgroup)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
   geom_hline(yintercept = 0, linewidth = 0.3) +
-  scale_fill_manual(values = pal) +
-  labs(title = "Stop Codon Signed SHAP: NMD vs Control",
-       subtitle = "Mean signed SHAP at stop codon variable positions (5-run pooled)",
-       x = "Stop codon", y = "Signed SHAP (variable positions)", fill = NULL)
-save_fig(p_sc_class, "fig4a_stop_codon_nmd_ctrl", width = 8, height = 5)
+  scale_fill_manual(values = subgroup_pal_short) +
+  labs(title = "Stop Codon Signed SHAP by Subgroup",
+       subtitle = "Mean signed SHAP at stop codon variable positions (5-run pooled). PTC+ carries the largest NMD signal.",
+       x = "Stop codon", y = "Signed SHAP (variable positions)", fill = NULL) +
+  theme(legend.position = "top")
+save_fig(p_sc_class, "fig4a_stop_codon_subgroup", width = 9, height = 5)
 ```
 
 ```{r tbl4a-stop-codon-nmd-ctrl, eval=has_subgroup_shap}
 render_dt(
-  sg_sc_class %>%
+  sg_sc_subgroup %>%
+    select(subgroup, stop_codon,
+           signed_shap = mean_signed_shap_mean,
+           pct        = pct_mean,
+           n_samples  = mean_signed_shap_count) %>%
     mutate(signed_shap = round(signed_shap, 5), pct = round(pct, 3)),
-  caption = "Table 4a: Stop codon identity — NMD vs Control (5-run pooled)")
+  caption = "Table 4a: Stop codon signed SHAP and frequency by subgroup (5-run pooled)")
 ```
 
 **Observations:**
 
-- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. Aggregated across NMD subgroups the TGA magnitude is comparable to Control (NMD/Control ≈ 0.7x), but within the canonical NMD PTC+ subgroup the TGA contribution is the largest of any class (mean signed SHAP ≈ +0.010 vs Control ≈ +0.008). The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism.
+- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. Weighted by subgroup size, the NMD aggregate TGA SHAP is slightly larger than Control (≈+0.009 vs +0.008, ratio 1.15x); the canonical NMD PTC+ subgroup carries the largest TGA contribution (≈+0.010, ratio 1.3x vs Control). The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism. Frequency analysis (Section 4.1) confirms the same direction at the population level: TGA is enriched in NMD (55.9% vs 48.1% in Control).
 - **(Data)** The TGA-positive / TAA,TAG-negative pattern is sign-consistent across all 5 DeepSHAP replicates.
 
 ---
@@ -1299,7 +1332,7 @@ save_fig(p_max_attn, "fig5c_max_attn_density")
 **Observations:**
 
 - **(Data)** The median max attention weight is `r round(median(max_attn_per_iso$max_weight[max_attn_per_iso$class == "NMD"]), 3)` for NMD and `r round(median(max_attn_per_iso$max_weight[max_attn_per_iso$class == "Control"]), 3)` for Control. Both classes show strong single-ORF dominance, with most isoforms concentrating >50% of attention on one ORF.
-- **(Data)** NMD isoforms have slightly lower max attention weights than Controls, consistent with the higher attention entropy observed above — the model is less certain about ORF selection for NMD transcripts.
+- **(Data)** NMD isoforms have slightly lower median max attention weights than Controls (0.84 vs 0.86) and slightly higher median attention entropy (0.84 vs 0.78 bits) — marginally more diffuse attention by both metrics. The mean entropy direction is opposite (Table 5a: NMD 0.91 vs Ctrl 0.95) because Control has heavier upper-tail outliers; formal central-tendency tests are non-significant (Mann-Whitney p=0.68), while a Kolmogorov–Smirnov test detects a distributional shape difference (p<10⁻¹⁴).
 
 <details><summary>Table 5b: ORF composition by rank and NMD status</summary>
 
@@ -1945,13 +1978,15 @@ This section contains analyses that complement the main results but are not dire
 
 ## 9.1 Splice Site Motif at 3'UTR Junctions {#sec9-junction-motif}
 
-```{r fig4b-junction-logo, eval=has_motif_logos, fig.width=10, fig.height=8}
+```{r fig4b-junction-logo, eval=has_motif_marginal, fig.width=10, fig.height=8}
 # ── Data provenance ──
-# Source: motif_logos_stop_{shap_run_tag}.tsv — produced by 07_motif_analysis.py
+# Source: motif_logos_stop_{shap_run_tag}.tsv (marginal, multi-landmark) — only
+# this file carries the first_3utr_junction landmark; the joint TSV is single-
+# landmark (stop_codon only).
 # Methods: METHODS.md § "Landmark motif analysis"
 # Population: NMD samples with >=1 exon junction in visible 3'UTR (n varies by transcript)
 
-junc_sub <- motif_stop %>% filter(landmark == "first_3utr_junction")
+junc_sub <- motif_stop_multi %>% filter(landmark == "first_3utr_junction")
 
 if (nrow(junc_sub) > 0) {
   junc_positions <- sort(unique(junc_sub$relative_position))
@@ -2203,37 +2238,39 @@ render_dt(shap_stability %>%
 
 ## 9.4 Downstream Junction SHAP: NMD vs Control {#sec9-junction-shap}
 
-```{r fig4f-junction-nmd-ctrl, eval=has_subgroup_shap, fig.width=8, fig.height=5}
+```{r fig4f-junction-nmd-ctrl, eval=has_subgroup_shap, fig.width=9, fig.height=5}
 # ── Data provenance ──
-# Source: subgroup_junction_downstream_shap_{tag}.tsv — produced by 08_export_subgroup_deepshap_tsv.py
-# Aggregated to NMD vs Control.
+# Source: subgroup_junction_downstream_shap_{tag}.tsv (08_export_subgroup_deepshap_tsv.py).
+# Shown by subgroup to avoid the unweighted-aggregation pitfall: PTC+ (n=1,798)
+# carries the dominant junction signal; aggregating across imbalanced NMD
+# subgroups (1798/194/276) dilutes the signal with the small PTC- subgroups.
 
-sg_junc_class <- sg_junc %>%
-  mutate(class = ifelse(subgroup == "Control", "Control", "NMD")) %>%
-  group_by(class) %>%
-  summarise(junction_shap = mean(mean_junction_shap_mean),
-            ci_lo = mean(mean_junction_shap_ci_lo),
-            ci_hi = mean(mean_junction_shap_ci_hi),
-            frac_with_junction = mean(frac_with_junction_mean),
-            mean_junc_count = mean(mean_junc_count_mean),
-            .groups = "drop")
+sg_junc_subgroup <- sg_junc %>%
+  mutate(subgroup = factor(subgroup,
+                           levels = c("Control", "NMD PTC+",
+                                      "NMD PTC-, ref ATG retained",
+                                      "NMD PTC-, ref ATG lost")))
 
-p_junc_class <- ggplot(sg_junc_class, aes(x = class, y = junction_shap, fill = class)) +
-  geom_col(width = 0.5) +
-  geom_errorbar(aes(ymin = ci_lo, ymax = ci_hi), width = 0.15, linewidth = 0.3) +
+p_junc_class <- ggplot(sg_junc_subgroup,
+                       aes(x = subgroup, y = mean_junction_shap_mean, fill = subgroup)) +
+  geom_col(width = 0.6) +
+  geom_errorbar(aes(ymin = mean_junction_shap_ci_lo,
+                    ymax = mean_junction_shap_ci_hi),
+                width = 0.15, linewidth = 0.3) +
   geom_hline(yintercept = 0, linewidth = 0.3) +
-  scale_fill_manual(values = pal) +
-  labs(title = "Junction Channel SHAP Downstream of Stop: NMD vs Control",
+  scale_fill_manual(values = subgroup_pal_short) +
+  labs(title = "Junction Channel SHAP Downstream of Stop, by Subgroup",
        subtitle = "Mean signed SHAP in 3'UTR region (5-run pooled, 95% CI)",
        x = NULL, y = "Mean junction SHAP", fill = NULL) +
-  guides(fill = "none")
-save_fig(p_junc_class, "fig4f_junction_nmd_ctrl", width = 8, height = 5)
+  guides(fill = "none") +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+save_fig(p_junc_class, "fig4f_junction_subgroup", width = 9, height = 5)
 ```
 
 **Observations:**
 
-- **(Data)** NMD transcripts have substantially stronger downstream junction SHAP than Controls — the junction channel is the primary sequence-level EJC signature in the stop branch.
-- **(Data)** The NMD signal reflects exon-exon junctions downstream of the stop codon, which are the physical basis for NMD (EJC-mediated recognition of premature termination).
+- **(Data)** The NMD PTC+ subgroup carries the dominant downstream junction SHAP signal, with PTC- subgroups showing weak or near-zero junction attribution. The junction channel is the primary sequence-level EJC signature in the stop branch — and it operates almost entirely through the canonical PTC+EJC mechanism.
+- **(Data)** The NMD PTC+ junction signal reflects exon-exon junctions downstream of the stop codon, which are the physical basis for canonical NMD (EJC-mediated recognition of premature termination).
 
 ---
 
@@ -2680,9 +2717,9 @@ render_dt(orf_type_attn,
 
 **Observations:**
 
-- **(Data)** **PTC+** shows the most focused attention: rank-0 is dominant in ~93% of transcripts, with median attention ≈ 0.87. The model is highly confident about which ORF to evaluate.
-- **(Data)** **PTC- ref ATG retained** has strikingly diffuse attention: rank-0 is dominant in only ~51% of transcripts. Attention "leaks" substantially to ranks 1-4, indicating the model searches across multiple ORFs for signals. This is the hardest subgroup — the model is genuinely uncertain which ORF explains NMD status.
-- **(Data)** **PTC- ref ATG lost** is similarly diffuse (~50% rank-0 dominant, median attention ≈ 0.59), with attention shifting toward SQANTI/TD2 CDS ORFs when ref CDS is unavailable.
+- **(Data)** **PTC+** shows the most focused attention: rank-0 is dominant in ~93% of transcripts, with median max-attention ≈ 0.87. The model is highly confident about which ORF to evaluate.
+- **(Data)** **PTC- ref ATG retained** has strikingly diffuse attention: rank-0 is dominant in only ~51% of transcripts (median max-attention 0.73). Attention "leaks" substantially to ranks 1-4, indicating the model searches across multiple ORFs for signals. This is the hardest subgroup — the model is genuinely uncertain which ORF explains NMD status.
+- **(Data)** **PTC- ref ATG lost** is similarly diffuse (~50% rank-0 dominant, median max-attention 0.59), with attention shifting toward SQANTI/TD2 CDS ORFs when ref CDS is unavailable.
 - **(Interpretation)** The attention mechanism reveals three distinct decision strategies: (1) PTC+: lock onto ref CDS with strong Kozak, check for downstream EJC; (2) PTC- ATG lost: shift to TD2/SQANTI CDS as fallback anchor; (3) PTC- ATG retained: distribute attention across multiple ORFs, searching for alternative explanations (upstream ORFs, out-of-frame ORFs). This is consistent with the subgroup-specific sequence-level findings in Section 9.6.
 
 ```{r fig6-shap-start-site, fig.width=10, fig.height=6}
@@ -3003,6 +3040,18 @@ save_fig(p_feat, "fig7b_features_by_outcome", height = 8)
 
 - **TP:** NMD correctly predicted (prob > 0.5). **FN:** NMD missed. **FP:** Control falsely flagged. **TN:** Control correct.
 - **Calibration plot:** Perfect calibration follows the diagonal. Point size = bin count.
+
+```{r sec7-calibration-obs, results='asis'}
+# Brier score and decile-weighted ECE for an honest calibration summary
+brier_score <- mean((preds$prob - preds$label)^2)
+ece_decile  <- cal_data %>%
+  filter(n > 0) %>%
+  mutate(abs_err = abs(mean_pred - obs_rate),
+         w = n / sum(n)) %>%
+  summarise(ece = sum(abs_err * w)) %>% pull(ece)
+cat(sprintf("**Observations:**\n\n- **(Data)** The model is well-calibrated at the extremes (P<0.1 and P>0.9, |pred − obs| ≤ 0.05) but **systematically overconfident in middle bins** (P=0.4–0.8, |pred − obs| ≈ 0.14–0.22). Decile-weighted expected calibration error = %.3f; Brier score = %.3f. Most test transcripts (60%%) fall in the well-calibrated extremes, so this overconfidence affects ~25%% of the test set in the boundary region.\n\n",
+    ece_decile, brier_score))
+```
 
 <details><summary>Table 7a: False Negative characterization</summary>
 ```{r table7a-fn}

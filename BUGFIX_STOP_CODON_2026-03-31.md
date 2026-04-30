@@ -137,3 +137,39 @@ This regenerates all 6 subgroup TSVs including the corrected `subgroup_stop_codo
 | Wrong `stop_codon` column | 05s_orfik_scan.R | None | None (column unused) | Deferred |
 | EJC threshold off by 3nt | 05s_orfik_scan.R | Negligible | Negligible | Deferred |
 | Stop codon SHAP positions | 08_export_subgroup_deepshap_tsv.py | None | Yes — wrong freqs/SHAP | Job 5528000 running |
+
+---
+
+## 2026-04-30 4ct addendum
+
+The 5-step verification of `orf_model_report_v5.Rmd` (Step 2, result correctness)
+discovered that 4ct's `selected_orfs.tsv` was carrying over the buggy `stop_codon`
+column despite the upstream R fix being applied in March. The Rmd's §4.1 chi-squared
+test and stop-codon frequency claims were affected: the figure caption read p=0.86 (NS)
+while the prose claimed "TGA enriched in NMD" — a direct contradiction created by the
+test being computed from SHAP-subset reconstructed counts of post-stop nucleotides.
+
+**Resolution applied 2026-04-30:**
+
+1. Wrote `scripts/patch_stop_codon.py`, which re-derives `stop_codon` from the bug-free
+   HDF5 one-hot encoding (positions [-1, 0, +1] of each ORF's stop window) and patches
+   `selected_orfs.tsv` in place. It also filters the file to the 4ct isoform set
+   (the file was carrying 6ct legacy rows). Post-patch: 198,816 rows, 39,938 unique
+   isoforms, 100% canonical (TGA/TAA/TAG) stop rate.
+
+2. Rewrote the §4.1 R chunk to compute the chi-squared from the proper
+   `predictions × selected_orfs` join across the full test set. With clean data:
+   χ² = 46.6, p ≈ 7.5e-11 (highly significant). TGA is enriched in NMD (55.9% vs
+   48.1% in Control); TAA depleted (23.9% vs 29.9%); TAG slightly depleted (20.2%
+   vs 22.0%). The model's TGA-positive/TAA-negative/TAG-negative SHAP signs are now
+   directionally consistent with the population frequencies.
+
+3. Wrote `scripts/export_joint_motif_logos.py` to pool the 5 joint DeepSHAP NPZs into
+   `motif_logo_atg_joint_atg500_stop500.tsv` and `motif_logo_stop_joint_atg500_stop500.tsv`
+   (covering the full test set: n_nmd=2,268, n_ctrl=7,863). The Rmd's existing fallback
+   logic (§0, line ~207) now picks these up in preference to the marginal run-1 TSVs,
+   so the §3.1 Kozak and §4.1 stop motif logos cover all test transcripts.
+
+No model retraining or DeepSHAP regeneration needed. The patcher is reproducible from
+the HDF5 (which was always bug-free); if the upstream R pipeline is ever re-run from
+the 2026-03-31-fixed `05s_orfik_scan.R`, the patcher becomes redundant.
