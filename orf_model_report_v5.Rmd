@@ -73,7 +73,7 @@ results_dir <- "results_4ct"
 
 ```{r best-model-params}
 # ---------------------------------------------------------------------------
-# Best model: ATG=500, STOP=500 (selected by AUPRC across window sweep)
+# Best model: ATG=500, STOP=500 (selected by AUC across window sweep)
 # Methods: METHODS.md § "Model Training and Window Size Sweep"
 # ---------------------------------------------------------------------------
 best_atg  <- 500
@@ -347,7 +347,7 @@ print(p_shap)
 
 The model's input is derived from full-length spliced transcript sequences (SQANTI-corrected FASTA). For each transcript, ORFik scans all open reading frames and a priority selection algorithm chooses up to K=5 ORFs:
 
-- **Rank 0:** The ORF whose ATG matches the **reference CDS** — the reading frame of the gene's dominant non-NMD isoform. Available for ~73% of transcripts; when unavailable, this slot is filled by the next priority tier.
+- **Rank 0:** The ORF whose ATG matches the **reference CDS** — the reading frame of the gene's dominant non-NMD isoform. Available for ~70% of transcripts; when unavailable, this slot is filled by the next priority tier.
 - **Rank 1:** The ORF matching the **SQANTI/TransDecoder2 CDS** call (longest ORF with homology support), if different from the reference CDS.
 - **Ranks 2–4:** Remaining slots filled by ORFs with the highest **Kozak consensus scores**. Ties in Kozak score are broken by transcript position (5'-most ORF wins), reflecting the ORFik scan order preserved by pandas stable sort.
 
@@ -537,8 +537,8 @@ auprc_100_500 <- all_metrics$auprc[all_metrics$tag == "atg500_stop500"] -
                  all_metrics$auprc[all_metrics$tag == "atg500_stop100"]
 ```
 
-- **STOP=500 is optimal by AUPRC** (AUC = `r best_auc`, AUPRC = `r best_auprc`). **(Data)** Performance declines at larger stop windows (STOP=2000 AUC = `r round(auc_stop2000, 3)`), suggesting the v5 architecture saturates its use of downstream context at ~500bp.
-- **(Data)** **Stop window matters more than ATG window.** AUPRC peaks at STOP=500 across all ATG sizes. ATG=100 and ATG=500 perform similarly by AUPRC (< 0.002 difference at STOP=500), though ATG=500 has slightly higher AUC.
+- **STOP=500 is optimal by AUC** (AUC = `r best_auc`, AUPRC = `r best_auprc`). **(Data)** Performance declines at larger stop windows (STOP=2000 AUC = `r round(auc_stop2000, 3)`), suggesting the v5 architecture saturates its use of downstream context at ~500bp.
+- **(Data)** **Stop window matters more than ATG window.** AUC peaks at STOP=500 for every ATG size. AUPRC also peaks at STOP=500 for ATG=100 and ATG=1000, though within the ATG=500 row STOP=1000 has marginally higher AUPRC (0.839 vs 0.833). ATG=100 and ATG=500 perform similarly at STOP=500 (AUPRC difference 0.004).
 - **(Data)** The AUPRC gain from STOP=100→500 is +`r round(auprc_100_500, 3)`, confirming that extending the stop window from 100bp captures additional informative sequence context (particularly downstream splice junctions).
 
 ---
@@ -761,7 +761,7 @@ save_fig(p_stop_zoom, "fig2d_stop_zoom", width = 10, height = 4)
 **Observations:**
 
 - **(Data)** The **stop codon itself** (Panel B) shows a clear SHAP spike — the highest per-position attribution in either window. The T at position -1 drops (invariant, no information), while the variable positions (0 and +1) show elevated G attribution, consistent with TGA preference.
-- **(Data)** The **ATG branch** (Panel A) shows **strong period-3 periodicity** in the G channel both upstream and downstream of the ATG. This reflects the model learning codon usage bias — G at the 3rd codon position (GC3) is a hallmark of vertebrate coding sequences. The lag-3 autocorrelation for G is 0.95 in the ORF body, with 90% of FFT power at period 3. The model detects reading frame composition from raw nucleotide sequence, in addition to the explicit frame-position encoding channels.
+- **(Data)** The **ATG branch** (Panel A) shows **strong period-3 periodicity** in the G channel both upstream and downstream of the ATG. This reflects the model learning codon usage bias — G at the 3rd codon position (GC3) is a hallmark of vertebrate coding sequences. The lag-3 autocorrelation for G is 0.86 in the NMD ORF body and 0.92 in Control, with most FFT power concentrated near period 3. The model detects reading frame composition from raw nucleotide sequence, in addition to the explicit frame-position encoding channels.
 
 ---
 
@@ -923,14 +923,19 @@ kz_T_p4_nmd <- kz_val(2, "T", "nmd")
 # Overall +4 (sum of all nucleotide contributions)
 kz_p4_nmd <- kz_val(2, "A", "nmd") + kz_val(2, "C", "nmd") + kz_val(2, "G", "nmd") + kz_val(2, "T", "nmd")
 kz_p4_ctrl <- kz_val(2, "A", "ctrl") + kz_val(2, "C", "ctrl") + kz_val(2, "G", "ctrl") + kz_val(2, "T", "ctrl")
+# G at canonical Kozak landmark positions (the dominant model signal at -3, -1, +4)
+kz_G_m3_nmd  <- kz_val(-4, "G", "nmd")
+kz_G_m3_ctrl <- kz_val(-4, "G", "ctrl")
+kz_G_m1_nmd  <- kz_val(-2, "G", "nmd")
+kz_G_m1_ctrl <- kz_val(-2, "G", "ctrl")
 ```
 
 **Observations:**
 
-- **(Data)** A at position -3 (the canonical Kozak purine position) is the strongest single-position signal in the ATG branch (`r kz_A_m3_nmd` in NMD, `r kz_A_m3_ctrl` in controls). C at position -1 is the second strongest (`r kz_C_m1_nmd` in NMD, `r kz_C_m1_ctrl` in controls).
-- **(Data)** At position -3, the direction reverses between NMD (positive) and Control (slightly negative). At positions -1 and +4, the direction is the same in both classes (positive) but the magnitude is larger in NMD.
-- **(Data)** Interestingly, the canonical G at position +4 has negative SHAP in NMD (`r kz_G_p4_nmd`) but positive in controls (`r kz_G_p4_ctrl`). The NMD-positive signal at +4 comes from A (`r kz_A_p4_nmd`) and T (`r kz_T_p4_nmd`), not the canonical G. This suggests the model is not simply recognizing strong Kozak context.
-- **(Hypothesis)** The strong A at -3 signal in NMD may reflect a combination of genuine Kozak context recognition and the broader AT-rich composition bias of coding sequence upstream of the ATG (see Section 6 for an analogous GC composition effect at the stop codon). Disentangling these would require controlling for local nucleotide composition.
+- **(Data)** At the canonical Kozak landmark positions, model attribution concentrates in the consensus residues. **G at position -3** carries the largest single-channel positive signal (`r kz_G_m3_nmd` in NMD, `r kz_G_m3_ctrl` in controls); **G at position +4** is similarly dominant (`r kz_G_p4_nmd` in NMD, `r kz_G_p4_ctrl` in controls). Non-purine residues at -3 and non-G residues at +4 contribute small, predominantly negative signals (e.g., A at -3: `r kz_A_m3_nmd` in NMD).
+- **(Data)** At position -1, the canonical C contributes a negative signal (`r kz_C_m1_nmd` in NMD, `r kz_C_m1_ctrl` in controls), while G again contributes a positive signal (`r kz_G_m1_nmd` in NMD).
+- **(Data)** At all three Kozak landmark positions (-3, -1, +4), the magnitude of the G signal is substantially larger in NMD than Control — NMD/Control ratios of approximately 7-8x. The model recognizes Kozak-consensus residues in both classes but assigns much higher attribution to those features when classifying NMD.
+- **(Hypothesis)** The amplified Kozak-consensus signal in NMD may reflect the model leveraging strong Kozak context to identify genuine start codons among candidate-ORF ATGs — a signal especially relevant for NMD subtypes that depend on alternative start codon usage (see Section 9.7).
 
 ---
 
@@ -975,7 +980,7 @@ save_fig(p_stop_full, "fig4_stop_importance_profile", width = 10, height = 4)
 
 **Observations:**
 
-- **(Data)** Importance peaks sharply at the stop codon itself, with most attribution concentrated in the ~50nt preceding the stop site (final codons of the ORF) and falling off into the 3'UTR. NMD transcripts have ~2x higher overall |SHAP| than Controls — the stop branch is where the model expresses its strongest opinion (consistent with the branch decomposition in Section 2.1).
+- **(Data)** Importance peaks sharply at the stop codon itself, with most attribution concentrated in the ~50nt preceding the stop site (final codons of the ORF) and falling off into the 3'UTR. NMD transcripts have ~30% higher overall |SHAP| than Controls in the stop branch (NMD/Control ratio ≈ 1.3x). Although the relative NMD/Control gap is larger in the ATG branch (≈ 2x), the stop branch carries the highest absolute attribution and contributes the largest share to predictions (consistent with the branch decomposition in Section 2.1).
 - **(Data)** Modest elevation at the very edges of the window (positions ±230 to ±250) reflects a CNN boundary effect (Section 0); the first/last ~25bp should be interpreted with that caveat.
 
 ## 4.1 Stop Codon Identity {#sec4-stop-codon}
@@ -1186,7 +1191,7 @@ render_dt(
 
 **Observations:**
 
-- **(Data)** TGA has positive signed SHAP in both NMD and Control, but the NMD magnitude is approximately 2x larger. TAA and TAG both have negative SHAP. This confirms the model has learned that TGA (the stop codon with the highest readthrough rate) is associated with NMD.
+- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. Aggregated across NMD subgroups the TGA magnitude is comparable to Control (NMD/Control ≈ 0.7x), but within the canonical NMD PTC+ subgroup the TGA contribution is the largest of any class (mean signed SHAP ≈ +0.010 vs Control ≈ +0.008). The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism.
 - **(Data)** The TGA-positive / TAA,TAG-negative pattern is sign-consistent across all 5 DeepSHAP replicates.
 
 ---
@@ -1486,7 +1491,7 @@ save_fig(p_d, "fig4d_gc_raw_stop", width = 10, height = 5)
 **Observations:**
 
 - **(Data)** At the ATG boundary (Panels A–B), both GC SHAP fraction and raw GC content rise after the start codon, reflecting the transition from AT-rich 5'UTR into GC-rich coding sequence. The model's attribution pattern mirrors the underlying composition shift.
-- **(Data)** At the stop boundary (Panels C–D), both GC SHAP fraction and raw GC content drop after the stop codon, reflecting the coding → 3'UTR transition. In controls, the drop is sharp (~48% → ~36% in raw GC). In NMD transcripts, the drop is attenuated (~50% → ~45%).
+- **(Data)** At the stop boundary (Panels C–D), both GC SHAP fraction and raw GC content drop after the stop codon, reflecting the coding → 3'UTR transition. In controls, the drop is pronounced (~50% just upstream of the stop → ~40% in the downstream window). In NMD transcripts, the drop is attenuated (~50% → ~47%).
 - **(Hypothesis)** The attenuated GC drop in NMD transcripts at the stop codon is consistent with "UTR-ization" — when a PTC truncates the reading frame, the sequence between PTC and normal stop is structurally coding (GC-rich) but functionally 3'UTR. Both the raw composition (Panel D) and the model attribution (Panel C) capture this anomaly, confirming the model learned the coding/UTR compositional boundary as a discriminative signal.
 - **(Data)** The correspondence between SHAP-based panels (A, C) and raw-sequence panels (B, D) confirms the model is responding to nucleotide composition rather than specific motifs at these scales.
 
@@ -2022,7 +2027,7 @@ if (nrow(junc_sub) > 0) {
 }
 ```
 
-**Variable definitions:** Each sample contributes its own first 3'UTR junction location, aligned to position 0. In the processed mRNA (which is what the model sees), the junction is the ligation point between exons after intron removal. The dominant pattern is **...A | G(G)...**: position -1 = A (65% freq, last base of upstream exon), position 0 = G (82%, first base of downstream exon). After intron removal, the mRNA junction reflects the exonic bases flanking the splice site. The A at position -1 and G at position +1 are the terminal/initial exon bases, consistent with the preference for these nucleotides at mammalian exon boundaries. n varies because not all transcripts have junctions within the visible stop window.
+**Variable definitions:** Each sample contributes its own first 3'UTR junction location, aligned to position 0. In the processed mRNA (which is what the model sees), the junction is the ligation point between exons after intron removal. The dominant pattern is **...A | G(G)...**: position -1 = A (~65% freq in NMD, ~54% in Control; last base of upstream exon), position 0 = G (~79% in NMD, ~76% in Control; first base of downstream exon). After intron removal, the mRNA junction reflects the exonic bases flanking the splice site. The A at position -1 and G at position +1 are the terminal/initial exon bases, consistent with the preference for these nucleotides at mammalian exon boundaries. n varies because not all transcripts have junctions within the visible stop window.
 
 ## 9.2 EJC Dose-Response and Ordinal Importance {#sec9-ejc}
 
@@ -2437,7 +2442,7 @@ save_fig(p_stop_sg, "fig6_stop_profile_subgroup", width = 10, height = 5)
 **Observations:**
 
 - **(Data)** **Structural features:** `n_downstream_ejc` dominates for PTC+ but drops sharply for PTC- ref ATG retained (which by definition lacks downstream EJCs). `is_ref_cds` is important for PTC+ and PTC- ref ATG retained (where the reference CDS frame is still available) but zero for ref ATG lost.
-- **(Data)** **ATG branch:** PTC- ref ATG retained shows elevated |SHAP| compared to Control and PTC+, consistent with the KernelSHAP finding that this subgroup relies more heavily on start codon context (27% ATG branch vs 8% for PTC+).
+- **(Data)** **ATG branch:** PTC- ref ATG retained shows elevated |SHAP| compared to Control and PTC+, consistent with the KernelSHAP finding that this subgroup relies more heavily on start codon context (`r ptcneg_ret$pct_atg`% ATG branch vs `r ptcpos$pct_atg`% for PTC+).
 - **(Data)** **Stop branch:** PTC+ shows dramatically higher |SHAP| than all other subgroups, with a pronounced spike at the stop codon and elevated 3'UTR signal — reflecting the dominant EJC/junction signature. PTC- ref ATG retained shows minimal stop branch signal, confirming the model's alternative prediction strategy for this subgroup.
 
 ## 9.7 Start Site Signals by Subgroup {#sec9-start-subgroup}
@@ -2675,9 +2680,9 @@ render_dt(orf_type_attn,
 
 **Observations:**
 
-- **(Data)** **PTC+** shows the most focused attention: rank-0 is dominant in ~95% of transcripts, with median attention ≈ 0.88. The model is highly confident about which ORF to evaluate.
-- **(Data)** **PTC- ref ATG retained** has strikingly diffuse attention: rank-0 is dominant in only ~50% of transcripts. Attention "leaks" substantially to ranks 1-4, indicating the model searches across multiple ORFs for signals. This is the hardest subgroup — the model is genuinely uncertain which ORF explains NMD status.
-- **(Data)** **PTC- ref ATG lost** falls in between (~63% rank-0 dominant), with attention shifting toward SQANTI/TD2 CDS ORFs when ref CDS is unavailable.
+- **(Data)** **PTC+** shows the most focused attention: rank-0 is dominant in ~93% of transcripts, with median attention ≈ 0.87. The model is highly confident about which ORF to evaluate.
+- **(Data)** **PTC- ref ATG retained** has strikingly diffuse attention: rank-0 is dominant in only ~51% of transcripts. Attention "leaks" substantially to ranks 1-4, indicating the model searches across multiple ORFs for signals. This is the hardest subgroup — the model is genuinely uncertain which ORF explains NMD status.
+- **(Data)** **PTC- ref ATG lost** is similarly diffuse (~50% rank-0 dominant, median attention ≈ 0.59), with attention shifting toward SQANTI/TD2 CDS ORFs when ref CDS is unavailable.
 - **(Interpretation)** The attention mechanism reveals three distinct decision strategies: (1) PTC+: lock onto ref CDS with strong Kozak, check for downstream EJC; (2) PTC- ATG lost: shift to TD2/SQANTI CDS as fallback anchor; (3) PTC- ATG retained: distribute attention across multiple ORFs, searching for alternative explanations (upstream ORFs, out-of-frame ORFs). This is consistent with the subgroup-specific sequence-level findings in Section 9.6.
 
 ```{r fig6-shap-start-site, fig.width=10, fig.height=6}
@@ -2921,7 +2926,7 @@ The subgroup analyses in this section converge on a consistent picture. NMD tran
 
 3. **Different ORF feature reliance (Section 7.3):** Attribution analysis shows PTC+ relies on `n_downstream_ejc` and `is_ref_cds`, with diminished importance for PTC- subgroups where the canonical EJC signature is absent.
 
-4. **Qualitatively different branch strategies (Section 7.3):** KernelSHAP branch decomposition reveals the ATG (start codon) branch rises from 8% of total attribution in PTC+ to **27% in PTC- ref ATG retained**, dominating 25% of those isoforms. The model shifts prediction strategy from EJC-dependent (structural + stop branch) to start-codon-dependent for non-canonical NMD.
+4. **Qualitatively different branch strategies (Section 7.3):** KernelSHAP branch decomposition reveals the ATG (start codon) branch rises from `r ptcpos$pct_atg`% of total attribution in PTC+ to **`r ptcneg_ret$pct_atg`% in PTC- ref ATG retained**, dominating `r round(100*nrow(atg_dom_ret)/ptcneg_ret$n, 0)`% of those isoforms. The model shifts prediction strategy from EJC-dependent (structural + stop branch) to start-codon-dependent for non-canonical NMD.
 
 5. **Higher attention uncertainty (Sections 9.9–9.10):** Both PTC- subgroups have higher attention entropy and lower accuracy, reflecting ambiguous ORF landscapes.
 
