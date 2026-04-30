@@ -39,6 +39,9 @@ theme_set(theme_pub)
 
 pal <- c(NMD = "#ef8a62", Control = "#67a9cf")
 nuc_colors <- c(A = "#109648", C = "#255C99", G = "#F7B32B", T = "#D62839")
+# Display labels for the T-channel use the RNA convention (U). Internal column
+# names and TSV channels remain "T"; this is presentation-only.
+nuc_labels_rna <- c(A = "A", C = "C", G = "G", T = "U")
 pal_type <- c(`ORF structural` = "#d95f02", Sequence = "#7570b3")
 ejc_pal <- c("EJC 1" = "#e41a1c", "EJC 2" = "#377eb8", "EJC 3" = "#4daf4a",
              "EJC 4" = "#984ea3", "EJC 5+" = "#ff7f00")
@@ -160,7 +163,8 @@ noptc <- noptc_all %>% filter(any_orf_has_ejc == 0)
 all_orfs <- read.delim(file.path(results_dir, "selected_orfs.tsv"))
 
 # Reference CDS features (for 3'UTR correction analysis in Section 9.13)
-# Source: export_rds.R from 05t_ref_cds_features.R; see METHODS.md § "Transcript-level features"
+# Source: ref_cds_features.tsv (symlink into ../nmd_orf_model/results/, produced upstream by
+#   05t_ref_cds_features.R in that repo). See README.md § "Cross-repo dependencies".
 ref_features <- read.delim(file.path(results_dir, "ref_cds_features.tsv"))
 
 # TD2 features (needed for subgroup assignment in Sections 7.1 and 8)
@@ -219,15 +223,22 @@ if (has_motif_atg_joint && has_motif_stop_joint) {
   motif_atg  <- read.delim(motif_atg_joint_path)
   motif_stop <- read.delim(motif_stop_joint_path)
   has_motif_logos <- TRUE
+  motif_logo_source <- "joint"      # 5-run pooled, all test samples
   cat("Using joint SHAP motif logos for ATG/stop windows (all test samples)\n")
 } else if (has_motif_marginal) {
   motif_stop <- motif_stop_multi
   motif_atg  <- read.delim(motif_atg_path)
   has_motif_logos <- TRUE
+  motif_logo_source <- "marginal"   # run-1 subsample, n_nmd≈444
   cat("Using marginal SHAP motif logos (run 1 subsample)\n")
 } else {
   has_motif_logos <- FALSE
+  motif_logo_source <- "none"
 }
+motif_logo_subtitle_tag <- switch(motif_logo_source,
+  joint    = "Source: joint DeepSHAP, 5-run pooled, all test samples.",
+  marginal = "Source: marginal DeepSHAP, run 1 only, n_nmd ≈ 444 stratified subsample.",
+  none     = "Source: motif logo TSV not found.")
 
 # Additional analysis TSVs
 gc_path <- file.path(results_dir, paste0("gc_content_across_stop_window_", best_tag, ".tsv"))
@@ -235,10 +246,6 @@ has_gc <- file.exists(gc_path)
 if (has_gc) gc_data <- read.delim(gc_path)
 
 # v5: stop codon stats come from subgroup-level DeepSHAP (loaded as sg_stop_cd above)
-
-pa_path <- file.path(results_dir, paste0("polya_signal_", shap_run_tag, ".tsv"))
-has_pa <- file.exists(pa_path)
-if (has_pa) pa_data <- read.delim(pa_path)
 
 junc_ord_path <- file.path(results_dir, paste0("junction_ordinal_summary_", shap_run_tag, ".tsv"))
 junc_raw_path <- file.path(results_dir, paste0("junction_by_ordinal_", shap_run_tag, ".tsv"))
@@ -335,6 +342,12 @@ if (length(missing) == 0) {
                 m$what, m$file, results_dir))
   }
   cat("\n")
+}
+# Surface motif-logo source (joint vs marginal-fallback), independent of missing-input warnings
+if (motif_logo_source == "joint") {
+  cat("\n**Motif logo source (Sections 3.1, 4.1):** joint DeepSHAP, 5-run pooled, all test samples.\n")
+} else if (motif_logo_source == "marginal") {
+  cat("\n**Motif logo source (Sections 3.1, 4.1):** ⚠ marginal DeepSHAP fallback — run 1 only, n_nmd ≈ 444 stratified subsample. Joint pooled TSV (`motif_logo_{atg,stop}_joint_*.tsv`) not found; regenerate via `slurm_export_joint_motif_logos.sh`.\n")
 }
 ```
 
@@ -615,9 +628,9 @@ shap_feature_labels <- c(shap_feature_labels,
   "joint_structural:is_sqanti_cds" = "Is SQANTI/TD2 CDS",
   "joint_structural:frac_start" = "Fractional start position",
   "joint_structural:frac_stop" = "Fractional stop position",
-  setNames(paste0("ATG: ", c("Adenine","Cytosine","Guanine","Thymine","splice junction","rolling GC","frame pos 0","frame pos 1","frame pos 2")),
+  setNames(paste0("ATG: ", c("Adenine","Cytosine","Guanine","Uracil","splice junction","rolling GC","frame pos 0","frame pos 1","frame pos 2")),
            paste0("joint_atg:", c("A","C","G","T","junction","rolling_gc","frame_0","frame_1","frame_2"))),
-  setNames(paste0("Stop: ", c("Adenine","Cytosine","Guanine","Thymine","splice junction","rolling GC","frame pos 0","frame pos 1","frame pos 2")),
+  setNames(paste0("Stop: ", c("Adenine","Cytosine","Guanine","Uracil","splice junction","rolling GC","frame pos 0","frame pos 1","frame pos 2")),
            paste0("joint_stop:", c("A","C","G","T","junction","rolling_gc","frame_0","frame_1","frame_2")))
 )
 
@@ -729,8 +742,9 @@ The full-window positional |SHAP| profiles for the start and stop branches — w
 
 ```{r fig2c-atg-zoom, eval=has_shap_profiles, fig.width=10, fig.height=4}
 # ── Data provenance ──
-# Source: shap_profile_atg_joint_{tag}.tsv — per-position |SHAP| from joint DeepSHAP
-# Population: all test transcripts (NMD only), joint DeepSHAP run 1
+# Source: shap_profile_atg_joint_{tag}.tsv — produced by 09b_export_subgroup_profiles.py
+#   from deepshap_joint_{tag}_run{1..5}.npz (per-position |SHAP|, 5-run pooled)
+# Population: all test transcripts (NMD only); n averaged across 5 replicates.
 
 # ATG zoom ±15bp per nucleotide
 p_atg_zoom <- atg_profile %>%
@@ -739,9 +753,9 @@ p_atg_zoom <- atg_profile %>%
   geom_line(linewidth = 0.8) +
   annotate("rect", xmin = -1.5, xmax = 1.5, ymin = -Inf, ymax = Inf,
            fill = "grey90", alpha = 0.3) +
-  scale_color_manual(values = nuc_colors) +
+  scale_color_manual(values = nuc_colors, labels = nuc_labels_rna) +
   labs(title = "A. ATG ±15bp: Per-Nucleotide |SHAP| (NMD only)",
-       subtitle = "Grey = ATG codon (A at -1, T at 0, G at +1). Note G periodicity (codon signal).",
+       subtitle = "Grey = ATG codon (A at -1, U at 0, G at +1). Note G periodicity (codon signal).",
        x = "Position relative to ATG", y = "Mean |SHAP|", color = "Nucleotide")
 
 save_fig(p_atg_zoom, "fig2c_atg_zoom", width = 10, height = 4)
@@ -755,9 +769,9 @@ p_stop_zoom <- stop_profile %>%
   geom_line(linewidth = 0.8) +
   annotate("rect", xmin = -1.5, xmax = 1.5, ymin = -Inf, ymax = Inf,
            fill = "grey90", alpha = 0.3) +
-  scale_color_manual(values = nuc_colors) +
+  scale_color_manual(values = nuc_colors, labels = nuc_labels_rna) +
   labs(title = "B. Stop ±15bp: Per-Nucleotide |SHAP| (NMD only)",
-       subtitle = "Grey = stop codon (T at -1, variable at 0 and +1). Clear stop codon spike.",
+       subtitle = "Grey = stop codon (U at -1, variable at 0 and +1). Clear stop codon spike.",
        x = "Position relative to stop codon", y = "Mean |SHAP|", color = "Nucleotide")
 
 save_fig(p_stop_zoom, "fig2d_stop_zoom", width = 10, height = 4)
@@ -769,7 +783,7 @@ save_fig(p_stop_zoom, "fig2d_stop_zoom", width = 10, height = 4)
 
 **Observations:**
 
-- **(Data)** The **stop codon itself** (Panel B) shows a clear SHAP spike — the highest per-position attribution in either window. The T at position -1 drops (invariant, no information), while the variable positions (0 and +1) show elevated G attribution, consistent with TGA preference.
+- **(Data)** The **stop codon itself** (Panel B) shows a clear SHAP spike — the highest per-position attribution in either window. The U at position -1 drops (invariant, no information), while the variable positions (0 and +1) show elevated G attribution, consistent with TGA preference.
 - **(Data)** The **ATG branch** (Panel A) shows **strong period-3 periodicity** in the G channel both upstream and downstream of the ATG. This reflects the model learning codon usage bias — G at the 3rd codon position (GC3) is a hallmark of vertebrate coding sequences. The lag-3 autocorrelation for G is 0.86 in the NMD ORF body and 0.92 in Control, with most FFT power concentrated near period 3. The model detects reading frame composition from raw nucleotide sequence, in addition to the explicit frame-position encoding channels.
 
 ---
@@ -831,15 +845,20 @@ save_fig(p_atg_full, "fig3_atg_importance_profile", width = 10, height = 4)
 
 ```{r fig3a-kozak-logo, eval=has_motif_logos, fig.width=10, fig.height=8}
 # ── Data provenance ──
-# Source: motif_logo_atg_{shap_run_tag}.tsv — produced by 07_motif_analysis.py
-#   from deepshap_atg_{tag}.npz (DeepSHAP on rank-0 ORF ATG window)
+# Source (preferred): motif_logo_atg_joint_{tag}.tsv — produced by scripts/export_joint_motif_logos.py
+#   from deepshap_joint_{tag}_run{1..5}.npz (5-run pooled, all test samples)
+# Source (fallback, if joint missing): motif_logo_atg_{tag}_run1.tsv from 07_motif_analysis.py
+#   (marginal DeepSHAP, run 1 only, n_nmd=444 stratified subsample)
+# Active source flagged in setup chunk; surfaced in figure subtitle and §0 data-status panel.
 # Methods: METHODS.md § "DeepSHAP Sequence Interpretation"
 
 kozak_range <- motif_atg %>% filter(relative_position >= -11, relative_position <= 11)
 positions <- sort(unique(kozak_range$relative_position))
 nuc_order <- c("A", "C", "G", "T")
+nuc_order_display <- c("A", "C", "G", "U")  # RNA-convention for figure labels
 
-# Build matrices for ggseqlogo
+# Build matrices for ggseqlogo (rows keyed by data channel for indexing, then
+# rename rownames to RNA convention for display)
 nmd_mat <- matrix(0, nrow = 4, ncol = length(positions),
                   dimnames = list(nuc_order, positions))
 ctrl_mat <- matrix(0, nrow = 4, ncol = length(positions),
@@ -855,10 +874,12 @@ for (i in seq_along(positions)) {
     if (length(v_c) == 1) ctrl_mat[j, i] <- v_c
   }
 }
+rownames(nmd_mat) <- nuc_order_display
+rownames(ctrl_mat) <- nuc_order_display
 
-# Standard Kozak numbering: A of ATG = +1, no position 0
-# Window center (relative_position = 0) is the T of ATG (middle nucleotide of codon).
-# A of ATG is at relative_position = -1.
+# Standard Kozak numbering: A of AUG = +1, no position 0
+# Window center (relative_position = 0) is the U of AUG (middle nucleotide of codon).
+# A of AUG is at relative_position = -1.
 # Mapping: Kozak = relative_position + 2 for rel >= -1, else relative_position + 1
 kozak_num <- ifelse(positions >= -1, positions + 2, positions + 1)
 pos_labels <- ifelse(kozak_num > 0, paste0("+", kozak_num), as.character(kozak_num))
@@ -866,7 +887,7 @@ pos_labels[kozak_num == -3] <- "-3*"
 pos_labels[kozak_num == -1] <- "-1*"
 pos_labels[kozak_num == 4]  <- "+4*"
 pos_labels[positions == -1] <- "A(+1)"
-pos_labels[positions == 0]  <- "T(+2)"
+pos_labels[positions == 0]  <- "U(+2)"
 pos_labels[positions == 1]  <- "G(+3)"
 
 # Shared y-axis — generous padding (1.4x) to prevent ggseqlogo letter clipping
@@ -874,7 +895,7 @@ kz_ylim <- range(c(nmd_mat, ctrl_mat))
 kz_ylim <- c(min(kz_ylim[1], 0), max(kz_ylim[2], 0))
 kz_ylim <- kz_ylim * 1.4
 
-p_kz_nmd <- ggseqlogo(nmd_mat, method = "custom", seq_type = "dna") +
+p_kz_nmd <- ggseqlogo(nmd_mat, method = "custom", seq_type = "rna") +
   geom_hline(yintercept = 0, linewidth = 0.5, color = "black") +
   scale_x_continuous(breaks = 1:length(positions), labels = pos_labels) +
   coord_cartesian(ylim = kz_ylim) +
@@ -885,7 +906,7 @@ p_kz_nmd <- ggseqlogo(nmd_mat, method = "custom", seq_type = "dna") +
        x = "Position (A of ATG = +1)", y = "Mean SHAP x input") +
   theme(axis.text.x = element_text(size = 8))
 
-p_kz_ctrl <- ggseqlogo(ctrl_mat, method = "custom", seq_type = "dna") +
+p_kz_ctrl <- ggseqlogo(ctrl_mat, method = "custom", seq_type = "rna") +
   geom_hline(yintercept = 0, linewidth = 0.5, color = "black") +
   scale_x_continuous(breaks = 1:length(positions), labels = pos_labels) +
   coord_cartesian(ylim = kz_ylim) +
@@ -996,13 +1017,15 @@ save_fig(p_stop_full, "fig4_stop_importance_profile", width = 10, height = 4)
 
 ```{r fig4a-stop-logo, eval=has_motif_logos, fig.width=10, fig.height=8}
 # ── Data provenance ──
-# Source: motif_logos_stop_{shap_run_tag}.tsv — produced by 07_motif_analysis.py
-#   from deepshap_stop_{tag}.npz (DeepSHAP on rank-0 ORF stop window)
-# Population: ~2,000 DeepSHAP samples per replicate (run 1 shown)
+# Source (preferred): motif_logo_stop_joint_{tag}.tsv — produced by scripts/export_joint_motif_logos.py
+#   from deepshap_joint_{tag}_run{1..5}.npz (5-run pooled, all test samples)
+# Source (fallback, if joint missing): motif_logos_stop_{tag}_run1.tsv from 07_motif_analysis.py
+#   (marginal DeepSHAP, run 1 only, n_nmd=444 stratified subsample)
+# Active source flagged in setup chunk; surfaced in figure subtitle and §0 data-status panel.
 
 # Stop codon logo: ±10bp around the stop codon
 # Window center (relative_position = 0) = middle nucleotide of stop codon (2nd nt)
-# Stop codon: T at -1, variable at 0, variable at +1
+# Stop codon: U at -1, variable at 0, variable at +1
 # Joint logo TSV has no landmark column; marginal has landmark == "stop_codon"
 if ("landmark" %in% names(motif_stop)) {
   stop_logo <- motif_stop %>% filter(landmark == "stop_codon",
@@ -1012,7 +1035,7 @@ if ("landmark" %in% names(motif_stop)) {
 }
 stop_positions <- sort(unique(stop_logo$relative_position))
 
-# Build SHAP×input matrices
+# Build SHAP×input matrices (rows keyed by data channel, then renamed to RNA convention)
 nmd_stop_mat <- matrix(0, nrow = 4, ncol = length(stop_positions),
                        dimnames = list(nuc_order, stop_positions))
 ctrl_stop_mat <- matrix(0, nrow = 4, ncol = length(stop_positions),
@@ -1028,13 +1051,15 @@ for (i in seq_along(stop_positions)) {
     if (length(v_c) == 1) ctrl_stop_mat[j, i] <- v_c
   }
 }
+rownames(nmd_stop_mat) <- nuc_order_display
+rownames(ctrl_stop_mat) <- nuc_order_display
 
 # Position labels: same convention as Kozak — first codon nucleotide = +1, no zero.
-# relative_position -1 = 1st nt of stop (T), 0 = 2nd nt, +1 = 3rd nt
+# relative_position -1 = 1st nt of stop (U), 0 = 2nd nt, +1 = 3rd nt
 # Mapping: stop_num = relative_position + 2 for rel >= -1, else rel + 1
 stop_num <- ifelse(stop_positions >= -1, stop_positions + 2, stop_positions + 1)
 stop_pos_labels <- ifelse(stop_num > 0, paste0("+", stop_num), as.character(stop_num))
-stop_pos_labels[stop_positions == -1] <- "T(+1)"
+stop_pos_labels[stop_positions == -1] <- "U(+1)"
 stop_pos_labels[stop_positions == 0]  <- "+2"
 stop_pos_labels[stop_positions == 1]  <- "+3"
 
@@ -1044,7 +1069,7 @@ sc_ylim <- range(c(nmd_stop_mat, ctrl_stop_mat))
 sc_ylim <- c(min(sc_ylim[1], 0), max(sc_ylim[2], 0))
 sc_ylim <- sc_ylim * 1.8
 
-p_sc_nmd <- ggseqlogo(nmd_stop_mat, method = "custom", seq_type = "dna") +
+p_sc_nmd <- ggseqlogo(nmd_stop_mat, method = "custom", seq_type = "rna") +
   geom_hline(yintercept = 0, linewidth = 0.5, color = "black") +
   scale_x_continuous(breaks = 1:length(stop_positions), labels = stop_pos_labels) +
   coord_cartesian(ylim = sc_ylim) +
@@ -1053,11 +1078,11 @@ p_sc_nmd <- ggseqlogo(nmd_stop_mat, method = "custom", seq_type = "dna") +
            ymin = -Inf, ymax = Inf, fill = "grey90", alpha = 0.3) +
   labs(title = sprintf("Stop Codon Context — NMD (n=%d, SHAP x input, +/-10bp)",
                        stop_logo$n_nmd[1]),
-       subtitle = "Letter height = SHAP attribution. Grey = stop codon (T + 2 variable positions). Above zero = toward NMD.",
-       x = "Position (T of stop codon = +1)", y = "Mean SHAP x input") +
+       subtitle = "Letter height = SHAP attribution. Grey = stop codon (U + 2 variable positions). Above zero = toward NMD.",
+       x = "Position (U of stop codon = +1)", y = "Mean SHAP x input") +
   theme(axis.text.x = element_text(size = 8))
 
-p_sc_ctrl <- ggseqlogo(ctrl_stop_mat, method = "custom", seq_type = "dna") +
+p_sc_ctrl <- ggseqlogo(ctrl_stop_mat, method = "custom", seq_type = "rna") +
   geom_hline(yintercept = 0, linewidth = 0.5, color = "black") +
   scale_x_continuous(breaks = 1:length(stop_positions), labels = stop_pos_labels) +
   coord_cartesian(ylim = sc_ylim) +
@@ -1065,13 +1090,13 @@ p_sc_ctrl <- ggseqlogo(ctrl_stop_mat, method = "custom", seq_type = "dna") +
            xmax = which(stop_positions == 1) + 0.5,
            ymin = -Inf, ymax = Inf, fill = "grey90", alpha = 0.3) +
   labs(title = sprintf("Stop Codon Context — Control (n=%d)", stop_logo$n_ctrl[1]),
-       x = "Position (T of stop codon = +1)", y = "Mean SHAP x input") +
+       x = "Position (U of stop codon = +1)", y = "Mean SHAP x input") +
   theme(axis.text.x = element_text(size = 8))
 
 save_fig(p_sc_nmd / p_sc_ctrl, "fig4a_stop_logo", width = 12, height = 8)
 ```
 
-**Variable definitions:** Letter height = mean signed SHAP × input. Positive (upward) = pushes toward NMD. Grey shading = stop codon (3 positions: invariant T + 2 variable nucleotides encoding TGA/TAA/TAG). At the variable stop codon positions, letter heights reflect the model's preference: taller G at position 2 indicates TGA preference (positive SHAP), while A/G distribution at position 3 reflects TAA vs TAG distinction.
+**Variable definitions:** Letter height = mean signed SHAP × input. Positive (upward) = pushes toward NMD. Grey shading = stop codon (3 positions: invariant U + 2 variable nucleotides encoding TGA/TAA/TAG). At the variable stop codon positions, letter heights reflect the model's preference: taller G at position 2 indicates TGA preference (positive SHAP), while A/G distribution at position 3 reflects TAA vs TAG distinction.
 
 **Observations:**
 
@@ -1300,7 +1325,7 @@ save_fig(p_attn, "fig4b_attention_by_rank")
 # ── Data provenance ──
 # Source: attention_weights_{tag}.tsv — produced by 04_interpret_attention.py
 # Methods: METHODS.md § "Attention Analysis"
-# Population: all test transcripts. 10 isoforms with all-zero weights (no valid ORFs) excluded.
+# Population: all test transcripts.
 
 max_attn_per_iso <- attn_with_class %>%
   group_by(isoform_id, class) %>%
@@ -1543,7 +1568,7 @@ We stratify all test-set transcripts into four subgroups: one Control and three 
 # Population: all test-set transcripts (n = n_test)
 
 # Build a single analysis data frame with subgroup assignments for all test transcripts
-# Subgroups based on the upstream category field from 05t_ref_cds_features.R:
+# Subgroups based on the upstream category field from 05t_ref_cds_features.R (../nmd_orf_model):
 #   effectively_ptc       → NMD PTC+
 #   no_downstream_ejc     → NMD PTC-, ref ATG retained
 #   truncated_no_ejc      → NMD PTC-, ref ATG retained
@@ -1627,7 +1652,7 @@ p_subgroups <- subgroup_counts %>%
 save_fig(p_subgroups, "fig6a_subgroup_counts", width = 9, height = 4)
 ```
 
-**Subgroup definitions** (applied to all `r format(n_test, big.mark = ",")` test transcripts, based on the `category` field from the upstream reference-CDS tracing in `05t_ref_cds_features.R`):
+**Subgroup definitions** (applied to all `r format(n_test, big.mark = ",")` test transcripts, based on the `category` field from the upstream reference-CDS tracing in `05t_ref_cds_features.R` in the `../nmd_orf_model` repo):
 
 | Subgroup | Definition |
 |----------|------------|
@@ -1650,10 +1675,9 @@ The model uses different ORF-level features for different subgroups, as measured
 
 ```{r fig6c-attribution-by-subgroup, fig.width=10, fig.height=7, eval=file.exists(file.path(results_dir, paste0("sample_shap_structural_", best_tag, ".tsv")))}
 # ── Data provenance ──
-# Source: sample_shap_structural_{tag}.tsv — per-sample DeepSHAP (5 ORF features)
-#   Produced by deepshap.py --branches structural --n-explain 0 --n-background 500
-#   Averaged across 5 replicates (different background seeds). All test transcripts.
-# Population: all test transcripts across 4 subgroups
+# Source: sample_shap_structural_{tag}.tsv — produced by 09b_export_subgroup_profiles.py
+#   from deepshap_joint_{tag}_run{1..5}.npz (per-sample 5-feature SHAP, 5-run averaged).
+# Population: all test transcripts across 4 subgroups (NMD only after filter).
 
 shap_orf_samples <- read.delim(file.path(results_dir, paste0("sample_shap_structural_", best_tag, ".tsv")))
 
@@ -2001,6 +2025,8 @@ if (nrow(junc_sub) > 0) {
       if (length(v_c) == 1) junc_ctrl_mat[j, i] <- v_c
     }
   }
+  rownames(junc_nmd_mat) <- nuc_order_display
+  rownames(junc_ctrl_mat) <- nuc_order_display
 
   # Standard splice site numbering: no position 0.
   # -1 = last nt of upstream exon, +1 = first nt of downstream exon.
@@ -2012,7 +2038,7 @@ if (nrow(junc_sub) > 0) {
   junc_pos_labels[junc_positions == -1] <- "-1\n(A)"
   junc_pos_labels[junc_positions == 0]  <- "+1\njxn(G)"
   junc_pos_labels[junc_positions == 1]  <- "+2\n(G)"
-  junc_pos_labels[junc_positions == 2]  <- "+3\n(T)"
+  junc_pos_labels[junc_positions == 2]  <- "+3\n(U)"
 
   # Only show labels at every 3rd position + the key ones to avoid crowding
   show_idx <- c(which(junc_positions %% 3 == 0),
@@ -2030,7 +2056,7 @@ if (nrow(junc_sub) > 0) {
   junc_ylim <- c(min(junc_ylim[1], 0), max(junc_ylim[2], 0))
   junc_ylim <- junc_ylim * 1.8
 
-  p_junc_nmd <- ggseqlogo(junc_nmd_mat, method = "custom", seq_type = "dna") +
+  p_junc_nmd <- ggseqlogo(junc_nmd_mat, method = "custom", seq_type = "rna") +
     geom_hline(yintercept = 0, linewidth = 0.5, color = "black") +
     scale_x_continuous(breaks = 1:length(junc_positions), labels = sparse_labels) +
     coord_cartesian(ylim = junc_ylim) +
@@ -2044,7 +2070,7 @@ if (nrow(junc_sub) > 0) {
          subtitle = "Red line = exon-exon junction. Pattern: ...A | G(G)T... All positive = pushes toward NMD.",
          x = "Position relative to junction (bp)", y = "Mean SHAP x input")
 
-  p_junc_ctrl <- ggseqlogo(junc_ctrl_mat, method = "custom", seq_type = "dna") +
+  p_junc_ctrl <- ggseqlogo(junc_ctrl_mat, method = "custom", seq_type = "rna") +
     geom_hline(yintercept = 0, linewidth = 0.5, color = "black") +
     scale_x_continuous(breaks = 1:length(junc_positions), labels = sparse_labels) +
     coord_cartesian(ylim = junc_ylim) +
@@ -2424,8 +2450,11 @@ save_fig(p_struct_sg, "fig6_struct_by_subgroup", width = 10, height = 5)
 
 ```{r fig6-atg-profile-subgroup, fig.width=10, fig.height=5}
 # ── Data provenance ──
-# Source: shap_profile_atg_subgroup_joint_{tag}.tsv — per-position total nuc |SHAP| by subgroup
-# Population: all test transcripts from joint DeepSHAP run 1
+# Source: shap_profile_atg_subgroup_joint_{tag}.tsv — produced by 09b_export_subgroup_profiles.py
+#   from deepshap_joint_{tag}_run{1..5}.npz (per-position total nuc |SHAP| by subgroup, 5-run pooled).
+# Population: all test transcripts, stratified into 4 subgroups (rank-0 ORF window).
+# Window center (relative_position = 0) = the rank-0 ATG. For PTC-ref-ATG-retained, PTC+, and
+# Control, rank-0 = reference CDS start. For PTC-ref-ATG-lost, rank-0 falls back to TD2/SQANTI start.
 
 atg_sg_profile_path <- file.path(results_dir, paste0("shap_profile_atg_subgroup_joint_", best_tag, ".tsv"))
 stop_sg_profile_path <- file.path(results_dir, paste0("shap_profile_stop_subgroup_joint_", best_tag, ".tsv"))
@@ -2497,7 +2526,7 @@ if (has_atg_sg) {
   kozak_num <- ifelse(positions >= -1, positions + 2, positions + 1)
   pos_labels <- ifelse(kozak_num > 0, paste0("+", kozak_num), as.character(kozak_num))
   pos_labels[positions == -1] <- "A(+1)"
-  pos_labels[positions == 0]  <- "T(+2)"
+  pos_labels[positions == 0]  <- "U(+2)"
   pos_labels[positions == 1]  <- "G(+3)"
 
   # First pass: build all matrices (for shared y-limit)
@@ -2515,6 +2544,7 @@ if (has_atg_sg) {
         if (length(v) == 1) mat[j, i] <- v
       }
     }
+    rownames(mat) <- nuc_order_display
     sg_mats[[sg]] <- mat
   }
   # Shared y-limit across the 4 panels (1.4x padding for ggseqlogo)
@@ -2524,7 +2554,7 @@ if (has_atg_sg) {
   # Second pass: build plots with shared y-axis
   sg_plots <- list()
   for (sg in c("NMD PTC+", "NMD PTC-, ref ATG retained", "NMD PTC-, ref ATG lost", "Control")) {
-    sg_plots[[sg]] <- ggseqlogo(sg_mats[[sg]], method = "custom", seq_type = "dna") +
+    sg_plots[[sg]] <- ggseqlogo(sg_mats[[sg]], method = "custom", seq_type = "rna") +
       geom_hline(yintercept = 0, linewidth = 0.3) +
       scale_x_continuous(breaks = 1:length(positions), labels = pos_labels) +
       coord_cartesian(ylim = atg_sg_ylim) +
@@ -2565,7 +2595,7 @@ if (has_stop_sg) {
   positions <- sort(unique(stop_sg$relative_position))
   stop_num <- ifelse(positions >= -1, positions + 2, positions + 1)
   stop_labels <- ifelse(stop_num > 0, paste0("+", stop_num), as.character(stop_num))
-  stop_labels[positions == -1] <- "T(+1)"
+  stop_labels[positions == -1] <- "U(+1)"
   stop_labels[positions == 0]  <- "+2"
   stop_labels[positions == 1]  <- "+3"
 
@@ -2584,6 +2614,7 @@ if (has_stop_sg) {
         if (length(v) == 1) mat[j, i] <- v
       }
     }
+    rownames(mat) <- nuc_order_display
     sg_stop_mats[[sg]] <- mat
   }
   # Shared y-limit across the 4 panels (1.4x padding for ggseqlogo)
@@ -2592,7 +2623,7 @@ if (has_stop_sg) {
 
   sg_plots_stop <- list()
   for (sg in c("NMD PTC+", "NMD PTC-, ref ATG retained", "NMD PTC-, ref ATG lost", "Control")) {
-    sg_plots_stop[[sg]] <- ggseqlogo(sg_stop_mats[[sg]], method = "custom", seq_type = "dna") +
+    sg_plots_stop[[sg]] <- ggseqlogo(sg_stop_mats[[sg]], method = "custom", seq_type = "rna") +
       geom_hline(yintercept = 0, linewidth = 0.3) +
       scale_x_continuous(breaks = 1:length(positions), labels = stop_labels) +
       coord_cartesian(ylim = stop_sg_ylim) +
@@ -2621,7 +2652,7 @@ if (has_stop_sg) {
 
 ```{r sec6-attention-subgroup-setup, eval=has_subgroup_shap}
 # ── Data provenance ──
-# Source: attention_weights_{tag}.tsv joined to subgroup assignments from Section 9.13 logic
+# Source: attention_weights_{tag}.tsv joined to subgroup assignments (same logic as §7.1).
 # Methods: METHODS.md § "Attention Analysis"
 # Population: all test transcripts, classified into 4 subgroups.
 
@@ -2739,8 +2770,9 @@ render_dt(orf_type_attn,
 
 ```{r fig6-shap-start-site, fig.width=10, fig.height=6}
 # ── Data provenance ──
-# Source: shap_profile_atg_subgroup_joint_{tag}.tsv — per-position total nuc |SHAP| by subgroup
-# Population: all test transcripts from joint DeepSHAP run 1
+# Source: shap_profile_atg_subgroup_joint_{tag}.tsv — produced by 09b_export_subgroup_profiles.py
+#   from deepshap_joint_{tag}_run{1..5}.npz (per-position total nuc |SHAP| by subgroup, 5-run pooled).
+# Population: all test transcripts, 4 subgroups, rank-0 ORF window.
 
 # SHAP-based start site importance by subgroup
 # Analogous to Panel K (attention by rank) but using positional DeepSHAP values
@@ -2862,9 +2894,9 @@ render_dt(q_summary %>%
 
 ```{r fig6-all-orfs-setup}
 # ── Data provenance ──
-# Source: deepshap_all_orfs_summary_{tag}.tsv — per-sample per-ORF total |SHAP|
-# Produced by aggregating deepshap_joint_{tag}[_orf{1-4}]_run1.npz files
-# Population: all test transcripts, 500 background, joint DeepSHAP run 1
+# Source: deepshap_all_orfs_summary_{tag}.tsv — per-sample per-ORF total |SHAP|.
+# Aggregator over deepshap_joint_{tag}[_orf{1-4}]_run{1..5}.npz files (5-run pooled if generated).
+# Population: all test transcripts, 500 background. Currently absent — see §9.11 skip-note below.
 
 all_orfs_path <- file.path(results_dir, paste0("deepshap_all_orfs_summary_", best_tag, ".tsv"))
 has_all_orfs <- file.exists(all_orfs_path)
@@ -2875,16 +2907,18 @@ cat("> **Section intentionally not generated for the 4ct retrain.** Populating t
 ```
 
 ```{r fig6-all-orfs, eval=has_all_orfs, fig.width=10, fig.height=10}
-all_orfs <- read.delim(all_orfs_path)
+# Distinct from the global `all_orfs` table at L160 (selected_orfs.tsv): this is the
+# per-ORF DeepSHAP summary, only loaded when §9.11 is active.
+all_orfs_per_orf <- read.delim(all_orfs_path)
 
 # Join with subgroup assignments
-all_orfs_sg <- all_orfs %>%
+all_orfs_sg <- all_orfs_per_orf %>%
   left_join(sec8_data %>% select(isoform_id, subgroup),
             by = "isoform_id") %>%
   filter(!is.na(subgroup))
 
 # Panel O: Mean total |SHAP| by ORF rank (NMD vs Control)
-orf_by_class <- all_orfs %>%
+orf_by_class <- all_orfs_per_orf %>%
   mutate(class = ifelse(label == 1, "NMD", "Control")) %>%
   group_by(orf_rank, class) %>%
   summarise(mean_shap = mean(total_abs_shap),
@@ -2901,13 +2935,13 @@ p_orf_overall <- orf_by_class %>%
   scale_fill_manual(values = pal) +
   scale_y_sqrt(breaks = c(0, 1, 2, 5, 10, 15, 20, 25)) +
   labs(title = sprintf("O. Joint DeepSHAP: Mean Total SHAP Magnitude by ORF Rank (n=%s transcripts)",
-                       format(length(unique(all_orfs$isoform_id)), big.mark = ",")),
+                       format(length(unique(all_orfs_per_orf$isoform_id)), big.mark = ",")),
        subtitle = "ORF 0 (rank-0, priority CDS) dominates; secondary ORFs contribute modestly. Y-axis: square-root scale.",
        x = "ORF rank", y = expression("Mean total" ~ group("|", SHAP, "|")), fill = NULL) +
   theme(legend.position = "top")
 
 # Panel P: Branch decomposition by ORF rank (NMD only)
-branch_by_orf <- all_orfs %>%
+branch_by_orf <- all_orfs_per_orf %>%
   filter(label == 1) %>%
   group_by(orf_rank) %>%
   summarise(ATG = mean(atg_abs_shap),

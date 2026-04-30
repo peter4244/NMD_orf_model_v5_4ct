@@ -10,7 +10,7 @@ suppressPackageStartupMessages({
   library(jsonlite)
 })
 
-results_dir <- "results"
+results_dir <- "results_4ct"
 best_tag <- "atg500_stop500"
 cat("=== Report Audit: Hardcoded Number Verification ===\n\n")
 

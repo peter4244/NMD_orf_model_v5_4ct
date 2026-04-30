@@ -73,6 +73,44 @@ deepshap.py                # DeepSHAP (5 independent runs)
 11_kernel_shap_branches.py  # Branch-level Shapley values
 ```
 
+## Build order (intermediate TSVs feeding the report)
+
+The report `orf_model_report_v5.Rmd` consumes a number of intermediate TSVs that
+are not produced directly by the numbered pipeline scripts. Build order:
+
+```
+1. relabel_tx_summary_4ct.R                         (one-time bootstrap from tx_summary_6ct.tsv)
+2. slurm_build_h5.sh                                (data_prep.py → nmd_orf_data.h5, selected_orfs.tsv)
+3. slurm_patch_selected_orfs.sh                     (scripts/patch_stop_codon.py — fixes stop_codon
+                                                     column off-by-one; required for §4.1 χ² test)
+4. slurm_train_4ct.sh / slurm_train_4ct_sweep*.sh   (03_train.py)
+5. slurm_interpret_v5.sh                            (evaluate.py, 04_, 05_)
+6. slurm_deepshap_joint.sh                          (deepshap.py × 5 runs → deepshap_joint_*_run{1..5}.npz)
+7. slurm_deepshap_structural.sh                     (deepshap.py --branches structural × 5 runs)
+8. slurm_export_motif_v5.sh                         (06_, 07_ — marginal motif logos, fallback path)
+9. slurm_export_joint_motif_logos.sh                (scripts/export_joint_motif_logos.py — preferred
+                                                     5-run pooled motif logos for §3.1, §4.1)
+10. slurm_export_subgroup_profiles_09b.sh           (09b_export_subgroup_profiles.py — feeds §3.1, §4.1,
+                                                     §7.2, §9.4, §9.6, §9.7, §9.8)
+11. slurm_export_features_09.sh                     (09_ GC, polya, junction-ordinal)
+12. slurm_export_subgroup_v5.sh                     (08_ subgroup-specific marginal SHAP)
+13. slurm_export_importance_v5.sh                   (05b_, 05c_ structural rollups)
+14. slurm_kernel_shap.sh                            (11_ KernelSHAP branch decomposition)
+15. slurm_render_v5.sh                              (renders orf_model_report_v5.Rmd)
+```
+
+## Cross-repo dependencies
+
+The following inputs to `results_4ct/` are **symlinks into the upstream `../nmd_orf_model/` repo**
+and are not regenerated here:
+
+- `ref_cds_features.tsv` — produced by `05t_ref_cds_features.R` in `../nmd_orf_model/`
+- `td2_features.tsv` — produced by `05t_td2_features.R` in `../nmd_orf_model/`
+
+Both feed subgroup classification (§7.1) and the joint per-ORF analyses (§9.6–§9.8). If
+the upstream repo moves, regenerate these in the upstream tree and re-link before re-running
+the 4ct pipeline.
+
 ## Data Provenance
 
 - **Sequences:** SQANTI-corrected FASTA from isopair pipeline v6.0
