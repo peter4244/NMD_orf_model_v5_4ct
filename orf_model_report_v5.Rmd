@@ -285,6 +285,50 @@ cat(sprintf("DeepSHAP subset: 2,000 samples (~%d NMD, ~%d Control) per replicate
             shap_n_nmd, 2000 - shap_n_nmd))
 ```
 
+```{r data-status-flags, include=FALSE}
+# Pre-compute every file-existence flag the data-status panel needs,
+# in advance of the later chunks that also (re)define some of these.
+has_kernel_shap <- file.exists(file.path(results_dir, paste0("kernel_shap_branch_", best_tag, ".tsv")))
+has_shap_profiles <- file.exists(file.path(results_dir, paste0("shap_profile_atg_joint_", best_tag, ".tsv"))) &&
+                     file.exists(file.path(results_dir, paste0("shap_profile_stop_joint_", best_tag, ".tsv")))
+has_pa_sqanti <- file.exists(file.path(results_dir, paste0("polya_sqanti_test_", best_tag, ".tsv")))
+has_sg_profiles <- file.exists(file.path(results_dir, paste0("shap_profile_atg_subgroup_joint_", best_tag, ".tsv"))) &&
+                   file.exists(file.path(results_dir, paste0("shap_profile_stop_subgroup_joint_", best_tag, ".tsv")))
+has_atg_sg  <- file.exists(file.path(results_dir, paste0("motif_logo_atg_subgroup_joint_", best_tag, ".tsv")))
+has_stop_sg <- file.exists(file.path(results_dir, paste0("motif_logo_stop_subgroup_joint_", best_tag, ".tsv")))
+has_all_orfs <- file.exists(file.path(results_dir, paste0("deepshap_all_orfs_summary_", best_tag, ".tsv")))
+```
+
+```{r data-status, results='asis'}
+# Surface any chunk-guard flag that is FALSE so missing-data sections do not
+# silently render as empty. Each entry: (flag, label for downstream sections, file).
+data_status <- list(
+  list(flag = has_kernel_shap,    what = "Branch-level KernelSHAP (Section 2.1, 7.3)", file = sprintf("kernel_shap_branch_%s.tsv", best_tag)),
+  list(flag = has_shap_profiles,  what = "Positional SHAP profiles (Sections 2.3, 3, 4)", file = sprintf("shap_profile_{atg,stop}_joint_%s.tsv", best_tag)),
+  list(flag = has_motif_logos,    what = "Motif logos (Sections 3.1, 4.1, 9.1)",         file = sprintf("motif_logo{,s}_{atg,stop}*_%s.tsv", best_tag)),
+  list(flag = has_subgroup_shap,  what = "Subgroup-stratified DeepSHAP (Sections 4.1, 9.4)", file = sprintf("subgroup_*_%s.tsv", best_tag)),
+  list(flag = has_gc,             what = "GC-content stop-window panel (Section 6)",     file = sprintf("gc_content_across_stop_window_%s.tsv", best_tag)),
+  list(flag = has_junc_ord,       what = "EJC ordinal SHAP (Section 9.2)",                file = sprintf("junction_*_%s_run1.tsv", best_tag)),
+  list(flag = has_pa_sqanti,      what = "Poly(A) annotations (Section 9.3)",             file = sprintf("polya_sqanti_test_%s.tsv", best_tag)),
+  list(flag = has_stability,      what = "DeepSHAP stability (Sections 3, 4, 9.3)",       file = sprintf("deepshap_stability_%s.tsv", best_tag)),
+  list(flag = has_sg_profiles,    what = "By-subgroup positional SHAP (Section 9.6)",     file = sprintf("shap_profile_{atg,stop}_subgroup_joint_%s.tsv", best_tag)),
+  list(flag = has_atg_sg,         what = "By-subgroup ATG motif logo (Section 9.7)",      file = sprintf("motif_logo_atg_subgroup_joint_%s.tsv", best_tag)),
+  list(flag = has_stop_sg,        what = "By-subgroup stop motif logo (Section 9.8)",     file = sprintf("motif_logo_stop_subgroup_joint_%s.tsv", best_tag)),
+  list(flag = has_all_orfs,       what = "Per-ORF (rank 1-4) joint DeepSHAP (Section 9.11)", file = sprintf("deepshap_all_orfs_summary_%s.tsv", best_tag))
+)
+missing <- Filter(function(x) !x$flag, data_status)
+if (length(missing) == 0) {
+  cat("\n**Data status:** all expected interpretation TSVs present — every section will render.\n")
+} else {
+  cat("\n**Data status — sections with missing inputs (will render as empty in the HTML):**\n\n")
+  for (m in missing) {
+    cat(sprintf("- ⚠ **%s** — required file `%s` not found in `%s/`.\n",
+                m$what, m$file, results_dir))
+  }
+  cat("\n")
+}
+```
+
 ## Architecture and Interpretation Framework
 
 ```{r fig0-architecture, fig.width=16, fig.height=20, eval=file.exists("make_architecture_figure.R")}
@@ -401,7 +445,9 @@ p_auc <- all_metrics %>%
   geom_tile(color = "white", linewidth = 1) +
   geom_text(aes(label = sprintf("%.4f", auc)), size = 4, fontface = "bold") +
   scale_fill_gradient2(low = "#67a9cf", mid = "#f7f7f7", high = "#ef8a62",
-                       midpoint = median(all_metrics$auc), name = "Test AUC") +
+                       midpoint = median(all_metrics$auc), name = "Test AUC",
+                       breaks = scales::pretty_breaks(n = 3),
+                       labels = function(x) sprintf("%.3f", x)) +
   labs(title = sprintf("Test AUC by Window Size (3x4 sweep, n=%s)", format(n_test, big.mark = ",")),
        subtitle = sprintf("AUC: area under ROC curve. Higher = better. %s NMD (%s%% prevalence).",
                           format(n_nmd, big.mark = ","), nmd_pct),
@@ -668,14 +714,77 @@ render_dt(struct_imp %>% mutate(mean_abs_gxi = round(mean_abs_gxi, 6)),
 - **`is_sqanti_cds`:** Whether this ORF matches the SQANTI/TD2 CDS prediction.
 - **`frac_start` / `frac_stop`:** Fractional position of the ORF start/stop within the transcript.
 
-## 2.3 Sequence SHAP Profiles {#sec2-sequence}
+## 2.3 Per-Nucleotide SHAP Near Start and Stop Codons {#sec2-sequence}
 
-```{r fig2c-atg-profile, eval=has_shap_profiles, fig.width=10, fig.height=8}
+The full-window positional |SHAP| profiles for the start and stop branches — which show importance ramping up as the model approaches each codon — are presented at the head of Sections 3 and 4 alongside the motif logos. Here we zoom in to ±15bp around each codon to expose the per-nucleotide-channel signal that the motif logos summarize.
+
+```{r fig2c-atg-zoom, eval=has_shap_profiles, fig.width=10, fig.height=4}
 # ── Data provenance ──
-# Source: shap_profile_{atg,stop}_joint_{tag}.tsv — per-position |SHAP| from joint DeepSHAP
-# Population: all test transcripts (NMD vs Control), joint DeepSHAP run 1
+# Source: shap_profile_atg_joint_{tag}.tsv — per-position |SHAP| from joint DeepSHAP
+# Population: all test transcripts (NMD only), joint DeepSHAP run 1
 
-# ATG full window: total nucleotide |SHAP| by NMD/Control
+# ATG zoom ±15bp per nucleotide
+p_atg_zoom <- atg_profile %>%
+  filter(relative_position >= -15, relative_position <= 15) %>%
+  ggplot(aes(x = relative_position, y = nmd_abs_shap, color = channel)) +
+  geom_line(linewidth = 0.8) +
+  annotate("rect", xmin = -1.5, xmax = 1.5, ymin = -Inf, ymax = Inf,
+           fill = "grey90", alpha = 0.3) +
+  scale_color_manual(values = nuc_colors) +
+  labs(title = "A. ATG ±15bp: Per-Nucleotide |SHAP| (NMD only)",
+       subtitle = "Grey = ATG codon (A at -1, T at 0, G at +1). Note G periodicity (codon signal).",
+       x = "Position relative to ATG", y = "Mean |SHAP|", color = "Nucleotide")
+
+save_fig(p_atg_zoom, "fig2c_atg_zoom", width = 10, height = 4)
+```
+
+```{r fig2d-stop-zoom, eval=has_shap_profiles, fig.width=10, fig.height=4}
+# Stop zoom ±15bp per nucleotide
+p_stop_zoom <- stop_profile %>%
+  filter(relative_position >= -15, relative_position <= 15) %>%
+  ggplot(aes(x = relative_position, y = nmd_abs_shap, color = channel)) +
+  geom_line(linewidth = 0.8) +
+  annotate("rect", xmin = -1.5, xmax = 1.5, ymin = -Inf, ymax = Inf,
+           fill = "grey90", alpha = 0.3) +
+  scale_color_manual(values = nuc_colors) +
+  labs(title = "B. Stop ±15bp: Per-Nucleotide |SHAP| (NMD only)",
+       subtitle = "Grey = stop codon (T at -1, variable at 0 and +1). Clear stop codon spike.",
+       x = "Position relative to stop codon", y = "Mean |SHAP|", color = "Nucleotide")
+
+save_fig(p_stop_zoom, "fig2d_stop_zoom", width = 10, height = 4)
+```
+
+**Variable definitions:**
+
+- **Mean |SHAP|:** Per-nucleotide-channel mean |SHAP| at each position for NMD samples. Curve height shows which specific nucleotide carries the attribution signal.
+
+**Observations:**
+
+- **(Data)** The **stop codon itself** (Panel B) shows a clear SHAP spike — the highest per-position attribution in either window. The T at position -1 drops (invariant, no information), while the variable positions (0 and +1) show elevated G attribution, consistent with TGA preference.
+- **(Data)** The **ATG branch** (Panel A) shows **strong period-3 periodicity** in the G channel both upstream and downstream of the ATG. This reflects the model learning codon usage bias — G at the 3rd codon position (GC3) is a hallmark of vertebrate coding sequences. The lag-3 autocorrelation for G is 0.95 in the ORF body, with 90% of FFT power at period 3. The model detects reading frame composition from raw nucleotide sequence, in addition to the explicit frame-position encoding channels.
+
+---
+
+# 3. Start Codon Signals {#sec3-start}
+
+**Question:** What does the model learn from the sequence context around the ATG start codon?
+
+**Metrics:** Section 3 uses DeepSHAP on the ATG branch (500bp window, all test samples, joint DeepSHAP averaged across 5 replicates). Subgroup-specific start codon analyses are in Section 9.7.
+
+```{r sec3-stability-note, eval=has_stability, results='asis'}
+nuc_cv <- shap_stability %>%
+  filter(channel %in% c("A", "C", "G", "T")) %>% pull(cv_nmd)
+junc_cv <- shap_stability %>%
+  filter(channel == "junction", branch == "stop") %>% pull(cv_nmd)
+cat(sprintf("**Attribution stability:** All DeepSHAP values in Sections 3-4 are means across 5 independent replicates. Nucleotide channel CVs = %.1f--%.1f%%; junction channel CV = %.1f%%.\n",
+            100 * min(nuc_cv), 100 * max(nuc_cv), 100 * junc_cv))
+```
+
+```{r fig3-atg-importance-profile, eval=has_shap_profiles, fig.width=10, fig.height=4}
+# ── Data provenance ──
+# Source: shap_profile_atg_joint_{tag}.tsv — per-position |SHAP| from joint DeepSHAP
+# Population: all test transcripts (NMD vs Control), averaged across 5 runs
+
 atg_total <- atg_profile %>%
   pivot_longer(cols = c(nmd_abs_shap, ctrl_abs_shap),
                names_to = "class", values_to = "abs_shap") %>%
@@ -690,94 +799,24 @@ p_atg_full <- atg_total %>%
   scale_color_manual(values = pal) +
   annotate("text", x = -100, y = Inf, label = "5'UTR", size = 3.5, color = "grey40", vjust = 2) +
   annotate("text", x = 100, y = Inf, label = "ORF body", size = 3.5, color = "grey40", vjust = 2) +
-  labs(title = sprintf("C. ATG Branch: Nucleotide |SHAP| Across Window (n=%s)",
+  labs(title = sprintf("Start Window: Total Nucleotide |SHAP| Across Position (n=%s)",
                        format(n_test, big.mark = ",")),
-       subtitle = "Loess smooth. Sum of A+C+G+T |SHAP| per position. Dashed = ATG start codon.",
+       subtitle = "Loess smooth (span=0.1) of A+C+G+T |SHAP| summed per position. Dashed = ATG start codon.",
        x = "Position relative to ATG", y = "Total nucleotide |SHAP|", color = NULL) +
   theme(legend.position = "top")
 
-# ATG zoom ±15bp per nucleotide
-p_atg_zoom <- atg_profile %>%
-  filter(relative_position >= -15, relative_position <= 15) %>%
-  ggplot(aes(x = relative_position, y = nmd_abs_shap, color = channel)) +
-  geom_line(linewidth = 0.8) +
-  annotate("rect", xmin = -1.5, xmax = 1.5, ymin = -Inf, ymax = Inf,
-           fill = "grey90", alpha = 0.3) +
-  scale_color_manual(values = nuc_colors) +
-  labs(title = "D. ATG ±15bp: Per-Nucleotide |SHAP| (NMD only)",
-       subtitle = "Grey = ATG codon (A at -1, T at 0, G at +1). Note G periodicity (codon signal).",
-       x = "Position relative to ATG", y = "Mean |SHAP|", color = "Nucleotide")
-
-save_fig(p_atg_full / p_atg_zoom, "fig2c_atg_profile", width = 10, height = 8)
+save_fig(p_atg_full, "fig3_atg_importance_profile", width = 10, height = 4)
 ```
 
-```{r fig2d-stop-profile, eval=has_shap_profiles, fig.width=10, fig.height=8}
-# Stop full window
-stop_total <- stop_profile %>%
-  pivot_longer(cols = c(nmd_abs_shap, ctrl_abs_shap),
-               names_to = "class", values_to = "abs_shap") %>%
-  mutate(class = ifelse(class == "nmd_abs_shap", "NMD", "Control")) %>%
-  group_by(relative_position, class) %>%
-  summarise(total_shap = sum(abs_shap), .groups = "drop")
+**Variable definitions:**
 
-p_stop_full <- stop_total %>%
-  ggplot(aes(x = relative_position, y = total_shap, color = class)) +
-  geom_smooth(method = "loess", span = 0.1, se = TRUE, alpha = 0.15, linewidth = 0.8) +
-  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
-  scale_color_manual(values = pal) +
-  annotate("text", x = -150, y = Inf, label = "ORF body", size = 3.5, color = "grey40", vjust = 2) +
-  annotate("text", x = 150, y = Inf, label = "3'UTR", size = 3.5, color = "grey40", vjust = 2) +
-  labs(title = sprintf("E. Stop Branch: Nucleotide |SHAP| Across Window (n=%s)",
-                       format(n_test, big.mark = ",")),
-       subtitle = "Loess smooth. Sum of A+C+G+T |SHAP| per position. Dashed = stop codon.",
-       x = "Position relative to stop codon", y = "Total nucleotide |SHAP|", color = NULL) +
-  theme(legend.position = "top")
-
-# Stop zoom ±15bp per nucleotide
-p_stop_zoom <- stop_profile %>%
-  filter(relative_position >= -15, relative_position <= 15) %>%
-  ggplot(aes(x = relative_position, y = nmd_abs_shap, color = channel)) +
-  geom_line(linewidth = 0.8) +
-  annotate("rect", xmin = -1.5, xmax = 1.5, ymin = -Inf, ymax = Inf,
-           fill = "grey90", alpha = 0.3) +
-  scale_color_manual(values = nuc_colors) +
-  labs(title = "F. Stop ±15bp: Per-Nucleotide |SHAP| (NMD only)",
-       subtitle = "Grey = stop codon (T at -1, variable at 0 and +1). Clear stop codon spike.",
-       x = "Position relative to stop codon", y = "Mean |SHAP|", color = "Nucleotide")
-
-save_fig(p_stop_full / p_stop_zoom, "fig2d_stop_profile", width = 10, height = 8)
-```
-
-**Variable definitions (Panels C–F):**
-
-- **Total nucleotide |SHAP| (Panels C, E):** Sum of mean |SHAP| across the 4 nucleotide channels (A, C, G, T) at each position. Higher values indicate positions where the model attends more strongly to nucleotide identity for NMD prediction.
-- **Mean |SHAP| (Panels D, F):** Per-nucleotide-channel mean |SHAP| at each position for NMD samples. Letter height in the zoom panels shows which specific nucleotide carries the attribution signal.
-- **Loess smooth (span=0.1):** Local polynomial regression to reveal position-dependent trends across the 500bp window. Ribbon = 95% CI.
+- **Total nucleotide |SHAP|:** Sum of mean |SHAP| across the 4 nucleotide channels (A, C, G, T) at each position within the 500bp ATG window. Higher values indicate positions where the model attends more strongly to nucleotide identity for NMD prediction.
+- **Loess smooth (span=0.1):** Local polynomial regression revealing position-dependent trends. Ribbon = 95% CI.
 
 **Observations:**
 
-- **(Data)** The **stop branch** (Panel E) shows ~2x higher total nucleotide |SHAP| than the ATG branch (Panel C) at every position, consistent with the KernelSHAP branch decomposition (29% vs 10%).
-- **(Data)** NMD transcripts have consistently higher sequence |SHAP| than Controls in both branches, reflecting the model's stronger "opinion" about NMD predictions.
-- **(Data)** The **stop codon itself** (Panel F) shows a clear SHAP spike — the highest per-position attribution in either window. The T (red) at position -1 drops (invariant, no information), while the variable positions (0 and +1) show elevated G attribution, consistent with TGA preference.
-- **(Data)** The **ATG branch** (Panel D) shows **strong period-3 periodicity** in the G channel (yellow) both upstream and downstream of the ATG. This reflects the model learning codon usage bias — G at the 3rd codon position (GC3) is a hallmark of vertebrate coding sequences. The lag-3 autocorrelation for G is 0.95 in the ORF body, with 90% of FFT power at period 3. The model detects reading frame composition from raw nucleotide sequence, in addition to the explicit frame-position encoding channels.
-- **(Data)** The ATG branch SHAP is relatively **flat** across the window — no dramatic peak at the Kozak positions. The start codon context is a distributed signal, not concentrated at a single landmark.
-
----
-
-# 3. Start Codon Signals {#sec3-start}
-
-**Question:** What does the model learn from the sequence context around the ATG start codon?
-
-**Metrics:** Section 3.1 uses DeepSHAP on the ATG branch (500bp window, all test samples, joint DeepSHAP averaged across 5 replicates). Subgroup-specific start codon analyses are in Section 9.7.
-
-```{r sec3-stability-note, eval=has_stability, results='asis'}
-nuc_cv <- shap_stability %>%
-  filter(channel %in% c("A", "C", "G", "T")) %>% pull(cv_nmd)
-junc_cv <- shap_stability %>%
-  filter(channel == "junction", branch == "stop") %>% pull(cv_nmd)
-cat(sprintf("**Attribution stability:** All DeepSHAP values in Sections 3-4 are means across 5 independent replicates. Nucleotide channel CVs = %.1f--%.1f%%; junction channel CV = %.1f%%.\n",
-            100 * min(nuc_cv), 100 * max(nuc_cv), 100 * junc_cv))
-```
+- **(Data)** Importance ramps up sharply as the model approaches the ATG codon, with the steepest rise within the ~50nt preceding the start site, then plateaus or attenuates moving downstream into the ORF body. NMD transcripts carry consistently higher |SHAP| than Controls across the window — the model places more "opinion" on NMD transcripts at every position.
+- **(Data)** The ramp is not symmetric: signal is concentrated immediately around the ATG rather than at distant 5'UTR positions, consistent with the model recognizing local Kozak context (Section 3.1) rather than long-range 5'UTR features.
 
 ## 3.1 Kozak Context {#sec3-kozak}
 
@@ -900,6 +939,44 @@ kz_p4_ctrl <- kz_val(2, "A", "ctrl") + kz_val(2, "C", "ctrl") + kz_val(2, "G", "
 **Question:** What does the model learn from the sequence context around and downstream of the stop codon?
 
 **Metric:** DeepSHAP on the stop branch (500-position window centered on the rank-0 ORF's stop codon, capturing ~250bp of 3'UTR). Same population as Section 3.
+
+```{r fig4-stop-importance-profile, eval=has_shap_profiles, fig.width=10, fig.height=4}
+# ── Data provenance ──
+# Source: shap_profile_stop_joint_{tag}.tsv — per-position |SHAP| from joint DeepSHAP
+# Population: all test transcripts (NMD vs Control), averaged across 5 runs
+
+stop_total <- stop_profile %>%
+  pivot_longer(cols = c(nmd_abs_shap, ctrl_abs_shap),
+               names_to = "class", values_to = "abs_shap") %>%
+  mutate(class = ifelse(class == "nmd_abs_shap", "NMD", "Control")) %>%
+  group_by(relative_position, class) %>%
+  summarise(total_shap = sum(abs_shap), .groups = "drop")
+
+p_stop_full <- stop_total %>%
+  ggplot(aes(x = relative_position, y = total_shap, color = class)) +
+  geom_smooth(method = "loess", span = 0.1, se = TRUE, alpha = 0.15, linewidth = 0.8) +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
+  scale_color_manual(values = pal) +
+  annotate("text", x = -150, y = Inf, label = "ORF body", size = 3.5, color = "grey40", vjust = 2) +
+  annotate("text", x = 150, y = Inf, label = "3'UTR", size = 3.5, color = "grey40", vjust = 2) +
+  labs(title = sprintf("Stop Window: Total Nucleotide |SHAP| Across Position (n=%s)",
+                       format(n_test, big.mark = ",")),
+       subtitle = "Loess smooth (span=0.1) of A+C+G+T |SHAP| summed per position. Dashed = stop codon.",
+       x = "Position relative to stop codon", y = "Total nucleotide |SHAP|", color = NULL) +
+  theme(legend.position = "top")
+
+save_fig(p_stop_full, "fig4_stop_importance_profile", width = 10, height = 4)
+```
+
+**Variable definitions:**
+
+- **Total nucleotide |SHAP|:** Sum of mean |SHAP| across the 4 nucleotide channels (A, C, G, T) at each position within the 500bp stop window.
+- **Loess smooth (span=0.1):** Local polynomial regression revealing position-dependent trends. Ribbon = 95% CI.
+
+**Observations:**
+
+- **(Data)** Importance peaks sharply at the stop codon itself, with most attribution concentrated in the ~50nt preceding the stop site (final codons of the ORF) and falling off into the 3'UTR. NMD transcripts have ~2x higher overall |SHAP| than Controls — the stop branch is where the model expresses its strongest opinion (consistent with the branch decomposition in Section 2.1).
+- **(Data)** Modest elevation at the very edges of the window (positions ±230 to ±250) reflects a CNN boundary effect (Section 0); the first/last ~25bp should be interpreted with that caveat.
 
 ## 4.1 Stop Codon Identity {#sec4-stop-codon}
 
@@ -2734,6 +2811,10 @@ render_dt(q_summary %>%
 
 all_orfs_path <- file.path(results_dir, paste0("deepshap_all_orfs_summary_", best_tag, ".tsv"))
 has_all_orfs <- file.exists(all_orfs_path)
+```
+
+```{r sec9-all-orfs-skip-note, eval=!has_all_orfs, results='asis'}
+cat("> **Section intentionally not generated for the 4ct retrain.** Populating this section would require running joint DeepSHAP on the rank-1, rank-2, rank-3, and rank-4 ORFs (in addition to the rank-0 NPZs already on disk) and aggregating the five sets of attributions. Each rank is ~25 min on an Explorer GPU, and the resulting analysis is not cited by the manuscript or supplement. We decided the marginal scientific value did not justify the additional ~1.5–2 GPU-hours plus aggregation/render time. Should this become relevant (e.g., in response to a reviewer question about attention dispersal beyond the priority ORF), submit `slurm_deepshap_joint_orf1_4.sh` to produce the four missing NPZs, then re-run the aggregator and re-render.\n")
 ```
 
 ```{r fig6-all-orfs, eval=has_all_orfs, fig.width=10, fig.height=10}

@@ -89,6 +89,24 @@ def write_sample_shap_structural(meta, ids, struct_shap, labels, n_runs, out_pat
     print(f"  -> {out_path.name}  ({len(df)} rows)")
 
 
+def write_class_profile(shap_arr, labels, channel_names, window, out_path):
+    """Per-position, per-channel mean |SHAP| for NMD vs Control (no subgroup
+    stratification). Schema: relative_position, channel, nmd_abs_shap, ctrl_abs_shap."""
+    rel_pos = np.arange(window) - (window // 2)
+    nmd_mask = labels > 0.5
+    ctrl_mask = ~nmd_mask
+    rows = []
+    for ci, ch in enumerate(channel_names):
+        nmd_mean = np.abs(shap_arr[nmd_mask, ci, :]).mean(axis=0)
+        ctrl_mean = np.abs(shap_arr[ctrl_mask, ci, :]).mean(axis=0)
+        for p, n_v, c_v in zip(rel_pos, nmd_mean, ctrl_mean):
+            rows.append((int(p), ch, float(n_v), float(c_v)))
+    out = pd.DataFrame(rows, columns=["relative_position", "channel",
+                                       "nmd_abs_shap", "ctrl_abs_shap"])
+    out.to_csv(out_path, sep="\t", index=False)
+    print(f"  -> {out_path.name}  ({len(out)} rows)")
+
+
 def write_subgroup_profile(shap_arr, subgroups, channel_names, n_ch, window,
                             window_name, out_path):
     """Per-subgroup, per-position total |SHAP| over the 4 nucleotide channels."""
@@ -180,6 +198,14 @@ def main():
     write_sample_shap_structural(
         meta, isoform_ids, meta["struct_shap"], meta["labels"], args.n_runs,
         results_dir / f"sample_shap_structural_{tag}.tsv")
+
+    write_class_profile(
+        meta["atg_shap"], meta["labels"], meta["channel_names"], meta["w_atg"],
+        results_dir / f"shap_profile_atg_joint_{tag}.tsv")
+
+    write_class_profile(
+        meta["stop_shap"], meta["labels"], meta["channel_names"], meta["w_stop"],
+        results_dir / f"shap_profile_stop_joint_{tag}.tsv")
 
     write_subgroup_profile(
         meta["atg_shap"], subgroups, meta["channel_names"], meta["n_ch"],
