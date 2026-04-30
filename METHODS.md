@@ -27,15 +27,19 @@ Multivariate adaptive shrinkage (mashr) was re-run using only the 4 retained cel
 ### Relabeling procedure
 The relabeling is performed by `relabel_tx_summary_4ct.R`, which reads the 4 per-cell-type mashr CSVs, computes the union/intersection aggregate, and updates the `is_nmd` column in `tx_summary.tsv`. ORF features, junction positions, and other structural data are unchanged from the original v5 pipeline.
 
+### Pipeline / build order
+
+For the canonical sequence in which to run the SLURM wrappers (relabel → data_prep → patch_stop_codon → train → evaluate → deepshap_joint → deepshap_structural → 09b → export_joint_motif_logos → 09 → 08 → 11 → render), see **README.md "Build order"**. METHODS does not duplicate the list to avoid drift.
+
 ---
 
 ## Model Training and Window Size Sweep
 
 ### Architecture
-The ORF-centric hybrid model processes up to K=5 candidate ORFs per transcript through a shared-weight encoder (ATG CNN + stop CNN + structural feature linear layer), aggregates via learned attention, and predicts NMD status. See `model.py` for full architecture (NMDOrfModel class).
+The ORF-centric hybrid model processes up to K=5 candidate ORFs per transcript through a shared-weight `ORFEncoder` and aggregates via learned attention. Each `ORFEncoder` (`model.py:70-109`) has three sub-encoders for the rank-k ORF: an ATG CNN over the 9-channel ATG window, a stop CNN over the 9-channel stop window, and a structural linear branch `Linear(5, 32) → ReLU` over the 5 per-ORF features. The three 32-dim sub-embeddings are concatenated (96 dim) and fused via `Linear(96, 64) → ReLU → Dropout(0.2)` to produce the per-ORF embedding. The 5 ORF embeddings are aggregated by a learned attention pooler (softmax-normalized over valid ORFs), yielding a transcript embedding that is fed to a small classification head. See `model.py` (`NMDOrfModel`).
 
 ### Priority ORF Selection
-ORFs are ranked by priority: (1) reference CDS ORF (if the gene's dominant non-NMD isoform's ATG can be mapped), (2) SQANTI/TransDecoder2 CDS ORF (if different from ref CDS), (3) remaining ORFs ranked by Kozak score, up to K=5. Implemented in `data_prep.py::select_priority_orfs()`. K=5 captures 83% of attention weight; ranks 5-9 contribute <17% collectively (see Section 5 of the report).
+ORFs are ranked by priority: (1) reference CDS ORF (if the gene's dominant non-NMD isoform's ATG can be mapped), (2) SQANTI/TransDecoder2 CDS ORF (if different from ref CDS), (3) remaining ORFs ranked by Kozak score, up to K=5. Implemented in `data_prep.py::select_priority_orfs()`. The choice of K=5 is supported by an ORF-coverage analysis: a small fraction of transcripts have more than 5 ORFs that meet the priority criteria, but the median number of priority-eligible ORFs per transcript is well below 5 (see Section 5 of the report for attention-rank dominance figures).
 
 ### Sequence source
 Full-length spliced transcript sequences are read directly from the SQANTI corrected FASTA (`nmd_lungcells_corrected.fasta`). This replaces an earlier pipeline that used `cnn_data.tsv` which truncated sequences to 4,096 bp, causing 40% of STOP=1000 windows to be partially zero-padded. Verification: ATG codon confirmed at `orf_start` position for all rank-0 ORFs. Junction positions computed from `structures.rds` exon coordinates (strand-aware cumulative exon lengths).
@@ -50,7 +54,22 @@ Each ORF contributes two sequence windows: one centered on the **ATG (start codo
 The `window_size` parameter specifies the **total window length** in positions. Internally, `half_win = window_size // 2` positions are extracted on each side of the center (center − half_win to center + half_win − 1). A window_size of 500 therefore produces a **500-position window** spanning ±250bp around the center. Positions that fall outside the transcript boundary are zero-padded. Implemented in `data_prep.py::encode_window_v5()`.
 
 ### Window size sweep
-12 models trained with ATG window ∈ {100, 500, 1000} × stop window ∈ {100, 500, 1000, 2000} positions (each spanning ±half the window size around the codon center). Training uses BCEWithLogitsLoss with pos_weight for class imbalance, Adam optimizer, early stopping on validation AUC (patience=10), and mixed precision.
+12 models trained with ATG window ∈ {100, 500, 1000} × stop window ∈ {100, 500, 1000, 2000} positions (each spanning ±half the window size around the codon center).
+
+### Training hyperparameters (`config.yaml`, `03_train.py`)
+
+- **Loss:** BCEWithLogitsLoss with dynamic `pos_weight = n_neg / max(n_pos, 1)` computed from the training set (`utils.py:84-88`).
+- **Optimizer:** Adam with **differential weight decay** — `weight_decay = 0.001` for CNN parameters (`atg_cnn`, `stop_cnn`), `weight_decay = 0.0001` for everything else (`03_train.py:30-45`).
+- **Learning rate:** `lr = 0.001`, with **`ReduceLROnPlateau`** scheduler (`mode="max"` on val AUC, `factor=0.5`, `patience=5`).
+- **Early stopping:** monitor val AUC, `patience=10` epochs, max `epochs=100`.
+- **Batch size:** 256.
+- **Mixed precision:** enabled.
+- **Seed:** 42.
+- **Overfit guard:** training halts if `train_auc - val_auc > 0.05` for `patience` consecutive epochs (`overfit_gap_threshold`).
+
+### Best model selection
+
+Selected configuration: **ATG=500, STOP=500** by AUC (0.9306). AUPRC peaks at ATG=500 STOP=1000 (0.8387 vs ATG=500 STOP=500 at 0.8330; difference 0.004) — both are within the AUC tier. The selection prioritizes AUC for consistency with the original v5 model and because AUC is more robust to the 4ct's class-ratio change. See README.md "Model Performance" for the full sweep table.
 
 ### Train/val/test split
 - Test (holdout): chr 1, 3, 5, 7 (paralog genes excluded → "test_paralog" split)
@@ -58,104 +77,52 @@ The `window_size` parameter specifies the **total window length** in positions. 
 - Training: remaining chromosomes
 - Splits assigned in `data_prep.py::build_dataset()`.
 
-### 10-channel sequence encoding
-Each window is encoded with 10 binary (0/1) channels at each position:
+### 9-channel sequence encoding
+Each window is encoded with 9 channels at each position (`data_prep.py:41,108-160`; channel names also surfaced in DeepSHAP NPZs at `deepshap.py:307-309`):
 
-| Channel | Name | Definition |
-|---------|------|-----------|
-| 0-3 | A, C, G, T | One-hot nucleotide encoding. Exactly one is 1 per position. |
-| 4 | Splice junction | 1 at exon-exon boundary positions (transcript-space junction coordinates from `structures.rds`). |
-| 5 | ATG codon marker | 1 at all three positions of any ATG triplet within the window. |
-| 6-8 | Stop codon frame 0/1/2 | 1 at positions within stop codons (TAA/TAG/TGA), assigned to the channel matching the reading frame relative to the ORF's ATG. |
-| 9 | ORF body | 1 at positions inside the ORF (between start and stop codons), 0 outside. |
+| Channel | Name | Type | Definition |
+|---------|------|------|-----------|
+| 0-3 | A, C, G, T | Binary (one-hot) | Nucleotide identity. Exactly one is 1 per position; positions outside the transcript are all-zero. |
+| 4 | Splice junction | Binary | 1 at exon-exon junction positions within the window (from `junctions.tsv`, transcript-space coordinates). |
+| 5 | Rolling GC | Continuous [0, 1] | Local GC fraction over a 50bp sliding window centered on the position (`compute_rolling_gc()`, `data_prep.py:82-102`). |
+| 6-8 | Reading frame 0/1/2 | Binary (one-hot) | Codon position (0/1/2) of this position relative to this ORF's ATG, computed as `(genomic_position - orf_start) % 3`. Exactly one is 1 per position within the transcript. |
 
-Implemented in `data_prep.py::encode_window_vectorized()`. Windows that extend beyond the sequence boundary are zero-padded.
+Implemented in `encode_window_v5()` (`data_prep.py:105-162`). Windows that extend beyond the sequence boundary are zero-padded across all 9 channels. The legacy "ATG codon marker", "stop-codon frame", and "ORF body" channels described in earlier docs do **not** exist in v5; codon identity is determined implicitly via the reading-frame channels and the ATG/stop windows being centered on the codons of interest.
 
 ---
 
-## Feature Definitions and CDS Sources
+## Per-ORF Structural Features
 
-The model uses two levels of structural features: per-ORF (9 features) and per-transcript (8 features). Understanding their provenance is critical for interpreting the results.
+The v5 model receives **5 per-ORF structural features** and **no transcript-level features** — a substantial simplification from earlier versions, which fed parallel ref-CDS and TD2 transcript-level feature blocks. The v5 model recovers cross-ORF context from the per-ORF features alone, plus the two CNN branches and the attention aggregator. The forward signature is `model(atg_windows, stop_windows, orf_features, orf_mask)` (`model.py:200-244`); there is **no** `tx_features` argument.
 
-### CDS identity indicators
-
-Two binary per-ORF features identify whether an ORF corresponds to a known CDS call:
-
-- **`is_ref_cds`**: 1 if this ORF's start position matches the **reference CDS ATG**. The reference CDS is defined as the reading frame of the gene's dominant non-NMD isoform (highest DMSO CPM across cell types). This is a gene-level anchor: for each gene, we identify the most abundant non-NMD isoform and trace its ATG through the target isoform. Available for 45,008 / 61,697 isoforms (73%). Unavailable when no non-NMD isoform in the gene shares the ATG with a top-10 ORF, or when the gene has no clearly dominant non-NMD isoform.
-
-- **`is_sqanti_cds`**: 1 if this ORF's start position matches the **SQANTI/TransDecoder2 CDS call**. SQANTI assigns CDS via TransDecoder2, which selects the longest ORF with homology support. For novel transcripts not in reference annotation, this is the only CDS call available. Available for all 61,697 coding isoforms.
-
-For annotated (ENST) transcripts, both indicators may flag the same ORF if TD2 and the reference agree on the reading frame. For novel transcripts, `is_ref_cds` may be available if the novel isoform belongs to a gene with a dominant non-NMD isoform whose ATG can be traced, but `is_sqanti_cds` is always available.
-
-### Transcript-level features (17 total: 8 ref-CDS + 8 TD2 + 1 indicator)
-
-The model receives two parallel sets of transcript-level structural features — one derived from the reference CDS frame and one from the TransDecoder2 (TD2) CDS prediction — plus an indicator for reference CDS availability. This dual-channel design ensures the model has structural context for all isoforms, including the ~25% where the reference CDS ATG cannot be mapped.
-
-#### Ref-CDS features (`ref_` prefix, 8 features)
-
-Derived from the **reference CDS frame** — the reading frame of the gene's dominant non-NMD isoform projected onto the target isoform. Available for ~75% of isoforms (`ref_atg_available == 1`). For the remaining ~25%, all ref-CDS features are 0 (filled from NaN).
+### The 5 features (`data_prep.py:47-53`)
 
 | Feature | Definition |
 |---------|-----------|
-| `ref_downstream_ejc` | Number of exon-exon junctions downstream of the reference CDS stop codon. Primary PTC indicator. |
-| `ref_log_utr3_length` | Log of the 3'UTR length as defined by the reference CDS stop codon |
-| `ref_atg_density` | Density of ATG codons in the 5'UTR (upstream of the reference CDS start) |
-| `ref_atg_strong_kozak` | Whether the reference CDS ATG has a strong Kozak consensus |
-| `ref_uorf_count_overlapping` | Number of upstream ORFs overlapping the reference CDS |
-| `ref_uorf_count_outframe` | Number of out-of-frame upstream ORFs in the 5'UTR |
-| `ref_utr5_orf_coverage` | Fraction of the 5'UTR covered by upstream ORFs |
-| `ref_stop_density` | Density of stop codons in the vicinity of the reference CDS stop |
+| `frac_start` | Fractional start position: `orf_start / tx_length` (0 = 5' end). |
+| `frac_stop` | Fractional stop position: `orf_end / tx_length` (1 = 3' end). |
+| `is_ref_cds` | Binary: 1 if this ORF's start matches the reference CDS ATG (the gene's dominant non-NMD isoform's ATG, traced through the target isoform). |
+| `is_sqanti_cds` | Binary: 1 if this ORF's start matches the SQANTI/TransDecoder2 CDS call. |
+| `n_downstream_ejc` | Count of exon-exon junctions downstream of this ORF's stop codon. **Primary PTC indicator.** Included because junctions beyond the stop window are otherwise invisible to the CNN (`data_prep.py:46`). |
 
-Source: `ref_cds_features.tsv` (computed by `05t_ref_cds_features.R`).
+All 5 features are z-score normalized by training set statistics before entering the model. The structural sub-encoder is a single linear layer `Linear(5, 32) → ReLU` (`model.py:85,106`).
 
-#### TD2 features (`td2_` prefix, 8 features)
+### CDS identity sourcing
 
-Derived from the **TransDecoder2 CDS prediction** — SQANTI/TD2's CDS call for each isoform. Available for ~99% of coding isoforms (excludes ~750 with zero-length 5'UTR or failed ATG validation). Unlike ref-CDS features, TD2 features do not require cross-isoform reference tracing, so they have near-complete coverage.
+`is_ref_cds` and `is_sqanti_cds` are derived from upstream feature tables that this repo **does not regenerate**:
 
-| Feature | Definition |
-|---------|-----------|
-| `td2_downstream_ejc` | Number of exon-exon junctions downstream of the TD2 CDS stop (capped at 5) |
-| `td2_log_utr3_length` | Log of the 3'UTR length from the TD2 CDS stop |
-| `td2_atg_density` | Density of ATG codons in the 5'UTR (upstream of TD2 CDS start) |
-| `td2_atg_strong_kozak` | Number of strong Kozak ATGs in the 5'UTR |
-| `td2_uorf_count_overlapping` | Number of upstream ORFs overlapping the TD2 CDS |
-| `td2_uorf_count_outframe` | Number of out-of-frame upstream ORFs |
-| `td2_utr5_orf_coverage` | Fraction of the 5'UTR covered by upstream ORFs |
-| `td2_stop_density` | Density of stop codons in the 5'UTR |
+- `ref_cds_features.tsv` — symlink to `../nmd_orf_model/results/ref_cds_features.tsv`, produced upstream by `05t_ref_cds_features.R` in that repo. Provides the reference CDS ATG position and a `category` column (used downstream for subgroup classification).
+- `td2_features.tsv` — symlink to `../nmd_orf_model/results/td2_features.tsv`, produced upstream by `05t_td2_features.R`. Provides the TD2/SQANTI CDS ATG and `td2_downstream_ejc` (used for subgroup classification).
 
-Source: `td2_features.tsv` (assembled from `utr5_features_all.rds`, `ptc.rds`, and `cds.rds`/`structures.rds`).
+If the upstream repo moves, regenerate these files in the upstream tree and re-link before re-running the 4ct pipeline. See README.md "Cross-repo dependencies" for the canonical statement of this dependency.
 
-#### CDS source indicator (1 feature)
+### What is NOT in the model
 
-| Feature | Definition |
-|---------|-----------|
-| `ref_atg_available` | Binary: 1 if the reference CDS ATG is exonic in this isoform, 0 otherwise. Signals to the model whether the ref-CDS features are informative (real values) or uninformative (zeros). |
-
-#### Design rationale
-
-For isoforms where both feature sets are available (~75%), the ref-CDS and TD2 features often agree (when TD2 selects the correct reading frame) but can differ substantially (when TD2 selects an alternative ORF). The model can learn to weight each source appropriately. For isoforms where only TD2 features are available (~25%), the model uses the `ref_atg_available = 0` indicator to discount the zeroed ref-CDS features and rely on TD2 features and per-ORF/sequence inputs.
-
-### Per-ORF features
-
-These are computed for each of the 10 priority-ranked ORFs (ref CDS > SQANTI CDS > Kozak-ranked), independent of any CDS annotation beyond the `is_ref_cds` and `is_sqanti_cds` indicators:
-
-| Feature | Definition |
-|---------|-----------|
-| `orf_length` | ORF length in nucleotides |
-| `frac_position` | Fractional position of ORF start within the transcript (0 = 5' end) |
-| `frac_tx_covered` | Fraction of transcript length covered by this ORF |
-| `kozak_score` | Kozak consensus score (0-2): count of canonical positions matching (purine at -3, G at +4) |
-| `n_upstream_atgs` | Number of ATG codons upstream of this ORF's start |
-| `n_downstream_ejc` | Number of exon-exon junctions downstream of this ORF's stop codon |
-| `has_downstream_ejc` | Binary: n_downstream_ejc > 0 |
-| `is_ref_cds` | Binary: this ORF matches the reference CDS ATG (see above) |
-| `is_sqanti_cds` | Binary: this ORF matches the SQANTI/TD2 CDS ATG. TD2 selects the highest-scoring ORF per transcript based on length and homology evidence (BLAST/PFAM); defaults to longest ORF without hits. |
-
-Note that `n_downstream_ejc` and `has_downstream_ejc` at the ORF level are computed for each candidate ORF independently. They differ from the TX-level `ref_downstream_ejc` and `td2_downstream_ejc` which are specific to their respective reading frames. For the ORF that happens to be the reference CDS (or TD2 CDS), the values will agree; for other ORFs, they reflect a different stop codon position.
+The following are present in `selected_orfs.tsv` (and used by `04_interpret_attention.py` for downstream ORF-level analyses) but **do not enter** `NMDOrfModel`: `orf_length`, `frac_position` (different from `frac_start`), `frac_tx_covered`, `kozak_score`, `n_upstream_atgs`, `has_downstream_ejc`. The transcript-level `ref_*` and `td2_*` blocks (8 + 8 + 1 indicator) described in pre-v5 docs were removed in v5 (`model.py:199` "v5: no tx_features input"; `data_prep.py:692-693` "v5: no tx_features dataset"; `utils.py:31` "No tx_features (removed in v5)").
 
 ### Relationship to the prior structural elastic net
 
-The prior 24-feature elastic net model (AUC = 0.94) used 12 TD2 features + 12 reference-CDS features. The ORF model extends this by: (1) replacing the TD2 per-ORF feature set with a multi-ORF approach — evaluating all 10 candidate ORFs via shared-weight encoding and attention selection; (2) retaining both ref-CDS and TD2 transcript-level features as parallel channels (8 + 8 = 16), plus the `ref_atg_available` indicator; (3) adding sequence-level features via CNN branches.
+The prior 24-feature elastic net (AUC = 0.94) used 12 TD2 features + 12 reference-CDS features at the transcript level. The v5 ORF model replaces this with: (1) a multi-ORF approach evaluating K=5 candidate ORFs via shared-weight encoding and attention selection; (2) only 5 per-ORF structural features (no TX-level features); (3) two CNN branches over ATG and stop windows providing the sequence-level signal that the elastic net could not access.
 
 ---
 
@@ -163,9 +130,9 @@ The prior 24-feature elastic net model (AUC = 0.94) used 12 TD2 features + 12 re
 
 ### Data structure
 
-The unit of observation for most attention analyses is an **ORF-within-a-transcript**. Each test-set transcript has up to 10 ORFs (top-K by Kozak score from orfik scan). Each ORF has an attention weight assigned by the model's attention aggregator (softmax-normalized across ORFs within a transcript, so weights sum to 1 per transcript).
+The unit of observation for most attention analyses is an **ORF-within-a-transcript**. Each test-set transcript has up to K=5 ORFs, priority-ranked (ref CDS > SQANTI/TD2 CDS > top Kozak fill — see "Priority ORF Selection" above). Each ORF has an attention weight assigned by the model's attention aggregator (softmax-normalized across ORFs within a transcript, so weights sum to 1 per transcript).
 
-Test set: 15,584 transcripts (chr 1, 3, 5, 7; paralog-free), yielding 155,840 ORF-level rows (including padding). Of these, 2,386 are NMD-sensitive.
+Test set: 10,131 transcripts (chr 1, 3, 5, 7; paralog-free), yielding 50,655 ORF-level rows (including padding to K=5). Of these, 2,268 are NMD-sensitive.
 
 ### Analysis 1: Attention by ORF type
 
@@ -206,7 +173,7 @@ Correlations are computed separately for NMD, non-NMD, and all transcripts. Feat
 
 ### Analysis 4: No-PTC NMD isoform attention
 
-Identifies NMD-sensitive test transcripts where no ORF in the top-K has a downstream exon-junction complex (`has_downstream_ejc == 0` for all ORFs). These are "no-PTC" cases — NMD isoforms the model cannot explain via the classical PTC + downstream EJC mechanism.
+Identifies NMD-sensitive test transcripts where no ORF in K=5 has a downstream exon-junction complex (`has_downstream_ejc == 0` for all ORFs). These are "no-PTC" cases — NMD isoforms the model cannot explain via the classical PTC + downstream EJC mechanism.
 
 For these transcripts, reports: model prediction accuracy, attention distribution across ORF ranks, and a feature comparison (mean ORF features of the top-attended ORF) between no-PTC and PTC NMD isoforms.
 
@@ -227,7 +194,7 @@ The **sign** of mean grad x input indicates direction: positive means the featur
 ### Stratifications
 
 - **By class:** Mean |grad x input| computed separately for NMD, non-NMD, and all test transcripts
-- **By ORF rank:** ORF feature importance broken down by rank (0-9), showing whether the model uses different features for the priority ORF vs lower-ranked ones
+- **By ORF rank:** ORF feature importance broken down by rank (0-4), showing whether the model uses different features for the priority ORF vs lower-ranked ones
 - **By CDS status:** ORF feature importance for ref-CDS ORFs vs non-ref-CDS ORFs among NMD transcripts, revealing whether the model treats the reference frame differently
 
 ---
@@ -236,17 +203,25 @@ The **sign** of mean grad x input indicates direction: positive means the featur
 
 ### Method
 
-DeepSHAP (Lundberg & Lee, 2017) computes per-position, per-channel attribution values for the 10-channel sequence encoding. We use the `shap.DeepExplainer` implementation, which applies the DeepLIFT algorithm through the CNN layers.
+DeepSHAP (Lundberg & Lee, 2017) computes per-position, per-channel attribution values for the 9-channel sequence encoding. We use the `shap.DeepExplainer` implementation, which applies the DeepLIFT algorithm through the CNN layers.
 
-### Wrapper architecture
+### Three wrappers — three modes
 
-For each test sample, a `BranchWrapper` isolates a single sequence branch (ATG or stop) of the rank-0 ORF. All other inputs (other ORFs' windows, structural features, TX features) are held constant at their observed values. Only the target window varies, allowing DeepSHAP to attribute the model's output to specific nucleotide positions in that window.
+`deepshap.py` provides three explainer wrappers that expose different slices of the model to DeepSHAP. Each is selected by `--branches {atg, stop, structural, joint}`:
+
+- **`BranchWrapper`** (`deepshap.py:24-65`, `--branches {atg,stop}`) — **Marginal sequence mode.** Varies a single sequence window (ATG or stop) of the rank-0 ORF. All other inputs (rank 1-4 windows, structural features) are held constant at observed values. Used by the legacy single-branch interpretation flow (figures fall back to this when joint TSVs are unavailable).
+- **`StructuralWrapper`** (`deepshap.py:69-103`, `--branches structural`) — Varies the 5 per-ORF structural features of the rank-0 ORF; sequence windows fixed. Produces the §7.2 attribution heatmap and the per-sample 5-feature SHAP table.
+- **`JointBranchWrapper`** (`deepshap.py:105-166`, `--branches joint`) — **Joint mode (current canonical flow).** Varies the rank-0 ORF's ATG window + stop window + structural features simultaneously as a single flattened input vector. Fixes ranks 1-4 at observed values. Yields an additive decomposition `φ_ATG + φ_stop + φ_struct` in the embedding space that can be allocated back to position/channel level. This is the mode used to produce the SHAP data feeding §3.1 (Kozak motif logo), §4.1 (stop-codon motif logo), §7.2 (structural attribution), §9.4 (junction SHAP), §9.6 (input importance by subgroup), §9.7 (start by subgroup), §9.8 (stop by subgroup).
 
 ### Background and sample selection
 
-- **Background set:** 100 randomly sampled training transcripts (reflecting ~15% NMD prevalence). The SHAP baseline is the average model prediction over this background.
-- **Explained samples:** 2,000 randomly sampled test transcripts.
-- **Replication:** 5 independent runs with different random seeds (100, 200, 300, 400, 500) for background and sample selection. Channel-level CVs are 2-5% for nucleotide channels and 3-6% for the junction channel.
+The current 4ct pipeline runs DeepSHAP on **all test samples** with **500 background**, in 5 replicates with seeds 100, 200, 300, 400, 500 (`slurm_deepshap_joint.sh:19,25-26`, `slurm_deepshap_seq_500bg.sh`, `slurm_deepshap_structural.sh`):
+
+- **Background set:** 500 randomly sampled training transcripts. The background is sampled uniformly over the training set, so it inherits ~22% NMD prevalence (8,840 / 39,938) — not stratified.
+- **Explained samples:** `n_explain = 0` flag selects all 10,131 test transcripts (`deepshap.py` interprets 0 as "explain everything").
+- **Replication:** 5 independent runs with seeds {100, 200, 300, 400, 500}. The 5 NPZ files (`deepshap_joint_atg500_stop500_run{1..5}.npz`) are pooled by averaging in downstream scripts.
+
+A **legacy** marginal-mode flow exists in `slurm_deepshap_v5.sh` at `n_explain=2000`, `n_background=100` — this matches what earlier docs described, but the current report does not consume that data when joint TSVs are present. Step-4 finding E1 documents the silent fallback behavior.
 
 ### Attribution metric
 
@@ -256,13 +231,56 @@ The primary metric is **SHAP × input**: the DeepSHAP value at each position mul
 
 CNN-based SHAP values are elevated at the first and last ~25bp of the sequence window due to the CNN's receptive field extending beyond the window boundary. This was confirmed by comparing STOP=500 and STOP=1000 half-windows (1,000 vs 2,000 bp total): the elevated region moves with the window boundary, not with genomic position. The first and last bins of regional SHAP plots should be interpreted with this caveat.
 
-### Landmark motif analysis (`07_motif_analysis.py`)
+### Pooled outputs from joint NPZs
 
-Per-nucleotide SHAP logos are extracted at ±15bp around biologically meaningful positions (stop codon, exon-exon junctions). For variable-position landmarks (junctions), each sample contributes its own landmark location, and SHAP values are aligned to the landmark position.
+Two helper scripts pool the 5 joint NPZ files into the TSVs the report consumes (added during Step-2/Step-4 reproducibility work; absent from earlier METHODS):
+
+- **`scripts/export_joint_motif_logos.py`** — pools the 5 NPZs into per-position-per-channel mean SHAP × input + nucleotide frequency for the ATG and stop windows. Outputs: `motif_logo_atg_joint_{tag}.tsv` (§3.1) and `motif_logo_stop_joint_{tag}.tsv` (§4.1). Population: all test samples (n_nmd ≈ 2,268, n_ctrl ≈ 7,863), 5-run averaged.
+- **`09b_export_subgroup_profiles.py`** — pools the 5 NPZs into 6 TSVs feeding the subgroup analyses: `sample_shap_structural_{tag}.tsv` (per-sample 5-feature SHAP), `shap_profile_{atg,stop}_joint_{tag}.tsv` (per-position class-average), `shap_profile_{atg,stop}_subgroup_joint_{tag}.tsv` (per-position per-subgroup), `motif_logo_{atg,stop}_subgroup_joint_{tag}.tsv` (per-position per-channel per-subgroup). Subgroup classification logic at `09b_export_subgroup_profiles.py:30-43` mirrors the report's §7.1 case_when (see "Subgroup definitions" below).
+
+### Landmark motif analysis (marginal flow, `07_motif_analysis.py`)
+
+The legacy flow extracts per-nucleotide SHAP logos at ±15bp around biologically meaningful positions (stop codon, exon-exon junctions) from the marginal-mode NPZ. This produces a **multi-landmark** TSV (`motif_logos_stop_*.tsv`) carrying both `stop_codon` and `first_3utr_junction` landmarks. Only the `first_3utr_junction` landmark is consumed by the report (§9.1) — the stop-codon logo is sourced from the joint flow. For variable-position landmarks (junctions), each sample contributes its own landmark location, and SHAP values are aligned to the landmark position.
 
 ---
 
-## Subgroup-Specific DeepSHAP Analysis (`08_export_subgroup_deepshap_tsv.py`)
+## KernelSHAP Branch Decomposition (`11_kernel_shap_branches.py`)
+
+This produces the §2.1 branch decomposition (60.7% structural / 28.8% stop / 10.5% ATG of NMD branch attribution). Distinct from DeepSHAP, which attributes per-position; KernelSHAP here treats the model's three sub-encoders (ATG branch, stop branch, structural branch) as **3 "players"** and computes their exact additive Shapley contributions.
+
+### Method
+
+For each test transcript:
+1. Pre-compute the 3 rank-0 ORF sub-embeddings (32-dim each) from `model.orf_encoder` (`11_kernel_shap_branches.py:33-118`).
+2. Evaluate all `2^3 = 8` coalitions of present/absent branches. For absent branches, integrate over background sub-embeddings (uniform sample from the same `n_background=500` training set; `11_kernel_shap_branches.py:251`) — not a mean approximation, since the ReLU fusion layer is nonlinear.
+3. Compute exact Shapley values `φ_ATG + φ_stop + φ_struct = f(x) - E[f(x)]` per transcript.
+
+Additivity check: residual `|φ_ATG + φ_stop + φ_struct - (f(x) - E[f(x)])|` ≤ 1.8e-15 (machine epsilon) across the test set (Step-2 verified).
+
+### Output
+
+`kernel_shap_branch_{tag}.tsv` (per-transcript Shapley values per branch), consumed by §2.1 (overall decomposition) and §7.3 (per-subgroup decomposition).
+
+---
+
+## Stop-codon column patch (`scripts/patch_stop_codon.py`)
+
+`selected_orfs.tsv` is generated by `data_prep.py` and was found in March 2026 to carry an off-by-one error in its `stop_codon` column — the column was reading the three nucleotides immediately downstream of the stop codon rather than the stop codon itself (full diagnosis in `BUGFIX_STOP_CODON_2026-03-31.md`). The 4ct addendum (2026-04-30) describes the patch flow:
+
+1. After `data_prep.py` writes `selected_orfs.tsv`, run `python scripts/patch_stop_codon.py` (or `slurm_patch_selected_orfs.sh`).
+2. The patch reads the one-hot encoded stop window from `nmd_orf_data.h5`, decodes the actual codon at the rank-0 stop position, and overwrites the `stop_codon` column with the correct value.
+3. The patched file has 100% canonical stop codons (TAA/TAG/TGA) for rank-0 ORFs.
+
+The §4.1 chi-square test depends on this patched column. **A user re-running `data_prep.py` cleanly will regenerate the buggy column** — the patch must be re-applied. README.md's "Build order" section places the patch step between `data_prep.py` and `03_train.py`.
+
+---
+
+## Subgroup-Specific DeepSHAP Analysis
+
+There are **two subgroup-specific DeepSHAP flows** in the repo, with different scope and sample size:
+
+- **Marginal subgroup flow** (`08_export_subgroup_deepshap_tsv.py`) — Stratifies the legacy run-1 marginal-mode subset (n=2,000) into subgroups and computes per-subgroup statistics on Kozak, 5'UTR composition, stop codon, junction, periodicity, and rolling GC. This is the older flow.
+- **Joint subgroup flow** (`09b_export_subgroup_profiles.py`) — Pools the 5 joint-mode NPZs (all test samples, 500 background each) and emits per-subgroup positional and motif-logo TSVs. This is the **current canonical flow** for §3.1, §4.1, §7.2, §9.4, §9.6, §9.7, §9.8.
 
 ### Subgroup definitions
 
@@ -273,28 +291,25 @@ NMD isoforms in the test set are classified into three subgroups based on the `c
 - **NMD PTC-, ref ATG lost**: `category ∈ {ref_atg_lost, no_ref_isoform, not_atg_in_target, no_stop_in_target}` with `td2_downstream_ejc == 0` or NA.
 - Non-NMD transcripts are labeled **Control**.
 
-This logic mirrors the R report's `case_when` assignment in Section 7.1 (lines 1565–1581 of `orf_model_report_v5.Rmd`). A small number of NMD isoforms (~15) that do not fit any subgroup are classified as "NMD other" and excluded from subgroup analyses.
+This logic mirrors the report's `case_when` assignment in §7.1 of `orf_model_report_v5.Rmd` and is implemented in `09b_export_subgroup_profiles.py:30-43` (`assign_subgroup()`). NMD isoforms that fall outside all three subgroups are labeled "NMD other" and excluded from subgroup analyses (currently 0 isoforms in the 4ct test set; the four named subgroups sum to 10,131 — Step-1 verified).
 
-### Method
+### Joint subgroup flow method
 
-For each of the 5 DeepSHAP replicates (runs 1–5), the 2,000 explained test samples are mapped to subgroups via their `explain_indices` (which index directly into the test set, in the same order as `predictions_{tag}.tsv`). SHAP × input statistics are then computed per subgroup for:
+Per-subgroup outputs from `09b_export_subgroup_profiles.py`:
+- `sample_shap_structural_{tag}.tsv` — per-sample DeepSHAP for the 5 structural features. Used by §7.2.
+- `shap_profile_{atg,stop}_joint_{tag}.tsv` — per-position per-channel mean |SHAP| for NMD vs Control. Used by §2.3, §3, §4.
+- `shap_profile_{atg,stop}_subgroup_joint_{tag}.tsv` — per-position total nucleotide |SHAP| (A+C+G+T) per subgroup. Used by §9.6.
+- `motif_logo_{atg,stop}_subgroup_joint_{tag}.tsv` — per-position per-channel mean SHAP × input + nucleotide frequency, ±15bp, per subgroup. Used by §9.7, §9.8.
 
-1. **Kozak context**: Per-nucleotide SHAP at standard Kozak positions (-6 to +7, A of ATG = +1).
-2. **5'UTR composition**: Mean channel SHAP upstream of the Kozak zone (> 6bp from ATG).
-3. **Stop codon identity**: TGA/TAA/TAG frequency and total signed SHAP at variable stop codon positions.
-4. **Downstream junction SHAP**: Junction channel SHAP in the 3'UTR portion of the stop window.
-5. **Codon periodicity**: Per-frame nucleotide SHAP and lag-3 autocorrelation in the ORF body.
-6. **Rolling GC importance**: By transcript region (5'UTR, CDS, ORF body, 3'UTR).
+Each output averages across the 5 joint NPZ runs; n_samples per subgroup matches the test-set sums per the case_when classification.
 
-### Cross-run stability
+### Marginal subgroup flow method (legacy)
 
-Per-run subgroup statistics are aggregated to produce:
-- **Mean** and **standard deviation** across 5 runs.
-- **CV** (coefficient of variation): std / |mean|.
-- **Sign consistency**: "YES" if the sign of the mean is the same in all 5 runs, "NO" otherwise.
-- **95% CI**: mean ± 1.96 × SE, where SE = std / √5.
+For each of the 5 DeepSHAP replicates (runs 1–5), the 2,000 explained test samples are mapped to subgroups via their `explain_indices`. SHAP × input statistics are computed per subgroup for: (1) Kozak context (-6 to +7, A of ATG = +1); (2) 5'UTR composition; (3) stop codon identity; (4) junction SHAP; (5) codon periodicity; (6) rolling GC by region.
 
-Findings are reported as robust only when sign-consistent across all 5 runs. Channels or positions with sign inconsistency or CV > 50% are noted but not presented as findings.
+### Cross-run stability (marginal flow)
+
+The marginal flow aggregates per-run subgroup statistics into mean, standard deviation, CV, sign consistency (YES if all 5 runs agree on sign), and 95% CI (mean ± 1.96 × SE, SE = std / √5). Findings are reported as robust only when sign-consistent across all 5 runs. The joint flow performs the same averaging implicitly via its 5-run NPZ pooling.
 
 ---
 
