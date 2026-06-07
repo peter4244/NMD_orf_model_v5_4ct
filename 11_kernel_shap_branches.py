@@ -250,6 +250,10 @@ def main():
     parser.add_argument("--tag", default="atg500_stop500")
     parser.add_argument("--n-background", type=int, default=500)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--explain-split", default="test",
+                        help="isoforms to explain: 'test' (default), 'all' "
+                             "(train+val+test+paralog, full cohort), 'test_all', 'train', 'val'. "
+                             "Background is always drawn from train.")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -274,10 +278,10 @@ def main():
     model.eval()
     print(f"Model loaded from {ckpt_path}")
 
-    # Load data
-    test_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="test")
+    # Load data — explained set (default test; 'all' = full cohort) + train (background)
+    test_ds = NMDDataset(h5_path, ws_atg, ws_stop, split=args.explain_split)
     train_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="train")
-    print(f"Test: {len(test_ds)}, Train: {len(train_ds)}")
+    print(f"Explain ({args.explain_split}): {len(test_ds)}, Train(bg): {len(train_ds)}")
 
     # Load isoform IDs
     with h5py.File(h5_path, 'r') as f:
@@ -374,8 +378,9 @@ def main():
         pct = 100 * nmd[branch].abs().mean() / total_nmd
         print(f"  {branch:20s}: {pct:.1f}%")
 
-    # Save
-    out_path = results_dir / f"kernel_shap_branch_{args.tag}.tsv"
+    # Save (suffix non-test explained sets so the full-cohort file is distinct)
+    suffix = "" if args.explain_split == "test" else f"_{args.explain_split}"
+    out_path = results_dir / f"kernel_shap_branch_{args.tag}{suffix}.tsv"
     df.to_csv(out_path, sep="\t", index=False)
     print(f"\n-> {out_path} ({len(df)} rows)")
     print("Done.")

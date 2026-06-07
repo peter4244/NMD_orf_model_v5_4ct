@@ -41,6 +41,8 @@ class NMDDataset(Dataset):
                 mask = splits == "test"
             elif split == "test_all":
                 mask = (splits == "test") | (splits == "test_paralog")
+            elif split == "all":
+                mask = np.ones(len(splits), dtype=bool)   # every isoform (for full-cohort interpretation)
             else:
                 mask = splits == split
 
