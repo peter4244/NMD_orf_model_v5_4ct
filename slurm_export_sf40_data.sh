@@ -21,12 +21,12 @@ conda activate nmd_model
 
 TAG="atg500_stop500"
 
-echo "=== 06: DeepSHAP positional TSVs (atg + stop, with nucleotide freqs) ==="
-python 06_export_deepshap_tsv.py --tag ${TAG}
+echo "=== 09: raw rolling-GC content across the AUG window ==="
+python 09_export_gc_content.py --tag ${TAG} --run 1 --branch atg
 
 echo ""
 echo "=== 09: raw rolling-GC content across the stop window ==="
-python 09_export_gc_content.py --tag ${TAG} --run 1
+python 09_export_gc_content.py --tag ${TAG} --run 1 --branch stop
 
 echo ""
 echo "Done."

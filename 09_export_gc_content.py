@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-09_export_gc_content.py — Export GC content across the stop window.
+09_export_gc_content.py — Export GC content across the AUG or stop window.
 
-Computes sliding-window GC content from the stop branch inputs (one-hot
-nucleotide channels) for NMD and Control samples, producing the
-gc_content_across_stop_window_{tag}.tsv expected by the report.
+Computes sliding-window GC content from a branch's one-hot nucleotide
+channels for NMD and Control samples. Emits
+gc_content_across_{branch}_window_{tag}.tsv, where {branch} is `atg`
+or `stop` (defaults to `stop` for backwards compatibility with the
+Rmd report).
 
 Columns: rel_mid, mean_gc, se_gc, class
 """
@@ -20,6 +22,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tag", default="atg500_stop500")
     parser.add_argument("--run", type=int, default=1)
+    parser.add_argument("--branch", choices=("atg", "stop"), default="stop",
+                        help="Which branch NPZ to read from (default: stop, "
+                             "for backwards compatibility with the original "
+                             "gc_content_across_stop_window_*.tsv path).")
     parser.add_argument("--gc-window", type=int, default=50,
                         help="Sliding window size for GC computation")
     parser.add_argument("--gc-step", type=int, default=10,
@@ -28,9 +34,10 @@ def main():
 
     results_dir = Path("results_4ct")
     run_tag = f"{args.tag}_run{args.run}"
+    branch = args.branch
 
-    # Load stop branch inputs
-    npz_path = results_dir / f"deepshap_stop_{run_tag}.npz"
+    # Load requested branch's inputs
+    npz_path = results_dir / f"deepshap_{branch}_{run_tag}.npz"
     print(f"Loading {npz_path}")
     data = np.load(npz_path)
     inputs = data["inputs"]   # (N, 9, W)
@@ -38,7 +45,7 @@ def main():
     channel_names = list(data["channel_names"])
 
     N, C, W = inputs.shape
-    stop_pos = W // 2
+    codon_pos = W // 2
 
     # G and C channels
     g_idx = channel_names.index("G")
@@ -60,7 +67,7 @@ def main():
 
         for start in range(0, W - win + 1, step):
             end = start + win
-            rel_mid = ((start + end) / 2) - stop_pos
+            rel_mid = ((start + end) / 2) - codon_pos
 
             # Mean GC in this window for each sample, then aggregate
             sample_gc = gc_class[:, start:end].mean(axis=1)  # (n_class,)
@@ -77,7 +84,7 @@ def main():
     df = pd.DataFrame(rows)
 
     # Save with the tag format expected by the report (no _run suffix)
-    out_path = results_dir / f"gc_content_across_stop_window_{args.tag}.tsv"
+    out_path = results_dir / f"gc_content_across_{branch}_window_{args.tag}.tsv"
     df.to_csv(out_path, sep="\t", index=False)
     print(f"  -> {out_path} ({len(df)} rows)")
 
