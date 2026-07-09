@@ -1,0 +1,7 @@
+class	stop_codon	n	pct	class_total
+NMD	UGA	1268	55.9	2268
+NMD	UAA	542	23.9	2268
+NMD	UAG	458	20.2	2268
+Control	UGA	3780	48.1	7863
+Control	UAA	2351	29.9	7863
+Control	UAG	1732	22.0	7863
