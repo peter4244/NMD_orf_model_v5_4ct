@@ -91,10 +91,14 @@ def main():
         print(f"       rank column = {rank_col!r}; filtering to rank == 0")
         priority = sel[sel[rank_col] == 0].copy()
 
-    # Join with predictions to get the class label + test-split flag.
+    # Join with predictions to get the class label. Filter test set by
+    # chromosome (chr 1/3/5/7 = train-time held-out split); predictions TSV
+    # doesn't carry a `split` column.
     print(f"[load] {PREDS}")
     preds = pd.read_csv(PREDS, sep="\t")
-    keep = preds[preds["split"] == "test"][["isoform_id", "label"]].copy()
+    TEST_CHRS = {"chr1", "chr3", "chr5", "chr7"}
+    keep = preds[preds["chr"].isin(TEST_CHRS)][["isoform_id", "label"]].copy()
+    print(f"       test-chr rows = {len(keep):,}")
 
     df = priority.merge(keep, on="isoform_id", how="inner")
     df["stop_rna"] = df[stop_col].apply(normalize_stop)
