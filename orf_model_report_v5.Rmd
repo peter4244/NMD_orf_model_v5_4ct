@@ -1163,8 +1163,6 @@ p_sc <- sc_freq %>%
   scale_y_continuous(labels = percent_format(), limits = c(0, 0.78)) +
   labs(title = sprintf("Stop Codon Usage: NMD vs Control (rank-0 ORF, n=%s)",
                        format(nrow(sc_data), big.mark = ",")),
-       subtitle = sprintf("Chi-sq = %.1f, p = %.1e (overall); pairwise Fisher exact tests shown per codon.",
-                          as.numeric(chi_test$statistic), chi_test$p.value),
        x = "Stop codon", y = "Frequency", fill = NULL) +
   theme(legend.position = "top")
 
