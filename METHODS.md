@@ -316,3 +316,69 @@ The marginal flow aggregates per-run subgroup statistics into mean, standard dev
 ## Gene-Matched C2/C4 Analysis
 
 A supplementary report uses gene-matched isoform pairs from the isopair analysis to control for gene-level confounds. C2 (NMD) and C4 (Control) pairs share the same (gene_id, reference_isoform_id). Only pairs where both comparators are in the test set are used. Structural importance is recomputed from per-sample grad × input vectors (`sample_importance_{tag}.npz`) filtered to gene-matched isoforms. DeepSHAP channel summaries are recomputed from the per-sample NPZ arrays filtered to gene-matched isoform IDs.
+
+---
+
+## uORF-Attention Attribution Analysis (`infer_uorf_attention.py`, `compute_uorf_attention_metrics.R`)
+
+A transcriptome-wide attribution analysis testing whether the attention layer can distinguish NMD-triggering upstream ORFs (uORFs) from main-ORF PTC mechanisms.
+
+### Universe and inference
+
+Inference is run on the **full v5_4ct labeled universe** (39,938 isoforms = 8,840 NMD + 31,098 non-NMD) rather than the held-out test subset. This is an attribution analysis (where does attention land?), not a prediction-generalization analysis; the training-vs-test distinction does not apply to attention-pattern interpretation. The model checkpoint is `results_4ct/best_model_atg500_stop500.pt` (val AUC 0.9376). Sequence and ORF-feature inputs are taken from the v5 HDF5 (per v5_4ct CLAUDE.md "ORF features … unchanged from the original v5 pipeline"); normalization stats are the v5_4ct training-set arrays extracted from `results_4ct/nmd_orf_data.h5::/normalization/` on the cluster:
+
+- `mean = [0.3708552, 0.5446399, 0.13680594, 0.19173051, 1.7330148]`
+- `std  = [0.26555353, 0.26279053, 0.3435218, 0.39381742, 3.6128473]`
+
+(feature order: `frac_start, frac_stop, is_ref_cds, is_sqanti_cds, n_downstream_ejc`).
+
+Outputs per isoform: attention weights across the 5 priority ORFs, P(NMD) (sigmoid of logit), split assignment.
+
+### Operational uORF definition
+
+An ORF is a **uORF** in this analysis if and only if:
+
+1. Its start codon is upstream of the identified main-CDS ORF in transcript coordinates (`frac_position < main_frac_position`), AND
+2. It is itself not the main-CDS ORF (`orf_rank != main_orf_rank`).
+
+The **main-CDS ORF** per isoform is identified by priority chain: (1) the model-flagged `is_ref_cds==1` ORF if present; (2) else the `is_sqanti_cds==1` ORF; (3) else the longest ORF in the per-isoform priority set. This fallback resolves the main CDS even for isoforms where neither flag is set (e.g., categories `no_ref_isoform`, `not_atg_in_target`, `no_stop_in_target` — including both ATF4 isoforms in the model universe).
+
+### Per-isoform metrics
+
+- **`uorf_attention_frac`** ∈ [0, 1] = sum of attention weights over ORFs flagged as uORFs.
+- **`top_is_uorf`** ∈ {TRUE, FALSE} = TRUE iff the argmax-attention ORF is a uORF.
+
+### Subgroup classification
+
+Mechanistic subgroups are assigned via the canonical v5_4ct classifier (`09b_export_subgroup_profiles.py::assign_subgroup`, also documented above in §"Subgroup definitions"), using v5_4ct's relabeled `is_nmd` from `tx_summary.tsv` (NOT the v5 HDF5 `labels` field, which differs for the ~22 isoforms relabeled during the 4-CT mashr refit).
+
+### Statistical tests
+
+Primary contrast: PTC− NMD (combined, n=1,952) vs PTC+ NMD (n=6,888).
+- **Wilcoxon rank-sum** (one-sided, "PTC− > PTC+") on `uorf_attention_frac`.
+- **Cliff's δ** for ordinal effect size.
+- **Fisher's exact** on `top_is_uorf`. Two-by-two table row order enforced (PTC− as row 1) so the returned OR > 1 corresponds to "PTC− has higher odds of top_is_uorf than PTC+"; without an explicit factor level, R's `count()` would sort groups alphabetically and the returned OR would be the reciprocal of the intended quantity.
+
+### Outputs
+
+- `results_4ct/uorf_attention_predictions.tsv` — per-isoform attention + prediction (one row per isoform).
+- `results_4ct/uorf_attention_metrics.tsv` — per-isoform metrics + subgroup assignment.
+- `results_4ct/uorf_attention_subgroup_counts.tsv` — n per subgroup.
+
+Full report: `uorf_attention_attribution.Rmd` → `uorf_attention_attribution.html`. Companion audit: `uorf_attention_attribution_AUDIT.md`.
+
+### Feature signature of high-attention uORFs (extension)
+
+A follow-up analysis (Tables 5–6 in the Rmd) asks: within PTC− NMD isoforms with multiple candidate uORFs, does the model concentrate attention on specific uORFs, and what features distinguish the favored uORF?
+
+**Population.** Of the 1,952 PTC− NMD isoforms, 1,428 have ≥1 uORF in the model's priority slots and 871 have ≥2 (the within-isoform comparison population).
+
+**Attention concentration metrics.** Per isoform with ≥2 uORFs:
+- `top_uorf_share = max(attention[uORFs]) / sum(attention[uORFs])` ∈ [0, 1].
+- `norm_entropy = -Σ p_i log p_i / log(n_uORFs)` where p_i is the within-uORF attention share. 0 = single uORF dominates; 1 = uniform.
+
+**Within-isoform paired feature deltas.** For each isoform with ≥2 uORFs, identify the top-attended uORF and compute Δfeature = (top uORF's feature) - mean(other uORFs' feature) for: `kozak_score`, `orf_length`, `n_downstream_ejc`, `frac_position`. Pool deltas across isoforms; one-sample Wilcoxon signed-rank test against 0 (one-sided "greater" for Kozak/length/EJC where NMD biology predicts top to be larger; two-sided for frac_position).
+
+**Output.** Intermediate per-uORF table at `results_4ct/uorf_features_in_priority_slots.tsv`.
+
+**Caveat (documented in the Rmd's Limitations).** The 5-ORF priority set is already Kozak-filtered, so within-set Kozak variance is compressed. Downstream-EJC count is largely determined by transcript exon structure, so within-set EJC variance is also compressed. The null results for Kozak and EJC in this analysis should be read with that constraint in mind.
