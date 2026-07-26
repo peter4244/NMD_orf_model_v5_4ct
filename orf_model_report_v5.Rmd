@@ -163,8 +163,10 @@ noptc <- noptc_all %>% filter(any_orf_has_ejc == 0)
 all_orfs <- read.delim(file.path(results_dir, "selected_orfs.tsv"))
 
 # Reference CDS features (for 3'UTR correction analysis in Section 9.13)
-# Source: ref_cds_features.tsv (symlink into ../nmd_orf_model/results/, produced upstream by
-#   05t_ref_cds_features.R in that repo). See README.md § "Cross-repo dependencies".
+# Source: ref_cds_features.tsv — written in-repo by export_rds.R from
+#   data_mashr/analysis_cache/ref_cds_features_all.rds, which is produced by
+#   05t_ref_cds_features.R in the Isopair Version_6.0 wrapper.
+#   See README.md § "Inputs and regeneration (code-only deposit)".
 ref_features <- read.delim(file.path(results_dir, "ref_cds_features.tsv"))
 
 # TD2 features (needed for subgroup assignment in Sections 7.1 and 8)
@@ -1566,7 +1568,7 @@ We stratify all test-set transcripts into four subgroups: one Control and three 
 # Population: all test-set transcripts (n = n_test)
 
 # Build a single analysis data frame with subgroup assignments for all test transcripts
-# Subgroups based on the upstream category field from 05t_ref_cds_features.R (../nmd_orf_model):
+# Subgroups based on the `category` field from 05t_ref_cds_features.R (Isopair Version_6.0 wrapper):
 #   effectively_ptc       → NMD PTC+
 #   no_downstream_ejc     → NMD PTC-, ref ATG retained
 #   truncated_no_ejc      → NMD PTC-, ref ATG retained
@@ -1650,7 +1652,7 @@ p_subgroups <- subgroup_counts %>%
 save_fig(p_subgroups, "fig6a_subgroup_counts", width = 9, height = 4)
 ```
 
-**Subgroup definitions** (applied to all `r format(n_test, big.mark = ",")` test transcripts, based on the `category` field from the upstream reference-CDS tracing in `05t_ref_cds_features.R` in the `../nmd_orf_model` repo):
+**Subgroup definitions** (applied to all `r format(n_test, big.mark = ",")` test transcripts, based on the `category` field from the reference-CDS tracing in `05t_ref_cds_features.R` in the Isopair Version_6.0 wrapper):
 
 | Subgroup | Definition |
 |----------|------------|
