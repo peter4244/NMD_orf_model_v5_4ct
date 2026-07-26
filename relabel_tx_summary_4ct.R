@@ -53,6 +53,50 @@ if (length(overlap) > 0) {
 
 cat(sprintf("\nAggregate: %d NMD, %d non-NMD\n", length(all_nmd), length(all_non_nmd)))
 
+# --- GUARD: the non-NMD set must match the definition the paper documents ------------
+#
+# Supplemental Methods: "Non-NMD susceptible isoforms were defined as those with mashr
+# lfsr >= 0.05 AND per-cell-type adj.P.Val > 0.30". The loop above applies only the
+# adj.P.Val half. On the 2026.3.10 vintage the two are EXACTLY equivalent -- measured
+# 2026-07-26, all 77,459 isoforms, zero difference -- because adj.P.Val > 0.30 in all four
+# cell types already implies lfsr >= 0.05 in all four.
+#
+# That is a property of this vintage, not a theorem. mashr shrinkage borrows strength
+# across conditions, so a re-run could produce a confidently-signed isoform (lfsr < 0.05)
+# whose per-cell-type p-values all stay above 0.30 -- and it would enter the training set
+# as a NEGATIVE while the paper's own definition excludes it. Silently, and only in the
+# labels. Assert the equivalence rather than re-derive it; if it ever breaks, the fix is to
+# apply both conditions, but that is a decision to take deliberately, not by drift.
+#
+# Columns are selected by PATTERN, not by a hardcoded ct->column map: the die files spell
+# the cell types at/dd/fb/mv while the lfsr matrix spells them AT2/LAE/FB/MV, and a
+# spelling mismatch of exactly this kind silently zeroed a published range on 2026-07-25.
+# Requiring lfsr >= 0.05 in ALL cell types makes the mapping irrelevant.
+lfsr_path <- file.path(mashr_dir, sprintf("mashr_isoform_lfsr_%s.csv", de_date))
+if (!file.exists(lfsr_path)) {
+  stop(sprintf("cannot verify the documented non-NMD definition: %s not found", lfsr_path))
+}
+lfsr <- read.csv(lfsr_path, check.names = FALSE)
+lfsr_cols <- grep("^Smg1i_in_", names(lfsr), value = TRUE)
+if (length(lfsr_cols) != length(cts)) {
+  stop(sprintf("expected %d Smg1i_in_* columns in the lfsr matrix, found %d: %s",
+               length(cts), length(lfsr_cols), paste(lfsr_cols, collapse = ", ")))
+}
+min_lfsr  <- do.call(pmin, c(lfsr[lfsr_cols], na.rm = TRUE))
+lfsr_ok   <- lfsr$txid[min_lfsr >= 0.05]
+violators <- setdiff(all_non_nmd, lfsr_ok)
+if (length(violators) > 0) {
+  stop(sprintf(paste0(
+    "non-NMD set no longer matches the documented definition: %d of %d isoforms have ",
+    "lfsr < 0.05 in at least one cell type.\n  e.g. %s\n",
+    "  The Supplemental Methods require lfsr >= 0.05 AND adj.P.Val > 0.30; this script ",
+    "applies only the second. Decide explicitly before proceeding."),
+    length(violators), length(all_non_nmd),
+    paste(utils::head(violators, 3), collapse = ", ")))
+}
+cat(sprintf("  guard: all %d non-NMD isoforms satisfy lfsr >= 0.05 (documented definition)\n",
+            length(all_non_nmd)))
+
 # --- Update tx_summary ---
 tx <- read.delim(file.path(results_dir, "tx_summary_6ct.tsv"),
                  stringsAsFactors = FALSE)
