@@ -8,6 +8,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 import torch
+import os
 import yaml
 from sklearn.metrics import roc_auc_score, average_precision_score
 from torch.utils.data import Dataset
@@ -16,6 +17,11 @@ from torch.utils.data import Dataset
 def load_config(config_path="config.yaml"):
     with open(config_path) as f:
         return yaml.safe_load(f)
+
+
+# Path resolution lives in paths_config (no torch dependency); re-exported
+# here so `from utils import resolve_path` keeps working.
+from paths_config import PATH_ENV, resolve_path  # noqa: E402,F401
 
 
 def set_seed(seed):

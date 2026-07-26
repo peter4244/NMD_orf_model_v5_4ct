@@ -26,15 +26,20 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from paths_config import resolve_path
+
 # =============================================================================
 # Constants
 # =============================================================================
-CACHE_DIR = Path("/projects/talisman/shared-data/nmd/isoform_transitions/"
-                 "Version_6.0/isopair_wrapper/data_mashr/analysis_cache")
-SQANTI_CLASS_PATH = Path("/projects/talisman/shared-data/nmd/sqanti/results/"
-                         "nmd_lungcells_classification.txt")
-FASTA_PATH = Path("/projects/talisman/shared-data/nmd/sqanti/results/"
-                  "nmd_lungcells_corrected.fasta")
+# Resolved from config.yaml `paths:`, overridable per machine with $NMD_ISOPAIR_CACHE /
+# $NMD_SQANTI_CLASS / $NMD_SQANTI_FASTA. These were absolute /projects/talisman/... literals,
+# which pinned the model's entire isoform universe to one machine's copy of the LEGACY isopair
+# tree -- and invisibly: 0 of 24 isoforms that the rebuilt structures.rds added appear in the
+# resulting tx_summary.tsv (measured 2026-07-26). A path only changeable by editing code is a
+# path nobody changes.
+CACHE_DIR = resolve_path("isopair_cache")
+SQANTI_CLASS_PATH = resolve_path("sqanti_class")
+FASTA_PATH = resolve_path("sqanti_fasta")
 
 MAX_ORFS = 5
 WINDOW_SIZES = [100, 500, 1000, 2000]

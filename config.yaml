@@ -1,3 +1,26 @@
+# =============================================================================
+# paths — inputs produced OUTSIDE this repo.
+#
+# These were hardcoded as absolute /projects/talisman/... literals in data_prep.py,
+# export_rds.R, 09_export_polya.py and relabel_tx_summary_4ct.R. That is not a style
+# problem: it silently pinned the model's ENTIRE isoform universe to one machine's copy
+# of the legacy isopair tree. Measured 2026-07-26 -- 0 of 24 isoforms that the rebuilt
+# structures.rds added appear in the model's tx_summary.tsv, so the published model was
+# trained and explained on that stale universe without anything saying so.
+#
+# The defaults below are exactly those Channing (talisman) locations, so behaviour is
+# unchanged where they exist. Override per-machine WITHOUT editing code:
+#   env var      NMD_ISOPAIR_CACHE, NMD_ISOPAIR_DATA, NMD_SQANTI_CLASS, NMD_SQANTI_FASTA
+#   or edit      this file
+# Read by utils.resolve_path() (Python) and read_paths() in export_rds.R (R), so the two
+# languages share one source rather than drifting.
+paths:
+  isopair_cache: /projects/talisman/shared-data/nmd/isoform_transitions/Version_6.0/isopair_wrapper/data_mashr/analysis_cache
+  isopair_data:  /projects/talisman/shared-data/nmd/isoform_transitions/Version_6.0/isopair_wrapper/data_mashr
+  sqanti_class:  /projects/talisman/shared-data/nmd/sqanti/results/nmd_lungcells_classification.txt
+  sqanti_fasta:  /projects/talisman/shared-data/nmd/sqanti/results/nmd_lungcells_corrected.fasta
+  mashr_dir:     /projects/talisman/shared-data/nmd/mashr
+
 data:
   hdf5_path: results_4ct/nmd_orf_data.h5
   max_orfs_per_tx: 5

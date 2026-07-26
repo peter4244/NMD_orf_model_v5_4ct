@@ -7,8 +7,20 @@
 # - Isoforms in neither set are dropped from tx_summary
 #
 
-mashr_dir <- "/projects/talisman/shared-data/nmd/mashr"
-results_dir <- "/home/p.castaldi/cc/nmd_orf_model_v5_4ct/results_4ct"
+# Repo root, from this script's own path -- so nothing depends on which machine it runs on.
+REPO <- local({
+  a <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+  if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))) else normalizePath(getwd())
+})
+
+# External input: config.yaml `paths:` / $NMD_MASHR_DIR, not a baked-in absolute path.
+mashr_dir <- (function() {
+  ev <- Sys.getenv("NMD_MASHR_DIR", unset = "")
+  if (nzchar(ev)) return(ev)
+  yaml::read_yaml(file.path(REPO, "config.yaml"))$paths$mashr_dir
+})()
+# This repo's OWN output dir -- derive it, never hardcode one machine's home.
+results_dir <- file.path(REPO, "results_4ct")
 de_date <- "2026.3.10"
 
 cts <- c("at", "dd", "fb", "mv")

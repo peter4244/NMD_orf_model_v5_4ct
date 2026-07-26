@@ -13,12 +13,15 @@ from pathlib import Path
 
 import pandas as pd
 
+from paths_config import resolve_path
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tag", default="atg500_stop500")
+    # Default resolved from config.yaml `paths:` / $NMD_SQANTI_CLASS rather than baked in.
     parser.add_argument("--sqanti-classification",
-                        default="/projects/talisman/shared-data/nmd/sqanti/results/nmd_lungcells_classification.txt")
+                        default=str(resolve_path("sqanti_class")))
     args = parser.parse_args()
 
     results_dir = Path("results_4ct")

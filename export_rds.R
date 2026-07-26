@@ -15,7 +15,40 @@
 
 library(jsonlite)
 
-cache_dir <- "/projects/talisman/shared-data/nmd/isoform_transitions/Version_6.0/isopair_wrapper/data_mashr/analysis_cache"
+# ---------------------------------------------------------------------------
+# nmd_path(key) — external inputs, resolved the same way data_prep.py resolves them:
+# environment variable > config.yaml `paths:`. ONE source of truth across both languages.
+#
+# cache_dir and data_dir below were absolute /projects/talisman/... literals. That pinned
+# the feature tables -- and therefore the model's entire isoform universe -- to one
+# machine's copy of the LEGACY isopair tree. It was invisible until measured: 0 of 24
+# isoforms that the rebuilt structures.rds added appear in the resulting tx_summary.tsv
+# (2026-07-26). This script is the one that reads the analysis_cache, so it is the point
+# where a rerun either picks up the rebuilt universe or silently repeats the old one.
+# ---------------------------------------------------------------------------
+nmd_path <- function(key, must_exist = FALSE) {
+  env_of <- c(isopair_cache = "NMD_ISOPAIR_CACHE", isopair_data = "NMD_ISOPAIR_DATA",
+              sqanti_class  = "NMD_SQANTI_CLASS",  sqanti_fasta = "NMD_SQANTI_FASTA",
+              mashr_dir     = "NMD_MASHR_DIR")
+  ev <- Sys.getenv(env_of[[key]], unset = "")
+  src <- if (nzchar(ev)) paste0("$", env_of[[key]]) else "config.yaml"
+  val <- if (nzchar(ev)) ev else {
+    cfg_file <- file.path(dirname(sub("^--file=", "", grep("^--file=", commandArgs(FALSE),
+                                                           value = TRUE)[1])), "config.yaml")
+    if (!file.exists(cfg_file)) cfg_file <- "config.yaml"
+    yaml::read_yaml(cfg_file)$paths[[key]]
+  }
+  if (is.null(val) || !nzchar(val))
+    stop(sprintf("no path configured for '%s': set $%s or add paths.%s to config.yaml",
+                 key, env_of[[key]], key), call. = FALSE)
+  val <- path.expand(val)
+  if (must_exist && !file.exists(val))
+    stop(sprintf("%s does not exist:\n    %s\n  (from %s)\n  Set $%s or edit paths.%s.",
+                 key, val, src, env_of[[key]], key), call. = FALSE)
+  val
+}
+
+cache_dir <- nmd_path("isopair_cache")
 out_dir   <- "results_4ct"
 dir.create(out_dir, showWarnings = FALSE)
 
@@ -95,7 +128,7 @@ rm(ref); gc(verbose = FALSE)
 # ===========================================================================
 # TD2-based transcript features (utr5_features_all.rds + ptc.rds + cds.rds)
 # ===========================================================================
-data_dir <- "/projects/talisman/shared-data/nmd/isoform_transitions/Version_6.0/isopair_wrapper/data_mashr"
+data_dir <- nmd_path("isopair_data")
 
 cat("\n=== Building TD2 features ===\n")
 

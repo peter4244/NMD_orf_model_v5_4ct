@@ -43,9 +43,15 @@ suppressPackageStartupMessages({
   library(dplyr); library(tidyr); library(readr); library(stringr)
 })
 
-PROJ <- "/home/p.castaldi/cc/nmd_orf_model_v5_4ct"   # Explorer path
-if (!dir.exists(PROJ))
-  PROJ <- "/Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct"
+# Repo root, from this script's own path -- so nothing depends on which machine it runs on.
+REPO <- local({
+  a <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+  if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))) else normalizePath(getwd())
+})
+
+# Derived from this script's own location. Was a hardcoded Explorer path with a hardcoded
+# Mac fallback -- two machines' absolute paths in tracked code, and wrong on any third.
+PROJ <- REPO
 RES  <- file.path(PROJ, "results_4ct")
 
 # ── Path B-strict structural thresholds ─────────────────────────────────

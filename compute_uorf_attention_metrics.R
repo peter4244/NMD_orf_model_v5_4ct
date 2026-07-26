@@ -23,7 +23,13 @@ suppressPackageStartupMessages({
   library(dplyr); library(tidyr); library(readr); library(stringr)
 })
 
-PROJ <- "/Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct"
+# Repo root, from this script's own path -- so nothing depends on which machine it runs on.
+REPO <- local({
+  a <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+  if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))) else normalizePath(getwd())
+})
+# Was a hardcoded absolute path to one machine's checkout.
+PROJ <- REPO
 RES  <- file.path(PROJ, "results_4ct")
 
 # ── Load inference output ──
