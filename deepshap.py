@@ -167,7 +167,8 @@ class JointBranchWrapper(nn.Module):
 
 def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
                   atg_window=None, stop_window=None, seed=None, run_id=None,
-                  branches=None, orf_index=0):
+                  branches=None, orf_index=0,
+                 results_dir="results_4ct"):
     config = load_config(config_path)
     seed = seed if seed is not None else config["training"]["seed"]
     set_seed(seed)
@@ -178,7 +179,10 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     tag = f"atg{ws_atg}_stop{ws_stop}"
     run_suffix = f"_run{run_id}" if run_id is not None else ""
     orf_suffix = f"_orf{orf_index}" if orf_index != 0 else ""
-    results_dir = Path("results_4ct")
+    # Parameterised 2026-07-27. Fourth script with this defect: hardcoded, a deposit-native
+    # run reads the PUBLISHED checkpoint and overwrites the published deepshap_* npz and
+    # summary TSVs -- the artifacts it exists to be compared against. Default unchanged.
+    results_dir = Path(results_dir)
     h5_path = config["data"]["hdf5_path"]
 
     # Load model
@@ -661,6 +665,8 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--results-dir", default="results_4ct",
+                        help="where the checkpoint is read and outputs written")
     parser.add_argument("--n-explain", type=int, default=2000)
     parser.add_argument("--n-background", type=int, default=100)
     parser.add_argument("--atg-window", type=int, default=None,
@@ -679,4 +685,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     run_deepshap(args.config, args.n_explain, args.n_background,
                  args.atg_window, args.stop_window, args.seed, args.run_id,
-                 args.branches, args.orf_index)
+                 args.branches, args.orf_index, results_dir=args.results_dir)
