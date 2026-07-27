@@ -20,7 +20,8 @@ from model import NMDOrfModel, build_model
 from utils import NMDDataset, compute_metrics, load_config, set_seed
 
 
-def evaluate(config_path="config.yaml", atg_window=None, stop_window=None):
+def evaluate(config_path="config.yaml", atg_window=None, stop_window=None,
+             results_dir="results_4ct"):
     config = load_config(config_path)
     set_seed(config["training"]["seed"])
 
@@ -28,7 +29,9 @@ def evaluate(config_path="config.yaml", atg_window=None, stop_window=None):
     ws_atg = atg_window or config["data"]["window_size_atg"]
     ws_stop = stop_window or config["data"]["window_size_stop"]
     tag = f"atg{ws_atg}_stop{ws_stop}"
-    results_dir = Path("results_4ct")
+    # See 03_train.py: parameterised so an alternative run cannot overwrite the published
+    # predictions/metrics it is meant to be compared with. Default unchanged.
+    results_dir = Path(results_dir)
 
     # Load best checkpoint
     ckpt_path = results_dir / f"best_model_{tag}.pt"
@@ -128,9 +131,12 @@ def evaluate(config_path="config.yaml", atg_window=None, stop_window=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--results-dir", default="results_4ct",
+                        help="where the checkpoint is read and outputs written")
     parser.add_argument("--atg-window", type=int, default=None,
                         help="Override window_size_atg from config")
     parser.add_argument("--stop-window", type=int, default=None,
                         help="Override window_size_stop from config")
     args = parser.parse_args()
-    evaluate(args.config, atg_window=args.atg_window, stop_window=args.stop_window)
+    evaluate(args.config, atg_window=args.atg_window, stop_window=args.stop_window,
+             results_dir=args.results_dir)

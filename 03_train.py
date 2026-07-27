@@ -102,7 +102,8 @@ def eval_epoch(model, loader, criterion, device, use_amp):
     return metrics
 
 
-def train(config_path="config.yaml", atg_window=None, stop_window=None):
+def train(config_path="config.yaml", atg_window=None, stop_window=None,
+          results_dir="results_4ct"):
     config = load_config(config_path)
     set_seed(config["training"]["seed"])
 
@@ -148,7 +149,11 @@ def train(config_path="config.yaml", atg_window=None, stop_window=None):
     print(f"Mixed precision: {use_amp}")
 
     # Logging
-    results_dir = Path("results_4ct")
+    # RESULTS DIR IS A PARAMETER, not a literal (2026-07-27). It was hardcoded, so a
+    # deposit-native retrain would have written its checkpoint and training log straight over
+    # the PUBLISHED results_4ct artifacts -- the very ones the new run has to be compared
+    # against. Default is unchanged, so every existing invocation behaves exactly as before.
+    results_dir = Path(results_dir)
     results_dir.mkdir(exist_ok=True)
     tag = f"atg{ws_atg}_stop{ws_stop}"
     log_path = results_dir / f"training_log_{tag}.csv"
@@ -228,9 +233,12 @@ def train(config_path="config.yaml", atg_window=None, stop_window=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--results-dir", default="results_4ct",
+                        help="where checkpoints and logs are written")
     parser.add_argument("--atg-window", type=int, default=None,
                         help="Override window_size_atg from config")
     parser.add_argument("--stop-window", type=int, default=None,
                         help="Override window_size_stop from config")
     args = parser.parse_args()
-    train(args.config, atg_window=args.atg_window, stop_window=args.stop_window)
+    train(args.config, atg_window=args.atg_window, stop_window=args.stop_window,
+          results_dir=args.results_dir)
