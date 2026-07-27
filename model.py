@@ -55,7 +55,21 @@ class SequenceCNN(nn.Module):
         # For large windows, add a max-pool between conv layers to reduce length
         self.mid_pool = nn.MaxPool1d(4) if window_size > 100 else nn.Identity()
 
-        self.pool = nn.AdaptiveMaxPool1d(1)
+        # GLOBAL MAX OVER THE LENGTH AXIS. This was nn.AdaptiveMaxPool1d(1) followed by
+        # .squeeze(-1); it is now x.max(dim=-1).values, which computes THE SAME FUNCTION.
+        #
+        # WHY (2026-07-27): adaptive_max_pool2d_backward_cuda has no deterministic
+        # implementation, so torch.use_deterministic_algorithms(True) raises on it and the
+        # retrain could not be bit-reproducible. Measured on a V100 by verify_determinism.py,
+        # which is why the harness exists -- 32 seconds instead of discovering it hours into
+        # training. Its backward accumulates with atomicAdd; max()'s backward scatters into
+        # the argmax index instead, which is deterministic.
+        #
+        # THE ARCHITECTURE IS UNCHANGED. Adaptive max pooling to output size 1 IS a max over
+        # the length axis, and both ops are parameterless, so the state_dict keys and shapes
+        # are identical and the published checkpoint still loads. Only the accumulation order
+        # in the backward pass differs. Equivalence is asserted, not assumed -- see
+        # verify_pool_equivalence() below and the test in verify_determinism.py.
         self.fc = nn.Linear(conv_channels, out_dim)
 
     def forward(self, x):
@@ -63,7 +77,7 @@ class SequenceCNN(nn.Module):
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.mid_pool(x)
         x = F.relu(self.bn2(self.conv2(x)))
-        x = self.pool(x).squeeze(-1)  # (batch, conv_channels)
+        x = x.max(dim=-1).values  # (batch, conv_channels) — was AdaptiveMaxPool1d(1)+squeeze
         return self.fc(x)  # (batch, out_dim)
 
 

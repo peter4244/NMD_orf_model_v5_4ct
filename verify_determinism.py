@@ -101,9 +101,20 @@ def main():
     ap.add_argument("--steps", type=int, default=5)
     ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--seed", type=int, default=None, help="defaults to config training.seed")
+    # MUST BE TESTABLE AT THE REAL TRAINING CONFIG, not just config.yaml's defaults.
+    # SequenceCNN sets mid_pool = MaxPool1d(4) only when window_size > 100, so testing at the
+    # config default (ATG=100) leaves that op's backward UNEXERCISED -- the harness would pass
+    # while the configuration we actually train (atg500_stop500) still contained an untested
+    # op. Kernel sizes depend on window size too, so this is a different graph, not a resize.
+    ap.add_argument("--atg", type=int, default=None, help="override window_size_atg (real run: 500)")
+    ap.add_argument("--stop", type=int, default=None, help="override window_size_stop (real run: 500)")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
+    if args.atg is not None:
+        cfg["data"]["window_size_atg"] = args.atg
+    if args.stop is not None:
+        cfg["data"]["window_size_stop"] = args.stop
     seed = args.seed if args.seed is not None else cfg["training"]["seed"]
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -113,7 +124,8 @@ def main():
     if device == "cpu":
         print("  WARNING: running on CPU. This does NOT validate the GPU path, and the canonical\n"
               "           training runs on GPU. Re-run this on the training machine.")
-    print(f"  steps {args.steps} | seed {seed}\n")
+    print(f"  steps {args.steps} | seed {seed} | "
+          f"windows atg={cfg['data']['window_size_atg']} stop={cfg['data']['window_size_stop']}\n")
 
     try:
         print("run 1:")
