@@ -247,6 +247,11 @@ def compute_shapley_3(values):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yaml")
+    # Parameterised 2026-07-27 for the same reason as 03_train.py: hardcoded, this reads the
+    # PUBLISHED checkpoint and overwrites the PUBLISHED kernel_shap TSV -- the artifacts the
+    # deposit-native run exists to be compared against. Default unchanged.
+    parser.add_argument("--results-dir", default="results_4ct",
+                        help="where the checkpoint is read and the SHAP table written")
     parser.add_argument("--tag", default="atg500_stop500")
     parser.add_argument("--n-background", type=int, default=500)
     parser.add_argument("--seed", type=int, default=42)
@@ -262,7 +267,7 @@ def main():
 
     ws_atg = int(args.tag.split("_")[0].replace("atg", ""))
     ws_stop = int(args.tag.split("_")[1].replace("stop", ""))
-    results_dir = Path("results_4ct")
+    results_dir = Path(args.results_dir)
     h5_path = config["data"]["hdf5_path"]
 
     print(f"=== KernelSHAP Branch Decomposition ===")
