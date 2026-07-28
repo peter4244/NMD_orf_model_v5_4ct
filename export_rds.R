@@ -49,8 +49,31 @@ nmd_path <- function(key, must_exist = FALSE) {
 }
 
 cache_dir <- nmd_path("isopair_cache")
-out_dir   <- "results_4ct"
-dir.create(out_dir, showWarnings = FALSE)
+
+# ---------------------------------------------------------------------------
+# out_dir was the literal "results_4ct" and it is the WORST place in this repo for that,
+# because this script WRITES the eight feature tables the whole model chain reads. Two
+# consequences, both silent:
+#
+#   1. data_prep.py is invoked with --results-dir results_4ct_dn for the deposit-native
+#      rebuild and reads orf_features / tx_summary / ref_cds_features / td2_features /
+#      junctions / paralog_genes from THERE. With the output hardcoded, the tables the
+#      rebuild needs are written somewhere else and never arrive.
+#   2. Writing into results_4ct OVERWRITES THE PUBLISHED FEATURE TABLES -- the artifacts the
+#      deposit-native run exists to be compared against. That is the exact hazard
+#      REPRODUCTION.md records for --results-dir on 03_train/evaluate/11/deepshap.
+#
+# Resolution order matches the rest of the project: flag > NMD_RESULTS_DIR > default. The
+# default preserves the published behaviour, so no existing invocation changes. W76.
+# ---------------------------------------------------------------------------
+out_dir <- local({
+  a <- commandArgs(TRUE)
+  i <- which(a == "--results-dir")
+  if (length(i) && length(a) > i[1]) a[i[1] + 1L]
+  else Sys.getenv("NMD_RESULTS_DIR", unset = "results_4ct")
+})
+cat(sprintf("[results-dir] %s\n", out_dir))
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # Helper: convert logical columns to 0/1 integers for clean Python consumption
 logicals_to_int <- function(df) {

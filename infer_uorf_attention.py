@@ -12,26 +12,33 @@ Predictive overfitting concerns apply to AUC on training data, not to
 attention-pattern interpretation, so we use all isoforms the model has
 labels for.
 
-Inputs (all relative to this script's directory):
-  results_4ct/best_model_atg500_stop500.pt   — v5_4ct trained weights
-  results_4ct/tx_summary.tsv                  — v5_4ct labels (is_nmd 0/1)
-  results_4ct/nmd_orf_data.h5                 — v5 HDF5 inputs (symlinked;
+Inputs (all under --results-dir, itself relative to this script's directory):
+  <results-dir>/best_model_atg500_stop500.pt  — v5_4ct trained weights
+  <results-dir>/tx_summary.tsv                — v5_4ct labels (is_nmd 0/1)
+  <results-dir>/nmd_orf_data.h5               — v5 HDF5 inputs (symlinked;
                                                 features are unchanged from
                                                 v5 per v5_4ct CLAUDE.md)
   config.yaml                                 — model + training config
 
 Normalization stats are HARD-CODED here as the v5_4ct training-set
-arrays (extracted from results_4ct/nmd_orf_data.h5 on the cluster, since
-the v5 HDF5's stats reflect the v5 universe). This is intentional so the
-exact-normalization decision is reviewable in this file rather than
+arrays (extracted from the results dir's nmd_orf_data.h5 on the cluster,
+since the v5 HDF5's stats reflect the v5 universe). This is intentional so
+the exact-normalization decision is reviewable in this file rather than
 hidden in input data.
 
 Output:
-  results_4ct/uorf_attention_predictions.tsv
+  <results-dir>/uorf_attention_predictions.tsv
     Columns: isoform_id, split, chr, label, prob, logit,
              attn_0, attn_1, attn_2, attn_3, attn_4
+
+--results-dir MATCHES 03_train.py / evaluate.py / 11_kernel_shap_branches.py /
+deepshap.py / 10_export_stop_codon_freq_sf37.py. It is not cosmetic: the
+deposit-native rebuild writes to results_4ct_dn, and a hardcoded results_4ct
+silently reads the PUBLISHED checkpoint and reports it as deposit-native. This
+script had no argument parsing at all, so there was no way to point it anywhere.
 """
 
+import argparse
 import os, sys
 import numpy as np
 import pandas as pd
@@ -51,10 +58,20 @@ NORM_STD  = np.array([0.26555353, 0.26279053, 0.3435218, 0.39381742, 3.6128473],
                      dtype=np.float32)
 
 # ── Paths ──
-CKPT  = os.path.join(REPO, "results_4ct", "best_model_atg500_stop500.pt")
-H5    = os.path.join(REPO, "results_4ct", "nmd_orf_data.h5")
-TXSUM = os.path.join(REPO, "results_4ct", "tx_summary.tsv")
-OUT   = os.path.join(REPO, "results_4ct", "uorf_attention_predictions.tsv")
+# results_4ct was hardcoded four times here and this script took no arguments, so there was
+# no way to point it at the deposit-native rebuild. W76.
+_ap = argparse.ArgumentParser(description=__doc__.split("\n")[1] if __doc__ else None)
+_ap.add_argument("--results-dir", default="results_4ct",
+                 help="relative to this script's directory; results_4ct_dn for the "
+                      "deposit-native rebuild (default: %(default)s)")
+_args = _ap.parse_args()
+
+RES   = os.path.join(REPO, _args.results_dir)
+print(f"[results-dir] {RES}")
+CKPT  = os.path.join(RES, "best_model_atg500_stop500.pt")
+H5    = os.path.join(RES, "nmd_orf_data.h5")
+TXSUM = os.path.join(RES, "tx_summary.tsv")
+OUT   = os.path.join(RES, "uorf_attention_predictions.tsv")
 WS_ATG, WS_STOP = 500, 500
 BATCH = 256
 

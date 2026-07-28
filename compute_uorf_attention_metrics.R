@@ -30,7 +30,18 @@ REPO <- local({
 })
 # Was a hardcoded absolute path to one machine's checkout.
 PROJ <- REPO
-RES  <- file.path(PROJ, "results_4ct")
+
+# --results-dir, matching 03_train.py / evaluate.py / 11_kernel_shap_branches.py /
+# 10_export_stop_codon_freq_sf37.py. Not cosmetic: the deposit-native rebuild writes to
+# results_4ct_dn, and a hardcoded results_4ct silently re-reads the PUBLISHED run and
+# reports it as deposit-native -- exactly the defect W64 fixed one script at a time. W76.
+RESULTS_DIR <- local({
+  a <- commandArgs(TRUE)
+  i <- which(a == "--results-dir")
+  if (length(i) && length(a) > i[1]) a[i[1] + 1L] else "results_4ct"
+})
+RES  <- file.path(PROJ, RESULTS_DIR)
+cat(sprintf("[results-dir] %s\n", RES))
 
 # ── Load inference output ──
 predictions <- read_tsv(file.path(RES, "uorf_attention_predictions.tsv"),

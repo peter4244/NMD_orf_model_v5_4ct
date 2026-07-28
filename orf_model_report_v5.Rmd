@@ -68,7 +68,17 @@ save_fig <- function(p, name, width = 8, height = 5) {
   print(p)
 }
 
-results_dir <- "results_4ct"
+# results_dir was the literal "results_4ct" -- the PUBLISHED run. Every §5 script that takes
+# --results-dir is invoked with results_4ct_dn for the deposit-native rebuild (REPRODUCTION.md,
+# D6), so this report was the one step that silently rendered the published artifacts and
+# reported them as deposit-native. Same defect W64 fixed in 10_export_stop_codon_freq_sf37.py.
+#
+# AN ENV VAR, not a CLI flag, because rmarkdown::render() does not pass arguments through to
+# the document -- commandArgs() inside a knit sees the render invocation, not the report's own
+# options. NMD_RESULTS_DIR follows the NMD_<KEY> convention the rest of the project already
+# uses for overrides. W76.
+results_dir <- Sys.getenv("NMD_RESULTS_DIR", unset = "results_4ct")
+cat(sprintf("[results-dir] %s\n", normalizePath(results_dir, mustWork = FALSE)))
 ```
 
 # 0. Data Loading and Model Overview {#sec0-data}
