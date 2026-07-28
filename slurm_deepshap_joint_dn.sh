@@ -1,0 +1,59 @@
+#!/bin/bash
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:v100-sxm2:1
+#SBATCH --time=04:00:00
+#SBATCH --mem=32G
+#SBATCH --cpus-per-task=4
+#SBATCH --job-name=dn_joint
+#SBATCH --output=results_4ct_dn/deepshap_joint_dn_%A_%a.log
+#SBATCH --array=1-5
+
+# DEPOSIT-NATIVE **JOINT** DeepSHAP, 5 replicates. Second attempt, 2026-07-27.
+#
+# WHY THIS EXISTS. Claim 5.6.6's 2.153 and "~15x" come from the JOINT decomposition
+# (slurm_deepshap_joint.sh, --branches joint), whose summaries carry joint_atg / joint_stop /
+# joint_structural rows. The structural-only run produces an ISOLATED decomposition with a
+# `structural` branch and different magnitudes -- n_downstream_ejc is 2.7174 there against
+# 2.1232 in the published joint run. Not the same quantity; must not be compared.
+#
+# WHY ATTEMPT 1 FAILED, and it was self-inflicted. utils.set_seed now calls
+# torch.use_deterministic_algorithms(True), and shap's deeplift_grad routes MaxPool gradients
+# through max_unpool1d, which has NO deterministic CUDA kernel:
+#   "max_unpooling2d_forward_out does not have a deterministic implementation"
+# All five tasks died. The structural-only run survived because --branches structural explains
+# only the structural MLP; the joint run includes the sequence CNNs, where mid_pool is
+# MaxPool1d(4) at window 500. The published joint run predates the hardening, which is why it
+# ever worked.
+#
+# THE ESCAPE HATCH IS THE RIGHT ANSWER HERE, not a workaround. Determinism is not the
+# reproducibility mechanism for this computation: the 5 replicates deliberately vary the
+# background seed, so the replicate MEAN and SD are the uncertainty statement. Bitwise
+# determinism matters for a single-draw headline metric like AUC -- it does not for a
+# replicated estimate whose spread is reported. NMD_ALLOW_NONDETERMINISM=1 prints a warning
+# that its results are not canonical, which is exactly the disclosure wanted.
+export NMD_ALLOW_NONDETERMINISM=1
+
+cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
+PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+SEED=$((SLURM_ARRAY_TASK_ID * 100))
+echo "=== node $(hostname) | JOINT run ${SLURM_ARRAY_TASK_ID}, seed=${SEED}, all test, 500 bg ==="
+nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null
+
+$PY deepshap.py \
+    --config config_dn.yaml \
+    --results-dir results_4ct_dn \
+    --n-explain 0 \
+    --n-background 500 \
+    --atg-window 500 \
+    --stop-window 500 \
+    --seed ${SEED} \
+    --run-id ${SLURM_ARRAY_TASK_ID} \
+    --branches joint
+rc=$?
+echo "=== joint run ${SLURM_ARRAY_TASK_ID} exit: $rc ==="
+
+# PROPAGATE THE REAL EXIT CODE. Ending the script on an `echo` made SLURM report
+# COMPLETED 0:0 for five jobs that had ALL failed -- sacct said success while the log said
+# exit 1, and only reading the log caught it. A status line that cannot be wrong is worth
+# more than one that is usually right.
+exit $rc

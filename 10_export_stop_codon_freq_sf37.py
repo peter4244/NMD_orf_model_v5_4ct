@@ -59,6 +59,21 @@ def normalize_stop(seq: str) -> str | None:
 
 
 def main():
+    # --results-dir, matching the pattern applied to 03_train.py, evaluate.py,
+    # 11_kernel_shap_branches.py and deepshap.py: the deposit-native rebuild writes to
+    # results_4ct_dn, and a hardcoded results_4ct silently measures the PUBLISHED run instead.
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--results-dir", default="results_4ct")
+    ap.add_argument("--tag", default="atg500_stop500")
+    args = ap.parse_args()
+    global SELECTED, PREDS, OUT_TSV
+    RES = HERE / args.results_dir
+    SELECTED = RES / "selected_orfs.tsv"
+    PREDS    = RES / f"predictions_{args.tag}.tsv"
+    OUT_TSV  = RES / "stop_codon_freq_by_class_sf37.tsv"
+    print(f"[results-dir] {RES}")
+
     if not SELECTED.exists():
         sys.exit(f"[ERROR] {SELECTED} not found. Run this on the cluster.")
     if not PREDS.exists():

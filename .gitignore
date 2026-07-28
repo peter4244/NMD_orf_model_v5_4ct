@@ -11,3 +11,11 @@ __pycache__/
 *.html
 orf_model_report_v5_backup_*.Rmd
 .DS_Store
+
+# Deposit-native rebuild outputs (D1: the repo carries CODE only).
+# results_4ct_dn alone is 5.8G including five 340MB npz files, and the existing
+# results_4ct/* patterns do not cover it.
+results_4ct_dn/
+results_4ct_dn_race/
+figures_baseline/
+*.pre_determinism_backup

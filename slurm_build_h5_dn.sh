@@ -1,0 +1,38 @@
+#!/bin/bash
+#SBATCH --partition=short
+#SBATCH --time=02:00:00
+#SBATCH --mem=64G
+#SBATCH --cpus-per-task=8
+#SBATCH --job-name=dn_h5
+#SBATCH --output=results_4ct_dn/build_h5_%j.log
+
+# DEPOSIT-NATIVE HDF5 build (2026-07-27).
+#
+# Differs from slurm_build_h5.sh in two ways, both deliberate:
+#   1. --results-dir results_4ct_dn, so the published results_4ct and the old 6-CT tree
+#      it symlinks into are untouched. Every input here was regenerated from the deposit.
+#   2. the conda env python is called by ABSOLUTE PATH rather than `conda activate`.
+#      Conda init is being OOM-killed on the login node (.bashrc:33); an absolute path
+#      cannot be killed by a shell-init that never runs.
+set -euo pipefail
+cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
+PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+
+echo "=== Building DEPOSIT-NATIVE HDF5 ==="
+$PY -V
+$PY data_prep.py --results-dir results_4ct_dn --workers 8
+
+echo "=== Verifying ==="
+$PY -c "
+import h5py, json, collections
+with h5py.File(\"results_4ct_dn/nmd_orf_data.h5\",\"r\") as f:
+    print(\"Keys:\", list(f.keys()))
+    print(\"orf_features:\", f[\"orf_features\"].shape)
+    print(\"n isoforms:\", f[\"orf_mask\"].shape[0])
+    sp = [s.decode() if isinstance(s,bytes) else s for s in f[\"split\"][:]]
+    print(\"splits:\", collections.Counter(sp))
+    lab = f[\"label\"][:]
+    print(\"labels: NMD\", int(lab.sum()), \"/ non-NMD\", int((lab==0).sum()))
+    print(\"window_sizes:\", json.loads(f.attrs[\"window_sizes\"]))
+"
+echo "=== Done ==="

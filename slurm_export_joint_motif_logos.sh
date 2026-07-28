@@ -19,7 +19,7 @@ conda activate nmd_model
 TAG="atg500_stop500"
 
 echo "=== Joint motif logos, 5-run pooled ==="
-python scripts/export_joint_motif_logos.py --tag ${TAG} --n-runs 5
+python scripts/export_joint_motif_logos.py --atg 500 --stop 500 --n-runs 5
 
 echo ""
 echo "=== Done ==="
