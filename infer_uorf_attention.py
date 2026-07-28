@@ -26,18 +26,19 @@ v5 HDF5's own stats reflect the v5 universe). Hardcoding was intentional, so
 the exact-normalization decision is reviewable in this file rather than hidden
 in input data.
 
-**--results-dir DOES NOT REACH THEM, AND THIS IS A REAL LIMIT ON THE FLAG.**
-NORM_MEAN / NORM_STD below are literals from the published training set. Point
-this script at results_4ct_dn and it will load the deposit-native checkpoint and
-the deposit-native HDF5, then normalize their inputs with the PUBLISHED run's
-constants. The deposit-native universe is 42,043 isoforms against the published
-39,938, so its true feature means and sds are not these numbers.
+**THEY ARE NOW READ FROM THE HDF5, and the literals are only a fallback.**
+data_prep.py writes normalization/orf_feat_{mean,std} into every HDF5 from that
+build's own training split, and utils.py -- the path 03_train.py and evaluate.py
+use -- reads them from there. This script was the only place in the repo that
+bypassed that, so under --results-dir results_4ct_dn the model was TRAINED with
+the deposit-native statistics while its inputs here were normalized with the
+PUBLISHED ones: a silent train/inference mismatch scaling every feature.
 
-Whether that matters is unmeasured. It is stated here rather than left implicit
-because an earlier draft of this docstring said the stats came from "the results
-dir", which read as though they follow the flag -- the opposite of the truth.
-Fixing it properly means recomputing the two arrays from the deposit-native HDF5
-and selecting them by --results-dir alongside everything else.
+The literals below remain for an HDF5 predating the normalization group, and any
+disagreement between the two is PRINTED. An earlier draft of this docstring said
+the stats came from "the results dir", which read as though they followed the
+flag when they did not; they now do, by reading them where every other consumer
+does.
 
 Output:
   <results-dir>/uorf_attention_predictions.tsv
@@ -114,6 +115,30 @@ print(f"v5_4ct labeled universe: {len(labeled)} isoforms "
 
 # ── Stream HDF5 in row order, filtering to labeled universe ──
 with h5py.File(H5, "r") as f:
+    # NORMALIZATION STATS COME FROM THE HDF5 BEING READ, not from the literals above.
+    #
+    # data_prep.py:710-713 writes normalization/orf_feat_{mean,std} into EVERY HDF5,
+    # computed from that build's own training split, and utils.py:112-113 -- the path
+    # 03_train.py and evaluate.py use -- reads them from there. This script was the only
+    # place in the repo that bypassed them, so under --results-dir results_4ct_dn the model
+    # was TRAINED with the deposit-native statistics and its inputs normalized here with the
+    # PUBLISHED ones. A train/inference mismatch, silent, and it scales every feature.
+    #
+    # The literals are kept as a fallback for an HDF5 that predates the normalization group,
+    # and any disagreement is PRINTED rather than swallowed -- if these numbers move, that is
+    # a fact about the universe worth seeing, not a detail to reconcile quietly. W76.
+    if "normalization" in f:
+        h5_mean = f["normalization/orf_feat_mean"][:].astype(np.float32)
+        h5_std = f["normalization/orf_feat_std"][:].astype(np.float32)
+        drift = np.abs(h5_mean - NORM_MEAN).max(), np.abs(h5_std - NORM_STD).max()
+        print(f"[normalization] from {H5}::/normalization "
+              f"(max drift vs the published literals: mean {drift[0]:.4g}, std {drift[1]:.4g})")
+        NORM_MEAN, NORM_STD = h5_mean, h5_std
+    else:
+        print(f"[normalization] !! {H5} carries no /normalization group; falling back to the "
+              f"PUBLISHED results_4ct literals baked into this file. If this HDF5 is not the "
+              f"published one, its features are being scaled by the wrong constants.")
+
     all_isos = np.array([s.decode() if isinstance(s, bytes) else s
                          for s in f["isoform_id"][:]])
     all_splits = np.array([s.decode() if isinstance(s, bytes) else s
