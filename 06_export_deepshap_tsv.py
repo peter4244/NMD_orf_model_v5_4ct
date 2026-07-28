@@ -237,6 +237,23 @@ def process_replicates(results_dir, tag):
 
     combined = pd.concat(dfs)
 
+    # W52 GUARD. deepshap.py writes deepshap_summary_{tag}{orf}{run}.tsv with NO branch mode in
+    # the NAME, while the npz encodes it. So this glob can pick up a JOINT run and a
+    # STRUCTURAL-ONLY run and average them into a single "mean of 5 replicates" -- nothing is
+    # missing, the number just comes out wrong. Measured: n_downstream_ejc is 2.1232 under
+    # joint and 2.7174 under structural-only for the SAME model. The filename cannot tell them
+    # apart; the CONTENT can, so assert on content -- which protects legacy files too.
+    modes = sorted({str(b).split("_")[0] for b in combined["branch"].unique()})
+    if len(modes) > 1:
+        raise SystemExit(
+            "[W52] %d summary files span MORE THAN ONE decomposition: %s. Averaging across "
+            "them is meaningless. Files: %s"
+            % (len(run_files), modes, [f.name for f in run_files]))
+    if len(run_files) != 5:
+        print("  [W52 warn] %d replicate files, expected 5 -- a missing file silently "
+              "changes the methodology behind the figure" % len(run_files))
+    print("  [W52 ok] %d files, one decomposition: %s" % (len(run_files), modes[0]))
+
     # Compute mean and CV across runs per (branch, channel)
     stability = combined.groupby(["branch", "channel"]).agg(
         mean_abs_shap_mean=("mean_abs_shap", "mean"),

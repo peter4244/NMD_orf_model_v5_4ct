@@ -178,6 +178,15 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     ws_stop = stop_window or config["data"]["window_size_stop"]
     tag = f"atg{ws_atg}_stop{ws_stop}"
     run_suffix = f"_run{run_id}" if run_id is not None else ""
+    # W52. The SUMMARY filename must carry the decomposition, exactly as the npz already does
+    # at :305 -- deepshap_{branch}_{tag}... Without it, `deepshap_summary_{tag}_run1.tsv` means
+    # whichever --branches ran last: an atg+stop run overwrote the joint summaries in
+    # results_4ct_dn on 2026-07-27, and where run-ids differ instead of colliding, consumers
+    # glob and AVERAGE two decompositions into one "mean of 5 replicates" -- worse, because
+    # nothing is missing and the number is simply wrong. Measured: n_downstream_ejc is 2.1232
+    # under joint and 2.7174 under structural-only for the same model.
+    _mode = "-".join(sorted(branches)) if branches else "atg-stop-structural"
+    mode_suffix = f"_{_mode}"
     orf_suffix = f"_orf{orf_index}" if orf_index != 0 else ""
     # Parameterised 2026-07-27. Fourth script with this defect: hardcoded, a deposit-native
     # run reads the PUBLISHED checkpoint and overwrites the published deepshap_* npz and
@@ -655,7 +664,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
 
     if summary_rows:
         summary_df = pd.DataFrame(summary_rows)
-        summary_path = results_dir / f"deepshap_summary_{tag}{orf_suffix}{run_suffix}.tsv"
+        summary_path = results_dir / f"deepshap_summary_{tag}{mode_suffix}{orf_suffix}{run_suffix}.tsv"
         summary_df.to_csv(summary_path, sep="\t", index=False)
         print(f"  -> {summary_path}")
 
