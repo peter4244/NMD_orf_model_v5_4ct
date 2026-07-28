@@ -35,12 +35,22 @@ PROJ <- REPO
 # 10_export_stop_codon_freq_sf37.py. Not cosmetic: the deposit-native rebuild writes to
 # results_4ct_dn, and a hardcoded results_4ct silently re-reads the PUBLISHED run and
 # reports it as deposit-native -- exactly the defect W64 fixed one script at a time. W76.
-RESULTS_DIR <- local({
-  a <- commandArgs(TRUE)
-  i <- which(a == "--results-dir")
-  if (length(i) && length(a) > i[1]) a[i[1] + 1L] else "results_4ct"
+# Accepts `--results-dir X` and `--results-dir=X`; NMD_RESULTS_DIR as a fallback so an
+# env-prefixed invocation works the same way it does for export_rds.R and the report. An
+# ABSOLUTE value is honoured as given -- file.path() does NOT absorb an absolute second
+# component, so file.path(PROJ, "/abs/path") yields a nonsense doubled path and must be
+# tested for. The nzchar guard means an exported-but-empty variable is not an override.
+RES <- local({
+  a  <- commandArgs(TRUE)
+  eq <- grep("^--results-dir=", a, value = TRUE)
+  i  <- which(a == "--results-dir")
+  v <- if (length(eq)) sub("^--results-dir=", "", eq[1])
+       else if (length(i) && length(a) > i[1]) a[i[1] + 1L]
+       else Sys.getenv("NMD_RESULTS_DIR", unset = "")
+  if (!nzchar(v)) v <- "results_4ct"
+  v <- path.expand(v)
+  if (grepl("^(/|~|[A-Za-z]:)", v)) v else file.path(PROJ, v)
 })
-RES  <- file.path(PROJ, RESULTS_DIR)
 cat(sprintf("[results-dir] %s\n", RES))
 
 # ── Load inference output ──

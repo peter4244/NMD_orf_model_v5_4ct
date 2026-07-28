@@ -188,6 +188,12 @@ def summarize_by_rank_and_cds(orf_gxi, labels, masks, orf_feat_names,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yaml")
+    # W76: this script had NO --results-dir while 03_train/evaluate/11/deepshap/export_rds
+    # all take one, so a deposit-native run loaded the PUBLISHED checkpoint here and wrote
+    # its structural-importance tables back over the published ones.
+    parser.add_argument("--results-dir", default="results_4ct",
+                        help="results_4ct_dn for the deposit-native rebuild "
+                             "(default: %(default)s)")
     parser.add_argument("--tag", default="atg20_stop500")
     parser.add_argument("--atg-window", type=int, default=None)
     parser.add_argument("--stop-window", type=int, default=None)
@@ -200,7 +206,8 @@ def main():
     ws_atg = args.atg_window or config["data"]["window_size_atg"]
     ws_stop = args.stop_window or config["data"]["window_size_stop"]
     tag = args.tag
-    results_dir = Path("results_4ct")
+    results_dir = Path(args.results_dir)
+    print(f"[results-dir] {results_dir}")
     h5_path = config["data"]["hdf5_path"]
 
     print(f"Structural feature importance for model: {tag}")

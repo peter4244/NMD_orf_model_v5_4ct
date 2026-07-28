@@ -20,11 +20,24 @@ Inputs (all under --results-dir, itself relative to this script's directory):
                                                 v5 per v5_4ct CLAUDE.md)
   config.yaml                                 — model + training config
 
-Normalization stats are HARD-CODED here as the v5_4ct training-set
-arrays (extracted from the results dir's nmd_orf_data.h5 on the cluster,
-since the v5 HDF5's stats reflect the v5 universe). This is intentional so
-the exact-normalization decision is reviewable in this file rather than
-hidden in input data.
+Normalization stats are HARD-CODED here as the v5_4ct training-set arrays,
+extracted on the cluster from the PUBLISHED results_4ct/nmd_orf_data.h5 (the
+v5 HDF5's own stats reflect the v5 universe). Hardcoding was intentional, so
+the exact-normalization decision is reviewable in this file rather than hidden
+in input data.
+
+**--results-dir DOES NOT REACH THEM, AND THIS IS A REAL LIMIT ON THE FLAG.**
+NORM_MEAN / NORM_STD below are literals from the published training set. Point
+this script at results_4ct_dn and it will load the deposit-native checkpoint and
+the deposit-native HDF5, then normalize their inputs with the PUBLISHED run's
+constants. The deposit-native universe is 42,043 isoforms against the published
+39,938, so its true feature means and sds are not these numbers.
+
+Whether that matters is unmeasured. It is stated here rather than left implicit
+because an earlier draft of this docstring said the stats came from "the results
+dir", which read as though they follow the flag -- the opposite of the truth.
+Fixing it properly means recomputing the two arrays from the deposit-native HDF5
+and selecting them by --results-dir alongside everything else.
 
 Output:
   <results-dir>/uorf_attention_predictions.tsv
@@ -50,7 +63,10 @@ sys.path.insert(0, REPO)
 from model import build_model
 from utils import load_config
 
-# ── v5_4ct training-set normalization stats (extracted from cluster HDF5) ──
+# ── v5_4ct training-set normalization stats ──
+# EXTRACTED FROM THE PUBLISHED results_4ct HDF5 AND NOT SELECTED BY --results-dir. See the
+# module docstring: a deposit-native run normalizes with these published constants, which are
+# not the deposit-native universe's true means and sds. W76.
 # Feature order: [frac_start, frac_stop, is_ref_cds, is_sqanti_cds, n_downstream_ejc]
 NORM_MEAN = np.array([0.3708552, 0.5446399, 0.13680594, 0.19173051, 1.7330148],
                      dtype=np.float32)

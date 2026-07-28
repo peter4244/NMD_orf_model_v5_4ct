@@ -65,12 +65,31 @@ cache_dir <- nmd_path("isopair_cache")
 #
 # Resolution order matches the rest of the project: flag > NMD_RESULTS_DIR > default. The
 # default preserves the published behaviour, so no existing invocation changes. W76.
+#
+# ANCHORED TO THE SCRIPT'S OWN DIRECTORY, not the working directory. The first version of
+# this fix left a relative out_dir CWD-relative, and REPRODUCTION.md invokes this script as
+# `Rscript <model repo>/export_rds.R` FROM THE ANALYSIS REPO -- so the eight feature tables
+# would have been written into the analysis repo while data_prep.py, which anchors to the
+# model repo, looked for them here and found nothing. infer_uorf_attention.py anchors the
+# same flag to its own REPO; this now matches. An ABSOLUTE --results-dir is honoured as
+# given -- file.path() does NOT absorb an absolute second component, so it must be tested
+# for rather than blindly joined.
 # ---------------------------------------------------------------------------
 out_dir <- local({
   a <- commandArgs(TRUE)
-  i <- which(a == "--results-dir")
-  if (length(i) && length(a) > i[1]) a[i[1] + 1L]
-  else Sys.getenv("NMD_RESULTS_DIR", unset = "results_4ct")
+  # Accept both `--results-dir X` and `--results-dir=X`; ignore a value-less flag rather
+  # than silently taking the next argument or falling through to the published default.
+  eq <- grep("^--results-dir=", a, value = TRUE)
+  i  <- which(a == "--results-dir")
+  v <- if (length(eq)) sub("^--results-dir=", "", eq[1])
+       else if (length(i) && length(a) > i[1]) a[i[1] + 1L]
+       else Sys.getenv("NMD_RESULTS_DIR", unset = "")
+  if (!nzchar(v)) v <- "results_4ct"          # nzchar guard: an exported-but-empty var
+  v <- path.expand(v)                          # is not an override
+  script_dir <- dirname(sub("^--file=", "",
+                            grep("^--file=", commandArgs(FALSE), value = TRUE)[1]))
+  is_abs <- grepl("^(/|~|[A-Za-z]:)", v)
+  if (is_abs || is.na(script_dir) || !nzchar(script_dir)) v else file.path(script_dir, v)
 })
 cat(sprintf("[results-dir] %s\n", out_dir))
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
