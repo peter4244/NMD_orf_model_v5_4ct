@@ -20,11 +20,17 @@ import pandas as pd
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--results-dir", default="results_4ct",
+                        help="results tree to read and write "
+                             "(results_4ct_dn for the deposit-native rebuild)")
     parser.add_argument("--tag", default="atg500_stop500")
     parser.add_argument("--run", type=int, default=1)
     args = parser.parse_args()
 
-    results_dir = Path("results_4ct")
+    # --results-dir, matching 03_train / evaluate / 11_kernel_shap_branches / deepshap /
+    # 10_export. Hardcoded, this silently measures the PUBLISHED run when pointed at the
+    # deposit-native rebuild -- the reader sees a clean exit and numbers from the wrong tree.
+    results_dir = Path(args.results_dir)
     run_tag = f"{args.tag}_run{args.run}"
 
     # Load stop branch DeepSHAP

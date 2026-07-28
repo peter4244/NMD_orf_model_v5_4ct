@@ -13,6 +13,7 @@ This avoids the need for reticulate in the RMarkdown report.
 """
 
 import argparse
+import os
 from pathlib import Path
 
 import numpy as np
@@ -223,9 +224,34 @@ def export_gc_by_cds_status(inputs, labels, channels, stop_pos, out_dir, tag,
 
 def process_replicates(results_dir, tag):
     """Check for replicate runs and compute stability statistics."""
-    run_files = sorted(results_dir.glob(f"deepshap_summary_{tag}_run*.tsv"))
+    # MODE-QUALIFIED, and LOUD WHEN EMPTY (2026-07-28).
+    #
+    # W52 gave the summary filename its branch mode, so the old glob
+    # `deepshap_summary_{tag}_run*.tsv` now matches NOTHING -- the files are
+    # `deepshap_summary_{tag}_{mode}_run{N}.tsv`. With `if not run_files: return` that was a
+    # SILENT SKIP: the export would succeed, print nothing about replicates, and quietly drop
+    # the stability statistics. Measured on results_4ct_dn: 0 matches against 15 files present.
+    #
+    # This script consumes the deepshap_{atg,stop} npz, so its replicates are the `atg-stop`
+    # decomposition. Selecting the mode explicitly is what makes the W52 guard below meaningful
+    # -- globbing every mode would collect three decompositions and fire the guard on a tree
+    # that is perfectly healthy.
+    mode = os.environ.get("NMD_SHAP_SUMMARY_MODE", "atg-stop")
+    run_files = sorted(results_dir.glob(f"deepshap_summary_{tag}_{mode}_run*.tsv"))
     if not run_files:
-        return
+        legacy = sorted(results_dir.glob(f"deepshap_summary_{tag}_run*.tsv"))
+        if legacy:
+            print(f"  [replicates] no '{mode}' summaries; falling back to "
+                  f"{len(legacy)} pre-W52 unqualified file(s) -- their mode is not in the "
+                  f"filename, so the guard below checks their CONTENT")
+            run_files = legacy
+        else:
+            raise SystemExit(
+                f"[replicates] no summary files matched "
+                f"deepshap_summary_{tag}_{{{mode},<legacy>}}_run*.tsv in {results_dir}. "
+                f"Present: {[f.name for f in sorted(results_dir.glob('deepshap_summary_*'))][:6]}. "
+                f"Refusing to skip silently -- set NMD_SHAP_SUMMARY_MODE if you meant another "
+                f"decomposition.")
 
     print(f"\n=== Replicate stability ({len(run_files)} runs) ===")
     dfs = []
@@ -243,16 +269,32 @@ def process_replicates(results_dir, tag):
     # missing, the number just comes out wrong. Measured: n_downstream_ejc is 2.1232 under
     # joint and 2.7174 under structural-only for the SAME model. The filename cannot tell them
     # apart; the CONTENT can, so assert on content -- which protects legacy files too.
-    modes = sorted({str(b).split("_")[0] for b in combined["branch"].unique()})
-    if len(modes) > 1:
+    # THE INVARIANT IS ONE BRANCH SET ACROSS REPLICATES, not one branch prefix per file.
+    #
+    # The first cut took the first token of each branch value as "the mode", and it fired on
+    # a perfectly healthy tree: `--branches atg stop` legitimately writes BOTH an `atg` and a
+    # `stop` row into a single summary, so a correct atg-stop replicate looked like two mixed
+    # decompositions. Corrected 2026-07-28 after it false-positived on results_4ct_dn, and
+    # recorded as a finding rather than quietly relaxed -- a guard loosened to make a run pass
+    # is how a suite converges on green.
+    #
+    # What must never happen is AVERAGING ACROSS DECOMPOSITIONS: a joint replicate pooled with
+    # a structural one. That shows up as replicates whose branch SETS differ, which is what
+    # this checks. Measured: n_downstream_ejc is 2.1232 under joint and 2.7174 under
+    # structural-only for the same model.
+    per_file = {f.name: frozenset(pd.read_csv(f, sep="\t")["branch"].astype(str).unique())
+                for f in run_files}
+    distinct = set(per_file.values())
+    if len(distinct) > 1:
+        detail = "; ".join("%s: %s" % (n, sorted(v)) for n, v in sorted(per_file.items()))
         raise SystemExit(
-            "[W52] %d summary files span MORE THAN ONE decomposition: %s. Averaging across "
-            "them is meaningless. Files: %s"
-            % (len(run_files), modes, [f.name for f in run_files]))
+            "[W52] %d summary files do NOT share one decomposition. Averaging across them is "
+            "meaningless. %s" % (len(run_files), detail))
+    branch_set = sorted(next(iter(distinct)))
     if len(run_files) != 5:
         print("  [W52 warn] %d replicate files, expected 5 -- a missing file silently "
               "changes the methodology behind the figure" % len(run_files))
-    print("  [W52 ok] %d files, one decomposition: %s" % (len(run_files), modes[0]))
+    print("  [W52 ok] %d files, one decomposition: %s" % (len(run_files), branch_set))
 
     # Compute mean and CV across runs per (branch, channel)
     stability = combined.groupby(["branch", "channel"]).agg(
