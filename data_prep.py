@@ -558,19 +558,24 @@ def build_dataset(results_dir, n_workers=8):
     splits = []
     for tid in tx_ids:
         ch = chr_map.get(tid, "")
+        gene = gene_lookup.get(tid, "")
+        is_paralog = gene in paralog_genes
         if ch in HOLDOUT_CHRS:
-            gene = gene_lookup.get(tid, "")
-            if gene in paralog_genes:
-                splits.append("test_paralog")
-            else:
-                splits.append("test")
+            splits.append("test_paralog" if is_paralog else "test")
         elif ch in VAL_CHRS:
-            splits.append("val")
+            # THE VAL SCREEN IS NOW SYMMETRIC WITH THE TEST SCREEN (2026-07-29).
+            # It was not: the paralog test sat inside the HOLDOUT_CHRS branch only, so every
+            # chr2/chr4 transcript went to `val` unscreened. That was harmless while val was
+            # used only for early stopping, and it stops being harmless the moment val becomes
+            # the SELECTION set -- which is exactly what re-running the window sweep on
+            # train+val does. A config chosen on a paralog-contaminated val set carries the
+            # same leak the sweep is being re-run to remove, just relocated.
+            splits.append("val_paralog" if is_paralog else "val")
         else:
             splits.append("train")
 
     splits = np.array(splits)
-    for s in ["train", "val", "test", "test_paralog"]:
+    for s in ["train", "val", "val_paralog", "test", "test_paralog"]:
         print(f"  {s}: {(splits == s).sum():,}")
 
     # -------------------------------------------------------------------------

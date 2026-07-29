@@ -154,6 +154,25 @@ class NMDDataset(Dataset):
                 mask = splits == "test"
             elif split == "test_all":
                 mask = (splits == "test") | (splits == "test_paralog")
+            elif split == "val_clean":
+                # MIRRORS test_clean, AND REFUSES TO BE SILENTLY MEANINGLESS (2026-07-29).
+                # data_prep only began screening VAL_CHRS for paralogs on 2026-07-29. On an
+                # HDF5 built before that, `val` holds every chr2/chr4 transcript and NO
+                # `val_paralog` label exists -- so `splits == "val"` would return the
+                # UNSCREENED set while the name promised a screened one. Selecting a window
+                # config on that set would reintroduce the leak the sweep exists to remove,
+                # silently and at exit 0. An absent val_paralog label is therefore an error,
+                # not an empty category: rebuild the HDF5.
+                if not (splits == "val_paralog").any():
+                    raise ValueError(
+                        "split='val_clean' requested but this HDF5 contains no 'val_paralog' "
+                        "label, so `val` is UNSCREENED and val_clean would silently equal val. "
+                        "Rebuild the HDF5 with the current data_prep.py (which screens VAL_CHRS "
+                        "symmetrically with HOLDOUT_CHRS), or ask for split='val' explicitly if "
+                        "an unscreened validation set is genuinely what you want.")
+                mask = splits == "val"
+            elif split == "val_all":
+                mask = (splits == "val") | (splits == "val_paralog")
             elif split == "all":
                 mask = np.ones(len(splits), dtype=bool)   # every isoform (for full-cohort interpretation)
             else:
