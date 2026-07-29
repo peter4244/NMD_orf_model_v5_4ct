@@ -15,14 +15,11 @@ from sklearn.metrics import roc_auc_score, average_precision_score
 from torch.utils.data import Dataset
 
 
-def load_config(config_path="config.yaml"):
-    with open(config_path) as f:
-        return yaml.safe_load(f)
-
-
-# Path resolution lives in paths_config (no torch dependency); re-exported
-# here so `from utils import resolve_path` keeps working.
-from paths_config import PATH_ENV, resolve_path  # noqa: E402,F401
+# Config reading, path resolution and the selected-configuration tag all live in
+# paths_config (no torch dependency); re-exported here so `from utils import load_config`
+# keeps working for the scripts that already import utils for other reasons.
+from paths_config import (PATH_ENV, load_config, resolve_path,  # noqa: E402,F401
+                          selected_tag)
 
 
 def set_seed(seed, deterministic=True):
@@ -74,6 +71,8 @@ def set_seed(seed, deterministic=True):
     torch.use_deterministic_algorithms(True)
     print(f"  set_seed: seed={seed}, deterministic algorithms ON "
           f"(cudnn.deterministic=True, benchmark=False)")
+
+
 
 
 def member_tag(tag, seed=None):

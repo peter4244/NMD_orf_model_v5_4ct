@@ -35,11 +35,15 @@ from pathlib import Path
 
 import pandas as pd
 
+from paths_config import load_config, selected_tag
+
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results_4ct"
 
 SELECTED = RESULTS / "selected_orfs.tsv"
-PREDS    = RESULTS / "predictions_atg500_stop500.tsv"
+# Derived, not a literal: this path silently pinned the script to atg500_stop500 even when
+# --tag named a different configuration (2026-07-29).
+PREDS    = RESULTS / f"predictions_{selected_tag(load_config(HERE / 'config.yaml'))}.tsv"
 OUT_TSV  = RESULTS / "stop_codon_freq_by_class_sf37.tsv"
 
 # Map DNA → RNA notation for display (T → U in the stop codon).
@@ -65,8 +69,15 @@ def main():
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--results-dir", default="results_4ct")
-    ap.add_argument("--tag", default="atg500_stop500")
+    ap.add_argument("--tag", default=None,
+                                        help="Window-config tag. Default: the `selected:` block in --config. "
+                                             "Never a hardcoded literal -- see utils.selected_tag.")
+    ap.add_argument("--config", default="config.yaml",
+                       help="Where the selected window configuration is read from")
     args = ap.parse_args()
+    # Resolve the tag from the ONE place that names the selected configuration.
+    if args.tag is None:
+        args.tag = selected_tag(load_config(args.config))
     global SELECTED, PREDS, OUT_TSV
     RES = HERE / args.results_dir
     SELECTED = RES / "selected_orfs.tsv"

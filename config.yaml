@@ -21,9 +21,28 @@ paths:
   sqanti_fasta:  /projects/talisman/shared-data/nmd/sqanti/results/nmd_lungcells_corrected.fasta
   mashr_dir:     /projects/talisman/shared-data/nmd/mashr
 
+# WHICH CONFIGURATION WAS SELECTED. The single source of truth (2026-07-29).
+#
+# Before this block existed, the answer lived in ~14 scattered hardcoded strings --
+# `--tag` defaults in eight export scripts, TAG= in nine SLURM drivers, best_tag in
+# audit_report.R -- and NOWHERE authoritative. `data.window_size_*` below does NOT say it:
+# those are the sweep's starting grid point (atg=100, stop=1000), so `python 03_train.py`
+# with no flags trains a configuration that matches no artifact anyone uses. Every real
+# invocation passes --atg-window 500 --stop-window 500 explicitly
+# (slurm_train_4ct.sh:17, slurm_train_dn.sh:30, and the sweep driver).
+#
+# Re-selecting the window configuration therefore meant editing every one of those strings
+# and hoping none was missed -- 217 occurrences across 69 files, of which the `--tag`
+# defaults were the dangerous ones because a missed default keeps silently reading the OLD
+# tag's artifacts at exit 0. Change the two numbers here instead.
+selected:
+  window_size_atg: 500
+  window_size_stop: 500
+
 data:
   hdf5_path: results_4ct/nmd_orf_data.h5
   max_orfs_per_tx: 5
+  # THE SWEEP GRID'S STARTING POINT, NOT THE SELECTION -- see `selected:` above.
   window_size_atg: 100   # sweep over {100, 500, 1000}
   window_size_stop: 1000 # sweep over {100, 500, 1000, 2000}
 

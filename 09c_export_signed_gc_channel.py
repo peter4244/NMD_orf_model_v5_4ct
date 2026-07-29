@@ -25,6 +25,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from paths_config import load_config, selected_tag
+
 
 def load_joint_runs(results_dir, tag, n_runs=5):
     """Load and mean-pool signed SHAP × input for the rolling_gc channel
@@ -86,11 +88,18 @@ def write_signed_gc_profile(signed_arr, labels, window, out_path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tag", default="atg500_stop500")
+    ap.add_argument("--tag", default=None,
+                                        help="Window-config tag. Default: the `selected:` block in --config. "
+                                             "Never a hardcoded literal -- see utils.selected_tag.")
+    ap.add_argument("--config", default="config.yaml",
+                       help="Where the selected window configuration is read from")
     ap.add_argument("--results-dir", default="results_4ct")
     ap.add_argument("--n-runs", type=int, default=5)
     args = ap.parse_args()
 
+    # Resolve the tag from the ONE place that names the selected configuration.
+    if args.tag is None:
+        args.tag = selected_tag(load_config(args.config))
     rdir = Path(args.results_dir)
     print(f"Loading {args.n_runs} joint DeepSHAP NPZs for tag={args.tag}, "
           f"extracting signed SHAP × input for rolling_gc channel ...")

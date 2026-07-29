@@ -63,7 +63,7 @@ import torch
 REPO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, REPO)
 from model import build_model
-from utils import load_config, resolve_checkpoint
+from utils import load_config, resolve_checkpoint, selected_tag
 
 # ── v5_4ct training-set normalization stats ──
 # EXTRACTED FROM THE PUBLISHED results_4ct HDF5 AND NOT SELECTED BY --results-dir. See the
@@ -90,20 +90,25 @@ _args = _ap.parse_args()
 
 RES   = os.path.join(REPO, _args.results_dir)
 print(f"[results-dir] {RES}")
-# TAG WAS A STRING LITERAL HERE, not f"atg{WS_ATG}_stop{WS_STOP}" like every other consumer
-# (2026-07-29). That made this the one script that would keep loading the atg500_stop500
-# checkpoint after a sweep selected a different window config -- silently, since the file
-# exists. Named once, next to the window constants it must agree with.
-TAG   = "atg500_stop500"
+# TAG WAS A STRING LITERAL HERE, not derived like every other consumer (2026-07-29). That
+# made this the one script that would keep loading the atg500_stop500 checkpoint after a
+# sweep selected a different window config -- silently, since the file exists. It now reads
+# the one place that names the selection.
+config = load_config(os.path.join(REPO, "config.yaml"))
+TAG   = selected_tag(config)
 CKPT  = resolve_checkpoint(RES, TAG, _args.member_seed)
 H5    = os.path.join(RES, "nmd_orf_data.h5")
 TXSUM = os.path.join(RES, "tx_summary.tsv")
 OUT   = os.path.join(RES, "uorf_attention_predictions.tsv")
-WS_ATG, WS_STOP = 500, 500
+# WINDOW SIZES COME FROM THE SAME BLOCK AS THE TAG, and must never be stated separately.
+# They were the literals `500, 500` while TAG became config-derived, which would have built
+# the model with 500/500 windows around a checkpoint trained at whatever the selection said
+# -- a shape mismatch if lucky, and silently wrong attention if not. One source, both values.
+WS_ATG  = config["selected"]["window_size_atg"]
+WS_STOP = config["selected"]["window_size_stop"]
 BATCH = 256
 
 # ── Load model ──
-config = load_config(os.path.join(REPO, "config.yaml"))
 print(f"Loading checkpoint: {CKPT}")
 ckpt = torch.load(CKPT, map_location="cpu", weights_only=False)
 model_cfg = {**config["model"], "window_size_atg": WS_ATG, "window_size_stop": WS_STOP}

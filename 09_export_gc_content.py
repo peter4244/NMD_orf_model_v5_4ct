@@ -17,13 +17,19 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from paths_config import load_config, selected_tag
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--results-dir", default="results_4ct",
                         help="results tree to read and write "
                              "(results_4ct_dn for the deposit-native rebuild)")
-    parser.add_argument("--tag", default="atg500_stop500")
+    parser.add_argument("--tag", default=None,
+                                            help="Window-config tag. Default: the `selected:` block in --config. "
+                                                 "Never a hardcoded literal -- see utils.selected_tag.")
+    parser.add_argument("--config", default="config.yaml",
+                           help="Where the selected window configuration is read from")
     parser.add_argument("--run", type=int, default=1)
     parser.add_argument("--branch", choices=("atg", "stop"), default="stop",
                         help="Which branch NPZ to read from (default: stop, "
@@ -35,6 +41,9 @@ def main():
                         help="Step size for sliding window")
     args = parser.parse_args()
 
+    # Resolve the tag from the ONE place that names the selected configuration.
+    if args.tag is None:
+        args.tag = selected_tag(load_config(args.config))
     # --results-dir, matching 03_train / evaluate / 11_kernel_shap_branches / deepshap /
     # 10_export. Hardcoded, this silently measures the PUBLISHED run when pointed at the
     # deposit-native rebuild -- the reader sees a clean exit and numbers from the wrong tree.

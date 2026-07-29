@@ -18,7 +18,11 @@ cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 
-TAG="atg500_stop500"
+# Read the selected window configuration; do not restate it. A driver that hardcodes
+# the tag keeps running the PREVIOUS selection after a re-selection, silently, because
+# the old artifacts still exist. Torch-free, so it costs milliseconds.
+TAG="$(python3 paths_config.py --selected-tag --config config.yaml)"
+if [ -z "$TAG" ]; then echo "FATAL: could not resolve selected tag" >&2; exit 1; fi
 
 echo "=== 09b: per-subgroup profiles, 5-run pooled ==="
 python 09b_export_subgroup_profiles.py --tag ${TAG} --n-runs 5

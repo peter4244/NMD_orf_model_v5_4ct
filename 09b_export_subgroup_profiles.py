@@ -21,6 +21,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from paths_config import load_config, selected_tag
+
 
 PTC_LOST_CATS = {"ref_atg_lost", "no_ref_isoform",
                  "not_atg_in_target", "no_stop_in_target"}
@@ -160,11 +162,18 @@ def write_subgroup_motif_logo(shap_arr, inp_arr, subgroups, channel_names,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tag", default="atg500_stop500")
+    parser.add_argument("--tag", default=None,
+                                            help="Window-config tag. Default: the `selected:` block in --config. "
+                                                 "Never a hardcoded literal -- see utils.selected_tag.")
+    parser.add_argument("--config", default="config.yaml",
+                           help="Where the selected window configuration is read from")
     parser.add_argument("--n-runs", type=int, default=5)
     parser.add_argument("--results-dir", default="results_4ct")
     args = parser.parse_args()
 
+    # Resolve the tag from the ONE place that names the selected configuration.
+    if args.tag is None:
+        args.tag = selected_tag(load_config(args.config))
     results_dir = Path(args.results_dir)
     tag = args.tag
 

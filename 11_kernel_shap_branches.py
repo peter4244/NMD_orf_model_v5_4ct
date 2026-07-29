@@ -27,7 +27,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from model import build_model
-from utils import NMDDataset, load_config, resolve_checkpoint, set_seed
+from utils import (NMDDataset, load_config, resolve_checkpoint, selected_tag,
+                   set_seed)
 
 
 def extract_sub_embeddings(model, dataset, indices, device, batch_size=256):
@@ -252,7 +253,9 @@ def main():
     # deposit-native run exists to be compared against. Default unchanged.
     parser.add_argument("--results-dir", default="results_4ct",
                         help="where the checkpoint is read and the SHAP table written")
-    parser.add_argument("--tag", default="atg500_stop500")
+    parser.add_argument("--tag", default=None,
+                        help="Window-config tag. Default: the `selected:` block in "
+                             "--config. Never a hardcoded literal -- see selected_tag.")
     parser.add_argument("--n-background", type=int, default=500)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--explain-split", default="test",
@@ -263,6 +266,8 @@ def main():
     args = parser.parse_args()
 
     config = load_config(args.config)
+    if args.tag is None:
+        args.tag = selected_tag(config)
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

@@ -8,10 +8,24 @@
 suppressPackageStartupMessages({
   library(dplyr)
   library(jsonlite)
+  library(yaml)
 })
 
 results_dir <- "results_4ct"
-best_tag <- "atg500_stop500"
+
+# THE SELECTED WINDOW CONFIGURATION IS READ, NOT RESTATED (2026-07-29, D-B3.6).
+# `best_tag <- "atg500_stop500"` was a literal here, and it builds six input paths below. An
+# audit script that hardcodes the tag audits whichever configuration it was written for, not
+# the one that was selected -- so after a re-selection it would keep "verifying" the previous
+# model's artifacts and passing. Config is the one place that names the selection; see
+# paths_config.selected_tag for the Python side of the same rule.
+.cfg <- yaml::read_yaml("config.yaml")
+if (is.null(.cfg$selected$window_size_atg) || is.null(.cfg$selected$window_size_stop))
+  stop("config.yaml has no `selected:` block naming the chosen window configuration. ",
+       "Add selected: {window_size_atg: 500, window_size_stop: 500}. Do NOT read ",
+       "data.window_size_* -- those are the sweep grid's starting point, not the selection.")
+best_tag <- sprintf("atg%d_stop%d", .cfg$selected$window_size_atg,
+                    .cfg$selected$window_size_stop)
 cat("=== Report Audit: Hardcoded Number Verification ===\n\n")
 
 errors <- 0

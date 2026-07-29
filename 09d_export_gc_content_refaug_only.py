@@ -26,6 +26,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from paths_config import load_config, selected_tag
+
 
 N_CHANNELS = 9
 WINDOW = 500
@@ -98,13 +100,20 @@ def emit_gc(bundle, branch, gc_window, gc_step, out_path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tag", default="atg500_stop500")
+    parser.add_argument("--tag", default=None,
+                                            help="Window-config tag. Default: the `selected:` block in --config. "
+                                                 "Never a hardcoded literal -- see utils.selected_tag.")
+    parser.add_argument("--config", default="config.yaml",
+                           help="Where the selected window configuration is read from")
     parser.add_argument("--run", type=int, default=1)
     parser.add_argument("--results-dir", default="results_4ct")
     parser.add_argument("--gc-window", type=int, default=50)
     parser.add_argument("--gc-step", type=int, default=10)
     args = parser.parse_args()
 
+    # Resolve the tag from the ONE place that names the selected configuration.
+    if args.tag is None:
+        args.tag = selected_tag(load_config(args.config))
     rdir = Path(args.results_dir)
     bundle = load_joint_run(rdir, args.tag, args.run)
 

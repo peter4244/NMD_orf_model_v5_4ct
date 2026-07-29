@@ -1,6 +1,14 @@
+# WHICH CONFIGURATION WAS SELECTED — the single source of truth. See config.yaml for the
+# full rationale; kept in step with it deliberately, since a deposit-native run that
+# selected a different window config than the published one would be a silent confound.
+selected:
+  window_size_atg: 500
+  window_size_stop: 500
+
 data:
   hdf5_path: results_4ct_dn/nmd_orf_data.h5
   max_orfs_per_tx: 5
+  # THE SWEEP GRID'S STARTING POINT, NOT THE SELECTION — see `selected:` above.
   window_size_atg: 100   # sweep over {100, 500, 1000}
   window_size_stop: 1000 # sweep over {100, 500, 1000, 2000}
 

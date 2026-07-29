@@ -15,15 +15,24 @@ import pandas as pd
 
 from paths_config import resolve_path
 
+from paths_config import load_config, selected_tag
+
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tag", default="atg500_stop500")
+    parser.add_argument("--tag", default=None,
+                                            help="Window-config tag. Default: the `selected:` block in --config. "
+                                                 "Never a hardcoded literal -- see utils.selected_tag.")
+    parser.add_argument("--config", default="config.yaml",
+                           help="Where the selected window configuration is read from")
     # Default resolved from config.yaml `paths:` / $NMD_SQANTI_CLASS rather than baked in.
     parser.add_argument("--sqanti-classification",
                         default=str(resolve_path("sqanti_class")))
     args = parser.parse_args()
 
+    # Resolve the tag from the ONE place that names the selected configuration.
+    if args.tag is None:
+        args.tag = selected_tag(load_config(args.config))
     results_dir = Path("results_4ct")
 
     # Load predictions (test set)
