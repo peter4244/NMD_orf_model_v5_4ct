@@ -79,9 +79,10 @@ NORM_STD  = np.array([0.26555353, 0.26279053, 0.3435218, 0.39381742, 3.6128473],
 # results_4ct was hardcoded four times here and this script took no arguments, so there was
 # no way to point it at the deposit-native rebuild. W76.
 _ap = argparse.ArgumentParser(description=__doc__.split("\n")[1] if __doc__ else None)
-_ap.add_argument("--results-dir", default="results_4ct",
+_ap.add_argument("--results-dir", default=os.environ.get("NMD_RESULTS_DIR", "results_4ct"),
                  help="relative to this script's directory; results_4ct_dn for the "
-                      "deposit-native rebuild (default: %(default)s)")
+                      "deposit-native rebuild. Falls back to $NMD_RESULTS_DIR, then "
+                      "results_4ct (default: %(default)s)")
 _ap.add_argument("--member-seed", type=int, default=None,
                  help="Ensemble member to load, by training seed. Omitted = the legacy "
                       "un-seeded checkpoint. Never silently guesses a member; see "
