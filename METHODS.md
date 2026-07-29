@@ -210,8 +210,29 @@ DeepSHAP (Lundberg & Lee, 2017) computes per-position, per-channel attribution v
 `deepshap.py` provides three explainer wrappers that expose different slices of the model to DeepSHAP. Each is selected by `--branches {atg, stop, structural, joint}`:
 
 - **`BranchWrapper`** (`deepshap.py:24-65`, `--branches {atg,stop}`) — **Marginal sequence mode.** Varies a single sequence window (ATG or stop) of the rank-0 ORF. All other inputs (rank 1-4 windows, structural features) are held constant at observed values. Used by the legacy single-branch interpretation flow (figures fall back to this when joint TSVs are unavailable).
-- **`StructuralWrapper`** (`deepshap.py:69-103`, `--branches structural`) — Varies the 5 per-ORF structural features of the rank-0 ORF; sequence windows fixed. Produces the §7.2 attribution heatmap and the per-sample 5-feature SHAP table.
-- **`JointBranchWrapper`** (`deepshap.py:105-166`, `--branches joint`) — **Joint mode (current canonical flow).** Varies the rank-0 ORF's ATG window + stop window + structural features simultaneously as a single flattened input vector. Fixes ranks 1-4 at observed values. Yields an additive decomposition `φ_ATG + φ_stop + φ_struct` in the embedding space that can be allocated back to position/channel level. This is the mode used to produce the SHAP data feeding §3.1 (Kozak motif logo), §4.1 (stop-codon motif logo), §7.2 (structural attribution), §9.4 (junction SHAP), §9.6 (input importance by subgroup), §9.7 (start by subgroup), §9.8 (stop by subgroup).
+- **`StructuralBranchWrapper`** (`deepshap.py:67-103`, `--branches structural`) — Varies the 5 per-ORF structural features of the rank-0 ORF; sequence windows fixed. Produces the §7.2 attribution heatmap and the per-sample 5-feature SHAP table.
+- **`JointBranchWrapper`** (`deepshap.py:105-166`, `--branches joint`) — **Joint mode (current canonical flow).** Varies the rank-0 ORF's ATG window + stop window + structural features simultaneously as a single flattened input vector. Fixes ranks 1-4 at observed values. Attributions are per-position / per-channel and can be summed within a branch. This is the mode used to produce the SHAP data feeding §3.1 (Kozak motif logo), §4.1 (stop-codon motif logo), §7.2 (structural attribution), §9.4 (junction SHAP), §9.6 (input importance by subgroup), §9.7 (start by subgroup), §9.8 (stop by subgroup).
+
+  > **Corrected 2026-07-27.** This bullet previously said joint mode "yields an additive
+  > decomposition `φ_ATG + φ_stop + φ_struct` in the embedding space" — i.e. that it produces
+  > the same three-branch decomposition as the exact-Shapley script. **It does not**, and a
+  > replicator following that sentence would arrive at numbers contradicting the manuscript.
+  > The two computations differ in estimator (DeepLIFT approximation vs exact enumeration),
+  > in player set (per-position/per-channel inputs vs three 32-dim sub-embeddings), and in
+  > what "absence" means (interpolation toward a reference vs substitution of a real
+  > background embedding). Measured consequence: `n_downstream_ejc` mean|SHAP| is **2.1232**
+  > under joint mode and **2.7174** under structural-only mode for the same model and
+  > checkpoint. They are different quantities and must not be compared or averaged.
+  >
+  > *Related hazard, same root — PARTLY REPAIRED SINCE, 2026-07-29.* Joint and structural-only
+  > runs once both wrote `deepshap_summary_{tag}_run{N}.tsv`, so one silently overwrote the
+  > other and any consumer that globbed averaged across whatever happened to be present (W52).
+  > The **producer is now fixed**: `deepshap.py:189` builds a `mode_suffix` and `:667` writes
+  > `deepshap_summary_{tag}{mode}{orf}{run}.tsv`. The **Python consumer is fixed**:
+  > `06_export_deepshap_tsv.py:240` globs the mode-qualified name and fails loudly at `:251`
+  > rather than silently matching nothing. **`orf_model_report_v5.Rmd:189` is NOT fixed** — it
+  > still globs the legacy mode-less `deepshap_summary_{tag}_run*.tsv`, so under current
+  > naming it matches only pre-fix files. Treat that line as live.
 
 ### Background and sample selection
 
@@ -244,9 +265,52 @@ The legacy flow extracts per-nucleotide SHAP logos at ±15bp around biologically
 
 ---
 
-## KernelSHAP Branch Decomposition (`11_kernel_shap_branches.py`)
+## Branch Decomposition — exact Shapley, not KernelSHAP (`11_kernel_shap_branches.py`)
 
-This produces the §2.1 branch decomposition (60.7% structural / 28.8% stop / 10.5% ATG of NMD branch attribution). Distinct from DeepSHAP, which attributes per-position; KernelSHAP here treats the model's three sub-encoders (ATG branch, stop branch, structural branch) as **3 "players"** and computes their exact additive Shapley contributions.
+> **Naming corrected 2026-07-27.** The script, its docstring and every downstream description
+> call this "KernelSHAP". It is not: it enumerates all 2³ coalitions directly
+> (`11_kernel_shap_branches.py:319`, `coalitions = list(product([False, True], repeat=3))`) and
+> computes **exact** Shapley values. KernelSHAP is the weighted-least-squares *approximation*
+> used when the player count makes enumeration infeasible; with 3 players it is unnecessary.
+> The misnomer *understates* the rigour, which is an odd way to be wrong, but a replicator who
+> reaches for `shap.KernelExplainer` will not reproduce these numbers.
+
+This produces the §2.1 branch decomposition (60.7% structural / 28.8% stop / 10.5% ATG of NMD
+branch attribution). Distinct from DeepSHAP, which attributes per-position; it treats the model's
+three sub-encoders (ATG branch, stop branch, structural branch) as **3 "players"** and computes
+their exact additive Shapley contributions.
+
+**Scope, which the published figure legend does not state.** Two restrictions materially bound
+what these percentages describe, and both are properties of the code rather than choices made at
+reporting time:
+
+- **Rank-0 ORF only.** `11_kernel_shap_branches.py:39` hardcodes `orf_index = 0` and `main()`
+  exposes no `--orf-index` flag. ORFs of rank 1–4 are computed and held as *fixed context*, never
+  as players. So the shares describe the rank-0 ORF's contribution, not the transcript's.
+- **Test split, not the full cohort.** The published 60.7 / 28.8 / 10.5 come from
+  `kernel_shap_branch_{tag}.tsv` (n=10,131; NMD n=2,268), *not* from the `--explain-split all`
+  file, which gives 60.0 / 29.1 / 10.9 over 39,938 (NMD n=8,840).
+
+**What the percentages are.** `pct_b = mean|φ_b| / Σ_b mean|φ_b|` over NMD isoforms
+(`label > 0.5`), where φ is a displacement of the **raw logit** (`:168`,
+`logit = model.cls_head(model.head(tx_emb))`; no sigmoid appears in `NMDOrfModel.forward`). This
+is a share of mean absolute log-odds displacement. It is **not** variance explained, not accuracy
+attributable, and not information in any information-theoretic sense — a caveat that matters
+wherever the phrase "predictive information" is used.
+
+**This is `mean_of_abs`, and the ordering is not cosmetic.** The published shares average the
+absolute value per isoform and then normalise. Taking the absolute value *after* averaging —
+`|mean_i φ|`, the ordering an ensemble's own attribution implies — gives materially different
+shares on the same file: **67.2 / 28.2 / 4.7** on the test split and **65.1 / 28.4 / 6.5** over
+all 39,938. The ATG branch more than halves. Any statement about these shares must say which
+ordering produced it.
+
+**The baseline is local, not global.** For an absent branch the rank-0 sub-embedding is replaced
+by that of a real background transcript drawn from **train** (500, uniform, seeded), while *this*
+transcript's own ORFs 1–4 and its ORF mask are held fixed. `expected_value` is therefore
+per-sample, not a constant — mean −1.1233, sd 0.5417 over 39,938 rows. Any signal carried by
+"this transcript has four other ORFs arranged this way" is absorbed into the baseline and is
+invisible to all three φ.
 
 ### Method
 
