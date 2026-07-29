@@ -299,11 +299,39 @@ if (is.data.frame(paralogs)) {
   safe_write_tsv(data.frame(gene_id = paralogs),
                  file.path(out_dir, "paralog_genes.tsv"))
   cat("  -> wrote paralog_genes.tsv\n")
-} else {
-  df <- data.frame(gene_id = unlist(paralogs))
-  cat("  coerced to data.frame:", nrow(df), "rows\n")
-  safe_write_tsv(df, file.path(out_dir, "paralog_genes.tsv"))
+} else if (is.list(paralogs) && !is.null(paralogs$leakage_genes)) {
+  # NAME THE ELEMENT; DO NOT unlist() THE WHOLE OBJECT (2026-07-29).
+  #
+  # paralog_genes.rds is a 5-element list from 05u_paralog_annotation.R: leakage_genes
+  # (56 versioned gene ids -- the screen), leakage_pairs (161x5), all_expressed_pairs
+  # (82,590x3), paralog_pairs (131,280x3) and metadata. The previous branch was
+  # `data.frame(gene_id = unlist(paralogs))`, which flattened ALL FIVE into one column
+  # labelled gene_id: 642,485 rows in which only 56 values were the gene list and the
+  # rest were unversioned ids from the pair tables plus percent-identity NUMBERS like
+  # 47.2152, all presented under a column name asserting they were gene ids.
+  #
+  # It happened not to change the screen's result -- data_prep matches versioned ids, and
+  # noise cannot match -- so test_paralog = 122 is correct and claim 5.6.4 stands. That is
+  # luck, not design: the file was wrong by four orders of magnitude and read as if right.
+  #
+  # leakage_genes is what the screen means: >=80% protein identity, both genes expressed,
+  # and the pair straddling the train/test split (05u:69,196,211). It is versioned, which
+  # is what data_prep.py's gene_lookup compares against.
+  lg <- paralogs$leakage_genes
+  stopifnot("leakage_genes must be a character vector" = is.character(lg))
+  cat("  leakage_genes:", length(lg), "versioned gene IDs",
+      sprintf("(%d carry a version suffix)\n", sum(grepl(".", lg, fixed = TRUE))))
+  if (!is.null(paralogs$metadata$holdout_chrs))
+    cat("  screen defined against holdout chrs:",
+        paste(paralogs$metadata$holdout_chrs, collapse = ", "), "\n")
+  safe_write_tsv(data.frame(gene_id = lg), file.path(out_dir, "paralog_genes.tsv"))
   cat("  -> wrote paralog_genes.tsv\n")
+} else {
+  # Refusing rather than coercing. A silent unlist() is what produced the defect above.
+  stop("paralog_genes.rds is a ", paste(class(paralogs), collapse = "/"),
+       " with elements [", paste(names(paralogs), collapse = ", "),
+       "] and no `leakage_genes`. Name the element that holds the gene list; do not ",
+       "flatten the object and hope the consumer's matching filters the rest out.")
 }
 
 # ===========================================================================
