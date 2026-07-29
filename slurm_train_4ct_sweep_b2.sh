@@ -1,7 +1,12 @@
 #!/bin/bash
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
-#SBATCH --time=02:00:00
+#SBATCH --gres=gpu:v100-sxm2:1   # PINNED 2026-07-29. Generic gpu:1 draws either
+#   node family and they differ ~5x on identical work (array 8785576: 14:38 on
+#   d1017 vs 1:21:00 on c2204/c2205). With a right-sized wall an unpinned slow
+#   draw would be KILLED, and these producers write no partial output.
+#SBATCH --time=00:30:00   # measured ~8:08; ~3-4x headroom. Right-sized 2026-07-29:
+#   an oversized request is excluded from Slurm backfill, which is what kept job
+#   8826175 at PENDING(Priority) for an hour with 14 suitable nodes idle.
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=4ct_sw2

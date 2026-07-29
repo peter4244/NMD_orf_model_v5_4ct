@@ -1,6 +1,8 @@
 #!/bin/bash
 #SBATCH --partition=short
-#SBATCH --time=02:00:00
+#SBATCH --time=00:30:00   # measured 9:18; ~3-4x headroom. Right-sized 2026-07-29:
+#   an oversized request is excluded from Slurm backfill, which is what kept job
+#   8826175 at PENDING(Priority) for an hour with 14 suitable nodes idle.
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=dn_h5

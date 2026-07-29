@@ -1,7 +1,9 @@
 #!/bin/bash
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:v100-sxm2:1
-#SBATCH --time=06:00:00
+#SBATCH --time=01:45:00   # measured 31:06; ~3-4x headroom. Right-sized 2026-07-29:
+#   an oversized request is excluded from Slurm backfill, which is what kept job
+#   8826175 at PENDING(Priority) for an hour with 14 suitable nodes idle.
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=dn_atgstop
