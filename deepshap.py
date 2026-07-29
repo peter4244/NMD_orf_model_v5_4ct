@@ -18,7 +18,7 @@ import torch
 import torch.nn as nn
 
 from model import NMDOrfModel, build_model
-from utils import NMDDataset, load_config, set_seed
+from utils import NMDDataset, load_config, resolve_checkpoint, set_seed
 
 
 class BranchWrapper(nn.Module):
@@ -168,7 +168,7 @@ class JointBranchWrapper(nn.Module):
 def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
                   atg_window=None, stop_window=None, seed=None, run_id=None,
                   branches=None, orf_index=0,
-                 results_dir="results_4ct"):
+                 results_dir="results_4ct", member_seed=None):
     config = load_config(config_path)
     seed = seed if seed is not None else config["training"]["seed"]
     set_seed(seed)
@@ -195,7 +195,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     h5_path = config["data"]["hdf5_path"]
 
     # Load model
-    ckpt_path = results_dir / f"best_model_{tag}.pt"
+    ckpt_path = resolve_checkpoint(results_dir, tag, member_seed)
     print(f"Loading model from {ckpt_path}")
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model_config = {**config["model"],
@@ -691,7 +691,15 @@ if __name__ == "__main__":
                         help="Which branches to run (default: atg stop structural)")
     parser.add_argument("--orf-index", type=int, default=0,
                         help="Which ORF rank to explain (0-4, default: 0)")
+    # DISTINCT FROM --seed ABOVE, deliberately. --seed is this run's SHAP sampling RNG;
+    # --member-seed selects WHICH TRAINED MEMBER to load. Reusing one flag for both would
+    # silently tie the sampling draw to the ensemble member and make the two inseparable.
+    parser.add_argument("--member-seed", type=int, default=None,
+                        help="Ensemble member to load, by training seed. Omitted = the legacy "
+                             "un-seeded checkpoint. Never silently guesses a member; see "
+                             "utils.resolve_checkpoint.")
     args = parser.parse_args()
     run_deepshap(args.config, args.n_explain, args.n_background,
                  args.atg_window, args.stop_window, args.seed, args.run_id,
-                 args.branches, args.orf_index, results_dir=args.results_dir)
+                 args.branches, args.orf_index, results_dir=args.results_dir,
+                 member_seed=args.member_seed)

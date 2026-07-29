@@ -39,7 +39,7 @@ for cand in (HERE, HERE.parent, Path("~/cc/nmd_orf_model_v5_4ct").expanduser()):
 sys.path.insert(0, str(REPO))
 
 from model import build_model
-from utils import NMDDataset, load_config, set_seed
+from utils import NMDDataset, load_config, resolve_checkpoint, set_seed
 
 
 def main():
@@ -51,6 +51,7 @@ def main():
                    help="override; default reads config['data']['results_dir'] or results_4ct")
     p.add_argument("--split", default="all",
                    help="NMDDataset split (default: 'all')")
+    p.add_argument("--member-seed", type=int, default=None, help="Ensemble member to load, by training seed. Omitted = the legacy un-seeded checkpoint. Never silently guesses a member; see utils.resolve_checkpoint.")
     args = p.parse_args()
 
     config = load_config(args.config)
@@ -64,7 +65,7 @@ def main():
     if not results_dir.is_absolute():
         results_dir = REPO / results_dir
 
-    ckpt_path = results_dir / f"best_model_{tag}.pt"
+    ckpt_path = resolve_checkpoint(results_dir, tag, args.member_seed)
     print(f"[infer-all] checkpoint: {ckpt_path}")
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model_config = {**config["model"],

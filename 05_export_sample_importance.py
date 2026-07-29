@@ -26,7 +26,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from model import build_model
-from utils import NMDDataset, load_config, set_seed
+from utils import NMDDataset, load_config, resolve_checkpoint, set_seed
 
 
 def main():
@@ -35,6 +35,7 @@ def main():
     parser.add_argument("--tag", default="atg100_stop500")
     parser.add_argument("--atg-window", type=int, default=None)
     parser.add_argument("--stop-window", type=int, default=None)
+    parser.add_argument("--member-seed", type=int, default=None, help="Ensemble member to load, by training seed. Omitted = the legacy un-seeded checkpoint. Never silently guesses a member; see utils.resolve_checkpoint.")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -55,7 +56,7 @@ def main():
     print(f"  ORF features ({len(orf_feat_names)}): {orf_feat_names}")
 
     # Load model
-    ckpt_path = results_dir / f"best_model_{tag}.pt"
+    ckpt_path = resolve_checkpoint(results_dir, tag, args.member_seed)
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model_config = {**config["model"],
                     "window_size_atg": ws_atg, "window_size_stop": ws_stop}

@@ -17,11 +17,12 @@ from torch.amp import autocast
 from torch.utils.data import DataLoader
 
 from model import NMDOrfModel, build_model
-from utils import NMDDataset, compute_metrics, load_config, set_seed
+from utils import (NMDDataset, compute_metrics, load_config, resolve_checkpoint,
+                   set_seed)
 
 
 def evaluate(config_path="config.yaml", atg_window=None, stop_window=None,
-             results_dir="results_4ct"):
+             results_dir="results_4ct", member_seed=None):
     config = load_config(config_path)
     set_seed(config["training"]["seed"])
 
@@ -34,7 +35,7 @@ def evaluate(config_path="config.yaml", atg_window=None, stop_window=None,
     results_dir = Path(results_dir)
 
     # Load best checkpoint
-    ckpt_path = results_dir / f"best_model_{tag}.pt"
+    ckpt_path = resolve_checkpoint(results_dir, tag, member_seed)
     print(f"Loading checkpoint: {ckpt_path}")
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
 
@@ -137,6 +138,7 @@ if __name__ == "__main__":
                         help="Override window_size_atg from config")
     parser.add_argument("--stop-window", type=int, default=None,
                         help="Override window_size_stop from config")
+    parser.add_argument("--member-seed", type=int, default=None, help="Ensemble member to load, by training seed. Omitted = the legacy un-seeded checkpoint. Never silently guesses a member; see utils.resolve_checkpoint.")
     args = parser.parse_args()
     evaluate(args.config, atg_window=args.atg_window, stop_window=args.stop_window,
-             results_dir=args.results_dir)
+             results_dir=args.results_dir, member_seed=args.member_seed)

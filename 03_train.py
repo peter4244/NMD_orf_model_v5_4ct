@@ -23,7 +23,7 @@ from torch.amp import autocast, GradScaler
 from torch.utils.data import DataLoader
 
 from utils import (NMDDataset, compute_metrics, compute_pos_weight,
-                   load_config, set_seed)
+                   load_config, member_tag, set_seed)
 from model import NMDOrfModel, build_model, count_parameters
 
 
@@ -103,9 +103,12 @@ def eval_epoch(model, loader, criterion, device, use_amp):
 
 
 def train(config_path="config.yaml", atg_window=None, stop_window=None,
-          results_dir="results_4ct"):
+          results_dir="results_4ct", seed=None):
     config = load_config(config_path)
-    set_seed(config["training"]["seed"])
+    # SEED IS RESOLVED ONCE, HERE, AND THEN NAMES EVERY ARTIFACT THIS RUN WRITES (2026-07-29).
+    # It used to come from config only, which is why five array tasks all wrote one checkpoint.
+    seed = config["training"]["seed"] if seed is None else seed
+    set_seed(seed)
 
     # Apply CLI overrides for window sizes
     ws_atg = atg_window or config["data"]["window_size_atg"]
@@ -156,8 +159,13 @@ def train(config_path="config.yaml", atg_window=None, stop_window=None,
     results_dir = Path(results_dir)
     results_dir.mkdir(exist_ok=True)
     tag = f"atg{ws_atg}_stop{ws_stop}"
-    log_path = results_dir / f"training_log_{tag}.csv"
-    best_ckpt_path = results_dir / f"best_model_{tag}.pt"
+    # EVERY per-member artifact carries its member. Unconditional on purpose: if the seed suffix
+    # appeared only when --seed was passed, a five-task array whose driver forgot the flag would
+    # collide exactly as before and still exit 0. A rule that applies only when remembered is not
+    # a rule. See utils.member_tag.
+    mtag = member_tag(tag, seed)
+    log_path = results_dir / f"training_log_{mtag}.csv"
+    best_ckpt_path = results_dir / f"best_model_{mtag}.pt"
 
     best_val_auc = 0.0
     patience_counter = 0
@@ -239,6 +247,10 @@ if __name__ == "__main__":
                         help="Override window_size_atg from config")
     parser.add_argument("--stop-window", type=int, default=None,
                         help="Override window_size_stop from config")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Ensemble member seed. Defaults to config training.seed. "
+                             "Names the checkpoint and training log, so concurrent array "
+                             "tasks cannot overwrite each other.")
     args = parser.parse_args()
     train(args.config, atg_window=args.atg_window, stop_window=args.stop_window,
-          results_dir=args.results_dir)
+          results_dir=args.results_dir, seed=args.seed)

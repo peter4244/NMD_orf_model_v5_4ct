@@ -76,6 +76,68 @@ def set_seed(seed, deterministic=True):
           f"(cudnn.deterministic=True, benchmark=False)")
 
 
+def member_tag(tag, seed=None):
+    """Filename stem for ONE ensemble member. The single source of truth for member naming.
+
+    WHY THIS EXISTS (2026-07-29). 03_train.py took its seed from `config` only -- there was no
+    `--seed` -- and wrote `best_model_{tag}.pt`, a path with no seed slot. Five array tasks
+    therefore `torch.save` to ONE filename, non-atomically: the five "members" of the ensemble
+    are one checkpoint written five times, and the seed-variability table that is supposed to
+    JUSTIFY the ensemble would read sd = 0. It would look like a stability result. It would be
+    a filename collision.
+
+    Seven call sites build that path (evaluate.py, deepshap.py, 11_kernel_shap_branches.py,
+    05_interpret_structural.py, 05_export_sample_importance.py, run_infer_all.py,
+    infer_uorf_attention.py). Encoding the rule here rather than repeating an f-string seven
+    times is deliberate: a naming rule restated at seven call sites is a rule that will be
+    seven different rules within a month.
+
+    seed=None reproduces the legacy, pre-ensemble name, so artifacts already deposited under
+    results_4ct/ and results_4ct_dn/ still resolve and nothing published is orphaned. Training
+    never passes None -- 03_train.py resolves a concrete seed before it builds any path -- so
+    no new seedless checkpoint can be written from here on.
+    """
+    return tag if seed is None else f"{tag}_seed{seed}"
+
+
+def resolve_checkpoint(results_dir, tag, seed=None):
+    """Locate ONE member's checkpoint, and refuse to guess which member.
+
+    THE FAILURE THIS EXISTS TO PREVENT, which is nastier than the collision that motivated
+    member_tag. Training now writes best_model_{tag}_seed{S}.pt. Consumers default to seed=None
+    and therefore to the legacy best_model_{tag}.pt. So a reader who retrains and then evaluates
+    with default flags would silently score the OLD, published checkpoint with the NEW run's
+    label -- plausible numbers, exit 0, wrong model. That is precisely the shape of the
+    2026-07-28 hybrid (deposit-native checkpoint scored over the published universe) and of C44
+    (a finding reported off the wrong copy). Both were exit-0 and both were wrong.
+
+    So: seed given -> that member must exist, or raise. seed omitted -> the legacy file is used
+    ONLY if it exists; if it does not and seeded members do, raise and list them rather than
+    picking one. Never silently fall back, in either direction.
+    """
+    results_dir = Path(results_dir)
+    if seed is not None:
+        path = results_dir / f"best_model_{member_tag(tag, seed)}.pt"
+        if not path.exists():
+            raise FileNotFoundError(
+                f"No checkpoint for member seed={seed}: {path}. "
+                f"Train it first, or pass a seed that exists.")
+        return path
+
+    legacy = results_dir / f"best_model_{tag}.pt"
+    if legacy.exists():
+        return legacy
+
+    members = sorted(results_dir.glob(f"best_model_{tag}_seed*.pt"))
+    if members:
+        raise FileNotFoundError(
+            f"{legacy} does not exist, but {len(members)} ensemble member(s) do:\n  "
+            + "\n  ".join(p.name for p in members)
+            + "\nPass --seed to name the member you mean. Refusing to guess: silently "
+              "picking one would report a single member's number as the ensemble's.")
+    raise FileNotFoundError(f"No checkpoint found: {legacy} (and no seeded members either).")
+
+
 class NMDDataset(Dataset):
     """
     v5: PyTorch dataset — loads windows + minimal ORF features from HDF5.

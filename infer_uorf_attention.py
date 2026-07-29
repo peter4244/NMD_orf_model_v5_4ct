@@ -13,7 +13,8 @@ attention-pattern interpretation, so we use all isoforms the model has
 labels for.
 
 Inputs (all under --results-dir, itself relative to this script's directory):
-  <results-dir>/best_model_atg500_stop500.pt  — v5_4ct trained weights
+  <results-dir>/best_model_atg500_stop500[_seed<N>].pt  — v5_4ct trained weights
+      (the _seed<N> form is one ensemble member; select it with --member-seed)
   <results-dir>/tx_summary.tsv                — v5_4ct labels (is_nmd 0/1)
   <results-dir>/nmd_orf_data.h5               — v5 HDF5 inputs (symlinked;
                                                 features are unchanged from
@@ -62,7 +63,7 @@ import torch
 REPO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, REPO)
 from model import build_model
-from utils import load_config
+from utils import load_config, resolve_checkpoint
 
 # ── v5_4ct training-set normalization stats ──
 # EXTRACTED FROM THE PUBLISHED results_4ct HDF5 AND NOT SELECTED BY --results-dir. See the
@@ -81,11 +82,20 @@ _ap = argparse.ArgumentParser(description=__doc__.split("\n")[1] if __doc__ else
 _ap.add_argument("--results-dir", default="results_4ct",
                  help="relative to this script's directory; results_4ct_dn for the "
                       "deposit-native rebuild (default: %(default)s)")
+_ap.add_argument("--member-seed", type=int, default=None,
+                 help="Ensemble member to load, by training seed. Omitted = the legacy "
+                      "un-seeded checkpoint. Never silently guesses a member; see "
+                      "utils.resolve_checkpoint.")
 _args = _ap.parse_args()
 
 RES   = os.path.join(REPO, _args.results_dir)
 print(f"[results-dir] {RES}")
-CKPT  = os.path.join(RES, "best_model_atg500_stop500.pt")
+# TAG WAS A STRING LITERAL HERE, not f"atg{WS_ATG}_stop{WS_STOP}" like every other consumer
+# (2026-07-29). That made this the one script that would keep loading the atg500_stop500
+# checkpoint after a sweep selected a different window config -- silently, since the file
+# exists. Named once, next to the window constants it must agree with.
+TAG   = "atg500_stop500"
+CKPT  = resolve_checkpoint(RES, TAG, _args.member_seed)
 H5    = os.path.join(RES, "nmd_orf_data.h5")
 TXSUM = os.path.join(RES, "tx_summary.tsv")
 OUT   = os.path.join(RES, "uorf_attention_predictions.tsv")
