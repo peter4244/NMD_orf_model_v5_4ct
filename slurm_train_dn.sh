@@ -31,5 +31,12 @@ $PY 03_train.py --config config_dn.yaml --results-dir results_4ct_dn --atg-windo
 echo "=== train exit: $? ==="
 
 echo "=== EVALUATE ==="
-$PY evaluate.py --config config_dn.yaml --results-dir results_4ct_dn --atg-window 500 --stop-window 500
+# --split IS NOW REQUIRED (2026-07-29). evaluate.py used to hardcode split="test_clean",
+# which is why every metrics_*.json in existence is a test-set score -- including the twelve
+# that selected the published window config. Routine monitoring scores VAL; the test set is
+# a deliberate one-time act needing --final, shown commented below so it cannot happen by
+# habit.
+$PY evaluate.py --config config_dn.yaml --results-dir results_4ct_dn --atg-window 500 --stop-window 500 --split val
+# FINAL evaluation, run deliberately and once the config is settled:
+# $PY evaluate.py --config config_dn.yaml --results-dir results_4ct_dn --atg-window 500 --stop-window 500 --split test_clean --final
 echo "=== evaluate exit: $? ==="

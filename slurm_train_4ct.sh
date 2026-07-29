@@ -18,7 +18,14 @@ python 03_train.py --config config.yaml --atg-window 500 --stop-window 500
 
 echo ""
 echo "=== Evaluation ==="
-python evaluate.py --config config.yaml --atg-window 500 --stop-window 500
+# --split IS NOW REQUIRED (2026-07-29). evaluate.py used to hardcode split="test_clean",
+# which is why every metrics_*.json in existence is a test-set score -- including the twelve
+# that selected the published window config. Routine monitoring scores VAL; the test set is
+# a deliberate one-time act needing --final, shown commented below so it cannot happen by
+# habit.
+python evaluate.py --config config.yaml --atg-window 500 --stop-window 500 --split val
+# FINAL evaluation, run deliberately:
+# python evaluate.py --config config.yaml --atg-window 500 --stop-window 500 --split test_clean --final
 
 echo ""
 echo "=== Done ==="
