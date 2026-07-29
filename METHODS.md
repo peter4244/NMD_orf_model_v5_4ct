@@ -298,12 +298,20 @@ is a share of mean absolute log-odds displacement. It is **not** variance explai
 attributable, and not information in any information-theoretic sense — a caveat that matters
 wherever the phrase "predictive information" is used.
 
-**This is `mean_of_abs`, and the ordering is not cosmetic.** The published shares average the
-absolute value per isoform and then normalise. Taking the absolute value *after* averaging —
-`|mean_i φ|`, the ordering an ensemble's own attribution implies — gives materially different
-shares on the same file: **67.2 / 28.2 / 4.7** on the test split and **65.1 / 28.4 / 6.5** over
-all 39,938. The ATG branch more than halves. Any statement about these shares must say which
-ordering produced it.
+**State the aggregation ordering whenever these shares are quoted.** Precisely, the published
+quantity is `mean_i|φ_ib| / mean_i(Σ_b |φ_ib|)` over NMD isoforms `i` and branches `b`
+(`:381-385`) — absolute value per isoform first, mean second. This is a property of ONE trained
+model.
+
+A separate ordering question arises only for an **ensemble** of `K` members, and it is about
+averaging across members `k`, not across isoforms: `mean_i|mean_k φ|` (the ensemble's own
+attribution — sign-average across members first, absolute after) is not equal to
+`mean_k mean_i|φ|` (the mean of the members' individually-published shares). The two differ
+exactly to the extent that a branch's attribution flips sign across members. **At `K = 1` they
+are algebraically identical**, so no single-checkpoint file — including every file in
+`results_4ct/` — can measure that difference. It has to be measured across members or not at
+all. Do not substitute an across-*isoform* contrast for it: averaging signed φ over isoforms
+collapses cases whose attributions point opposite ways and answers a question nobody asks.
 
 **The baseline is local, not global.** For an absent branch the rank-0 sub-embedding is replaced
 by that of a real background transcript drawn from **train** (500, uniform, seeded), while *this*
