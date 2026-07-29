@@ -23,7 +23,8 @@ import torch
 from torch.utils.data import DataLoader
 
 from model import build_model
-from utils import NMDDataset, load_config, resolve_checkpoint, set_seed
+from utils import (NMDDataset, load_config, resolve_checkpoint, selected_tag,
+                   set_seed)
 
 
 def compute_grad_x_input(model, dataloader, device, orf_feat_names):
@@ -194,7 +195,10 @@ def main():
     parser.add_argument("--results-dir", default="results_4ct",
                         help="results_4ct_dn for the deposit-native rebuild "
                              "(default: %(default)s)")
-    parser.add_argument("--tag", default="atg20_stop500")
+    parser.add_argument("--tag", default=None,
+                        help="Window-config tag. Default: the `selected:` block in "
+                             "--config. Was the literal atg20_stop500, a configuration "
+                             "that is not even a point in the sweep grid.")
     parser.add_argument("--atg-window", type=int, default=None)
     parser.add_argument("--stop-window", type=int, default=None)
     parser.add_argument("--member-seed", type=int, default=None, help="Ensemble member to load, by training seed. Omitted = the legacy un-seeded checkpoint. Never silently guesses a member; see utils.resolve_checkpoint.")
@@ -206,7 +210,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ws_atg = args.atg_window or config["data"]["window_size_atg"]
     ws_stop = args.stop_window or config["data"]["window_size_stop"]
-    tag = args.tag
+    tag = args.tag if args.tag else selected_tag(config)
     results_dir = Path(args.results_dir)
     print(f"[results-dir] {results_dir}")
     h5_path = config["data"]["hdf5_path"]

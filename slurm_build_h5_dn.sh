@@ -31,7 +31,13 @@ with h5py.File(\"results_4ct_dn/nmd_orf_data.h5\",\"r\") as f:
     print(\"n isoforms:\", f[\"orf_mask\"].shape[0])
     sp = [s.decode() if isinstance(s,bytes) else s for s in f[\"split\"][:]]
     print(\"splits:\", collections.Counter(sp))
-    lab = f[\"label\"][:]
+    # \"labels\", not \"label\" -- the dataset data_prep.py writes is plural (2026-07-29).
+    # This one-character typo is why job 8783842 shows FAILED in sacct: data_prep.py had
+    # already written a complete 4.18 GB HDF5, and only this post-build verification block
+    # raised KeyError. Under `set -euo pipefail` that marked a successful build as a failed
+    # job, which is worse than no check at all -- a verification step that fails on its own
+    # bug teaches you to distrust the verification.
+    lab = f[\"labels\"][:]
     print(\"labels: NMD\", int(lab.sum()), \"/ non-NMD\", int((lab==0).sum()))
     print(\"window_sizes:\", json.loads(f.attrs[\"window_sizes\"]))
 "

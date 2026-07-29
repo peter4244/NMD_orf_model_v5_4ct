@@ -185,8 +185,33 @@ td2_features <- read.delim(file.path(results_dir, "td2_features.tsv"))
 # DeepSHAP channel summary (mean across 5 replicates)
 # Source: deepshap.py; see METHODS.md § "DeepSHAP Sequence Interpretation"
 # Numeric cols: mean_abs_shap, mean_abs_shap_nmd, mean_abs_shap_ctrl (safe to average)
+# THE GLOB IS MODE-QUALIFIED (2026-07-29). deepshap.py:667 has written
+# deepshap_summary_{tag}_{mode}_run{N}.tsv since the W52 fix, so this pattern -- the legacy
+# mode-less one -- matched NOTHING, set has_shap FALSE, and silently skipped the chunks
+# producing five section-5 claims at exit 0. 06_export_deepshap_tsv.py:240 was repaired at
+# the time; this consumer was not.
+#
+# `joint` is named explicitly, not globbed across modes: joint and structural-only are
+# DIFFERENT quantities and must never be averaged. Measured on the same model and
+# checkpoint, n_downstream_ejc mean|SHAP| is 2.1232 under joint and 2.7174 under
+# structural-only (METHODS.md, "DeepSHAP Sequence Interpretation"). Joint is the canonical
+# flow feeding sections 3.1, 4.1, 7.2, 9.4 and 9.6-9.8.
+shap_mode <- "joint"
 shap_run_files <- sort(Sys.glob(file.path(results_dir,
-                                           paste0("deepshap_summary_", best_tag, "_run*.tsv"))))
+                                           paste0("deepshap_summary_", best_tag, "_",
+                                                  shap_mode, "_run*.tsv"))))
+if (length(shap_run_files) == 0) {
+  legacy_shap_files <- sort(Sys.glob(file.path(results_dir,
+                                                paste0("deepshap_summary_", best_tag, "_run*.tsv"))))
+  if (length(legacy_shap_files) > 0) {
+    warning(sprintf(paste0("Falling back to %d LEGACY mode-less deepshap_summary file(s). ",
+                           "These predate the W52 mode suffix, so joint and structural-only ",
+                           "runs may have overwritten one another and what remains may mix ",
+                           "two different quantities. Re-run deepshap.py to regenerate ",
+                           "mode-qualified files."), length(legacy_shap_files)))
+    shap_run_files <- legacy_shap_files
+  }
+}
 has_shap <- length(shap_run_files) > 0
 if (has_shap) {
   shap_runs <- lapply(shap_run_files, read.delim)

@@ -26,13 +26,21 @@ import torch
 from torch.utils.data import DataLoader
 
 from model import build_model
-from utils import NMDDataset, load_config, resolve_checkpoint, set_seed
+from utils import (NMDDataset, load_config, resolve_checkpoint, selected_tag,
+                   set_seed)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yaml")
-    parser.add_argument("--tag", default="atg100_stop500")
+    parser.add_argument("--tag", default=None,
+                        help="Window-config tag. Default: the `selected:` block in "
+                             "--config. Was the literal atg100_stop500 -- a configuration "
+                             "that was never the selected one.")
+    parser.add_argument("--results-dir", default="results_4ct",
+                        help="where the checkpoint is read and outputs written. This was "
+                             "hardcoded, making it the ONE script of eight that could not "
+                             "be pointed at the deposit-native tree (C2).")
     parser.add_argument("--atg-window", type=int, default=None)
     parser.add_argument("--stop-window", type=int, default=None)
     parser.add_argument("--member-seed", type=int, default=None, help="Ensemble member to load, by training seed. Omitted = the legacy un-seeded checkpoint. Never silently guesses a member; see utils.resolve_checkpoint.")
@@ -44,8 +52,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ws_atg = args.atg_window or config["data"]["window_size_atg"]
     ws_stop = args.stop_window or config["data"]["window_size_stop"]
-    tag = args.tag
-    results_dir = Path("results_4ct")
+    tag = args.tag if args.tag else selected_tag(config)
+    results_dir = Path(args.results_dir)
     h5_path = config["data"]["hdf5_path"]
 
     # Load feature names
