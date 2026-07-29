@@ -1,12 +1,14 @@
 #!/bin/bash
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:v100-sxm2:1   # PINNED 2026-07-29. Generic gpu:1 draws either
-#   node family and they differ ~5x on identical work (array 8785576: 14:38 on
-#   d1017 vs 1:21:00 on c2204/c2205). With a right-sized wall an unpinned slow
-#   draw would be KILLED, and these producers write no partial output.
-#SBATCH --time=00:45:00   # measured 9:42; ~3-4x headroom. Right-sized 2026-07-29:
-#   an oversized request is excluded from Slurm backfill, which is what kept job
-#   8826175 at PENDING(Priority) for an hour with 14 suitable nodes idle.
+#SBATCH --gres=gpu:1   # UNPINNED 2026-07-29 (reversing the pin earlier the same day).
+#   Pinning to v100-sxm2 looked like a 34->14 node trade; it is not. sinfo -N emits one row
+#   per node-PARTITION pair, so that 14 was duplicates -- and d1002/d1007/d1009/d1010 are
+#   DRAINING, leaving ~2 nodes with capacity. Pinned, job 8826324 projected a start 2h LATER
+#   than the oversized job it replaced. Eligibility, not gap size, is the binding constraint.
+#   For SHORT work unpinning is free: the wall below covers the ~5x slow draw. Long jobs
+#   (joint/atg-stop/all-modes) stay pinned, since unpinned they would need 2-6h walls.
+#SBATCH --time=01:15:00   # 9:42 on the fast family, ~49m on the slow one; this
+#   wall survives EITHER draw, which is what makes unpinning safe.
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=dn_kshap
