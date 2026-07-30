@@ -326,6 +326,28 @@ if (is.data.frame(paralogs)) {
         paste(paralogs$metadata$holdout_chrs, collapse = ", "), "\n")
   safe_write_tsv(data.frame(gene_id = lg), file.path(out_dir, "paralog_genes.tsv"))
   cat("  -> wrote paralog_genes.tsv\n")
+
+  # THE VALIDATION SIDE IS A SEPARATE FILE, because it is a separate SET (2026-07-29, D35).
+  # 05u defines leakage as a pair straddling a split boundary, so the test-side and val-side
+  # sets are computed against different boundaries and are disjoint -- 56 genes on chr1/3/5/7
+  # and 19 on chr2/chr4. data_prep.py consults one per branch; a chr2 gene tested against the
+  # test-side set can never match, which is why val_paralog was 0.
+  if (!is.null(paralogs$val_leakage_genes)) {
+    vlg <- paralogs$val_leakage_genes
+    stopifnot("val_leakage_genes must be a character vector" = is.character(vlg))
+    cat("  val_leakage_genes:", length(vlg), "versioned gene IDs\n")
+    if (!is.null(paralogs$metadata$val_chrs))
+      cat("  screen defined against val chrs:",
+          paste(paralogs$metadata$val_chrs, collapse = ", "), "\n")
+    safe_write_tsv(data.frame(gene_id = vlg),
+                   file.path(out_dir, "val_paralog_genes.tsv"))
+    cat("  -> wrote val_paralog_genes.tsv\n")
+  } else {
+    # Not fatal here -- an older RDS predates D35. data_prep.py raises loudly if the file is
+    # missing, which is the right place for it: that is where the screen is actually applied.
+    cat("  NOTE: this paralog_genes.rds has no val_leakage_genes (predates D35).\n")
+    cat("        Re-run 05u_paralog_annotation.R --from-cache to add it (offline).\n")
+  }
 } else {
   # Refusing rather than coercing. A silent unlist() is what produced the defect above.
   stop("paralog_genes.rds is a ", paste(class(paralogs), collapse = "/"),

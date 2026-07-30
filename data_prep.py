@@ -289,13 +289,30 @@ def load_junctions(results_dir):
     return junc_map
 
 
-def load_paralog_genes(results_dir):
-    path = results_dir / "paralog_genes.tsv"
+def load_paralog_genes(results_dir, which="test"):
+    """Load ONE side's leakage-gene set. The two sides are different sets, not one shared set.
+
+    WHY THIS TAKES AN ARGUMENT NOW (2026-07-29). 05u defines leakage as a pair straddling a
+    split boundary, so "leaks into the test set" and "leaks into the validation set" are
+    computed against DIFFERENT boundaries and yield disjoint gene sets (56 on chr1/3/5/7, 19
+    on chr2/chr4, zero overlap -- they are different chromosomes). Testing a chr2 gene against
+    the test-side set can never match, which is exactly why val_paralog came out 0 after the
+    val branch was added: the branch was right, the set it consulted was the wrong one.
+    """
+    fname = {"test": "paralog_genes.tsv", "val": "val_paralog_genes.tsv"}[which]
+    path = results_dir / fname
+    if which == "val" and not path.exists():
+        # Loud, not silent: without this file the validation split cannot be screened, and a
+        # sweep scored on an unscreened val set relocates the published leak (D31).
+        raise FileNotFoundError(
+            f"{path} not found. The validation leakage screen needs it. Re-run "
+            f"05u_paralog_annotation.R (--from-cache is offline) so paralog_genes.rds carries "
+            f"val_leakage_genes, then export_rds.R to write the TSV.")
     print(f"Loading {path} ...")
     df = pd.read_csv(path, sep="\t")
     col = df.columns[0]
     genes = set(df[col].dropna().astype(str))
-    print(f"  {len(genes):,} paralog genes")
+    print(f"  {len(genes):,} {which}-side leakage genes")
     return genes
 
 
@@ -482,7 +499,8 @@ def build_dataset(results_dir, n_workers=8):
     tx_summary = load_tx_summary(results_dir)
     ref_features = load_ref_features(results_dir)  # still needed for gene_id + ref_atg_map
     junc_map = load_junctions(results_dir)
-    paralog_genes = load_paralog_genes(results_dir)
+    paralog_genes = load_paralog_genes(results_dir, which="test")
+    val_paralog_genes = load_paralog_genes(results_dir, which="val")
 
     # Load sequences from FASTA (filtered to transcripts in tx_summary)
     target_ids = set(tx_summary["isoform_id"].values)
@@ -559,9 +577,10 @@ def build_dataset(results_dir, n_workers=8):
     for tid in tx_ids:
         ch = chr_map.get(tid, "")
         gene = gene_lookup.get(tid, "")
-        is_paralog = gene in paralog_genes
+        # EACH BRANCH CONSULTS ITS OWN SIDE'S SET. A single `is_paralog` computed against the
+        # test-side set was the bug: it can never fire for a chr2/chr4 gene.
         if ch in HOLDOUT_CHRS:
-            splits.append("test_paralog" if is_paralog else "test")
+            splits.append("test_paralog" if gene in paralog_genes else "test")
         elif ch in VAL_CHRS:
             # THE VAL SCREEN IS NOW SYMMETRIC WITH THE TEST SCREEN (2026-07-29).
             # It was not: the paralog test sat inside the HOLDOUT_CHRS branch only, so every
@@ -570,7 +589,7 @@ def build_dataset(results_dir, n_workers=8):
             # the SELECTION set -- which is exactly what re-running the window sweep on
             # train+val does. A config chosen on a paralog-contaminated val set carries the
             # same leak the sweep is being re-run to remove, just relocated.
-            splits.append("val_paralog" if is_paralog else "val")
+            splits.append("val_paralog" if gene in val_paralog_genes else "val")
         else:
             splits.append("train")
 
