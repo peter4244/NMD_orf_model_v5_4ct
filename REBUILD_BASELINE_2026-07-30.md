@@ -34,16 +34,23 @@ The rebuild runs `sbatch slurm_build_h5_dn.sh`, which passes `--results-dir resu
 builds on the **deposit-native** tree against **fresh Stage 3 tables** (Pete's call, 2026-07-30 —
 not the 2026-07-27 vintage).
 
+**`k` IS NOW KNOWN EXACTLY (2026-07-30 02:xx), computed from the fresh tables before the rebuild
+ran.** Track A's Stage 3 output is at `~/claude_w69_tables_2026-07-30/` (a throwaway projection per
+D16). Joining `tx_summary.tsv` to `ref_cds_features.tsv` on `isoform_id` and counting composite
+`ENSGa.v::ENSGb.v` gene ids gives **278 transcripts on 233 loci, 0.66%** — so every expectation
+below is an exact number rather than a range. Reproduce with the snippet in §5.
+
 | check | expectation |
 |---|---|
-| `Master transcript list: N isoforms` | **N = 42,043 − k**, exactly, where `k` is the count on the `Excluding read-through loci:` line |
-| total transcripts | **41,765** if `k` = 278; the arithmetic must close either way |
-| `Excluding read-through loci:` | ~278 transcripts on ~233 composite gene ids, ~0.66% |
+| `Master transcript list: N isoforms` | **41,765**, exactly (42,043 − 278) |
+| `Excluding read-through loci:` | **278** transcripts on **233** composite gene ids, **0.66%** |
+| `gene_id present for all N transcripts` | **yes** — measured 0 of 42,043 missing, so the counter must report the all-present line |
 | `test_paralog` | **below 122** — two of its genes were read-through loci. Claim 5.6.4 rests on 122, so a move is a **finding needing a ledger row**, not a threshold quietly satisfied (Track A, W129) |
 | `val_paralog` | **> 0**; expected near 56 isoforms from 19 val-side genes |
 | `train + val + val_paralog + test + test_paralog` | **= N** (asserted in code as of `420a264`; raises otherwise) |
 | NMD fraction | ~22% overall and in each split |
-| `label provenance:` line | must appear, naming `export_rds.R` and the scan it read |
+| `label provenance:` line | must appear: **42,043 rows, NMD=9,425**, `export_rds.R` @ 2026-07-30T01:57:47, scan mtime 2026-07-30T01:56:14 |
+| NMD count after exclusion | **≤ 9,425**; the fresh scaffold is 9,425 / 32,618 = 22.4% NMD |
 | `gene_id present for all N transcripts` | ideally yes; if not, the count is printed and those transcripts skipped **both** gene-level screens |
 | `transcripts had NO chromosome` | ideally absent; if printed, they went to **train** by fall-through |
 
@@ -110,3 +117,46 @@ labelled with its tree.
 Recorded because the failure mode is the one this project keeps paying for: the number was
 arithmetically fine and the **population it belonged to** was never stated. An unstated population
 is not a detail — it is the defect.
+
+
+---
+
+## 5. Verified against the fresh tables, before the rebuild
+
+Track A's Stage 3 finished 2026-07-30 ~01:57 into `~/claude_projects/nmd_w69_tables_2026-07-30/`.
+Everything checkable without the cluster was checked there, and all of it passed:
+
+| quantity | measured | expected |
+|---|---|---|
+| `tx_summary.tsv` rows | **42,043** | 42,043 — the deposit-native scaffold |
+| `ref_cds_features.tsv` rows | **42,063** | 42,063 — the *eligible* set |
+| difference | **20** | C47's 20 no-ORF transcripts, now visible directly in the tables |
+| `paralog_genes.tsv` | **56** genes | 56 test-side |
+| `val_paralog_genes.tsv` | **19** genes | 19 val-side |
+| sidecar vs file | 42,043 rows / 9,425 NMD, **match** | the guard's whole purpose |
+| NMD fraction | **22.4%** | ~22% |
+| `SHA256SUMS.txt` | **OK** | — |
+| read-through in scaffold | **278 tx / 233 loci** | ~278 / ~233 |
+| isoforms with no `gene_id` | **0** of 42,043 | ideally 0 |
+
+One alarm raised and resolved: `paralog_genes.tsv` is 1.2 KB here against 9.8 MB in the 2026-07-27
+staging tree. That is a **format** change, not data loss — the new file is the flagged gene list
+(56 rows) and the counts match Track A's stated 56/19 exactly.
+
+```bash
+# recompute k from the tables, no cluster needed
+python3 - <<'EOF'
+import csv
+gene = {r["isoform_id"]: r["gene_id"] for r in
+        csv.DictReader(open("ref_cds_features.tsv"), delimiter="\t")}
+tx = [r["isoform_id"] for r in csv.DictReader(open("tx_summary.tsv"), delimiter="\t")]
+rt = [t for t in tx if "::" in str(gene.get(t, ""))]
+print(len(tx), len(rt), len({gene[t] for t in rt}), len(tx) - len(rt))
+EOF
+```
+
+**The labels changed and this is where it shows.** The fresh scaffold is 9,425 NMD / 32,618
+non-NMD over 42,043. The published tree was 8,833 / 31,105 over 39,938, and METHODS/README/CLAUDE
+document 8,840 / 31,098. Three different pairs. The fresh one is authoritative for the retrain and
+its provenance is now recorded; the published-vs-documented 7-isoform gap remains open and is a
+question about the *published* record, not about this build.
