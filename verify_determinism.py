@@ -32,7 +32,7 @@ import sys
 import torch
 import torch.nn as nn
 
-from model import build_model
+from model import build_model, verify_pool_equivalence
 from utils import load_config, set_seed
 
 
@@ -102,10 +102,14 @@ def main():
     ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--seed", type=int, default=None, help="defaults to config training.seed")
     # MUST BE TESTABLE AT THE REAL TRAINING CONFIG, not just config.yaml's defaults.
-    # SequenceCNN sets mid_pool = MaxPool1d(4) only when window_size > 100, so testing at the
-    # config default (ATG=100) leaves that op's backward UNEXERCISED -- the harness would pass
-    # while the configuration we actually train (atg500_stop500) still contained an untested
-    # op. Kernel sizes depend on window size too, so this is a different graph, not a resize.
+    # SequenceCNN sets mid_pool = MaxPool1d(4) only when window_size > 100, and kernel sizes
+    # change at the same threshold, so the graph differs by configuration -- this is not a resize.
+    #
+    # CORRECTED 2026-07-29: this used to say testing at the config default left that op
+    # unexercised. It does not. The default is atg=100 STOP=1000, and 1000 > 100, so the stop
+    # branch's pool IS exercised at the default. What a default-config run leaves untested is the
+    # START branch's pool and the larger kernels. Same false-precision class as the
+    # verify_pool_equivalence citation in model.py: a specific claim nobody checked.
     ap.add_argument("--atg", type=int, default=None, help="override window_size_atg (real run: 500)")
     ap.add_argument("--stop", type=int, default=None, help="override window_size_stop (real run: 500)")
     args = ap.parse_args()
@@ -119,6 +123,13 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     print("=== determinism check ===")
+    # The pooling substitution this harness exists for: SequenceCNN replaced
+    # AdaptiveMaxPool1d(1)+squeeze with x.max(dim=-1).values because the former has no
+    # deterministic CUDA backward. model.py claimed a test for that equivalence and there was
+    # none until 2026-07-29 -- the claim was checked by nobody. Cheap, so it runs first: if the
+    # substitution is not equivalent, nothing below is worth measuring.
+    verify_pool_equivalence()
+    print("  pool equivalence: max(dim=-1) == AdaptiveMaxPool1d(1), forward and gradient routing")
     print(f"  torch {torch.__version__} | device {device} | "
           f"cuda {torch.version.cuda if torch.cuda.is_available() else 'n/a'}")
     if device == "cpu":

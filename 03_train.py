@@ -122,7 +122,22 @@ def train(config_path="config.yaml", atg_window=None, stop_window=None,
     print(f"\nLoading data (ATG={ws_atg}, stop={ws_stop}) ...")
 
     train_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="train")
-    val_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="val")
+    # EARLY STOPPING SELECTS ON THE SCREENED VALIDATION SET (2026-07-29).
+    #
+    # This was split="val", the whole of chr2/chr4 -- including the transcripts whose genes have a
+    # >=80%-identity paralog in train or test. Every run therefore chose its best epoch, and hence
+    # the checkpoint it saved, partly on transcripts whose gene family the model had already seen.
+    #
+    # 56 of 4,437 sounds negligible and the effect on any single epoch's AUC is, but early stopping
+    # takes an ARGMAX over many nearly-tied epochs, and an argmax over noisy values is unusually
+    # sensitive to a small systematic component. It was also internally inconsistent: the sweep
+    # scores the comparison BETWEEN configurations on val_clean while selection WITHIN each
+    # configuration used the unscreened set -- the same leakage excluded from one decision and
+    # admitted to the other.
+    #
+    # Requires an HDF5 carrying a val_paralog label; NMDDataset raises otherwise rather than
+    # silently returning the unscreened set, so an old HDF5 fails loudly here.
+    val_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="val_clean")
 
     train_loader = DataLoader(train_ds, batch_size=config["training"]["batch_size"],
                               shuffle=True, num_workers=0, pin_memory=True,

@@ -69,7 +69,13 @@ class SequenceCNN(nn.Module):
         # the length axis, and both ops are parameterless, so the state_dict keys and shapes
         # are identical and the published checkpoint still loads. Only the accumulation order
         # in the backward pass differs. Equivalence is asserted, not assumed -- see
-        # verify_pool_equivalence() below and the test in verify_determinism.py.
+        # verify_pool_equivalence() below, which verify_determinism.py calls before training.
+        #
+        # THAT CITATION WAS FALSE UNTIL 2026-07-29. The comment named a function and a test that
+        # did not exist -- grep found this comment as the only occurrence of the name. So the
+        # equivalence claim for a substitution made specifically to obtain deterministic training
+        # was asserted and never checked. Found by an independent review of METHODS.md against the
+        # code; the function below now exists and is called.
         self.fc = nn.Linear(conv_channels, out_dim)
 
     def forward(self, x):
@@ -256,6 +262,41 @@ class NMDOrfModel(nn.Module):
         if return_attention:
             return cls_logits, attn_weights
         return cls_logits
+
+
+def verify_pool_equivalence(n=64, channels=32, lengths=(1, 2, 7, 100, 125, 500), seed=0):
+    """Assert x.max(dim=-1).values == AdaptiveMaxPool1d(1) + squeeze, exactly.
+
+    SequenceCNN.forward substitutes the former for the latter so that training can run under
+    torch.use_deterministic_algorithms(True) -- adaptive_max_pool2d_backward_cuda has no
+    deterministic kernel. The substitution is only safe if the two compute the same function,
+    and until 2026-07-29 the code claimed a test for that which did not exist.
+
+    Checks the FORWARD values bitwise, and that the gradient reaches the same single input
+    element, since the backward path is the whole reason for the change. Includes length 1 and 2
+    because degenerate lengths are where pooling implementations differ, and lengths that are not
+    multiples of the adaptive output size, where adaptive pooling's bucket arithmetic is least
+    like a plain max.
+    """
+    torch.manual_seed(seed)
+    pool = nn.AdaptiveMaxPool1d(1)
+    for L in lengths:
+        x = torch.randn(n, channels, L)
+        a = pool(x).squeeze(-1)
+        b = x.max(dim=-1).values
+        if not torch.equal(a, b):
+            raise AssertionError(
+                f"pool equivalence FAILED at length {L}: max abs diff "
+                f"{(a - b).abs().max().item():.3e}")
+        # Same argmax => same gradient destination. Compared as masks rather than by value so a
+        # tie broken differently would be caught rather than averaged away.
+        xa = x.clone().requires_grad_(True)
+        pool(xa).squeeze(-1).sum().backward()
+        xb = x.clone().requires_grad_(True)
+        xb.max(dim=-1).values.sum().backward()
+        if not torch.equal(xa.grad != 0, xb.grad != 0):
+            raise AssertionError(f"pool gradient routing differs at length {L}")
+    return True
 
 
 def count_parameters(model):

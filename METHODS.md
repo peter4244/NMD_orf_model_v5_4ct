@@ -33,61 +33,318 @@ For the canonical sequence in which to run the SLURM wrappers (relabel → data_
 
 ---
 
-## Model Training and Window Size Sweep
+## Model Training and Evaluation
+
+Revised 2026-07-29. Substantive changes from the published version are marked **[CHANGED]**; the
+numbers they affect are not comparable to the published ones and are noted as such.
+
+### Terminology
+The two sequence windows are the **start window** and the **stop window**, named for the codon each
+is anchored on. Code identifiers retain `atg` (the HDF5 key `atg_windows`, `ORFEncoder.atg_cnn`, the
+`--atg-window` flag, `window_size_atg` in config); renaming them would change the HDF5 schema and
+break already-deposited artifacts, so the terminology applies to prose only.
 
 ### Architecture
-The ORF-centric hybrid model processes up to K=5 candidate ORFs per transcript through a shared-weight `ORFEncoder` and aggregates via learned attention. Each `ORFEncoder` (`model.py:70-109`) has three sub-encoders for the rank-k ORF: an ATG CNN over the 9-channel ATG window, a stop CNN over the 9-channel stop window, and a structural linear branch `Linear(5, 32) → ReLU` over the 5 per-ORF features. The three 32-dim sub-embeddings are concatenated (96 dim) and fused via `Linear(96, 64) → ReLU → Dropout(0.2)` to produce the per-ORF embedding. The 5 ORF embeddings are aggregated by a learned attention pooler (softmax-normalized over valid ORFs), yielding a transcript embedding that is fed to a small classification head. See `model.py` (`NMDOrfModel`).
+Up to K=5 candidate ORFs per transcript pass through an `ORFEncoder` whose weights are shared
+**across the K ORFs**, and are aggregated by learned attention. Within each `ORFEncoder` there are
+three sub-encoders for the rank-k ORF, and they do **not** share weights with one another: a start
+CNN over the 9-channel start window, a stop CNN over the 9-channel stop window, and a structural
+branch `Linear(5, 32) → ReLU` over the 5 per-ORF features. `atg_cnn` and `stop_cnn` are separate
+`SequenceCNN` instances (`model.py:95,97`) with zero shared parameter tensors, 12,736 parameters
+each. The three 32-dim sub-embeddings are concatenated (96 dim) and fused via
+`Linear(96, 64) → ReLU → Dropout(0.2)`. The K ORF embeddings are pooled by a learned attention
+layer (softmax over valid ORFs) and passed to a classification head
+(`Linear(64,32) → ReLU → Dropout(0.3) → Linear(32,1)`, `model.py:203-208`). See `ORFEncoder`
+(`model.py:84`) and `NMDOrfModel` (`model.py:164`).
 
-### Priority ORF Selection
-ORFs are ranked by priority: (1) reference CDS ORF (if the gene's dominant non-NMD isoform's ATG can be mapped), (2) SQANTI/TransDecoder2 CDS ORF (if different from ref CDS), (3) remaining ORFs ranked by Kozak score, up to K=5. Implemented in `data_prep.py::select_priority_orfs()`. The choice of K=5 is supported by an ORF-coverage analysis: a small fraction of transcripts have more than 5 ORFs that meet the priority criteria, but the median number of priority-eligible ORFs per transcript is well below 5 (see Section 5 of the report for attention-rank dominance figures).
+Parameter counts depend on the window sizes, because kernel sizes do. **At 500/500: 34,050
+trainable parameters, 12,736 per sequence CNN.** Measured at other grid points: 25,346 total and
+8,384 per CNN at 100/100; 29,698 at 100/1000; 34,050 at 1000/2000. Four of the twelve swept
+configurations use a 100-position start window, so the 500/500 figures are not the whole grid.
+
+Each `SequenceCNN` is `Conv1d(9, 32, k1) → BatchNorm → ReLU → [MaxPool(4) if window > 100] →
+Conv1d(32, 32, k2) → BatchNorm → ReLU → max over the length axis → Linear(32, 32)`, with
+`k1, k2 = 15, 7` for windows above 100, `7, 5` at 100, and `5, 3` at 20 or below
+(`model.py:38-46`); the third branch is unused by the current grid.
+
+**The global pooling op changed on 2026-07-27 [CHANGED].** It was `AdaptiveMaxPool1d(1)` followed
+by `squeeze`, replaced by `x.max(dim=-1).values` because the former has no deterministic CUDA
+backward and training could not otherwise be bit-reproducible. Both are parameterless and compute
+the same function, so `state_dict` keys and shapes are unchanged and the published checkpoint still
+loads. The equivalence is now checked by `verify_pool_equivalence()` (`model.py`), which
+`verify_determinism.py` calls before training — forward values bitwise and gradient routing to the
+same input element. Until 2026-07-29 the code cited that check and it did not exist.
+
+**Consequence of the first convolution that matters for interpretation.** `conv1` spans all nine
+input channels at once, so every filter's response is a single weighted sum over `k1` positions ×
+9 channels. No channel has an independent pathway through a head: after BatchNorm, ReLU, pooling
+and the second convolution, the 32-dim branch embedding is not additively separable by channel.
+The branch decomposition therefore attributes to **regions** (start window, stop window,
+structural), not to modalities — each region's share already includes its own GC and junction
+content.
+
+### Isoform universe **[CHANGED]**
+Read-through loci are excluded. 233 `gene_id` values are composites of the form `ENSGa.v::ENSGb.v`,
+two adjacent genes transcribed as one unit. They are not one gene, so every gene-level operation on
+them is ill-defined: splits are assigned per gene, the paralog leakage screen keys on gene, and
+`05u_paralog_annotation.R` strips only the trailing version before querying Ensembl, so a composite
+becomes a string matching nothing and the locus is invisible to the paralog search. That last part
+had a measured consequence: two chr2 genes have a ≥80%-identity paralog whose only presence in this
+universe is inside a composite locus, so the screen never flagged them — real leakage, one into
+train and one into test. Excluding the composites deletes the twin sequence, so the leakage does not
+exist to be flagged. 278 transcripts on 233 loci. As a fraction, `data_prep.py` divides by the isoform count after the
+FASTA intersection; against the labeled universe of 39,938 (above) that is 0.70%. Note three
+different universe sizes appear in this repo — 39,938 (labeled), 42,043 and 42,063 — which are
+different vintages; the discrepancy is unresolved and worth settling before any of them is quoted
+in the manuscript.
+
+### Priority ORF selection
+ORFs are ranked: (1) reference CDS ORF, where the gene's dominant non-NMD isoform's start codon can
+be mapped; (2) SQANTI/TransDecoder2 CDS ORF, if different; (3) remaining ORFs by Kozak score, to
+K=5. Implemented in `data_prep.py::select_priority_orfs()`. K=5 was supported by an ORF-coverage analysis (`orf_coverage_diagnostics`,
+`data_prep.py:532-558`), but note what it measures: the count of **all** ORFik ORFs per transcript,
+not of priority-eligible ones, since it is never passed `select_priority_orfs`' output. Its output
+table is not present in this repo, so the quoted fraction and median cannot currently be checked.
+See also the report's attention-rank dominance figures.
 
 ### Sequence source
-Full-length spliced transcript sequences are read directly from the SQANTI corrected FASTA (`nmd_lungcells_corrected.fasta`). This replaces an earlier pipeline that used `cnn_data.tsv` which truncated sequences to 4,096 bp, causing 40% of STOP=1000 windows to be partially zero-padded. Verification: ATG codon confirmed at `orf_start` position for all rank-0 ORFs. Junction positions computed from `structures.rds` exon coordinates (strand-aware cumulative exon lengths).
+Full-length spliced transcript sequences are read from the SQANTI corrected FASTA
+(`nmd_lungcells_corrected.fasta`). An earlier pipeline used `cnn_data.tsv`, which truncated at
+4,096 bp and left 40% of 1000-position stop windows partly zero-padded. `data_prep.py` checks for a start codon at `orf_start` for rank-0 ORFs and prints a WARNING on
+mismatch; it does not assert, does not halt the build, and skips transcripts absent from the FASTA. Junction positions come from `structures.rds` exon coordinates
+(strand-aware cumulative exon lengths), via `junctions.tsv` in transcript-space coordinates.
 
-### Sequence window extraction
+### Sequence window extraction **[CHANGED]**
 
-Each ORF contributes two sequence windows: one centered on the **ATG (start codon)** and one centered on the **stop codon**. The window center is placed on the **middle nucleotide** of the three-nucleotide codon:
+Each ORF contributes two windows, anchored on the middle nucleotide of the relevant codon:
 
-- **ATG center:** `orf_start + 1` (0-based), i.e., the T of ATG.
-- **Stop center:** `orf_end - 1` (0-based), i.e., the middle nucleotide of the stop codon (A of TAA/TAG, or G of TGA).
+- **start anchor:** `orf_start + 1` (0-based), the T of ATG
+- **stop anchor:** `orf_end - 1` (0-based), the middle nucleotide of the stop codon
 
-The `window_size` parameter specifies the **total window length** in positions. Internally, `half_win = window_size // 2` positions are extracted on each side of the center (center − half_win to center + half_win − 1). A window_size of 500 therefore produces a **500-position window** spanning ±250bp around the center. Positions that fall outside the transcript boundary are zero-padded. Implemented in `data_prep.py::encode_window_v5()`.
+`window_size` is the total window length. The frame is `[anchor − half_win, anchor + half_win)`
+with `half_win = window_size // 2`, so the anchor sits at array index `half_win` with `half_win`
+positions before it and `half_win − 1` after. A 500-position window therefore reaches up to ~249 nt
+on the UTR side and ~251 on the ORF side of the start anchor (248/252 for the stop anchor, whose
+anchor is the middle nucleotide of a codon at the ORF's far end) — not a clean 250/250.
 
-### Window size sweep
-12 models trained with ATG window ∈ {100, 500, 1000} × stop window ∈ {100, 500, 1000, 2000} positions (each spanning ±half the window size around the codon center).
+**Windows are clipped at the ORF midpoint so the two heads never receive the same base.** Both
+windows are anchored and fixed-width, so without a bound they overlap. Because both anchors are the
+middle nucleotide of their codon, the anchor separation is `L − 3` for an ORF of length `L` and the
+raw overlap is `window_size − L + 3` — so overlap persists for ORFs slightly **longer** than the
+window, not only for shorter ones. Measured at a 500-position window: 473 positions at L=30, 404 at
+L=99, 203 at L=300, and still 2 at L=501. ORFs reach ~30 nt, so at a 500-position
+window a short ORF shared ~94% of both windows, and at 2000 the majority of ORFs overlapped at all.
+Because the start and stop CNNs are separate weight sets, shared bases were learned twice by
+independent parameters, and the branch decomposition attributed credit between two encoders reading
+one input. Each window is therefore bounded at `mid = (start_anchor + stop_anchor) // 2` — the start
+window may not fill at or beyond it, the stop window may not fill before it.
 
-### Training hyperparameters (`config.yaml`, `03_train.py`)
+The bound is applied unconditionally and is inert when it cannot bind: if the anchor separation is
+at least `window_size`, `mid` lies at or beyond the start window's own end. Clipping restricts the
+**filled range**, not the window frame, so the anchor stays at index `half_win` and a clipped window
+is zero-padded on its inner side rather than shifted. UTR-side extent is never reduced by the clip. Measured at a
+500-position window with real ORF coordinates (`mid = orf_start + (L−1)//2`, since `orf_end` is the
+last nucleotide of the stop codon), the start window retains 249 nt of 5′UTR for every ORF length,
+while its ORF side fills 14, 49, 149, 248 and 251 nt for ORF lengths of 30, 99, 300, 498 and 1200.
+ORF lengths are multiples of three, so 99 and 498 are used rather than 100 and 500.
 
-- **Loss:** BCEWithLogitsLoss with dynamic `pos_weight = n_neg / max(n_pos, 1)` computed from the training set (`utils.py:84-88`).
-- **Optimizer:** Adam with **differential weight decay** — `weight_decay = 0.001` for CNN parameters (`atg_cnn`, `stop_cnn`), `weight_decay = 0.0001` for everything else (`03_train.py:30-45`).
-- **Learning rate:** `lr = 0.001`, with **`ReduceLROnPlateau`** scheduler (`mode="max"` on val AUC, `factor=0.5`, `patience=5`).
-- **Early stopping:** monitor val AUC, `patience=10` epochs, max `epochs=100`.
-- **Batch size:** 256.
-- **Mixed precision:** enabled.
-- **Seed:** 42.
-- **Overfit guard:** training halts if `train_auc - val_auc > 0.05` for `patience` consecutive epochs (`overfit_gap_threshold`).
+Two properties of this design should be stated wherever window-dependent numbers appear. First, the
+extent of inner-side padding is a monotone function of absolute ORF length, and absolute ORF length
+is not a declared feature — the structural features supply `frac_start` and `frac_stop`, which are
+fractional, and transcript length is not an input. Second, under asymmetric window pairs the wider
+window is bounded at the same midpoint as the narrower one. That does **not** always cost total
+coverage: measured at a matched total window budget, the combined filled positions are invariant to
+how the budget is split both when neither window clips and when both do. A penalty appears only in
+the intermediate regime where exactly one window clips — for example at L=300, a 550/550 split fills
+847 positions against 748-749 for 100/1000 or 1000/100. Implemented in `encode_window_v5()` (`data_prep.py:110`) and
+`encode_transcript_orfs()` (`data_prep.py:216`).
 
-### Best model selection
-
-Selected configuration: **ATG=500, STOP=500** by AUC (0.9306). AUPRC peaks at ATG=500 STOP=1000 (0.8387 vs ATG=500 STOP=500 at 0.8330; difference 0.004) — both are within the AUC tier. The selection prioritizes AUC for consistency with the original v5 model and because AUC is more robust to the 4ct's class-ratio change. See README.md "Model Performance" for the full sweep table.
-
-### Train/val/test split
-- Test (holdout): chr 1, 3, 5, 7 (paralog genes excluded → "test_paralog" split)
-- Validation: chr 2, 4
-- Training: remaining chromosomes
-- Splits assigned in `data_prep.py::build_dataset()`.
-
-### 9-channel sequence encoding
-Each window is encoded with 9 channels at each position (`data_prep.py:41,108-160`; channel names also surfaced in DeepSHAP NPZs at `deepshap.py:307-309`):
+### 9-channel sequence encoding **[CHANGED: channel 5]**
 
 | Channel | Name | Type | Definition |
-|---------|------|------|-----------|
-| 0-3 | A, C, G, T | Binary (one-hot) | Nucleotide identity. Exactly one is 1 per position; positions outside the transcript are all-zero. |
-| 4 | Splice junction | Binary | 1 at exon-exon junction positions within the window (from `junctions.tsv`, transcript-space coordinates). |
-| 5 | Rolling GC | Continuous [0, 1] | Local GC fraction over a 50bp sliding window centered on the position (`compute_rolling_gc()`, `data_prep.py:82-102`). |
-| 6-8 | Reading frame 0/1/2 | Binary (one-hot) | Codon position (0/1/2) of this position relative to this ORF's ATG, computed as `(genomic_position - orf_start) % 3`. Exactly one is 1 per position within the transcript. |
+|---|---|---|---|
+| 0-3 | A, C, G, T | one-hot | Nucleotide identity. Positions outside the filled range are all-zero. Ambiguous bases (N, IUPAC codes) also give an all-zero one-hot. |
+| 4 | Splice junction | binary | 1 at exon-exon junction positions inside the filled range. |
+| 5 | Rolling GC | continuous [0,1] | Local GC fraction over a 50 nt support, **computed from the sequence in this window's own filled range** (`compute_rolling_gc`, `data_prep.py:87`). |
+| 6-8 | Reading frame | one-hot | `(position − orf_start) % 3`. Exactly one is 1 wherever sequence is present. |
 
-Implemented in `encode_window_v5()` (`data_prep.py:105-162`). Windows that extend beyond the sequence boundary are zero-padded across all 9 channels. The legacy "ATG codon marker", "stop-codon frame", and "ORF body" channels described in earlier docs do **not** exist in v5; codon identity is determined implicitly via the reading-frame channels and the ATG/stop windows being centered on the codons of interest.
+Channel names are also surfaced in the DeepSHAP NPZ exports (`deepshap.py:320,515`), so a mismatch
+between this table and the attribution outputs would be visible there.
+
+**Channel 5 [CHANGED].** It was previously a slice of a rolling GC computed across the whole
+transcript. The slice respected the clip but the values did not: with a 50 nt centered support, a
+value just inside the midpoint averaged 25 bases on the far side of it, so the two heads remained
+coupled over ~25 positions at each inner edge after the sequence channels had been separated.
+Because `conv1` sums all nine channels in one dot product, that coupling was not confined to a minor
+channel. It is now computed from `seq_uint8[w_start:w_end]`, i.e. GC of the sequence the head
+actually receives — the only definition consistent with separate heads. `compute_rolling_gc` shrinks
+its support at the edges of what it is given, so padding is treated as absent rather than as
+GC-free. This also changes the outer (UTR-side) edge, where there was no leak: the first ~25
+positions previously included transcript sequence beyond the window and now do not.
+
+The legacy "ATG codon marker", "stop codon frame" and "ORF body" channels described in earlier
+documentation do **not** exist in this model. Codon identity is implicit: the windows are anchored
+on the codons of interest and the reading-frame channels are computed relative to the ORF's start.
+
+**Channels 6-8, stated because the formula is misleading.** The frame is computed relative to the
+ORF's own start codon, and the window is anchored on that same codon, so the ORF term cancels: the
+resulting pattern is identical for every ORF and every anchor position, and is identical between the
+start and stop windows because ORF lengths are multiples of three. The frame **values** therefore carry no ORF-specific
+information. Their **support** does: the channels are non-zero exactly on the filled range, whose
+extent is set by the clip and is a monotone readout of absolute ORF length (measured filled widths
+at a 500-position window: 263, 298, 398, 497, 500 for ORF lengths 30, 99, 300, 498, 1200). So they
+are simultaneously an exact validity mask — distinguishing real sequence from padding even where
+channels 0-3 are all-zero because of an ambiguous base — and the clearest carrier of the ORF-length
+signal noted above.
+
+### Train / validation / test split **[CHANGED]**
+Splits are assigned by chromosome, per gene, and are independent of the training seed — every run
+scores the identical evaluation transcripts.
+
+- **test:** chr 1, 3, 5, 7
+- **validation:** chr 2, 4
+- **train:** remaining chromosomes
+
+A paralog leakage screen removes genes whose close paralog sits on the other side of a split
+boundary, since a near-identical relative in training lets the model recognize an evaluation gene it
+has effectively memorized. `05u_paralog_annotation.R` flags a gene when a paralog has ≥80% protein
+sequence identity, both genes are expressed in this dataset, and the pair straddles the boundary.
+Flagged transcripts move to a separate split rather than being deleted.
+
+- **test_paralog** — the original screen, defined across the chr 1/3/5/7 boundary.
+- **val_paralog [CHANGED]** — the same criterion with the validation chromosomes substituted. A
+  validation gene is flagged when its paralog lies **outside** chr 2/4, i.e. in train or in test.
+  Both directions matter and they protect different quantities: a paralog in train biases the
+  configuration choice; a paralog in test means a configuration chosen on validation is also
+  flattered on test, so the final estimate is optimistic. The original screen already covered the
+  reverse direction, because "not in the test chromosomes" includes chr 2/4.
+
+Kept as two separate screens rather than one widened screen, so the test-side set is unchanged by
+the addition. `NMDDataset` refuses `split="val_clean"` when the HDF5 carries no `val_paralog` label,
+rather than silently returning the unscreened validation set (`utils.py`).
+
+### Training (`config.yaml`, `03_train.py`) **[CHANGED: seeding]**
+- **Loss:** `BCEWithLogitsLoss`, `pos_weight = n_neg / max(n_pos, 1)` from the training split
+  (`compute_pos_weight`, `utils.py:217`).
+- **Optimizer:** Adam, differential weight decay — 0.001 on the CNN parameters, 0.0001 elsewhere
+  (`make_optimizer`, `03_train.py:30-45`).
+- **Learning rate:** 0.001, `ReduceLROnPlateau` on validation AUC (`factor=0.5`, `patience=5`).
+- **Early stopping [CHANGED]:** on validation AUC over the **screened** validation split
+  (`split="val_clean"`, `03_train.py:140`). It was the unscreened `split="val"`, so on an HDF5
+  without a `val_paralog` label every run chose its best epoch, and the checkpoint it saved, partly
+  on transcripts whose gene family the model had already seen. Once the label exists, `val` and
+  `val_clean` select the same transcripts — the difference is that `val_clean` raises on an
+  unscreened HDF5 instead of silently returning contaminated data. `patience=10`, maximum 100
+  epochs. The published run's best epoch was 3.
+- **Overfit monitor:** appends an `*** OVERFIT` flag to the epoch log when
+  `train AUC − validation AUC > 0.05` (`overfit_gap_threshold`, read at `03_train.py:173`, used only
+  at `:212`). It does **not** stop training, despite the name — the only stopping rules are early
+  stopping on validation AUC and the 100-epoch cap.
+- **Batch size:** 256, with `drop_last=True` on the training loader (`03_train.py:144`), so the
+  final partial batch of each epoch is discarded.
+- **Mixed precision:** enabled on CUDA only; disabled on CPU, where the sweep runs.
+- **Seeding [CHANGED]:** the seed is a command-line argument and names every artifact the run
+  writes. Checkpoints are `best_model_{tag}_seed{S}.pt` and training logs
+  `training_log_{tag}_seed{S}.csv`. Previously the seed came from config and the checkpoint path
+  carried no seed slot, so concurrent runs at different seeds wrote one file and any
+  seed-variability estimate would have been identically zero. Consumers locate a member through
+  `utils.resolve_checkpoint`, which refuses to guess: naming a seed requires that member to exist,
+  and finding seeded members with no un-seeded file raises and lists them rather than choosing one.
+
+### Determinism
+`utils.set_seed` seeds Python, NumPy and Torch, sets `cudnn.deterministic`, disables
+`cudnn.benchmark`, sets `CUBLAS_WORKSPACE_CONFIG` and enables `use_deterministic_algorithms`.
+`verify_determinism.py` trains the real architecture on synthetic batches and requires two seeded
+runs to be bit-identical in losses and weights; it must be run at the configuration to be trained,
+because `mid_pool` is `Identity` at window ≤ 100 and `MaxPool1d(4)` above it, and the kernel sizes
+change at the same threshold. The config default is start 100 / stop 1000, so the stop branch's pool
+**is** exercised there; what a default-config check leaves untested is the start branch's pool and
+the larger kernels. `verify_determinism.py` states this less precisely and should be corrected too. Determinism is a property of
+(hardware, library version) and makes our runs repeatable; it does not promise identical results on
+different hardware.
+
+Gradient-based DeepSHAP cannot run under these settings. `deepshap.py` itself calls `set_seed`
+with determinism ON; the disabling is done by the SLURM wrappers exporting
+`NMD_ALLOW_NONDETERMINISM=1` (read at `utils.py:57`), and it is **not uniform** — the deposit-native
+joint, atg-stop and all-modes wrappers set it while the non-deposit-native joint wrapper does not.
+`utils.set_seed` also honors a `deterministic=False` argument; both escape hatches print that the
+run's results are not canonical. `shap`'s
+DeepLIFT implementation routes MaxPool gradients through `max_unpool1d`, which has no deterministic
+CUDA kernel, so `use_deterministic_algorithms(True)` raises. That is acceptable because those
+quantities are reported as a mean and spread over replicates that deliberately vary the background
+sample: the replicate spread is the uncertainty statement, whereas a single-draw metric such as AUC
+has nothing to average over and needs bitwise reproducibility.
+
+### Evaluation **[CHANGED]**
+`evaluate.py` requires `--split` with no default, and refuses a test split unless `--final` is also
+given. Previously the split was the literal `test_clean` inside the function, so every metrics file
+in existence is a test-set score — including the twelve that selected the published window
+configuration. Training early-stopped on validation AUC, which is proper, but the architecture
+choice used the held-out set, so the published test performance is optimistically biased by twelve
+comparisons and the "held-out" description of the test set is not strictly true for that choice.
+Outputs carry both member and split (`metrics_{tag}_seed{S}_{split}.json`), so a selection sweep
+cannot write files indistinguishable from published test-set results, and the metrics record `split`
+and `n_eval` inline. `n_test` is emitted only for genuine test splits, so a validation score raises
+in a consumer expecting a test score rather than being silently read as one. `--final` combined with
+a non-test split is also an error, so the flag cannot be carried along inattentively.
+
+The HDF5 stores windows at all four sizes for both anchors, which is why a window sweep needs no
+rebuild between configurations — only a change to the window *construction* does.
+
+### Window configuration sweep **[CHANGED]**
+The configuration is re-selected on training and validation data only: 12 configurations
+(start window ∈ {100, 500, 1000} × stop window ∈ {100, 500, 1000, 2000}) × 5 seeds = 60 runs, each
+scored on `val_clean`. Five seeds are integral rather than incidental — with one seed a ranking
+cannot be distinguished from run-to-run variation.
+
+Reported per configuration: mean and standard deviation across seeds, and which configurations
+are within one standard deviation of the leader (`collect_sweep.py`). That is a **heuristic, not a
+test** — it compares a difference of means against the standard deviation of single runs, takes no
+account of sample size, and is anti-conservative, so the sets it reports are too small rather than
+too large. It should be replaced with a seed-paired, pooled-variance, simultaneous comparison before
+any selection is quoted. The
+selection metric and the tie-break rule are recorded decisions and are not chosen by inspecting
+these results.
+
+**The configuration selected in the published version, recorded because it is superseded rather
+than wrong-headed.** The published model used start window = 500, stop window = 500, chosen by AUC
+(0.9306). AUPRC peaked at start 500 / stop 1000 (0.8387 against 0.8330, a difference of 0.006). The
+stated reasoning was that AUC was preferred for consistency with the original 6-cell-type model and
+because AUC is more robust to the 4-cell-type class-ratio change. README.md "Model Performance"
+holds the full twelve-configuration table. Two facts now qualify that choice rather than contradict
+its reasoning: the twelve scores it ranked were test-set scores (see Evaluation above), and the
+margin between rank 1 and rank 2 was smaller than the run-to-run variation nobody had measured
+(below).
+
+**What the sweep can and cannot resolve.** A 60-run sweep was executed on the **pre-clip** encoding
+and gave a seed-to-seed validation AUC standard deviation with median 0.00248 (range
+0.00115-0.00473) across the 12 configurations. Those runs are superseded by the window and universe
+changes above and are retained only as a variance estimate; the values are not reproducible from
+this repository, because the sweep outputs are not tracked here.
+
+The published grid's rank-1 to rank-2 AUC gap was 0.00139 — a figure currently hardcoded in
+`collect_sweep.py` rather than derived from a tracked table, and one that comes from **test**-set
+scores on the published universe, whereas the standard deviations above are **validation**-set and
+from a different encoding. With that mismatch stated, the comparison is 0.00248 / 0.00139 = 1.8, and
+more usefully the gap is about 1.25 standard errors of a five-seed mean. So a difference of that size
+is not resolvable at five seeds: minimum detectable differences at 80% power are roughly 3-4x the gap
+uncorrected and 5-8x with multiplicity correction over the eleven comparisons against the leader.
+The honest output is that several configurations are indistinguishable, and where one is named it is
+the tie-break rule rather than the data that selected it.
+
+### Ensemble **[PLANNED — NOT IMPLEMENTED]**
+Nothing in this repository computes an ensemble logit, ensemble metrics, or a member mean ± standard
+deviation; `slurm_train_ensemble_dn.sh` trains five members and evaluates each separately. The
+emission contract with the `aggregation` vocabulary lives in the analysis repository
+(`nmd_lung_longread_2026/tools/claim_emit.py`), not here. This subsection is the intended design.
+
+The intended deliverable is the mean logit across five independently seeded members at the selected
+configuration. Reported alongside the ensemble's performance is the single-model mean ± standard
+deviation across members. Because Shapley values are linear in the value function, the ensemble's
+branch decomposition is the mean of the members' — but `mean_i |mean_k φ|` and `mean_k mean_i |φ|`
+are different quantities whenever attributions change sign across members, so which ordering
+produced a reported number must be stated. The emission contract records it as a closed vocabulary
+(`abs_of_mean` or `mean_of_abs`).
 
 ---
 
