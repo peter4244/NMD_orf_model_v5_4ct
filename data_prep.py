@@ -108,7 +108,7 @@ def compute_rolling_gc(seq_uint8, window=GC_ROLLING_WINDOW):
 
 
 def encode_window_v5(seq_uint8, junctions_set, center, half_win,
-                     orf_start_0based, rolling_gc, limit_lo=None, limit_hi=None):
+                     orf_start_0based, limit_lo=None, limit_hi=None):
     """
     v5 9-channel window encoding (vectorized).
 
@@ -175,9 +175,34 @@ def encode_window_v5(seq_uint8, junctions_set, center, half_win,
             continue
         encoded[4, j - start] = 1.0
 
-    # Channel 5: rolling GC fraction (vectorized slice)
-    if len(rolling_gc) > 0:
-        encoded[5, arr_start:arr_end] = rolling_gc[w_start:w_end].astype(np.float16)
+    # Channel 5: rolling GC COMPUTED FROM THIS WINDOW'S OWN SEQUENCE (2026-07-29, Pete).
+    #
+    # It used to be a slice of a transcript-wide rolling_gc. The slice respected the clip but
+    # the VALUES did not: GC_ROLLING_WINDOW is 50 with a centred support, so a value just
+    # inside the midpoint averaged 25 bases on the far side of it. Verified by perturbation --
+    # flipping a base at or after the midpoint changed the start window's channel 5, and
+    # symmetrically. So after the sequence channels were separated, the two heads stayed
+    # coupled through channel 5, over ~25 positions at each inner edge.
+    #
+    # That coupling is not confined to a minor channel. conv1 is Conv1d(9, 32, k), so every
+    # filter sums all nine channels at once (model.py:49-50): channel 5 enters the same dot
+    # product as the nucleotides at layer 1, and after BatchNorm/ReLU/pooling the branch
+    # embedding is not additively separable. A small leak in channel 5 can move the whole
+    # 32-dim embedding, which is exactly what the midpoint clip existed to prevent.
+    #
+    # Computing it from `seq_uint8[w_start:w_end]` makes the channel mean "GC of the sequence
+    # this head can see", which is the only definition consistent with having separate heads.
+    # compute_rolling_gc already shrinks its support at the edges of what it is given, so
+    # padding is treated as absent rather than as GC-free -- zeros would dilute the value.
+    #
+    # KNOWN CONSEQUENCE, stated rather than discovered later: this also changes the OUTER
+    # (UTR-side) edge, where there was no leak. Values in the first ~25 positions previously
+    # included real transcript sequence beyond the window; now they do not. That is a small
+    # loss of real information, accepted for a channel that means one thing everywhere instead
+    # of two things at its two edges.
+    if w_end > w_start:
+        encoded[5, arr_start:arr_end] = compute_rolling_gc(
+            seq_uint8[w_start:w_end]).astype(np.float16)
 
     # Channels 6-8: reading frame one-hot (vectorized)
     genomic_positions = np.arange(w_start, w_end)
@@ -204,9 +229,6 @@ def encode_transcript_orfs(args):
     seq_uint8 = seq_to_uint8(seq_str) if seq_str else np.array([], dtype=np.uint8)
     junctions = parse_junctions(junc_str)
     K = len(orf_mask_arr)
-
-    # Compute rolling GC once per transcript
-    rolling_gc = compute_rolling_gc(seq_uint8)
 
     result = {}
     for win_size in window_sizes:
@@ -249,11 +271,11 @@ def encode_transcript_orfs(args):
             if atg_pos >= 0:
                 atg_wins[k] = encode_window_v5(
                     seq_uint8, junctions, atg_pos, half_win,
-                    orf_s, rolling_gc, limit_hi=mid)
+                    orf_s, limit_hi=mid)
             if stop_pos >= 0:
                 stop_wins[k] = encode_window_v5(
                     seq_uint8, junctions, stop_pos, half_win,
-                    orf_s, rolling_gc, limit_lo=mid)
+                    orf_s, limit_lo=mid)
 
         result[win_size] = (atg_wins, stop_wins)
 
