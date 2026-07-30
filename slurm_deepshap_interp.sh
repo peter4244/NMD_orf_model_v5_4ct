@@ -4,7 +4,7 @@
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=ds_interp
-#SBATCH --output=results_4ct_interp/ds_%j.log
+#SBATCH --output=slurm_logs/ds_%j.log
 
 # DeepSHAP for ONE member of ONE configuration, for the v3 interpretation plan.
 #
@@ -18,6 +18,10 @@
 # DS_STOP, DS_SEED. Everything else has a plan-derived default.
 #
 #   DS_ATG=2000 DS_STOP=500 DS_SEED=100 sbatch slurm_deepshap_interp.sh
+# LOG PATH MUST ALREADY EXIST. SLURM opens --output BEFORE the script body runs, so a `mkdir -p`
+# in the body is too late: jobs 8834152/8834153 died at 17s having produced no log at all, which
+# also meant no diagnostic for why. slurm_logs/ is created once and committed with a .gitkeep, so
+# it is never the reason a job fails.
 set -euo pipefail
 cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python

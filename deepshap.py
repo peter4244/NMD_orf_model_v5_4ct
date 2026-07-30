@@ -185,14 +185,24 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     # member survived. utils.member_tag exists for precisely this -- it was written after five
     # array tasks wrote one checkpoint -- and the interpretation outputs never adopted it.
     #
-    # member_tag(tag, None) == tag, so every existing invocation writes byte-identical filenames
-    # and 06_export_deepshap_tsv.py / 09b / 09c / 09d keep matching. The name changes only when a
-    # member is actually named, which is exactly when the collision occurs.
-    # THE SPLIT TRAVELS WITH THE ARTIFACT, in the name and not only in a log. Pete's instruction,
-    # 2026-07-30: the data flags must match the other scoring entry points and that information has
-    # to track with the outputs. A DeepSHAP npz computed over `all` and one over `test_clean` were
-    # previously the same filename with nothing inside distinguishing them.
-    otag = f"{member_tag(tag, member_seed)}_{split}"
+    # member_tag(tag, None) == tag, so an invocation that names no member writes byte-identical
+    # filenames and every existing consumer keeps matching. The name changes only when a member is
+    # actually named, which is exactly when the collision occurs.
+    # THE SPLIT SEPARATES BY DIRECTORY, NOT BY FILENAME (2026-07-30, simplified after review).
+    #
+    # An earlier version of this line appended the split to every output name. It was correct about
+    # the hazard -- an npz explained over `all` and one over `test_clean` must not collide -- but
+    # the cure had a nine-file blast radius: four consumers and five SLURM drivers had to learn the
+    # new name, and five of those drivers were left passing no --split at all, so they would have
+    # died on the flag or exited 0 having produced nothing.
+    #
+    # One results directory per split is the same guarantee with none of that. --results-dir is
+    # already parameterised everywhere for exactly this reason, the repo already separates vintages
+    # this way (results_4ct vs results_4ct_dn), and stamp_dataset_provenance.py records what each
+    # directory holds. Two splits, two directories, no filename changes anywhere.
+    #
+    # The MEMBER stays in the name: members share a directory, so they genuinely can collide.
+    otag = member_tag(tag, member_seed)
     run_suffix = f"_run{run_id}" if run_id is not None else ""
     # W52. The SUMMARY filename must carry the decomposition, exactly as the npz already does
     # at :305 -- deepshap_{branch}_{tag}... Without it, `deepshap_summary_{tag}_run1.tsv` means
@@ -244,12 +254,23 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     print(f"ORF index: {orf_index}")
 
     # Subsample for tractability (n_explain=0 means all test samples)
-    rng = np.random.RandomState(seed)
+    # TWO RNGs, DELIBERATELY (2026-07-30). Before this, one RandomState(seed) drew the explained
+    # subset AND the background, while --run-id touched only the output filename. Two consequences,
+    # both silent:
+    #   * five "background replicates" at one seed were BIT-IDENTICAL -- zero background variance,
+    #     so any variance decomposition over them decomposes nothing;
+    #   * varying --seed to get replicates also moved the EXPLAINED subset, so background noise and
+    #     explained-population sampling noise were inseparable.
+    # Now: the explained subset depends on --seed only, so it is identical across replicates and
+    # across members; the background depends on the replicate, so replicates genuinely differ.
+    # Covered by test_guards.py section 2.
+    rng = np.random.RandomState(seed)                       # explained subset -- stable
+    bg_rng = np.random.RandomState(seed + 1000 * (run_id or 0))   # background -- varies by replicate
     if n_explain == 0 or n_explain >= len(test_ds):
         explain_idx = np.arange(len(test_ds))
     else:
         explain_idx = rng.choice(len(test_ds), size=n_explain, replace=False)
-    bg_idx = rng.choice(len(train_ds), size=min(n_background, len(train_ds)),
+    bg_idx = bg_rng.choice(len(train_ds), size=min(n_background, len(train_ds)),
                         replace=False)
 
     # Which branches to run

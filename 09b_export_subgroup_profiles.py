@@ -45,7 +45,7 @@ def assign_subgroup(row):
     return "NMD other"
 
 
-def load_runs(results_dir, tag, split, n_runs):
+def load_runs(results_dir, tag, n_runs):
     """Load all run NPZs, returning averaged shap and inputs as per-branch arrays."""
     n_ch, w_atg, w_stop, n_feat = 9, 500, 500, 5
     atg_size = n_ch * w_atg
@@ -55,7 +55,7 @@ def load_runs(results_dir, tag, split, n_runs):
     atg_in_runs, stop_in_runs = [], []
     labels = None
     for r in range(1, n_runs + 1):
-        path = results_dir / f"deepshap_joint_{tag}_{split}_run{r}.npz"
+        path = results_dir / f"deepshap_joint_{tag}_run{r}.npz"
         d = np.load(path, allow_pickle=True)
         sv = d["shap_values"].squeeze(-1)        # (N, 9005)
         inp = d["inputs"]                        # (N, 9005)
@@ -162,8 +162,6 @@ def write_subgroup_motif_logo(shap_arr, inp_arr, subgroups, channel_names,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--split", required=True,
-                        help="the split deepshap.py explained; part of the artifact name")
     parser.add_argument("--tag", default=None,
                                             help="Window-config tag. Default: the `selected:` block in --config. "
                                                  "Never a hardcoded literal -- see utils.selected_tag.")
@@ -198,7 +196,7 @@ def main():
 
     # ── Load DeepSHAP NPZs averaged across runs ──
     print(f"\nLoading {args.n_runs} joint DeepSHAP NPZs for tag={tag} ...")
-    meta = load_runs(results_dir, tag, args.split, args.n_runs)
+    meta = load_runs(results_dir, tag, args.n_runs)
 
     # NPZ explain_indices were verified to be 0..N-1 sorted, so NPZ row i ↔ preds row i.
     isoform_ids = preds["isoform_id"].values

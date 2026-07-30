@@ -78,17 +78,28 @@ def score_member(loader, cfg, ws_atg, ws_stop, ckpt_path, device):
                          "window_size_atg": ws_atg, "window_size_stop": ws_stop}).to(device)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
-    logits, labels = [], []
+    logits, labels, iter_order = [], [], []
+    n_seen = 0
     with torch.no_grad():
         for b in loader:
             out = model(b["atg_windows"].to(device), b["stop_windows"].to(device),
                         b["orf_features"].to(device), b["orf_mask"].to(device))
             logits.extend(out.squeeze(-1).cpu().numpy())
             labels.extend(b["label"].numpy())
-    # Return the INDICES this member actually iterated, so the caller can assert identity rather
-    # than infer it. See the alignment note in main().
+            # Record the position each row occupied in THIS pass. With shuffle=False this is
+            # 0,1,2,...; if a future refactor turns shuffling on, or swaps in a sampler, this
+            # diverges between members and the guard below catches it. Recording what was
+            # ITERATED is the only thing that can -- the index SET is unchanged by a reordering.
+            iter_order.extend(range(n_seen, n_seen + len(b["label"])))
+            n_seen += len(b["label"])
+    # Return a COPY of the indices, and the order they were actually iterated in.
+    #
+    # Two previous versions returned `ds.indices` / `loader.dataset.indices` -- the SAME OBJECT the
+    # caller already held -- so the check was `array_equal(x, x)` and could never fire. A copy is
+    # the minimum that makes the comparison mean anything; `iter_order` is what makes it detect the
+    # failure it exists for, since a reordering leaves the index SET identical.
     return (np.asarray(logits, float), np.asarray(labels, float),
-            np.asarray(loader.dataset.indices), int(ckpt["epoch"]))
+            np.array(loader.dataset.indices, copy=True), np.asarray(iter_order), int(ckpt["epoch"]))
 
 
 def main():
@@ -149,9 +160,20 @@ def main():
     # of 4,000 rows leaves array_equal True while the index vector differs. The INDICES are the
     # only per-row identity available, and until now they were captured once and used solely to
     # build the output frame -- a guard sitting unused.
-    per_member, labels_ref, epochs = [], None, []
+    per_member, labels_ref, epochs, order_ref = [], None, [], None
     for s, p in zip(seeds, paths):
-        lg, lb, midx, ep = score_member(loader, cfg, a.atg_window, a.stop_window, p, device)
+        lg, lb, midx, morder, ep = score_member(loader, cfg, a.atg_window, a.stop_window, p, device)
+        if order_ref is None:
+            order_ref = morder
+        elif not np.array_equal(morder, order_ref):
+            raise ValueError(
+                f"member seed {s} iterated the dataset in a DIFFERENT ORDER. The index set can be "
+                f"identical while the order differs, so the mean would be taken across misaligned "
+                f"rows and would still produce a plausible AUC.")
+        if midx is idx_ref:
+            raise AssertionError(
+                "member indices are the SAME OBJECT as the reference -- array_equal(x, x) is "
+                "always True and this guard cannot fire. See test_guards.py.")
         if not np.array_equal(midx, idx_ref):
             raise ValueError(
                 f"member seed {s} iterated a DIFFERENT transcript set than the first member. "
@@ -213,8 +235,12 @@ def main():
         "member_auprc_mean": float(mem_ap.mean()), "member_auprc_sd": float(mem_ap.std(ddof=1)),
     }
     # A pooled split is not a performance estimate; name its metrics so they cannot be read as one.
+    # Key names follow the SAME rule as the headline metrics: on a pooled split they must not be
+    # readable as performance. Previously this block wrote a bare "auc" even under --full-cohort,
+    # directly beneath a comment saying pooled metrics are named so they cannot be read as one.
+    _sfx = "_mixed_in_sample" if ev_class == "full_cohort" else ""
     out["sensitivity_mean_probability"] = {
-        "auc": ens_alt["auc"], "auprc": ens_alt["auprc"],
+        f"auc{_sfx}": ens_alt["auc"], f"auprc{_sfx}": ens_alt["auprc"],
         "auc_minus_primary": ens_alt["auc"] - ens["auc"],
         "auprc_minus_primary": ens_alt["auprc"] - ens["auprc"],
         "note": ("mean(sigmoid(logit)) instead of sigmoid(mean(logit)). NOT the headline; D30 "

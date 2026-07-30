@@ -4,7 +4,7 @@
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=ens_eval
-#SBATCH --output=results_4ct_sweep/ens_eval_%j.log
+#SBATCH --output=slurm_logs/ens_eval_%j.log
 
 # ENSEMBLE EVALUATION AS A BATCH JOB, because the first attempt died on the login node.
 #
