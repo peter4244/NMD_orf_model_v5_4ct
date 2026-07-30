@@ -222,7 +222,7 @@ def export_gc_by_cds_status(inputs, labels, channels, stop_pos, out_dir, tag,
         print(f"  -> {path}")
 
 
-def process_replicates(results_dir, tag):
+def process_replicates(results_dir, tag, split):
     """Check for replicate runs and compute stability statistics."""
     # MODE-QUALIFIED, and LOUD WHEN EMPTY (2026-07-28).
     #
@@ -237,7 +237,7 @@ def process_replicates(results_dir, tag):
     # -- globbing every mode would collect three decompositions and fire the guard on a tree
     # that is perfectly healthy.
     mode = os.environ.get("NMD_SHAP_SUMMARY_MODE", "atg-stop")
-    run_files = sorted(results_dir.glob(f"deepshap_summary_{tag}_{mode}_run*.tsv"))
+    run_files = sorted(results_dir.glob(f"deepshap_summary_{tag}_{split}_{mode}_run*.tsv"))
     if not run_files:
         legacy = sorted(results_dir.glob(f"deepshap_summary_{tag}_run*.tsv"))
         if legacy:
@@ -322,6 +322,10 @@ def process_replicates(results_dir, tag):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tag", default="atg100_stop500")
+    # REQUIRED, matching deepshap.py, which now carries the split in every output name. A
+    # consumer that guesses the split reads the wrong population's attributions or nothing.
+    parser.add_argument("--split", required=True,
+                        help="the split deepshap.py explained; part of the artifact name")
     parser.add_argument("--results-dir", default="results_4ct")
     parser.add_argument("--run-id", type=int, default=None,
                         help="If set, process a specific replicate run")
@@ -330,16 +334,22 @@ def main():
     results_dir = Path(args.results_dir)
     tag = args.tag
     run_suffix = f"_run{args.run_id}" if args.run_id is not None else ""
-    file_tag = f"{tag}{run_suffix}"
+    file_tag = f"{tag}_{args.split}{run_suffix}"
 
     atg_path = results_dir / f"deepshap_atg_{file_tag}.npz"
     stop_path = results_dir / f"deepshap_stop_{file_tag}.npz"
 
     if not atg_path.exists() or not stop_path.exists():
-        print(f"NPZ files not found for tag={file_tag}")
-        print(f"  Checked: {atg_path}")
-        print(f"  Checked: {stop_path}")
-        return
+        # RAISE, DO NOT RETURN (2026-07-30). This printed two lines and returned, so the script
+        # exited 0 with no outputs. A driver checking $? saw success. Worse, the SystemExit guard
+        # added to process_replicates -- written precisely to stop silent skips -- sits BELOW this
+        # return and could never fire. A missing input is not a successful run.
+        raise SystemExit(
+            f"NPZ inputs missing for tag={file_tag}\n"
+            f"  checked: {atg_path}\n"
+            f"  checked: {stop_path}\n"
+            f"  present: {[f.name for f in sorted(results_dir.glob('deepshap_atg_*'))][:6]}\n"
+            f"  Did deepshap.py run with this --split and --run-id?")
 
     print(f"Exporting DeepSHAP TSVs for {file_tag}")
 
@@ -374,7 +384,7 @@ def main():
                              results_dir, file_tag)
 
     # Process replicates if available
-    process_replicates(results_dir, tag)
+    process_replicates(results_dir, tag, args.split)
 
     print("\nDone.")
 
