@@ -301,3 +301,58 @@ over valid ORFs only (`data_prep.py:744-752`); the non-uniform `NMD_ALLOW_NONDET
    **≈39,660 transcripts**, `test_paralog` and `val_paralog` both moving down off 122 / 56.
 4. Fix `collect_sweep.py` (§4 plus the known defect) before any sweep number is quoted.
 5. §2.1 and §2.2 are METHODS edits, independent of everything else.
+
+---
+
+## 9. Addendum, found while landing the fixes — a blind spot in the claim graph itself
+
+**For Track A. This is about the instrument, not the model.**
+
+After committing, `tools/check.py` in the analysis repo went **52/53**, with
+`docs/extract_edges_G2.tsv` STALE. That much is the expected fifth occurrence of the pattern in
+handoff item 4. Attributing it turned up something else.
+
+**`relabel_tx_summary_4ct.R` has 0 rows in both G2 views** — `extract_calls_G2.tsv` and
+`extract_edges_G2.tsv`. The script that assigns every NMD/non-NMD training label does not appear
+in the code–claim graph at all. It is not a corpus gap: `config/corpus.yml` includes `"*.R"` for
+`model_repo`, so the file is in scope.
+
+**Mechanism.** G2 extracts I/O whose path literal sits **at the call site**, and misses I/O whose
+path was bound to a variable first:
+
+| extracted | not extracted |
+|---|---|
+| `safe_write_tsv(df, file.path(out_dir, "tx_summary.tsv"))` — export_rds.R:137, in the graph | `write.table(tx, out_path, ...)` — relabel:159, absent |
+| | `read.delim(prelabel_path, ...)` — relabel:123, absent |
+| | `jsonlite::write_json(prov, prov_path, ...)` — relabel:183, absent |
+
+**This is why the two-writers-one-file defect was invisible to the graph.** The edges view showed
+exactly one writer for `tx_summary.tsv` —
+
+```
+model_repo::export_rds.R   write   tx_summary.tsv   line 137
+```
+
+— because the competing writer routed its path through a variable. A graph used as a correctness
+instrument reported a single-writer file that had two writers.
+
+It is the same shape as the basename-grep rule (a path built by `sprintf`/`paste` survives a
+rename undetected), but one level up: here the path is fully determined and static, just not
+*syntactically present* where the extractor looks.
+
+**Three consequences worth landing:**
+
+1. The extent is unknown. One confirmed instance; any variable-routed read or write anywhere in
+   the corpus is equally invisible. Worth a sweep, because "no edge" currently cannot be
+   distinguished from "no such edge".
+2. **The rewiring committed in `420a264` will not show up in G2 either** — the new
+   `export_rds.R -> tx_summary_prelabel.tsv -> relabel -> tx_summary.tsv` chain is half
+   variable-routed, so regenerating the views will show `export_rds.R` writing
+   `tx_summary_prelabel.tsv` and *nothing* consuming it. That absence is an artifact, not a
+   dangling edge.
+3. The G2 edges view also now carries one **factually wrong** row, not merely a stale line number:
+   `export_rds.R write tx_summary.tsv line 137`. `export_rds.R` no longer writes that file. This
+   is a graph-shape change, so regenerating is required rather than optional.
+
+Not regenerated here — the analysis repo is Track A's, and it was live (worklog 119 → 122 while
+this review ran).
