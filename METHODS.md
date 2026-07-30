@@ -140,7 +140,7 @@ for the rebuild.
 ORFs are ranked: (1) reference CDS ORF, where the gene's dominant non-NMD isoform's start codon can
 be mapped; (2) SQANTI/TransDecoder2 CDS ORF, if different; (3) remaining ORFs by Kozak score, to
 K=5. Implemented in `data_prep.py::select_priority_orfs()`. K=5 was supported by an ORF-coverage analysis (`orf_coverage_diagnostics`,
-`data_prep.py:593-624`), but note what it measures: the count of **all** ORFik ORFs per transcript,
+`data_prep.py:619-650`), but note what it measures: the count of **all** ORFik ORFs per transcript,
 not of priority-eligible ones, since it is never passed `select_priority_orfs`' output. Its output
 table is not present in this repo, so the quoted fraction and median cannot currently be checked.
 See also the report's attention-rank dominance figures.
@@ -413,7 +413,7 @@ If the upstream repo moves, regenerate these files in the upstream tree and re-l
 
 ### What is NOT in the model
 
-The following are present in `selected_orfs.tsv` (and used by `04_interpret_attention.py` for downstream ORF-level analyses) but **do not enter** `NMDOrfModel`: `orf_length`, `frac_position` (different from `frac_start`), `frac_tx_covered`, `kozak_score`, `n_upstream_atgs`, `has_downstream_ejc`. The transcript-level `ref_*` and `td2_*` blocks (8 + 8 + 1 indicator) described in pre-v5 docs were removed in v5 (`model.py:219` "v5: no tx_features input"; `data_prep.py:932` "v5: no tx_features dataset"; `utils.py:143` "No tx_features (removed in v5)").
+The following are present in `selected_orfs.tsv` (and used by `04_interpret_attention.py` for downstream ORF-level analyses) but **do not enter** `NMDOrfModel`: `orf_length`, `frac_position` (different from `frac_start`), `frac_tx_covered`, `kozak_score`, `n_upstream_atgs`, `has_downstream_ejc`. The transcript-level `ref_*` and `td2_*` blocks (8 + 8 + 1 indicator) described in pre-v5 docs were removed in v5 (`model.py:219` "v5: no tx_features input"; `data_prep.py:958` "v5: no tx_features dataset"; `utils.py:143` "No tx_features (removed in v5)").
 
 ### Relationship to the prior structural elastic net
 

@@ -342,24 +342,50 @@ def _assert_labels_are_relabeled(results_dir, tx_summary):
 
     with open(prov_path) as f:
         prov = json.load(f)
-    n_rows = prov.get("n_rows_out")
+
+    # FIELD NAMES, and why this reads two of them. The sidecar was first written by
+    # relabel_tx_summary_4ct.R as `n_rows_out`; when D18 moved the job to export_rds.R (the sole
+    # writer of tx_summary.tsv) the field became `n_rows`, and this consumer was not updated.
+    # Result, found by running it 2026-07-30: prov.get("n_rows_out") returned None, the print
+    # raised TypeError on {None:,}, and -- far worse -- the `is not None` escape below meant the
+    # ROW-COUNT CHECK WOULD HAVE SILENTLY NO-OPPED had the print not crashed. A guard whose
+    # checks evaporate when a field is missing is not a guard. So:
+    #   * both spellings are accepted, newest first;
+    #   * a MISSING field is now fatal rather than a skipped check.
+    n_rows = prov.get("n_rows", prov.get("n_rows_out"))
     n_nmd = prov.get("n_nmd")
-    print(f"  label provenance: {prov.get('written_by')} @ {prov.get('written_at')}, "
-          f"mashr {prov.get('de_date')}, {n_rows:,} rows, NMD={n_nmd:,}")
+    missing = [k for k, v in (("n_rows", n_rows), ("n_nmd", n_nmd)) if v is None]
+    if missing:
+        raise ValueError(
+            f"{prov_path} is missing {missing}, so it cannot be checked against "
+            f"tx_summary.tsv and the label vintage is unverifiable. This is a MALFORMED sidecar, "
+            f"not an absent one -- re-run export_rds.R rather than deleting it, and do not reach "
+            f"for NMD_ALLOW_UNVERIFIED_LABELS, which is for trees that never had a sidecar.")
+
+    # `de_date` exists only on the legacy relabel sidecar: export_rds.R never reads the mashr CSVs
+    # and so cannot honestly claim a DE vintage. Reported when present, omitted when not.
+    de = prov.get("de_date")
+    print(f"  label provenance: {prov.get('written_by')} @ {prov.get('written_at')}"
+          + (f", mashr {de}" if de else "")
+          + f", {n_rows:,} rows, NMD={n_nmd:,}")
+    if prov.get("source_rds"):
+        print(f"    scan: {prov['source_rds']}")
+        print(f"          mtime {prov.get('source_mtime')}, {prov.get('source_bytes', 0):,} bytes")
 
     # The sidecar must describe THIS file, not a previous vintage of it. A stale sidecar beside a
     # regenerated tx_summary is exactly the "documented but not true" state the check exists for.
-    if n_rows is not None and n_rows != len(tx_summary):
+    if n_rows != len(tx_summary):
         raise ValueError(
             f"tx_summary_provenance.json says {n_rows:,} rows but tx_summary.tsv has "
             f"{len(tx_summary):,}. The sidecar is stale, or the two files came from different "
             f"runs. Re-run export_rds.R rather than editing either.")
-    if n_nmd is not None and "is_nmd" in tx_summary.columns:
-        actual = int((tx_summary["is_nmd"] == 1).sum())
-        if actual != n_nmd:
-            raise ValueError(
-                f"tx_summary_provenance.json says NMD={n_nmd:,} but tx_summary.tsv has "
-                f"{actual:,}. Re-run export_rds.R.")
+    if "is_nmd" not in tx_summary.columns:
+        raise ValueError("tx_summary.tsv has no is_nmd column; the labels cannot be checked.")
+    actual = int((tx_summary["is_nmd"] == 1).sum())
+    if actual != n_nmd:
+        raise ValueError(
+            f"tx_summary_provenance.json says NMD={n_nmd:,} but tx_summary.tsv has "
+            f"{actual:,}. Re-run export_rds.R.")
 
 
 def load_ref_features(results_dir):
