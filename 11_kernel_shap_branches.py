@@ -27,6 +27,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from model import build_model
+from evaluate import enforce_split_gate
 from utils import (NMDDataset, load_config, member_tag, resolve_checkpoint, run_suffix,
                    selected_tag, set_seed)
 
@@ -274,7 +275,31 @@ def main():
                         help="Attribution replicate id. Varies the BACKGROUND draw only; the "
                              "checkpoint and the explained set are untouched. Omitted = one "
                              "unreplicated draw, byte-identical to the pre-2026-07-30 behaviour.")
+    # READING A CHECKPOINT AND WRITING OUTPUTS ARE DIFFERENT DIRECTORIES (2026-07-30), the same
+    # separation deepshap.py gained at a301ffe. resolve_checkpoint was reading from --results-dir,
+    # so explaining the sweep's members meant writing 50 interpretation TSVs into the tree that
+    # holds the trained models. Omitted = --results-dir, so every existing invocation is unchanged.
+    parser.add_argument("--checkpoint-dir", default=None,
+                        help="where trained members live, if not --results-dir. Outputs always go "
+                             "to --results-dir.")
+    # THE SPLIT GATE, IMPORTED NOT RESTATED (2026-07-30). This file scored any split with no
+    # affirmation at all: `--explain-split test` was a final evaluation nothing marked as one, and
+    # `--explain-split all` pooled train and held-out data with nothing saying so. That is the hole
+    # C69 found in evaluate.py via `--split all` and closed at 420a264 -- still open here, in a
+    # producer of four section-5 claims. D31 and claim 5.6.4 rest on the test set being touched
+    # once, deliberately, and a second scoring entry point without the gate is how that stops being
+    # true quietly.
+    parser.add_argument("--final", action="store_true",
+                        help="affirm a final, pre-registered evaluation on a test split")
+    parser.add_argument("--full-cohort", action="store_true",
+                        help="affirm a pooled train+test interpretation run (--explain-split all)")
     args = parser.parse_args()
+
+    # evaluate.enforce_split_gate reads args.split; this file's flag is --explain-split for
+    # continuity with the wrappers that already pass it. Aliasing here rather than renaming the
+    # flag keeps slurm_kernel_shap*.sh working and still leaves ONE definition of the gate.
+    args.split = args.explain_split
+    enforce_split_gate(parser, args)
 
     config = load_config(args.config)
     if args.tag is None:
@@ -291,7 +316,7 @@ def main():
     print(f"Tag: {args.tag}, Background: {args.n_background}, Device: {device}")
 
     # Load model
-    ckpt_path = resolve_checkpoint(results_dir, args.tag, args.member_seed)
+    ckpt_path = resolve_checkpoint(args.checkpoint_dir or results_dir, args.tag, args.member_seed)
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model_config = {**config["model"],
                     "window_size_atg": ws_atg, "window_size_stop": ws_stop}

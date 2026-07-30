@@ -295,6 +295,39 @@ def test_no_member_pooling():
     check("a legacy file mixed in with a seeded one", legacy_mixed_with_seeded_is_rejected)
 
 
+# ---------------------------------------------------------------------------------------------
+# 6. The split gate is CALLED by every scoring entry point, not merely defined.
+# ---------------------------------------------------------------------------------------------
+def test_gate_is_wired():
+    """Section 3 proves the gate rejects its defects. It cannot prove a script CALLS it.
+
+    11_kernel_shap_branches.py did not: `--explain-split test` was a final evaluation nothing
+    marked as one, and `--explain-split all` pooled train and held-out data with no affirmation --
+    in the producer of four section-5 claims. That is C69's `--split all` hole, closed in
+    evaluate.py at 420a264 and still open here. D31 and claim 5.6.4 rest on the test set being
+    touched once; a second scoring entry point without the gate is how that stops being true.
+
+    So these run the real script and assert it exits non-zero. argparse errors before any data is
+    loaded, so no HDF5, checkpoint or cluster is needed.
+    """
+    import subprocess, sys, pathlib
+    HERE = pathlib.Path(__file__).parent
+    print("\n=== 6. the split gate is wired into the entry points ===")
+
+    def run(*flags):
+        r = subprocess.run([sys.executable, "11_kernel_shap_branches.py", *flags],
+                           cwd=HERE, capture_output=True, text=True, timeout=180)
+        if r.returncode != 0:
+            raise SystemExit(r.stderr)
+
+    check("11_: --explain-split all without --full-cohort",
+          lambda: run("--explain-split", "all"))
+    check("11_: --explain-split test without --final",
+          lambda: run("--explain-split", "test"))
+    check("11_: --final on a non-test split",
+          lambda: run("--explain-split", "train", "--final"))
+
+
 if __name__ == "__main__":
     print("planted-defect tests -- a guard that does not reject its defect is not a guard")
     test_alignment()
@@ -302,6 +335,7 @@ if __name__ == "__main__":
     test_split_gate()
     test_artifact_naming()
     test_no_member_pooling()
+    test_gate_is_wired()
     print("\n" + ("=" * 70))
     if FAILURES:
         print(f"FAIL — {len(FAILURES)} guard(s) did not behave: {FAILURES}")
