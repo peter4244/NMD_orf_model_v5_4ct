@@ -1,8 +1,24 @@
 #!/bin/bash
-#SBATCH --partition=short
-#SBATCH --time=01:00:00
-#SBATCH --mem=32G
-#SBATCH --cpus-per-task=16
+#SBATCH --partition=sharing
+#SBATCH --time=00:50:00
+#SBATCH --mem=16G
+#SBATCH --cpus-per-task=8
+#
+# MOVED OFF `short` TO `sharing`, 2026-07-29, measured not guessed. `short` is in bad shape --
+# 91 nodes down*, 58 draining, 29 usable against 725 queued jobs, i.e. 25 pending per usable
+# node. `sharing` had 123 usable nodes and 218 pending: 1.8 per node, ~14x better. Probe: three
+# 8cpu/16G jobs submitted to `sharing` at 21:49:17 all STARTED at 21:49:46 -- 29 seconds, and
+# concurrently -- while an identical job on `short` was still pending. On `short` the sweep was
+# managing about two cells per 37 minutes, which for 53 remaining cells is most of a day.
+#
+# Request halved to 8 cpu / 16G because `sharing` nodes are shared: a smaller footprint places
+# far more easily, and measured peak use is 7.9 GB. Fewer threads costs some per-cell time
+# (3:19 at 16 threads), which is a trivial price for running several cells at once instead of
+# queueing behind 725 jobs.
+#
+# 00:50:00 fits inside `sharing`'s 1-hour cap with room to spare: measured cell runtimes are
+# 2:50 to 11:59, graded by window size -- stop=2000 moves 20x the data of stop=100, which is why
+# a single "~3 min per cell" figure was misleading.
 #SBATCH --job-name=sw
 #SBATCH --output=results_4ct_sweep/sweep_%j.log
 #
