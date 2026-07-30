@@ -75,6 +75,45 @@ def eval_class_of(split):
     return "development"
 
 
+def enforce_split_gate(parser, args):
+    """The ONE definition of the --final / --full-cohort gates. Both entry points call this.
+
+    EXTRACTED 2026-07-30 after review. ensemble_evaluate.py imported the CONSTANTS from here and
+    then restated all four enforcement conditions as its own parser.error calls -- shared data,
+    duplicated logic -- while its docstring claimed the gates were "imported, not reimplemented".
+    That is the dangerous kind of false: the next person edits the gate here, reads that docstring,
+    and believes the ensemble path inherited the change. The four conditions were still faithful
+    copies when reviewed, so nothing had diverged yet; the defect was structural, and the fix is to
+    make divergence impossible rather than to check for it.
+
+    It also makes the gate TESTABLE. A planted-defect test against duplicated conditions confirms
+    that each copy fires and has no power to detect that they are copies. With one writer, a test
+    against this function covers every caller.
+
+    D31 and claim 5.6.4 rest on the test set being touched once, deliberately. That is what this
+    protects.
+    """
+    if args.split in FINAL_SPLITS and not args.final:
+        parser.error(
+            f"--split {args.split} is a TEST split. Scoring it is a final evaluation and "
+            f"requires --final.\nIf you are selecting a window configuration, tuning, or "
+            f"comparing runs, use --split val_clean (or train). The published configuration "
+            f"was chosen on twelve test-set scores; that is the defect this gate prevents.")
+    if args.final and args.split not in FINAL_SPLITS:
+        parser.error(f"--final given with --split {args.split}, which is not a test split. "
+                     f"--final asserts a final evaluation; drop it, or name a test split.")
+    if args.split in FULL_COHORT_SPLITS and not getattr(args, "full_cohort", False):
+        parser.error(
+            f"--split {args.split} POOLS training and held-out data (every isoform, chr1/3/5/7 "
+            f"included).\nAny ranking metric over it is in-sample and is not model performance. "
+            f"If you want the full cohort for an interpretation analysis -- attention, DeepSHAP, "
+            f"branch decomposition -- pass --full-cohort to say so.\nIf you want a performance "
+            f"number, use --split val_clean, or --split test_clean --final.")
+    if getattr(args, "full_cohort", False) and args.split not in FULL_COHORT_SPLITS:
+        parser.error(f"--full-cohort given with --split {args.split}, which is not a pooled "
+                     f"split. Drop it.")
+
+
 def evaluate(config_path="config.yaml", atg_window=None, stop_window=None,
              results_dir="results_4ct", member_seed=None, split=None):
     config = load_config(config_path)
@@ -261,32 +300,8 @@ if __name__ == "__main__":
                              "carry no `auc`/`auprc` key, by design.")
     args = parser.parse_args()
 
-    # THE TEST-SET GATE. Selecting a configuration on the test set is the leak D-row 4 exists
-    # to repair; it happened because scoring the test set was the path of least resistance.
-    # It now costs an extra, explicitly-named flag, so it cannot be done inattentively.
-    if args.split in FINAL_SPLITS and not args.final:
-        parser.error(
-            f"--split {args.split} is a TEST split. Scoring it is a final evaluation and "
-            f"requires --final.\nIf you are selecting a window configuration, tuning, or "
-            f"comparing runs, use --split val_clean (or train). The published configuration "
-            f"was chosen on twelve test-set scores; that is the defect this gate prevents.")
-    if args.final and args.split not in FINAL_SPLITS:
-        parser.error(f"--final given with --split {args.split}, which is not a test split. "
-                     f"--final asserts a final evaluation; drop it, or name a test split.")
-
-    # THE FULL-COHORT GATE (2026-07-30). Symmetric with --final, and it exists because `all`
-    # walked straight past that gate: NMDDataset maps `all` to every isoform, chr1/3/5/7
-    # included, so the held-out chromosomes could be scored without anyone typing "test".
-    if args.split in FULL_COHORT_SPLITS and not args.full_cohort:
-        parser.error(
-            f"--split {args.split} POOLS training and held-out data (every isoform, chr1/3/5/7 "
-            f"included).\nAny ranking metric over it is in-sample and is not model performance. "
-            f"If you want the full cohort for an interpretation analysis -- attention, DeepSHAP, "
-            f"branch decomposition -- pass --full-cohort to say so.\nIf you want a performance "
-            f"number, use --split val_clean, or --split test_clean --final.")
-    if args.full_cohort and args.split not in FULL_COHORT_SPLITS:
-        parser.error(f"--full-cohort given with --split {args.split}, which is not a pooled "
-                     f"split. Drop it.")
+    # ONE gate, one writer, called by every scoring entry point. See enforce_split_gate.
+    enforce_split_gate(parser, args)
 
     evaluate(args.config, atg_window=args.atg_window, stop_window=args.stop_window,
              results_dir=args.results_dir, member_seed=args.member_seed, split=args.split)

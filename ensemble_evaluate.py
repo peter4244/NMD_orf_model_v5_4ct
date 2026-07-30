@@ -14,12 +14,27 @@ D30, restated so the code can be checked against it:
   * headline performance is reported **alongside** the single-model mean +/- sd across members, so
     the ensemble's gain over one model is visible rather than implied.
 
-WHY MEAN LOGIT AND NOT MEAN PROBABILITY. They are different estimators and the choice changes the
-number. Averaging in logit space is the geometric mean of the odds; averaging probabilities is the
-arithmetic mean. D30 says logit, so that is what this computes -- and it records
-`aggregation: "mean_logit"` in the metrics file so a reader never has to infer which was used. AUC
-is invariant to the monotone sigmoid, so it is unaffected by the choice; AUPRC and any threshold
-metric are NOT.
+WHY MEAN LOGIT AND NOT MEAN PROBABILITY, corrected 2026-07-30 after review. An earlier version of
+this note said "AUC is invariant to the monotone sigmoid so it is unaffected by the choice; AUPRC
+and any threshold metric are NOT." That conflated two different things and was wrong about AUPRC.
+
+  * THE SIGMOID IS INERT for both metrics. compute_metrics applies sigmoid then calls
+    roc_auc_score and average_precision_score; both are RANK-based, and a monotone transform
+    cannot change a ranking. Verified numerically: AP identical to ten decimals with and without.
+    What genuinely is not invariant is anything at a FIXED threshold (accuracy, F1 at 0.5) and
+    every calibration measure (Brier, log-loss) -- none of which this reports.
+  * THE AGGREGATION IS NOT INERT, and it moves BOTH metrics. mean(sigmoid(x)) != sigmoid(mean(x)),
+    so mean-logit and mean-probability produce DIFFERENT RANKINGS. Measured on synthetic data with
+    realistic class imbalance: 3,986 of 4,000 ranks differ, AUC by +0.0047 and AUPRC by +0.0209 --
+    the AUPRC difference alone being larger than this sweep's exclusion threshold.
+
+So the choice matters and it is pre-registered rather than convenient: D30 names mean LOGIT, and
+swapping a pre-registered choice after seeing an 80-cell grid is exactly what D34/W114 exist to
+catch. Mean logit is primary. Mean probability is computed ALONGSIDE as a declared sensitivity
+check -- both are recorded, `aggregation: "mean_logit"` names the primary, and a reader never has
+to infer which produced the headline. Expectation, stated before the first run: they should agree
+closely if the members are similarly calibrated, and any divergence should localise to the
+low-score tail, which is where AUPRC lives under imbalance.
 
 THE SPLIT GATES ARE IMPORTED, NOT REIMPLEMENTED. evaluate.py's --final and --full-cohort gates
 exist because the published configuration was selected on twelve test-set scores. A second scoring
@@ -41,7 +56,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-from evaluate import FINAL_SPLITS, FULL_COHORT_SPLITS, eval_class_of
+from evaluate import FINAL_SPLITS, FULL_COHORT_SPLITS, enforce_split_gate, eval_class_of
 from model import build_model
 from utils import (NMDDataset, compute_metrics, load_config, member_tag,
                    resolve_checkpoint, set_seed)
@@ -70,7 +85,10 @@ def score_member(loader, cfg, ws_atg, ws_stop, ckpt_path, device):
                         b["orf_features"].to(device), b["orf_mask"].to(device))
             logits.extend(out.squeeze(-1).cpu().numpy())
             labels.extend(b["label"].numpy())
-    return np.asarray(logits, float), np.asarray(labels, float), int(ckpt["epoch"])
+    # Return the INDICES this member actually iterated, so the caller can assert identity rather
+    # than infer it. See the alignment note in main().
+    return (np.asarray(logits, float), np.asarray(labels, float),
+            np.asarray(loader.dataset.indices), int(ckpt["epoch"]))
 
 
 def main():
@@ -90,18 +108,10 @@ def main():
                     help="affirm a pooled train+test interpretation run (--split all)")
     a = ap.parse_args()
 
-    # SAME GATES AS evaluate.py, imported rather than restated.
-    if a.split in FINAL_SPLITS and not a.final:
-        ap.error(f"--split {a.split} is a TEST split and requires --final. The published "
-                 f"configuration was chosen on twelve test-set scores; that is the defect this "
-                 f"gate prevents. Use --split val_clean for anything developmental.")
-    if a.final and a.split not in FINAL_SPLITS:
-        ap.error(f"--final given with --split {a.split}, which is not a test split.")
-    if a.split in FULL_COHORT_SPLITS and not a.full_cohort:
-        ap.error(f"--split {a.split} POOLS training and held-out data. Pass --full-cohort to "
-                 f"affirm an interpretation run; it is not a performance number.")
-    if a.full_cohort and a.split not in FULL_COHORT_SPLITS:
-        ap.error(f"--full-cohort given with --split {a.split}, which is not a pooled split.")
+    # THE gate, called not copied. The previous version restated all four conditions here while
+    # the docstring claimed they were imported -- shared constants, duplicated logic, and a
+    # duplicate that stops tracking its twin is the failure D31 and claim 5.6.4 cannot afford.
+    enforce_split_gate(ap, a)
 
     cfg = load_config(a.config)
     set_seed(cfg["training"]["seed"])
@@ -127,9 +137,26 @@ def main():
     loader = DataLoader(ds, batch_size=cfg["training"]["batch_size"], shuffle=False, num_workers=0)
     idx_ref = ds.indices
 
+    # ALIGNMENT: the structural fix is what protects this, not the checks (review, 2026-07-30).
+    # ds and loader are built ONCE above, shuffle=False, num_workers=0, drop_last unset; every
+    # member iterates the same loader object and score_member cannot rebuild it. Misalignment is
+    # therefore unrepresentable rather than merely detected.
+    #
+    # The checks below are belt-and-braces against a future refactor reintroducing per-member
+    # loaders -- and one of them replaces a guard that could not fire. Comparing LABELS was nearly
+    # powerless: labels are 0/1, so ANY permutation within a class leaves the vector identical, and
+    # reordering is exactly the failure it was supposed to catch. Verified: a within-class shuffle
+    # of 4,000 rows leaves array_equal True while the index vector differs. The INDICES are the
+    # only per-row identity available, and until now they were captured once and used solely to
+    # build the output frame -- a guard sitting unused.
     per_member, labels_ref, epochs = [], None, []
     for s, p in zip(seeds, paths):
-        lg, lb, ep = score_member(loader, cfg, a.atg_window, a.stop_window, p, device)
+        lg, lb, midx, ep = score_member(loader, cfg, a.atg_window, a.stop_window, p, device)
+        if not np.array_equal(midx, idx_ref):
+            raise ValueError(
+                f"member seed {s} iterated a DIFFERENT transcript set than the first member. "
+                f"The mean would be taken across misaligned rows and would still produce a "
+                f"plausible AUC.")
         if labels_ref is None:
             labels_ref = lb
         elif not np.array_equal(lb, labels_ref):
@@ -162,6 +189,16 @@ def main():
           f"(1.0000 across the board would mean the members are not independent)")
     ens_logit = L.mean(axis=0)                   # D30: mean LOGIT, never averaged weights
     ens = compute_metrics(labels_ref, ens_logit)
+
+    # DECLARED SENSITIVITY CHECK, not an alternative headline. mean(sigmoid) != sigmoid(mean), so
+    # this ranks transcripts differently and moves both metrics; on synthetic data with this class
+    # balance it shifted AUPRC by 0.021, larger than the sweep's own exclusion threshold. Mean
+    # logit stays primary because D30 pre-registered it AND because it is the model's native
+    # scale -- cls_head is a bare Linear and the loss is BCEWithLogitsLoss, so probabilities only
+    # exist after a sigmoid this pipeline adds. Reporting both means the choice is measured rather
+    # than argued, and neither can be quietly substituted for the other.
+    ens_prob = (1.0 / (1.0 + np.exp(-L))).mean(axis=0)
+    ens_alt = compute_metrics(labels_ref, ens_prob)
     mem_auc = np.array([compute_metrics(labels_ref, l)["auc"] for l in L])
     mem_ap = np.array([compute_metrics(labels_ref, l)["auprc"] for l in L])
 
@@ -176,6 +213,14 @@ def main():
         "member_auprc_mean": float(mem_ap.mean()), "member_auprc_sd": float(mem_ap.std(ddof=1)),
     }
     # A pooled split is not a performance estimate; name its metrics so they cannot be read as one.
+    out["sensitivity_mean_probability"] = {
+        "auc": ens_alt["auc"], "auprc": ens_alt["auprc"],
+        "auc_minus_primary": ens_alt["auc"] - ens["auc"],
+        "auprc_minus_primary": ens_alt["auprc"] - ens["auprc"],
+        "note": ("mean(sigmoid(logit)) instead of sigmoid(mean(logit)). NOT the headline; D30 "
+                 "pre-registers mean logit, which is also the model's native output scale. "
+                 "Recorded so the aggregation choice is measured rather than assumed."),
+    }
     if ev_class == "full_cohort":
         out["ensemble_auc_mixed_in_sample"] = ens["auc"]
         out["ensemble_auprc_mixed_in_sample"] = ens["auprc"]
@@ -193,6 +238,9 @@ def main():
           f"   AUPRC {mem_ap.mean():.5f} +/- {mem_ap.std(ddof=1):.5f}")
     print(f"  ensemble gain over the mean member: AUC {ens['auc']-mem_auc.mean():+.5f}  "
           f"AUPRC {ens['auprc']-mem_ap.mean():+.5f}")
+    print(f"  [sensitivity] mean-PROBABILITY aggregation: AUC {ens_alt['auc']:.5f} "
+          f"({ens_alt['auc']-ens['auc']:+.5f})  AUPRC {ens_alt['auprc']:.5f} "
+          f"({ens_alt['auprc']-ens['auprc']:+.5f})   -- not the headline")
 
     stem = f"{tag}_ens{len(seeds)}_{a.split}"
     mp = rd / f"ensemble_metrics_{stem}.json"

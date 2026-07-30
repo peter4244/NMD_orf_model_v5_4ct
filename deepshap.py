@@ -18,7 +18,8 @@ import torch
 import torch.nn as nn
 
 from model import NMDOrfModel, build_model
-from utils import NMDDataset, load_config, resolve_checkpoint, set_seed
+from utils import (NMDDataset, load_config, member_tag, resolve_checkpoint,
+                   set_seed)
 
 
 class BranchWrapper(nn.Module):
@@ -177,6 +178,16 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     ws_atg = atg_window or config["data"]["window_size_atg"]
     ws_stop = stop_window or config["data"]["window_size_stop"]
     tag = f"atg{ws_atg}_stop{ws_stop}"
+    # THE MEMBER GOES IN THE OUTPUT NAME (2026-07-30). --member-seed selected WHICH trained member
+    # to load (:198) and then every output was written under a name with no member in it, so
+    # running member 100 and then member 200 silently overwrote, and nothing on disk said which
+    # member survived. utils.member_tag exists for precisely this -- it was written after five
+    # array tasks wrote one checkpoint -- and the interpretation outputs never adopted it.
+    #
+    # member_tag(tag, None) == tag, so every existing invocation writes byte-identical filenames
+    # and 06_export_deepshap_tsv.py / 09b / 09c / 09d keep matching. The name changes only when a
+    # member is actually named, which is exactly when the collision occurs.
+    otag = member_tag(tag, member_seed)
     run_suffix = f"_run{run_id}" if run_id is not None else ""
     # W52. The SUMMARY filename must carry the decomposition, exactly as the npz already does
     # at :305 -- deepshap_{branch}_{tag}... Without it, `deepshap_summary_{tag}_run1.tsv` means
@@ -311,7 +322,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
         label_arr = np.concatenate(all_labels, axis=0)
 
         # Save
-        out_path = results_dir / f"deepshap_{branch}_{tag}{orf_suffix}{run_suffix}.npz"
+        out_path = results_dir / f"deepshap_{branch}_{otag}{orf_suffix}{run_suffix}.npz"
         np.savez_compressed(out_path,
                             shap_values=shap_arr,
                             inputs=input_arr,
@@ -392,7 +403,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
         input_struct = np.concatenate(all_inputs_s, axis=0)
         label_struct = np.concatenate(all_labels_s, axis=0)
 
-        out_path = results_dir / f"deepshap_structural_{tag}{orf_suffix}{run_suffix}.npz"
+        out_path = results_dir / f"deepshap_structural_{otag}{orf_suffix}{run_suffix}.npz"
         np.savez_compressed(out_path,
                             shap_values=shap_struct,
                             inputs=input_struct,
@@ -501,7 +512,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
         label_joint = np.concatenate(all_labels_j, axis=0)
 
         # Save with metadata for unpacking
-        out_path = results_dir / f"deepshap_joint_{tag}{orf_suffix}{run_suffix}.npz"
+        out_path = results_dir / f"deepshap_joint_{otag}{orf_suffix}{run_suffix}.npz"
         np.savez_compressed(out_path,
                             shap_values=shap_joint,
                             inputs=input_joint,
@@ -556,7 +567,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
 
     # Sequence branches (ATG, stop): per-channel, averaged across positions
     for branch in seq_branches:
-        npz_path = results_dir / f"deepshap_{branch}_{tag}{orf_suffix}{run_suffix}.npz"
+        npz_path = results_dir / f"deepshap_{branch}_{otag}{orf_suffix}{run_suffix}.npz"
         if not npz_path.exists():
             continue
         data = np.load(npz_path)
@@ -577,7 +588,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
             })
 
     # Structural branch: per-feature (no positional dimension)
-    struct_npz = results_dir / f"deepshap_structural_{tag}{orf_suffix}{run_suffix}.npz"
+    struct_npz = results_dir / f"deepshap_structural_{otag}{orf_suffix}{run_suffix}.npz"
     if run_structural and struct_npz.exists():
         struct_data = np.load(struct_npz)
         struct_shap = struct_data["shap_values"]   # (N, n_features) or (N, n_features, 1)
@@ -599,7 +610,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
             })
 
     # Joint branch: summarize by splitting back into ATG/stop/structural regions
-    joint_npz = results_dir / f"deepshap_joint_{tag}{orf_suffix}{run_suffix}.npz"
+    joint_npz = results_dir / f"deepshap_joint_{otag}{orf_suffix}{run_suffix}.npz"
     if run_joint and joint_npz.exists():
         jd = np.load(joint_npz)
         jshap = jd["shap_values"]
@@ -664,7 +675,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
 
     if summary_rows:
         summary_df = pd.DataFrame(summary_rows)
-        summary_path = results_dir / f"deepshap_summary_{tag}{mode_suffix}{orf_suffix}{run_suffix}.tsv"
+        summary_path = results_dir / f"deepshap_summary_{otag}{mode_suffix}{orf_suffix}{run_suffix}.tsv"
         summary_df.to_csv(summary_path, sep="\t", index=False)
         print(f"  -> {summary_path}")
 

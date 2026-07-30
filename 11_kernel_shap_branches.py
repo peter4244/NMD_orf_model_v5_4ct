@@ -27,7 +27,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from model import build_model
-from utils import (NMDDataset, load_config, resolve_checkpoint, selected_tag,
+from utils import (NMDDataset, load_config, member_tag, resolve_checkpoint, selected_tag,
                    set_seed)
 
 
@@ -391,7 +391,11 @@ def main():
 
     # Save (suffix non-test explained sets so the full-cohort file is distinct)
     suffix = "" if args.explain_split == "test" else f"_{args.explain_split}"
-    out_path = results_dir / f"kernel_shap_branch_{args.tag}{suffix}.tsv"
+    # Member in the name, same reasoning as deepshap.py: --member-seed chose the checkpoint (:283)
+    # and the output name did not say which. member_tag(tag, None) == tag, so existing runs are
+    # unaffected. The explain-split suffix was already handled just above -- this file was half
+    # self-documenting and is now consistent.
+    out_path = results_dir / f"kernel_shap_branch_{member_tag(args.tag, args.member_seed)}{suffix}.tsv"
     df.to_csv(out_path, sep="\t", index=False)
     print(f"\n-> {out_path} ({len(df)} rows)")
     print("Done.")
