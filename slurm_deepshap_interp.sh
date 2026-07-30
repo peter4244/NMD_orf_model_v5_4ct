@@ -34,7 +34,9 @@ export MKL_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 : "${DS_SEED:?DS_SEED not set}"
 DS_SPLIT="${DS_SPLIT:-all}"
 DS_RUN="${DS_RUN:-1}"
-DS_RESULTS="${DS_RESULTS:-results_4ct_interp}"
+DS_RESULTS="${DS_RESULTS:-results_interp_all}"
+# Members are trained by the sweep and live there; interpretation outputs go somewhere else.
+DS_CKPT="${DS_CKPT:-results_4ct_sweep}"
 DS_NEXPLAIN="${DS_NEXPLAIN:-2000}"
 DS_BRANCHES="${DS_BRANCHES:-atg stop}"
 
@@ -52,6 +54,7 @@ $PY -V
 $PY deepshap.py \
     --config config_dn.yaml \
     --results-dir "$DS_RESULTS" \
+    --checkpoint-dir "$DS_CKPT" \
     --atg-window "$DS_ATG" \
     --stop-window "$DS_STOP" \
     --member-seed "$DS_SEED" \

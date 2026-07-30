@@ -170,7 +170,8 @@ class JointBranchWrapper(nn.Module):
 def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
                   atg_window=None, stop_window=None, seed=None, run_id=None,
                   branches=None, orf_index=0,
-                 results_dir="results_4ct", member_seed=None, split=None):
+                 results_dir="results_4ct", member_seed=None, split=None,
+                 checkpoint_dir=None):
     config = load_config(config_path)
     seed = seed if seed is not None else config["training"]["seed"]
     set_seed(seed)
@@ -221,7 +222,13 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     h5_path = config["data"]["hdf5_path"]
 
     # Load model
-    ckpt_path = resolve_checkpoint(results_dir, tag, member_seed)
+    # WHERE THE CHECKPOINT IS READ AND WHERE OUTPUTS ARE WRITTEN ARE DIFFERENT THINGS
+    # (2026-07-30). They were one parameter, which was invisible while everything lived in one
+    # directory and broke the moment outputs moved: jobs 8837815/8837816 looked for
+    # results_interp_all/best_model_*.pt because that was the output directory, while the
+    # checkpoints are in results_4ct_sweep. Defaults to results_dir, so every existing invocation
+    # is unchanged.
+    ckpt_path = resolve_checkpoint(checkpoint_dir or results_dir, tag, member_seed)
     print(f"Loading model from {ckpt_path}")
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model_config = {**config["model"],
@@ -762,6 +769,9 @@ if __name__ == "__main__":
                         help="affirm a final, pre-registered evaluation on a test split")
     parser.add_argument("--full-cohort", action="store_true",
                         help="affirm a pooled train+test interpretation run (--split all)")
+    parser.add_argument("--checkpoint-dir", default=None,
+                        help="where trained members live, if not --results-dir. Outputs always go "
+                             "to --results-dir.")
     args = parser.parse_args()
 
     # ONE gate, imported not restated. See evaluate.enforce_split_gate.
@@ -770,4 +780,5 @@ if __name__ == "__main__":
     run_deepshap(args.config, args.n_explain, args.n_background,
                  args.atg_window, args.stop_window, args.seed, args.run_id,
                  args.branches, args.orf_index, results_dir=args.results_dir,
-                 member_seed=args.member_seed, split=args.split)
+                 member_seed=args.member_seed, split=args.split,
+                 checkpoint_dir=args.checkpoint_dir)
