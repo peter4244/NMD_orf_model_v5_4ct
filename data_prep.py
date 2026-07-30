@@ -306,15 +306,19 @@ def _assert_labels_are_relabeled(results_dir, tx_summary):
     """Refuse to build an HDF5 from a tx_summary whose labels have no recorded provenance.
 
     THE FAILURE THIS EXISTS TO PREVENT (2026-07-30). `is_nmd` is read straight into the training
-    labels at the bottom of build_dataset with no check of any kind. Until today export_rds.R and
-    relabel_tx_summary_4ct.R BOTH wrote `tx_summary.tsv`, so whichever ran last decided the
-    contents: run export_rds.R second and the model trains on the ORFik scaffold's original
-    labels instead of the 4-CT ones. Plausible values, exit 0, wrong model -- the same shape as
-    C44 and the 2026-07-28 hybrid.
+    labels at the bottom of build_dataset with no check of any kind, and export_rds.R is its sole
+    writer (D18 retired relabel_tx_summary_4ct.R precisely so there would be one writer). So the
+    labels are whatever orfik_scan.rds carried, and nothing records WHICH scan that was.
 
-    The two writers are now separated (export_rds.R -> tx_summary_prelabel.tsv), which makes the
-    accident harder; this makes it detectable. relabel writes tx_summary_provenance.json and this
-    requires it to exist and to describe the file actually on disk.
+    That is the unguarded half of the hazard export_rds.R's own header documents: 0 of 24 isoforms
+    added by the rebuilt structures.rds appear in the resulting tx_summary.tsv (2026-07-26), and
+    nothing said so. A stale scan gives plausible labels, exit 0, and a model trained on the wrong
+    universe -- the same shape as C44 and the 2026-07-28 hybrid.
+
+    export_rds.R now writes tx_summary_provenance.json beside the table; this requires it to exist
+    and to describe the file actually on disk. NOTE it does NOT reinstate the relabel step and
+    asserts nothing about mashr: export_rds.R never reads the mashr CSVs, so the sidecar records
+    only the scan's identity and class counts.
 
     Escape hatch matches the house pattern -- an environment variable that PRINTS what it is
     conceding, not a quiet argument default:
@@ -326,12 +330,11 @@ def _assert_labels_are_relabeled(results_dir, tx_summary):
 
     if not prov_path.exists():
         msg = (f"{prov_path} not found, so the NMD labels in tx_summary.tsv have no recorded "
-               f"provenance and cannot be distinguished from the pre-relabel scaffold's own "
-               f"is_nmd column.\n"
-               f"  Run relabel_tx_summary_4ct.R (it writes both files), or set "
+               f"provenance: there is no way to tell which orfik_scan.rds produced them.\n"
+               f"  Re-run export_rds.R --results-dir <this dir> (it writes both files), or set "
                f"NMD_ALLOW_UNVERIFIED_LABELS=1 to build anyway.\n"
-               f"  Published trees built before 2026-07-30 have no sidecar; use the variable "
-               f"there, and note in the log that the label vintage is unverified.")
+               f"  Trees built before 2026-07-30 have no sidecar; use the variable there, and "
+               f"note in the log that the label vintage is unverified.")
         if not allow:
             raise FileNotFoundError(msg)
         print(f"\n  WARNING: NMD_ALLOW_UNVERIFIED_LABELS=1 -- {msg}")
@@ -350,13 +353,13 @@ def _assert_labels_are_relabeled(results_dir, tx_summary):
         raise ValueError(
             f"tx_summary_provenance.json says {n_rows:,} rows but tx_summary.tsv has "
             f"{len(tx_summary):,}. The sidecar is stale, or the two files came from different "
-            f"runs. Re-run relabel_tx_summary_4ct.R rather than editing either.")
+            f"runs. Re-run export_rds.R rather than editing either.")
     if n_nmd is not None and "is_nmd" in tx_summary.columns:
         actual = int((tx_summary["is_nmd"] == 1).sum())
         if actual != n_nmd:
             raise ValueError(
                 f"tx_summary_provenance.json says NMD={n_nmd:,} but tx_summary.tsv has "
-                f"{actual:,}. Re-run relabel_tx_summary_4ct.R.")
+                f"{actual:,}. Re-run export_rds.R.")
 
 
 def load_ref_features(results_dir):

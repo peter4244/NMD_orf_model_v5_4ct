@@ -4,10 +4,7 @@
 #
 # Inputs:  orfik_scan.rds, ref_cds_features_all.rds, paralog_genes.rds
 # Outputs: results/orf_features.tsv       — per-ORF features (2.4M rows)
-#          results/tx_summary_prelabel.tsv — per-transcript ORF summary, PRE-relabel scaffold.
-#                                            relabel_tx_summary_4ct.R reads this and writes
-#                                            tx_summary.tsv. This script does NOT write
-#                                            tx_summary.tsv; see the note at that write site.
+#          results/tx_summary.tsv         — per-transcript ORF summary (61K rows)
 #          results/ref_cds_features.tsv   — structural features (61K rows)
 #          results/synthetic_cds.tsv      — CDS coordinates
 #          results/paralog_genes.tsv      — paralog gene list
@@ -137,28 +134,40 @@ cat("  -> wrote orf_features.tsv\n")
 
 orfik$orf_features <- NULL  # free before writing next table
 
-# WRITES tx_summary_prelabel.tsv, NOT tx_summary.tsv (2026-07-30, Pete's call).
+safe_write_tsv(orfik$tx_summary, file.path(out_dir, "tx_summary.tsv"))
+cat("  -> wrote tx_summary.tsv\n")
+
+# LABEL PROVENANCE SIDECAR (2026-07-30). This script is the SOLE writer of tx_summary.tsv
+# (D18 retired relabel_tx_summary_4ct.R for exactly that reason), so `is_nmd` here is whatever
+# orfik_scan.rds carried -- and data_prep.py reads it straight into the training labels with no
+# record of which scan it came from.
 #
-# This script and relabel_tx_summary_4ct.R both used to write `tx_summary.tsv`, so the file's
-# CONTENTS depended on which ran last and nothing recorded which that was. Run export_rds.R
-# after relabel and data_prep.py silently trains on this scaffold's ORIGINAL is_nmd column --
-# plausible values, exit 0, wrong labels. There was no guard anywhere in the chain.
+# That is the unguarded half of the hazard this file's own header documents: 0 of 24 isoforms
+# added by the rebuilt structures.rds appear in the resulting tx_summary.tsv (2026-07-26), and
+# nothing said so. A stale scan yields plausible labels, exit 0, and a model trained on the wrong
+# universe. Recording the scan's identity and class counts makes the vintage checkable downstream
+# instead of assumed.
 #
-# The pipeline is now single-writer at every step:
-#     export_rds.R  ->  tx_summary_prelabel.tsv     (ORFik scaffold, labels NOT 4-CT)
-#     relabel_*.R   ->  tx_summary.tsv              (4-CT labels, neither-class rows dropped)
-#     data_prep.py  <-  tx_summary.tsv              (+ asserts the provenance sidecar)
-#
-# It also makes the bootstrap RE-RUNNABLE. The old arrangement had relabel read and overwrite
-# one name, so a second run relabelled already-relabelled data and the scaffold was gone. The
-# two names were `tx_summary_6ct.tsv` (committed) and `tx_summary_4ct.tsv` (an unstaged edit
-# whose comment attributed the file to THIS script, which never wrote either name). Neither was
-# produced by anything in the repo, so the pipeline could not rebuild its own inputs.
-safe_write_tsv(orfik$tx_summary, file.path(out_dir, "tx_summary_prelabel.tsv"))
-cat("  -> wrote tx_summary_prelabel.tsv",
-    sprintf("(%d rows -- the PRE-relabel scaffold; relabel_tx_summary_4ct.R turns this into",
-            nrow(orfik$tx_summary)),
-    "tx_summary.tsv)\n")
+# Deliberately NOT a claim about mashr: this script never reads the mashr CSVs, so it records only
+# what it can observe. It does not reinstate the relabel step and does not change tx_summary.tsv.
+local({
+  tx_prov <- list(
+    written_by  = "export_rds.R",
+    written_at  = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"),
+    source_rds  = rds_path,
+    source_mtime = format(file.mtime(rds_path), "%Y-%m-%dT%H:%M:%S%z"),
+    source_bytes = as.numeric(file.size(rds_path)),
+    n_rows      = nrow(orfik$tx_summary),
+    n_nmd       = if ("is_nmd" %in% names(orfik$tx_summary))
+                    sum(orfik$tx_summary$is_nmd == 1, na.rm = TRUE) else NA_integer_,
+    n_non_nmd   = if ("is_nmd" %in% names(orfik$tx_summary))
+                    sum(orfik$tx_summary$is_nmd == 0, na.rm = TRUE) else NA_integer_
+  )
+  write_json(tx_prov, file.path(out_dir, "tx_summary_provenance.json"),
+             auto_unbox = TRUE, pretty = TRUE)
+  cat(sprintf("  -> wrote tx_summary_provenance.json (%d rows, NMD=%s)\n",
+              tx_prov$n_rows, format(tx_prov$n_nmd)))
+})
 
 write_json(orfik$metadata, file.path(out_dir, "orf_scan_metadata.json"),
            auto_unbox = TRUE, pretty = TRUE)

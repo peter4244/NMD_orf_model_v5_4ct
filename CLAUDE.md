@@ -20,7 +20,9 @@ The model architecture is identical to the original v5: multi-branch transformer
 ## Repository Structure
 
 ### Source Code (pipeline order)
-- `relabel_tx_summary_4ct.R` — Reclassifies NMD/non-NMD labels from new 4ct mashr results
+- `export_rds.R` — Isopair RDS → the eight feature tables, incl. `tx_summary.tsv`
+  (sole writer) and `tx_summary_provenance.json`. `relabel_tx_summary_4ct.R` is RETIRED
+  (D18) and is NOT a build step — do not reinstate it.
 - `data_prep.py` — HDF5 dataset construction
 - `model.py` — NMDOrfModel architecture definition
 - `config.yaml` — Hyperparameters and paths
@@ -42,7 +44,8 @@ The model architecture is identical to the original v5: multi-branch transformer
 ## Data Provenance
 - ORF features, junctions, sequences: Same as original v5 (from isopair pipeline v6.0)
 - NMD labels: New 4-cell-type mashr DE results at `/projects/talisman/shared-data/nmd/mashr/`
-- Relabeling script: `relabel_tx_summary_4ct.R`
+- Labels: carried by the ORFik scan and written by `export_rds.R`; vintage recorded in
+  `tx_summary_provenance.json`. `relabel_tx_summary_4ct.R` is retired (D18).
 
 ## Working Conventions
 - Best model tag: `atg500_stop500`
