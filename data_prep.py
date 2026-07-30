@@ -161,10 +161,19 @@ def encode_window_v5(seq_uint8, junctions_set, center, half_win,
     encoded[valid_nuc, valid_positions] = 1.0
 
     # Channel 4: junctions (sparse — loop is fine, typically < 20 junctions)
+    # BOUNDED BY THE VALID RANGE, NOT THE WINDOW FRAME (fixed 2026-07-29). This tested
+    # `0 <= j - start < win_size`, i.e. the frame, while every other channel fills only
+    # arr_start:arr_end. Harmless while the sole clipping was the transcript edge -- a junction
+    # is always inside the transcript, so it could not land in the padded region. NOT harmless
+    # once the ORF-midpoint clip was added: junctions beyond the midpoint kept being marked in
+    # the ATG window, and junctions before it in the stop window, so the two branches stayed
+    # coupled through channel 4 after the sequence channels had been separated. The overlap fix
+    # would have been 8/9 complete and looked finished, because the verification measured
+    # nucleotide channels only.
     for j in junctions_set:
-        idx_in_win = j - start
-        if 0 <= idx_in_win < win_size:
-            encoded[4, idx_in_win] = 1.0
+        if not (w_start <= j < w_end):
+            continue
+        encoded[4, j - start] = 1.0
 
     # Channel 5: rolling GC fraction (vectorized slice)
     if len(rolling_gc) > 0:
