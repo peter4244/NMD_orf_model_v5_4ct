@@ -12,6 +12,84 @@ Repo state on arrival: `master` @ `3f96643`, clean except the one deliberate unc
 
 ---
 
+## 0. CORRECTIONS — two of this review's findings are WITHDRAWN
+
+Added 2026-07-30 after Track A supplied the ledger-side facts. Both retractions come from
+information that is not visible from the model repo, which is the split working as intended.
+
+### 0.1 §1.1 IS WRONG. The handoff's ~41,765 is CORRECT.
+
+I claimed the expected rebuild count was ~39,660, not ~41,765, because
+`relabel_tx_summary_4ct.R:132` drops neither-class rows and the published universe is 39,938.
+
+**The relabel is a verified no-op on the deposit-native scaffold.** Per
+`nmd_lung_longread_2026/config/corpus.yml:150-152` and
+`verification/phaseC/relabel_is_noop.py`: *"0 dropped, 0 disagreements over 42,043 isoforms"* —
+42,043 rows in, 42,043 out. The deposit-native scaffold is **already** restricted to the labeled
+universe, so nothing is dropped and 39,938 never enters the arithmetic.
+
+**My error:** I applied the PUBLISHED tree's universe to a DEPOSIT-NATIVE rebuild. 39,938 and
+42,043 are not two stages of one pipeline — they are two different trees:
+
+| tree | labeled universe | evidence |
+|---|---|---|
+| `results_4ct` (published) | **39,938** | measured, `uorf_attention_predictions.tsv` |
+| `results_4ct_dn` (deposit-native) | **42,043** | relabel_is_noop.py, 0 dropped |
+
+The rebuild targets `results_4ct_dn` (`slurm_build_h5_dn.sh` passes `--results-dir
+results_4ct_dn`), so **expect 42,043 − 278 = 41,765**, exactly as the handoff said.
+
+Knock-on: `METHODS.md:95-96`'s 0.70% — which §1.1 praised as correct — is the figure that is
+actually wrong for the deposit-native rebuild. It divides by the published tree's 39,938. The
+`data_prep.py:628` comment's 42,043-family denominator is the right one. **§1.1's diagnosis is
+inverted.** The remaining open item is narrow: 42,063 vs 42,043, a 20-row gap, still unexplained.
+
+**Caveat, and it is Track A's to close:** `relabel_is_noop.py`'s own docstring exists because C5
+recorded this same answer with *"no evidence field, no verification script, and no run log
+anywhere"*. So the number that corrects me rests on a verification whose run log I cannot see.
+My reasoning was wrong either way, but the replacement figure deserves a confirmed run.
+
+### 0.2 §9 IS WITHDRAWN ENTIRELY. There is no G2 blind spot.
+
+I claimed `relabel_tx_summary_4ct.R`'s absence from the G2 views revealed that the extractor
+misses I/O whose path is bound to a variable, and that this hid the two-writers-one-file defect.
+
+Both halves are false.
+
+1. **The file is excluded on purpose.** `config/corpus.yml:154-155` carries an explicit
+   `exclude: - "relabel_tx_summary_4ct.R"` for the `model_repo` G2 root, retired 2026-07-27 under
+   W60 and deliberately kept in G1. I grepped `-A20` around the `model_repo` block and the
+   `exclude:` key sits below that window. I then read "0 rows" as a mechanism instead of checking
+   the config — **concluding from an absence**, the exact failure mode both handoffs document.
+2. **The extractor resolves variable-routed I/O fine.** Disproof from the graph itself:
+   `model_repo::evaluate.py` write rows at lines 139, 153 and 159 are `pred_df.to_csv(pred_path,
+   …)`, `attn_df.to_csv(attn_path, …)` and a `json.dump` through `metrics_path` — every one a
+   variable. Same for `data_prep.py` at 580 and 593.
+
+The ledger also already knew about the collision: the same corpus.yml comment names it —
+*"two writers, one artifact (S4)"*. It was recorded, not missed.
+
+**What survives:** the rewiring committed in `420a264` is still worth having on its own terms
+(one writer per filename, and the repo regenerates its own inputs), and the `extract_edges_G2.tsv`
+row `export_rds.R write tx_summary.tsv line 137` is still factually wrong now rather than merely
+line-stale, so regeneration is still required rather than optional. Everything I said about *why*
+the graph could not have seen the problem is withdrawn.
+
+### 0.3 What is unaffected
+
+§1.3 (the `--split all` gate hole), §2.1 (six stale citations), §2.2 (markers stopping at the
+section boundary), §4 (`collect_sweep.py` leader without complete seeds), §5
+(`verify_pool_equivalence` is CPU-only; no AMP path), §6 (silent-absence defaults) and all of §7
+(parameter counts, every measured window number, disjointness by perturbation) are direct
+measurements against code in this repo and stand as written.
+
+One number needs re-scoping rather than retracting: I measured `test_paralog = 130` from the
+published artifact against the handoff's 122. Given §0.1, those are probably **different trees** —
+130 published, 122 deposit-native — not a contradiction. The 7-isoform label gap
+(8,833/31,105 measured vs 8,840/31,098 documented) is within the published tree and still open.
+
+---
+
 ## 1. Blocking — these sit in front of the next action
 
 ### 1.1 The handoff's pre-registered rebuild counts are wrong by ~2,100
