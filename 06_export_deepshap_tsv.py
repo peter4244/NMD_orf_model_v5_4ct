@@ -19,6 +19,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from utils import assert_one_member
+
 
 def load_npz(path):
     """Load NPZ and squeeze trailing singleton dim from shap_values."""
@@ -252,6 +254,16 @@ def process_replicates(results_dir, tag):
                 f"Present: {[f.name for f in sorted(results_dir.glob('deepshap_summary_*'))][:6]}. "
                 f"Refusing to skip silently -- set NMD_SHAP_SUMMARY_MODE if you meant another "
                 f"decomposition.")
+
+    # THE MEMBER AXIS, GUARDED AT THE GLOB SITE (2026-07-30). This glob is member-blind:
+    # `{tag}_{mode}_run*` does not match `{tag}_seed200_{mode}_run*`, so a member-tagged
+    # producer run makes the branch above fail loudly and name both paths. Correct.
+    # The tempting one-line repair -- loosen to `{tag}*_{mode}_run*` -- would match all five
+    # members and average them into one row, collapsing the BETWEEN-MEMBER spread that is
+    # the training-variability estimate. utils.assert_one_member makes that edit fail
+    # instead of succeeding quietly. The real repair is a --member-seed here; see the
+    # guard's docstring. test_guards.py section 5.
+    assert_one_member(run_files, "06_export_deepshap_tsv replicate stability")
 
     print(f"\n=== Replicate stability ({len(run_files)} runs) ===")
     dfs = []

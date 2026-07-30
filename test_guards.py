@@ -241,12 +241,67 @@ def test_artifact_naming():
           must_raise=False)
 
 
+# ---------------------------------------------------------------------------------------------
+# 5. A consumer must never pool across ensemble members.
+# ---------------------------------------------------------------------------------------------
+def test_no_member_pooling():
+    """The trap, planted. Verified 2026-07-30: the producer writes
+    `deepshap_atg_atg2000_stop500_seed200_run1.npz` and 06_export_deepshap_tsv.py:333 builds
+    `file_tag = f"{tag}{run_suffix}"` -- no member component -- so it seeks
+    `deepshap_atg_atg2000_stop500_run1.npz` and errors, naming both paths. Loud, and correct.
+
+    The one-line repair that would destroy the design is to loosen the glob to `{tag}*_run*` so it
+    "just finds the files". It would match all five members, pool them into one mean, and the
+    quantity collapsed is the BETWEEN-MEMBER spread -- the training-variability estimate. No error,
+    no warning, a plausible number with the signal averaged out. The real repair is --member-seed
+    on the consumer, mirroring the producer.
+    """
+    from utils import assert_one_member, member_tag, run_suffix
+
+    print("\n=== 5. consumers must not pool across members ===")
+    TAG = "atg1000_stop1000"
+
+    def names(members, runs):
+        return [f"deepshap_summary_{member_tag(TAG, m)}_atg-stop{run_suffix(r)}.tsv"
+                for m in members for r in runs]
+
+    def loosened_glob_is_rejected():
+        # Exactly what `{tag}*_atg-stop_run*.tsv` would return in a five-member directory.
+        assert_one_member(names((100, 200, 300, 400, 500), (1,)), "planted loose glob")
+    check("a glob spanning five members", loosened_glob_is_rejected)
+
+    def two_members_is_already_too_many():
+        assert_one_member(names((100, 200), (1, 2, 3, 4, 5)), "planted two-member glob")
+    check("a glob spanning two members", two_members_is_already_too_many)
+
+    def correct_glob_accepted():
+        # One member, five replicates -- the shape the design wants, and it must NOT fire.
+        assert_one_member(names((200,), (1, 2, 3, 4, 5)), "one member, five replicates")
+    check("one member across five replicates", correct_glob_accepted, must_raise=False)
+
+    def legacy_unseeded_accepted():
+        # Pre-ensemble artifacts carry no _seed component at all; the guard must not fire on the
+        # published files or every deposited tree becomes unreadable.
+        assert_one_member([f"deepshap_summary_atg500_stop500_joint_run{r}.tsv" for r in range(1, 6)],
+                          "legacy published files")
+    check("legacy un-seeded published files", legacy_unseeded_accepted, must_raise=False)
+
+    def legacy_mixed_with_seeded_is_rejected():
+        # A directory holding BOTH vintages is the hybrid that C44 and the 2026-07-28 checkpoint
+        # mix-up both came from. It must not average.
+        assert_one_member(["deepshap_summary_atg1000_stop1000_atg-stop_run1.tsv",
+                           "deepshap_summary_atg1000_stop1000_seed200_atg-stop_run1.tsv"],
+                          "planted mixed vintage")
+    check("a legacy file mixed in with a seeded one", legacy_mixed_with_seeded_is_rejected)
+
+
 if __name__ == "__main__":
     print("planted-defect tests -- a guard that does not reject its defect is not a guard")
     test_alignment()
     test_replicates()
     test_split_gate()
     test_artifact_naming()
+    test_no_member_pooling()
     print("\n" + ("=" * 70))
     if FAILURES:
         print(f"FAIL — {len(FAILURES)} guard(s) did not behave: {FAILURES}")

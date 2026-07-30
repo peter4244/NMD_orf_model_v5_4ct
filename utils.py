@@ -4,6 +4,7 @@ utils.py — Shared utilities for NMD ORF model v5: dataset, metrics, config loa
 
 import json
 import random
+import re
 from pathlib import Path
 
 import h5py
@@ -123,6 +124,43 @@ def run_suffix(run_id=None):
     resolves and no existing consumer has to learn anything. Same contract as member_tag(tag, None).
     """
     return "" if run_id is None else f"_run{run_id}"
+
+
+def members_in(paths):
+    """The set of ensemble members a file list spans, read back out of the names member_tag wrote."""
+    seeds = set()
+    for p in paths:
+        m = re.search(r"_seed(\d+)", Path(p).name)
+        seeds.add(int(m.group(1)) if m else None)
+    return seeds
+
+
+def assert_one_member(paths, where):
+    """Refuse a file set that spans more than one ensemble member. THE TRAP THIS EXISTS FOR:
+
+    The producers learned about members (member_tag) and the consumers did not -- 06's
+    `deepshap_summary_{tag}_{mode}_run*.tsv` does not match `{tag}_seed200_{mode}_run*.tsv`, so a
+    member-tagged run makes the consumer fail LOUDLY, naming both paths. That is correct behaviour
+    and nothing has been corrupted by it.
+
+    The obvious repair is to loosen the glob to `{tag}*_{mode}_run*.tsv` so it "just finds the
+    files". THAT IS THE DISASTER. It matches all five members, they get pooled into one mean, and
+    the collapsed quantity is precisely the BETWEEN-MEMBER spread -- the training-variability
+    estimate the whole two-variance design exists to produce. It would not error, would not warn,
+    and would return a plausible number with the signal averaged out of it. Every other failure in
+    this repo's history that cost a retraction had exactly that profile.
+
+    So the repair is: give the consumer a --member-seed and build its path through member_tag,
+    mirroring the producer. This guard sits at the glob site so that loosening it stops being a
+    one-line edit that nobody reviews.
+    """
+    seeds = members_in(paths)
+    if len(seeds) > 1:
+        raise ValueError(
+            f"{where}: matched files spanning {len(seeds)} ensemble members {sorted(seeds, key=str)}. "
+            f"Pooling them would average away the between-member spread, which IS the training-"
+            f"variability estimate. Pass --member-seed and match one member. Files: "
+            f"{[Path(p).name for p in list(paths)[:4]]}")
 
 
 def resolve_checkpoint(results_dir, tag, seed=None):
