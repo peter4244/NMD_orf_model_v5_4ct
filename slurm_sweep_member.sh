@@ -1,7 +1,23 @@
 #!/bin/bash
 #SBATCH --partition=sharing
 #SBATCH --time=00:50:00
-#SBATCH --mem=16G
+#SBATCH --mem=40G
+#
+# MEMORY IS SET FOR THE WORST CELL, NOT THE AVERAGE (fixed 2026-07-29 after 3 OOM kills).
+# I had cut this to 16G from a 7.86 GB measurement -- taken on atg500_stop500, one cell of a
+# grid whose memory spans 20x. utils.py loads a whole split into RAM as float32, so the windows
+# alone are 26,887 x 5 ORFs x 9 channels x W x 4 bytes, twice (ATG and stop):
+#
+#     ~4.84 GB per 1000 positions of window
+#     atg500_stop500   ~9.7 GB    fits 16G
+#     atg500_stop1000  ~14.5 GB   marginal
+#     atg100_stop2000  ~20.4 GB   EXCEEDS 16G  <- killed, exit 0:9
+#     atg1000_stop2000 ~14.5 GB train + val    <- worst case ~17-20 GB
+#
+# Jobs 8827523/8827525/8827526 died with SIGKILL mid-training on c3182, all large-window cells,
+# while the SAME configs had succeeded earlier under the previous 32G request. 40G covers the
+# worst cell with headroom; the cost of over-requesting on shared nodes is slower placement,
+# and the cost of under-requesting is a dead job with no partial output.
 #SBATCH --cpus-per-task=8
 #
 # MOVED OFF `short` TO `sharing`, 2026-07-29, measured not guessed. `short` is in bad shape --
