@@ -26,6 +26,24 @@ set -euo pipefail
 cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
 export PYTHONUNBUFFERED=1
+
+# DETERMINISM OFF, AND THIS IS CORRECT RATHER THAN A WORKAROUND.
+#
+# utils.set_seed enables torch.use_deterministic_algorithms(True), and shap's DeepLIFT routes
+# MaxPool gradients through max_unpool1d, which has no deterministic implementation -- so DeepSHAP
+# raises RuntimeError on any configuration whose window exceeds 100 (mid_pool = MaxPool1d(4)),
+# which is every configuration in this plan. Jobs 8837837/8837838 died exactly there.
+#
+# Why disabling it is legitimate HERE and not elsewhere: these quantities are reported as a mean
+# and spread over replicates that deliberately vary the background sample, so the replicate spread
+# IS the uncertainty statement. A single-draw metric like AUC has nothing to average over and needs
+# bitwise reproducibility -- which is why 03_train.py and evaluate.py must never see this flag.
+# utils.set_seed prints that the run is not canonical when it is set.
+#
+# The existing deepshap wrappers (joint_dn, atgstop_dn, all_dn) already set this; the non-dn joint
+# wrapper does not. That non-uniformity was noted in the 2026-07-30 review and this wrapper was
+# then written without the flag anyway.
+export NMD_ALLOW_NONDETERMINISM=1
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 export MKL_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 
