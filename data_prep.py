@@ -585,6 +585,41 @@ def build_dataset(results_dir, n_workers=8):
     # Use tx_summary order, filtered to master list
     tx_ids = tx_summary["isoform_id"].values
     tx_ids = np.array([tid for tid in tx_ids if tid in master_ids])
+
+    # READ-THROUGH LOCI ARE EXCLUDED ENTIRELY (2026-07-29, Pete's call).
+    #
+    # 233 gene_ids in ref_cds_features are composites of the form ENSGa.v::ENSGb.v -- two
+    # adjacent genes transcribed as one unit. They are not one gene, so EVERY gene-level
+    # operation on them is ill-defined: the split is assigned per gene (below), the paralog
+    # leakage screen keys on gene, and 05u_paralog_annotation.R strips only the TRAILING
+    # version before querying Ensembl, so a composite becomes a mangled string that matches
+    # nothing and the locus is invisible to the paralog search.
+    #
+    # That last part had a measured consequence, which is why removal beats patching the
+    # parser: two chr2 validation genes (ENSG00000144118.15, ENSG00000138069.19) have a
+    # >=80%-identity paralog whose ONLY presence in this universe is inside a composite locus,
+    # so the screen never flagged them -- real leakage, one into train and one into test.
+    # Patching the ID parsing would flag them. Removing the composites deletes the twin
+    # sequence instead, so the leakage does not exist to be flagged. Two more on the holdout
+    # side, which is why test_paralog will not stay at 122.
+    #
+    # Cost is 278 transcripts on 233 loci, 0.66% of 42,063. Cheap for removing a whole class
+    # of gene-level ambiguity rather than one of its symptoms.
+    _gene_of = dict(zip(ref_features["isoform_id"], ref_features["gene_id"])) \
+        if "gene_id" in ref_features.columns else {}
+    _readthrough = np.array([("::" in str(_gene_of.get(tid, ""))) for tid in tx_ids])
+    if _readthrough.any():
+        _loci = {_gene_of[t] for t, f in zip(tx_ids, _readthrough) if f}
+        print(f"\nExcluding read-through loci: {_readthrough.sum():,} transcripts "
+              f"on {len(_loci):,} composite gene ids "
+              f"({100 * _readthrough.sum() / len(tx_ids):.2f}% of {len(tx_ids):,})")
+        tx_ids = tx_ids[~_readthrough]
+    else:
+        # Loud rather than silent: if the pattern stops matching, the exclusion has silently
+        # become a no-op and the ambiguity is back without anything saying so.
+        print("\nWARNING: no read-through (::) gene ids found. Expected ~233 -- has the "
+              "gene_id format changed? The exclusion is doing nothing.")
+
     n_tx = len(tx_ids)
     tx_id_to_idx = {tid: i for i, tid in enumerate(tx_ids)}
     print(f"\nMaster transcript list: {n_tx:,} isoforms")
