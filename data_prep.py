@@ -108,7 +108,7 @@ def compute_rolling_gc(seq_uint8, window=GC_ROLLING_WINDOW):
 
 
 def encode_window_v5(seq_uint8, junctions_set, center, half_win,
-                     orf_start_0based, rolling_gc):
+                     orf_start_0based, rolling_gc, limit_lo=None, limit_hi=None):
     """
     v5 9-channel window encoding (vectorized).
 
@@ -117,6 +117,12 @@ def encode_window_v5(seq_uint8, junctions_set, center, half_win,
       4:   exon-exon junction positions
       5:   rolling GC fraction (continuous, ~50bp sliding window)
       6-8: reading frame one-hot — codon position (0/1/2) relative to this ORF's ATG
+
+    limit_lo / limit_hi bound the region that may be FILLED, without moving the window frame.
+    Used to stop the ATG and stop windows crossing the ORF midpoint -- see
+    encode_transcript_orfs. The anchor stays at array index half_win either way, so a clipped
+    window is zero-padded on its inward side rather than shifted; positional channels keep
+    meaning the same thing across ORFs of every length.
 
     Returns (9, win_size) float16 array.
     """
@@ -130,6 +136,12 @@ def encode_window_v5(seq_uint8, junctions_set, center, half_win,
     # Determine valid range within sequence
     w_start = max(0, start)
     w_end = min(seq_len, end)
+    # Never fill past the inward boundary. Applied to the VALID RANGE, not to `start`, so the
+    # array offset below and the anchor's index are unchanged.
+    if limit_lo is not None:
+        w_start = max(w_start, limit_lo)
+    if limit_hi is not None:
+        w_end = min(w_end, limit_hi)
     if w_start >= w_end:
         return encoded
 
@@ -200,14 +212,39 @@ def encode_transcript_orfs(args):
             stop_pos = stop_centers[k]
             orf_s = orf_starts[k]
 
+            # THE TWO WINDOWS MAY NOT CROSS THE ORF MIDPOINT (2026-07-29, Pete).
+            #
+            # Both windows are CENTRED on their anchor and span win_size, so they overlap
+            # whenever the ORF is shorter than the window -- by (win_size - orf_length)
+            # positions. ORFik is called with minimumLength=9 and longestORF=FALSE, so ORFs
+            # reach ~30 nt; at win_size=500 such an ORF has ~94% of each window in common, and
+            # at win_size=2000 the majority of ORFs overlap at all.
+            #
+            # That is not merely redundant input. The published branch decomposition
+            # (60.7% structural / 28.8% stop / 10.5% ATG) treats the ATG branch and the stop
+            # branch as two independent Shapley players. When they read the same bases, "how
+            # much did the stop window contribute rather than the ATG window" has no clean
+            # answer -- the attribution is split between inputs that are partly the same input.
+            # It also means window SIZE changes how confounded that decomposition is, which no
+            # selection criterion currently accounts for.
+            #
+            # The midpoint between the two anchors is the only boundary that guarantees
+            # disjointness. Note this is the ORF's midpoint, not the transcript's: an ORF near
+            # either end of the transcript would still overlap if clipped at the transcript's
+            # centre.
+            #
+            # Applied UNCONDITIONALLY, which is safe because it is inert for long ORFs: if
+            # stop - atg >= win_size then mid >= atg + half_win, i.e. at or beyond the ATG
+            # window's own end, so the bound never binds. No branch, no special case.
+            mid = (atg_pos + stop_pos) // 2 if (atg_pos >= 0 and stop_pos >= 0) else None
             if atg_pos >= 0:
                 atg_wins[k] = encode_window_v5(
                     seq_uint8, junctions, atg_pos, half_win,
-                    orf_s, rolling_gc)
+                    orf_s, rolling_gc, limit_hi=mid)
             if stop_pos >= 0:
                 stop_wins[k] = encode_window_v5(
                     seq_uint8, junctions, stop_pos, half_win,
-                    orf_s, rolling_gc)
+                    orf_s, rolling_gc, limit_lo=mid)
 
         result[win_size] = (atg_wins, stop_wins)
 
