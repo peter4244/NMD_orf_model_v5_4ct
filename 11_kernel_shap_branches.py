@@ -27,8 +27,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from model import build_model
-from utils import (NMDDataset, load_config, member_tag, resolve_checkpoint, selected_tag,
-                   set_seed)
+from utils import (NMDDataset, load_config, member_tag, resolve_checkpoint, run_suffix,
+                   selected_tag, set_seed)
 
 
 def extract_sub_embeddings(model, dataset, indices, device, batch_size=256):
@@ -263,6 +263,17 @@ def main():
                              "(train+val+test+paralog, full cohort), 'test_all', 'train', 'val'. "
                              "Background is always drawn from train.")
     parser.add_argument("--member-seed", type=int, default=None, help="Ensemble member to load, by training seed. Omitted = the legacy un-seeded checkpoint. Never silently guesses a member; see utils.resolve_checkpoint.")
+    # DISTINCT FROM --seed AND FROM --member-seed, deliberately, and this file is where the three
+    # axes finally become separable:
+    #   --seed         this run's sampling RNG          (held FIXED across everything)
+    #   --member-seed  which trained checkpoint         -> between-member / TRAINING variance
+    #   --run-id       which background draw            -> within-member / INTERPRETATION variance
+    # Same split of responsibilities deepshap.py already carries. Omitted reproduces the previous
+    # single-draw behaviour exactly -- see the bg RNG below and utils.run_suffix.
+    parser.add_argument("--run-id", type=int, default=None,
+                        help="Attribution replicate id. Varies the BACKGROUND draw only; the "
+                             "checkpoint and the explained set are untouched. Omitted = one "
+                             "unreplicated draw, byte-identical to the pre-2026-07-30 behaviour.")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -300,10 +311,19 @@ def main():
                             for x in f['isoform_id'][:]])
     test_ids = all_ids[test_ds.indices]
 
-    # Select background
-    rng = np.random.RandomState(args.seed)
-    bg_idx = rng.choice(len(train_ds), size=min(args.n_background, len(train_ds)),
-                        replace=False)
+    # Select background.
+    #
+    # THE REPLICATE AXIS, ADDED 2026-07-30. This is the only stochastic step in the whole script:
+    # the explained set is the WHOLE split (np.arange below, not a subsample), so unlike
+    # deepshap.py there is no explained-subset RNG to keep separate and --seed needs no second
+    # RandomState. Varying the background is therefore a clean interpretation-variance knob.
+    #
+    # `+ 1000 * run_id` matches deepshap.py:275 rather than inventing a second scheme, and
+    # run_id=None gives RandomState(args.seed) -- the exact draw every existing artifact was
+    # computed from, so nothing already deposited becomes unreproducible.
+    bg_rng = np.random.RandomState(args.seed + 1000 * (args.run_id or 0))
+    bg_idx = bg_rng.choice(len(train_ds), size=min(args.n_background, len(train_ds)),
+                           replace=False)
 
     # Pre-compute embeddings
     print("\nPre-computing test embeddings ...")
@@ -395,7 +415,13 @@ def main():
     # and the output name did not say which. member_tag(tag, None) == tag, so existing runs are
     # unaffected. The explain-split suffix was already handled just above -- this file was half
     # self-documenting and is now consistent.
-    out_path = results_dir / f"kernel_shap_branch_{member_tag(args.tag, args.member_seed)}{suffix}.tsv"
+    # THE REPLICATE SLOT (2026-07-30). The member was in the name and the replicate was not, so
+    # five background draws on one member wrote one file five times -- member_tag's own collision,
+    # one axis over, in the producer of four section-5 claims. utils.run_suffix is the rule;
+    # run_suffix(None) == "" keeps every deposited filename byte-identical. test_guards.py §4.
+    out_path = (results_dir /
+                f"kernel_shap_branch_{member_tag(args.tag, args.member_seed)}"
+                f"{suffix}{run_suffix(args.run_id)}.tsv")
     df.to_csv(out_path, sep="\t", index=False)
     print(f"\n-> {out_path} ({len(df)} rows)")
     print("Done.")

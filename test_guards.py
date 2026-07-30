@@ -171,11 +171,82 @@ def test_split_gate():
         check(f"every FULL_COHORT split is gated: {s}", lambda s=s: enforce_split_gate(p, A(s)))
 
 
+# ---------------------------------------------------------------------------------------------
+# 4. Artifact names must carry BOTH axes: the member and the replicate.
+# ---------------------------------------------------------------------------------------------
+def test_artifact_naming():
+    """The collision member_tag was written to prevent, one axis over.
+
+    11_kernel_shap_branches.py put the member in its output name and left NO slot for the
+    background replicate -- and had no --run-id at all. Five replicates on one member therefore
+    wrote one file five times, non-atomically. That is exactly the shape utils.member_tag's
+    docstring describes for checkpoints: the replicate spread that is supposed to be the
+    INTERPRETATION variance would be measured over one surviving file.
+
+    Panel C is the cheapest producer in section 5 and answers four of the eight model claims, so
+    this is the one place the collision costs the most.
+    """
+    from utils import member_tag, run_suffix
+
+    print("\n=== 4. artifact naming carries member AND replicate ===")
+
+    def name(tag, member_seed, run_id, split="all"):
+        suffix = "" if split == "test" else f"_{split}"
+        return f"kernel_shap_branch_{member_tag(tag, member_seed)}{suffix}{run_suffix(run_id)}.tsv"
+
+    MEMBERS = (100, 200, 300, 400, 500)
+    RUNS = (1, 2, 3, 4, 5)
+
+    def grid_is_distinct():
+        names = [name("atg1000_stop1000", m, r) for m in MEMBERS for r in RUNS]
+        if len(set(names)) != len(names):
+            dup = {n for n in names if names.count(n) > 1}
+            raise ValueError(f"{len(names) - len(set(names))} collisions, e.g. {sorted(dup)[:2]}")
+    check("25 member x replicate names are all distinct", grid_is_distinct, must_raise=False)
+
+    def old_rule_collides():
+        # What the code did before: member in the name, replicate nowhere.
+        names = [f"kernel_shap_branch_{member_tag('atg1000_stop1000', m)}_all.tsv"
+                 for m in MEMBERS for _ in RUNS]
+        if len(set(names)) != len(names):
+            raise ValueError("collision")
+    check("the OLD rule (no replicate slot) is detected as colliding", old_rule_collides)
+
+    def member_axis_still_separates():
+        # Guard against a fix that adds the replicate and drops the member.
+        names = [name("atg1000_stop1000", m, 1) for m in MEMBERS]
+        if len(set(names)) != len(names):
+            raise ValueError("members collide")
+    check("members remain distinct at a fixed replicate", member_axis_still_separates,
+          must_raise=False)
+
+    def legacy_name_unchanged():
+        # BACKWARD COMPATIBILITY IS PART OF THE RULE, not a courtesy: run_id=None must reproduce
+        # the published filename byte for byte, or every deposited artifact is orphaned and every
+        # consumer's glob stops matching. Same reasoning as member_tag(tag, None) == tag.
+        if name("atg500_stop500", None, None, split="test") != "kernel_shap_branch_atg500_stop500.tsv":
+            raise ValueError("legacy name changed")
+        if name("atg500_stop500", None, None) != "kernel_shap_branch_atg500_stop500_all.tsv":
+            raise ValueError("legacy full-cohort name changed")
+    check("run_id=None reproduces the published filename exactly", legacy_name_unchanged,
+          must_raise=False)
+
+    def suffix_matches_deepshap():
+        # One rule, not two. 06_export_deepshap_tsv.py parses `_run{N}` out of the stem
+        # (`f.stem.split("_run")[-1]`), so a second spelling here would be a second rule that
+        # silently stops being parsed.
+        if run_suffix(3) != "_run3" or run_suffix(None) != "":
+            raise ValueError("suffix spelling diverged from deepshap's")
+    check("replicate suffix is spelled the same as deepshap's", suffix_matches_deepshap,
+          must_raise=False)
+
+
 if __name__ == "__main__":
     print("planted-defect tests -- a guard that does not reject its defect is not a guard")
     test_alignment()
     test_replicates()
     test_split_gate()
+    test_artifact_naming()
     print("\n" + ("=" * 70))
     if FAILURES:
         print(f"FAIL — {len(FAILURES)} guard(s) did not behave: {FAILURES}")

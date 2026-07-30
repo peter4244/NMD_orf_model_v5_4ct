@@ -20,6 +20,7 @@ import torch.nn as nn
 from model import NMDOrfModel, build_model
 from evaluate import enforce_split_gate
 from utils import (NMDDataset, load_config, member_tag, resolve_checkpoint,
+                   run_suffix as _run_suffix,
                    set_seed)
 
 
@@ -204,7 +205,10 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     #
     # The MEMBER stays in the name: members share a directory, so they genuinely can collide.
     otag = member_tag(tag, member_seed)
-    run_suffix = f"_run{run_id}" if run_id is not None else ""
+    # ONE RULE, ONE PLACE (2026-07-30). This spelling is now utils.run_suffix, because
+    # 11_kernel_shap_branches.py needed the same slot and utils.member_tag:88-92 already
+    # records what happens to a naming rule restated at every call site. Output unchanged.
+    run_suffix = _run_suffix(run_id)
     # W52. The SUMMARY filename must carry the decomposition, exactly as the npz already does
     # at :305 -- deepshap_{branch}_{tag}... Without it, `deepshap_summary_{tag}_run1.tsv` means
     # whichever --branches ran last: an atg+stop run overwrote the joint summaries in

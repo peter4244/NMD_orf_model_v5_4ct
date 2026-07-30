@@ -99,6 +99,32 @@ def member_tag(tag, seed=None):
     return tag if seed is None else f"{tag}_seed{seed}"
 
 
+def run_suffix(run_id=None):
+    """Filename slot for ONE attribution replicate. The sibling of member_tag, and the same rule.
+
+    WHY THIS EXISTS (2026-07-30). member_tag closed the MEMBER collision; the REPLICATE collision
+    was left open one axis over. 11_kernel_shap_branches.py wrote
+    `kernel_shap_branch_{member_tag(tag, member_seed)}{split}.tsv` and had no --run-id at all, so
+    five background replicates on one member wrote one file, five times, non-atomically. The
+    interpretation-variance component -- the whole reason replicates are run -- would have been
+    measured over one surviving file, and it would have looked like a result.
+
+    The two axes are NOT interchangeable and the spelling matters:
+
+      member  (--member-seed)  which trained checkpoint  -> between-member / TRAINING variance
+      run     (--run-id)       which background draw     -> within-member / INTERPRETATION variance
+
+    Spelled `_run{N}` because deepshap.py already writes that and 06_export_deepshap_tsv.py
+    already parses it back out (`f.stem.split("_run")[-1]`). A second spelling would be a second
+    rule, and the consumer's glob would quietly stop matching -- which is how W52's mode suffix
+    turned `if not run_files: return` into a silent skip of five claims.
+
+    run_id=None reproduces the pre-replicate name byte for byte, so every deposited artifact still
+    resolves and no existing consumer has to learn anything. Same contract as member_tag(tag, None).
+    """
+    return "" if run_id is None else f"_run{run_id}"
+
+
 def resolve_checkpoint(results_dir, tag, seed=None):
     """Locate ONE member's checkpoint, and refuse to guess which member.
 
