@@ -413,7 +413,7 @@ If the upstream repo moves, regenerate these files in the upstream tree and re-l
 
 ### What is NOT in the model
 
-The following are present in `selected_orfs.tsv` (and used by `04_interpret_attention.py` for downstream ORF-level analyses) but **do not enter** `NMDOrfModel`: `orf_length`, `frac_position` (different from `frac_start`), `frac_tx_covered`, `kozak_score`, `n_upstream_atgs`, `has_downstream_ejc`. The transcript-level `ref_*` and `td2_*` blocks (8 + 8 + 1 indicator) described in pre-v5 docs were removed in v5 (`model.py:219` "v5: no tx_features input"; `data_prep.py:919` "v5: no tx_features dataset"; `utils.py:143` "No tx_features (removed in v5)").
+The following are present in `selected_orfs.tsv` (and used by `04_interpret_attention.py` for downstream ORF-level analyses) but **do not enter** `NMDOrfModel`: `orf_length`, `frac_position` (different from `frac_start`), `frac_tx_covered`, `kozak_score`, `n_upstream_atgs`, `has_downstream_ejc`. The transcript-level `ref_*` and `td2_*` blocks (8 + 8 + 1 indicator) described in pre-v5 docs were removed in v5 (`model.py:219` "v5: no tx_features input"; `data_prep.py:932` "v5: no tx_features dataset"; `utils.py:143` "No tx_features (removed in v5)").
 
 ### Relationship to the prior structural elastic net
 

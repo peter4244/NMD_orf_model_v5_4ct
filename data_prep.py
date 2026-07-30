@@ -683,11 +683,24 @@ def build_dataset(results_dir, n_workers=8):
     # >=80%-identity paralog whose ONLY presence in this universe is inside a composite locus,
     # so the screen never flagged them -- real leakage, one into train and one into test.
     # Patching the ID parsing would flag them. Removing the composites deletes the twin
-    # sequence instead, so the leakage does not exist to be flagged. Two more on the holdout
-    # side, which is why test_paralog will not stay at 122.
+    # sequence instead, so the leakage does not exist to be flagged.
     #
-    # Cost is 278 transcripts on 233 loci, 0.66% of 42,063. Cheap for removing a whole class
-    # of gene-level ambiguity rather than one of its symptoms.
+    # THE PARALOG SPLIT COUNTS DO NOT MOVE, and an earlier version of this comment said they
+    # would ("Two more on the holdout side, which is why test_paralog will not stay at 122").
+    # That cannot happen, and the reason is the same defect that motivated the exclusion: a
+    # composite id is `ENSGa.v::ENSGb.v`, which never equals a plain `ENSG` in paralog_genes,
+    # so a composite-locus transcript was NEVER in test_paralog to begin with. Excluding it can
+    # only shrink train/val/test. Measured on the 2026-07-30 tables before this ran: of the 278
+    # excluded transcripts, 176 are train-side, 77 holdout-side and 25 val-side, and ZERO have a
+    # gene in either paralog list -- test_paralog stays 122 and val_paralog stays 56.
+    #
+    # So the leakage is removed by deleting the twin SEQUENCE, not by reassigning a split. Do not
+    # read an unchanged test_paralog as evidence the exclusion failed; unchanged is correct.
+    #
+    # Cost is 278 transcripts on 233 loci. Against the 42,043-row deposit-native scaffold that is
+    # 0.66%; the published tree's 39,938 would give 0.70%, and the two are different populations
+    # (see METHODS "Isoform universe"). Cheap for removing a whole class of gene-level ambiguity
+    # rather than one of its symptoms.
     _gene_of = dict(zip(ref_features["isoform_id"], ref_features["gene_id"])) \
         if "gene_id" in ref_features.columns else {}
     # COUNT THE TRANSCRIPTS THAT HAVE NO GENE (2026-07-30). `_gene_of.get(tid, "")` defaults to

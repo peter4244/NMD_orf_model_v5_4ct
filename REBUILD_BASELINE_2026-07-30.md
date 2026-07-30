@@ -45,9 +45,12 @@ below is an exact number rather than a range. Reproduce with the snippet in §5.
 | `Master transcript list: N isoforms` | **41,765**, exactly (42,043 − 278) |
 | `Excluding read-through loci:` | **278** transcripts on **233** composite gene ids, **0.66%** |
 | `gene_id present for all N transcripts` | **yes** — measured 0 of 42,043 missing, so the counter must report the all-present line |
-| `test_paralog` | **below 122** — two of its genes were read-through loci. Claim 5.6.4 rests on 122, so a move is a **finding needing a ledger row**, not a threshold quietly satisfied (Track A, W129) |
-| `val_paralog` | **> 0**; expected near 56 isoforms from 19 val-side genes |
-| `train + val + val_paralog + test + test_paralog` | **= N** (asserted in code as of `420a264`; raises otherwise) |
+| `train` | **26,711** |
+| `val` | **4,356** |
+| `val_paralog` | **56** — UNCHANGED, see below |
+| `test` | **10,520** |
+| `test_paralog` | **122** — UNCHANGED, see below |
+| `train + val + val_paralog + test + test_paralog` | **= 41,765** (asserted in code as of `420a264`; raises otherwise) |
 | NMD fraction | ~22% overall and in each split |
 | `label provenance:` line | must appear: **42,043 rows, NMD=9,425**, `export_rds.R` @ 2026-07-30T01:57:47, scan mtime 2026-07-30T01:56:14 |
 | NMD count after exclusion | **≤ 9,425**; the fresh scaffold is 9,425 / 32,618 = 22.4% NMD |
@@ -57,8 +60,37 @@ below is an exact number rather than a range. Reproduce with the snippet in §5.
 The strongest of these is `N = 42,043 − k`, because it is verified **inside the log** rather than
 against anyone's recollection. The read-through count is printed two lines above the master total.
 
-**Stop if:** `test_paralog` goes **up**, `val_paralog` comes back **0**, the master total does not
-equal 42,043 − k, or the label-provenance line is missing.
+### The paralog stop condition was BACKWARDS, and this corrects it
+
+The Track B handoff says *"`test_paralog` moves off 122 — lower, because two of its genes were
+read-through loci"*, `data_prep.py` carried the same claim in a comment, and an earlier version of
+**this file** said "below 122". All three are wrong, and the reason is the very defect the exclusion
+was introduced to remove.
+
+A composite gene id is `ENSGa.v::ENSGb.v`. It never equals a plain `ENSG` in `paralog_genes.tsv`,
+so a composite-locus transcript was **never in `test_paralog` to begin with** — that invisibility is
+the bug. Excluding it can therefore only shrink `train`/`val`/`test`. Measured on the fresh tables,
+before the rebuild ran:
+
+| | pre-exclusion | post-exclusion | delta |
+|---|---|---|---|
+| train | 26,887 | **26,711** | −176 |
+| val | 4,381 | **4,356** | −25 |
+| val_paralog | 56 | **56** | **0** |
+| test | 10,597 | **10,520** | −77 |
+| test_paralog | 122 | **122** | **0** |
+| total | 42,043 | **41,765** | −278 |
+
+Of the 278 excluded transcripts, **zero** have a gene in either paralog list. The leakage is removed
+by deleting the twin **sequence**, not by reassigning a split — which is exactly what METHODS
+"Isoform universe" says, and METHODS was right while the handoff and the code comment were not.
+
+**So do not read an unchanged `test_paralog` as evidence the exclusion failed.** Unchanged is
+correct, and 122 is also what claim 5.6.4 rests on, so it staying put is convenient rather than
+suspicious. `data_prep.py`'s comment is corrected.
+
+**Stop if:** any of the five split counts differs from the table above, the master total is not
+41,765, the read-through line is not 278 / 233, or the label-provenance line is missing.
 
 ## 2. The three universes
 

@@ -16,7 +16,7 @@ METHODS.md	data_prep.py:51	data_prep.py	# n_downstream_ejc included because junc
 METHODS.md	data_prep.py:52	data_prep.py	ORF_FEATURE_COLS = [
 METHODS.md	data_prep.py:593	data_prep.py	def orf_coverage_diagnostics(orf_df, tx_summary, max_k=MAX_ORFS):
 METHODS.md	data_prep.py:87	data_prep.py	def compute_rolling_gc(seq_uint8, window=GC_ROLLING_WINDOW):
-METHODS.md	data_prep.py:919	data_prep.py	# v5: no tx_features dataset
+METHODS.md	data_prep.py:932	data_prep.py	# v5: no tx_features dataset
 METHODS.md	deepshap.py:105	deepshap.py	class JointBranchWrapper(nn.Module):
 METHODS.md	deepshap.py:189	deepshap.py	mode_suffix = f"_{_mode}"
 METHODS.md	deepshap.py:24	deepshap.py	class BranchWrapper(nn.Module):
