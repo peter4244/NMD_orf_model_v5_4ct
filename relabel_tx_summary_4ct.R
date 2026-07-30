@@ -1,10 +1,13 @@
 #!/usr/bin/env Rscript
 #
-# Relabel tx_summary.tsv using new 4-cell-type mashr results (AT, DD, FB, MV).
+# Build tx_summary.tsv from tx_summary_prelabel.tsv using 4-cell-type mashr (AT, DD, FB, MV).
 #
 # - NMD = union of nmd_responsive == TRUE across 4 cell types
-# - non-NMD = intersection of adj.P.Val > 0.50 across 4 cell types
-# - Isoforms in neither set are dropped from tx_summary
+# - non-NMD = intersection of adj.P.Val > NON_NMD_ADJ_P across 4 cell types.
+#   THE THRESHOLD IS 0.30, not the 0.50 this header claimed until 2026-07-30; it was lowered
+#   for 4-CT mashr and the constant below has read 0.30 throughout. Header only, no behaviour.
+# - Isoforms in neither set are dropped
+# - Writes tx_summary_provenance.json alongside; data_prep.py requires it
 #
 
 # Repo root, from this script's own path -- so nothing depends on which machine it runs on.
@@ -98,10 +101,29 @@ cat(sprintf("  guard: all %d non-NMD isoforms satisfy lfsr >= 0.05 (documented d
             length(all_non_nmd)))
 
 # --- Update tx_summary ---
-tx <- read.delim(file.path(results_dir, "tx_summary_6ct.tsv"),
-                 stringsAsFactors = FALSE)
+# INPUT IS NOW tx_summary_prelabel.tsv, WRITTEN BY export_rds.R (2026-07-30, Pete's call).
+#
+# Supersedes an unstaged 2026-07-27 edit that repointed this from tx_summary_6ct.tsv to
+# tx_summary_4ct.tsv and attributed that file to export_rds.R. export_rds.R wrote neither name
+# -- it wrote tx_summary.tsv, the same path THIS script writes -- so the pipeline had two
+# writers on one filename and read a bootstrap input that nothing in the repo produced.
+#
+# Now: export_rds.R -> tx_summary_prelabel.tsv -> (this script) -> tx_summary.tsv. One writer
+# per file, and the repo regenerates its own inputs, which is what the deposit has to support.
+prelabel_path <- file.path(results_dir, "tx_summary_prelabel.tsv")
+if (!file.exists(prelabel_path)) {
+  stop(sprintf(paste0(
+    "%s not found.\n",
+    "  It is written by export_rds.R, which must run first -- see README 'Build order'.\n",
+    "  If you have a legacy tx_summary_6ct.tsv or tx_summary_4ct.tsv from before 2026-07-30,\n",
+    "  do NOT rename it into place: neither was produced by this repo and neither has a\n",
+    "  recorded row count, so its vintage is unknown. Re-run export_rds.R instead."),
+    prelabel_path))
+}
+tx <- read.delim(prelabel_path, stringsAsFactors = FALSE)
+nrow_in <- nrow(tx)
 cat(sprintf("\nOriginal tx_summary: %d rows (NMD=%d, non-NMD=%d)\n",
-            nrow(tx), sum(tx$is_nmd == 1), sum(tx$is_nmd == 0)))
+            nrow_in, sum(tx$is_nmd == 1), sum(tx$is_nmd == 0)))
 
 # Assign new labels
 tx$is_nmd_new <- NA_integer_
@@ -136,3 +158,28 @@ cat(sprintf("\nFinal tx_summary: %d rows (NMD=%d, non-NMD=%d)\n",
 out_path <- file.path(results_dir, "tx_summary.tsv")
 write.table(tx, out_path, sep = "\t", row.names = FALSE, quote = TRUE)
 cat(sprintf("\nWritten to %s\n", out_path))
+
+# PROVENANCE SIDECAR (2026-07-30). data_prep.py reads tx_summary.tsv and takes its `is_nmd`
+# column on faith -- there was no way for it to tell 4-CT labels from the scaffold's original
+# ones, and the two were one filename apart. This records what produced the labels, and
+# data_prep.py refuses to build an HDF5 unless it is present and its row count matches.
+#
+# A sidecar rather than a column: it survives being read by code that does not know about it,
+# and it carries the mashr vintage, which no column could.
+prov <- list(
+  written_by      = "relabel_tx_summary_4ct.R",
+  written_at      = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"),
+  input           = "tx_summary_prelabel.tsv",
+  n_rows_in       = nrow_in,
+  n_rows_out      = nrow(tx),
+  n_nmd           = sum(tx$is_nmd == 1),
+  n_non_nmd       = sum(tx$is_nmd == 0),
+  mashr_dir       = mashr_dir,
+  de_date         = de_date,
+  cell_types      = cts,
+  non_nmd_adj_p   = NON_NMD_ADJ_P
+)
+prov_path <- file.path(results_dir, "tx_summary_provenance.json")
+jsonlite::write_json(prov, prov_path, auto_unbox = TRUE, pretty = TRUE)
+cat(sprintf("Provenance to %s (%d rows, NMD=%d, non-NMD=%d, mashr %s)\n",
+            prov_path, prov$n_rows_out, prov$n_nmd, prov$n_non_nmd, de_date))

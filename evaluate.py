@@ -8,7 +8,24 @@ no default), extracts attention weights, saves predictions and metrics.
 --split is mandatory and test splits additionally require --final, because this script used
 to hardcode split="test_clean": every metrics_{tag}.json in existence is therefore a test-set
 score, including the twelve that selected the published window configuration. Model selection
-belongs on train/val; --final marks the one evaluation that is allowed to touch chr1,3,5,7.
+belongs on train/val.
+
+TWO splits reach chr1/3/5/7 and each needs its own affirmation (the second added 2026-07-30):
+
+  --final        a test split: one shot, pre-registered, a genuine held-out estimate.
+  --full-cohort  --split all: EVERY isoform, train and test pooled. Legitimate for
+                 interpretation (attention, DeepSHAP, branch decomposition), never for
+                 performance. `all` previously required neither flag and could not even be
+                 marked final, so the held-out chromosomes could be scored without anyone
+                 typing "test".
+
+The affirmation propagates rather than staying at the command line:
+  * metrics JSON carries `evaluation_class` (development | final_test | full_cohort)
+  * a full-cohort run writes NO `auc`/`auprc` key -- they become `auc_mixed_in_sample` /
+    `auprc_mixed_in_sample`, so a consumer expecting `auc` raises instead of quoting an
+    in-sample number, the same way `n_test` already protects validation runs
+  * predictions_*.tsv carries a per-row `split` column, so a pooled file is self-describing
+    and the legitimate held-out metric is recoverable by filtering
 
 Outputs are named {tag}[_seed<N>]_{split}, so a selection sweep can never write a file that
 looks like a published test-set result.
@@ -30,6 +47,32 @@ from utils import (NMDDataset, compute_metrics, load_config, member_tag,
 
 
 FINAL_SPLITS = {"test", "test_clean", "test_all", "test_paralog"}
+
+# SPLITS THAT POOL TRAINING AND HELD-OUT DATA (2026-07-30).
+#
+# `all` maps to np.ones(...) in NMDDataset -- EVERY isoform, chr1/3/5/7 included. It was not in
+# FINAL_SPLITS, so it scored the held-out chromosomes with no --final, and the second gate below
+# made it impossible to even mark such a run as final. The --final docstring claimed "--final
+# marks the one evaluation that is allowed to touch chr1,3,5,7"; that was false while `all`
+# existed ungated.
+#
+# `all` is legitimate and stays: the interpretation analyses run over the full cohort by design
+# (attention, DeepSHAP, branch decomposition). What is NOT legitimate is a ranking metric computed
+# over it, because train and test are pooled -- so this asks for its own affirmation, and the
+# metrics it writes are named so they cannot be read as generalization performance.
+FULL_COHORT_SPLITS = {"all"}
+
+# Written into every metrics JSON so the population is carried BY THE FILE, not inferred from the
+# filename. `development` = train/val, safe for selection. `final_test` = held-out, one shot.
+# `full_cohort` = train and test pooled; interpretation only, never a performance number.
+EVAL_CLASS = {"final_test": FINAL_SPLITS, "full_cohort": FULL_COHORT_SPLITS}
+
+
+def eval_class_of(split):
+    for cls, members in EVAL_CLASS.items():
+        if split in members:
+            return cls
+    return "development"
 
 
 def evaluate(config_path="config.yaml", atg_window=None, stop_window=None,
@@ -95,12 +138,27 @@ def evaluate(config_path="config.yaml", atg_window=None, stop_window=None,
 
     # Metrics
     metrics = compute_metrics(labels, logits)
+    # THE SCOPE OF THE METRIC IS PART OF THE METRIC (2026-07-30). For a full-cohort split the
+    # score is computed over pooled train+test data, so it is not a generalization estimate and
+    # must not be readable as one. `auc`/`auprc` are therefore RENAMED rather than annotated:
+    # a consumer that expects `auc` raises KeyError instead of quoting an in-sample number --
+    # the same mechanism `n_test` already uses for validation runs.
+    ev_class = eval_class_of(split)
+    if ev_class == "full_cohort":
+        metrics["auc_mixed_in_sample"] = metrics.pop("auc")
+        metrics["auprc_mixed_in_sample"] = metrics.pop("auprc")
+        metrics["metric_scope"] = (
+            "POOLED train+val+test. In-sample for the training rows. NOT a generalization "
+            "estimate and NOT comparable to a test-split AUC. For a legitimate held-out "
+            "number, filter predictions_*.tsv to split == 'test' or re-run with "
+            "--split test_clean --final.")
     # THE SPLIT IS RECORDED IN THE FILE, not implied by the filename (2026-07-29). The
     # published metrics_{tag}.json files record `n_test` and no split name, which is what let
     # twelve test-set sweep scores be read later as if the choice had been made on validation
     # data. A number whose population is not written down next to it is the dominant defect
     # class in this manuscript.
     metrics["split"] = split
+    metrics["evaluation_class"] = ev_class
     metrics["n_eval"] = len(labels)
     # `n_test` is emitted ONLY for genuine test splits. Legacy consumers keep working on test
     # runs and raise KeyError on a val run -- which is correct: a validation score must not be
@@ -113,9 +171,14 @@ def evaluate(config_path="config.yaml", atg_window=None, stop_window=None,
     metrics["best_epoch"] = ckpt["epoch"]
     metrics["member_seed"] = member_seed
 
-    print(f"\n{split} results (n={len(labels):,}):")
-    print(f"  AUC:   {metrics['auc']:.4f}")
-    print(f"  AUPRC: {metrics['auprc']:.4f}")
+    print(f"\n{split} results (n={len(labels):,}), evaluation_class={ev_class}:")
+    if ev_class == "full_cohort":
+        print(f"  AUC (POOLED, in-sample):   {metrics['auc_mixed_in_sample']:.4f}")
+        print(f"  AUPRC (POOLED, in-sample): {metrics['auprc_mixed_in_sample']:.4f}")
+        print("  ^ train and test are pooled here. NOT a generalization estimate; do not quote.")
+    else:
+        print(f"  AUC:   {metrics['auc']:.4f}")
+        print(f"  AUPRC: {metrics['auprc']:.4f}")
 
     # Load isoform IDs for the test set
     import h5py
@@ -124,12 +187,21 @@ def evaluate(config_path="config.yaml", atg_window=None, stop_window=None,
                             for s in f["isoform_id"][:]])
         all_chrs = np.array([s.decode() if isinstance(s, bytes) else s
                              for s in f["chr"][:]])
+        # PER-ROW SPLIT LABEL (2026-07-30). A pooled `--split all` predictions file was previously
+        # indistinguishable, row by row, from a test-set one, so anyone recomputing an AUC from it
+        # got an in-sample number with nothing on the row saying so. Carrying the HDF5's own split
+        # label makes the file self-describing AND makes the legitimate held-out metric recoverable
+        # by filtering, instead of requiring a second evaluation run.
+        all_splits = np.array([s.decode() if isinstance(s, bytes) else s
+                               for s in f["split"][:]])
     test_ids = all_ids[test_ds.indices]
     test_chrs = all_chrs[test_ds.indices]
+    test_splits = all_splits[test_ds.indices]
 
     # Save predictions
     pred_df = pd.DataFrame({
         "isoform_id": test_ids,
+        "split": test_splits,
         "chr": test_chrs,
         "label": labels.astype(int),
         "logit": logits,
@@ -182,6 +254,11 @@ if __name__ == "__main__":
     parser.add_argument("--final", action="store_true",
                         help="Affirm that this is a final, pre-registered evaluation. Required "
                              "before any test split can be scored.")
+    parser.add_argument("--full-cohort", action="store_true",
+                        help="Affirm that this run pools training and held-out data for an "
+                             "INTERPRETATION analysis, not for performance. Required for "
+                             "--split all, and refused for anything else. The metrics file will "
+                             "carry no `auc`/`auprc` key, by design.")
     args = parser.parse_args()
 
     # THE TEST-SET GATE. Selecting a configuration on the test set is the leak D-row 4 exists
@@ -196,6 +273,20 @@ if __name__ == "__main__":
     if args.final and args.split not in FINAL_SPLITS:
         parser.error(f"--final given with --split {args.split}, which is not a test split. "
                      f"--final asserts a final evaluation; drop it, or name a test split.")
+
+    # THE FULL-COHORT GATE (2026-07-30). Symmetric with --final, and it exists because `all`
+    # walked straight past that gate: NMDDataset maps `all` to every isoform, chr1/3/5/7
+    # included, so the held-out chromosomes could be scored without anyone typing "test".
+    if args.split in FULL_COHORT_SPLITS and not args.full_cohort:
+        parser.error(
+            f"--split {args.split} POOLS training and held-out data (every isoform, chr1/3/5/7 "
+            f"included).\nAny ranking metric over it is in-sample and is not model performance. "
+            f"If you want the full cohort for an interpretation analysis -- attention, DeepSHAP, "
+            f"branch decomposition -- pass --full-cohort to say so.\nIf you want a performance "
+            f"number, use --split val_clean, or --split test_clean --final.")
+    if args.full_cohort and args.split not in FULL_COHORT_SPLITS:
+        parser.error(f"--full-cohort given with --split {args.split}, which is not a pooled "
+                     f"split. Drop it.")
 
     evaluate(args.config, atg_window=args.atg_window, stop_window=args.stop_window,
              results_dir=args.results_dir, member_seed=args.member_seed, split=args.split)

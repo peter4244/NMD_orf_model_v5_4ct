@@ -298,7 +298,65 @@ def load_tx_summary(results_dir):
     print(f"Loading {path} ...")
     df = pd.read_csv(path, sep="\t", dtype={"isoform_id": str})
     print(f"  {len(df):,} transcripts")
+    _assert_labels_are_relabeled(results_dir, df)
     return df
+
+
+def _assert_labels_are_relabeled(results_dir, tx_summary):
+    """Refuse to build an HDF5 from a tx_summary whose labels have no recorded provenance.
+
+    THE FAILURE THIS EXISTS TO PREVENT (2026-07-30). `is_nmd` is read straight into the training
+    labels at the bottom of build_dataset with no check of any kind. Until today export_rds.R and
+    relabel_tx_summary_4ct.R BOTH wrote `tx_summary.tsv`, so whichever ran last decided the
+    contents: run export_rds.R second and the model trains on the ORFik scaffold's original
+    labels instead of the 4-CT ones. Plausible values, exit 0, wrong model -- the same shape as
+    C44 and the 2026-07-28 hybrid.
+
+    The two writers are now separated (export_rds.R -> tx_summary_prelabel.tsv), which makes the
+    accident harder; this makes it detectable. relabel writes tx_summary_provenance.json and this
+    requires it to exist and to describe the file actually on disk.
+
+    Escape hatch matches the house pattern -- an environment variable that PRINTS what it is
+    conceding, not a quiet argument default:
+
+        NMD_ALLOW_UNVERIFIED_LABELS=1
+    """
+    prov_path = Path(results_dir) / "tx_summary_provenance.json"
+    allow = os.environ.get("NMD_ALLOW_UNVERIFIED_LABELS") == "1"
+
+    if not prov_path.exists():
+        msg = (f"{prov_path} not found, so the NMD labels in tx_summary.tsv have no recorded "
+               f"provenance and cannot be distinguished from the pre-relabel scaffold's own "
+               f"is_nmd column.\n"
+               f"  Run relabel_tx_summary_4ct.R (it writes both files), or set "
+               f"NMD_ALLOW_UNVERIFIED_LABELS=1 to build anyway.\n"
+               f"  Published trees built before 2026-07-30 have no sidecar; use the variable "
+               f"there, and note in the log that the label vintage is unverified.")
+        if not allow:
+            raise FileNotFoundError(msg)
+        print(f"\n  WARNING: NMD_ALLOW_UNVERIFIED_LABELS=1 -- {msg}")
+        return
+
+    with open(prov_path) as f:
+        prov = json.load(f)
+    n_rows = prov.get("n_rows_out")
+    n_nmd = prov.get("n_nmd")
+    print(f"  label provenance: {prov.get('written_by')} @ {prov.get('written_at')}, "
+          f"mashr {prov.get('de_date')}, {n_rows:,} rows, NMD={n_nmd:,}")
+
+    # The sidecar must describe THIS file, not a previous vintage of it. A stale sidecar beside a
+    # regenerated tx_summary is exactly the "documented but not true" state the check exists for.
+    if n_rows is not None and n_rows != len(tx_summary):
+        raise ValueError(
+            f"tx_summary_provenance.json says {n_rows:,} rows but tx_summary.tsv has "
+            f"{len(tx_summary):,}. The sidecar is stale, or the two files came from different "
+            f"runs. Re-run relabel_tx_summary_4ct.R rather than editing either.")
+    if n_nmd is not None and "is_nmd" in tx_summary.columns:
+        actual = int((tx_summary["is_nmd"] == 1).sum())
+        if actual != n_nmd:
+            raise ValueError(
+                f"tx_summary_provenance.json says NMD={n_nmd:,} but tx_summary.tsv has "
+                f"{actual:,}. Re-run relabel_tx_summary_4ct.R.")
 
 
 def load_ref_features(results_dir):
@@ -629,6 +687,19 @@ def build_dataset(results_dir, n_workers=8):
     # of gene-level ambiguity rather than one of its symptoms.
     _gene_of = dict(zip(ref_features["isoform_id"], ref_features["gene_id"])) \
         if "gene_id" in ref_features.columns else {}
+    # COUNT THE TRANSCRIPTS THAT HAVE NO GENE (2026-07-30). `_gene_of.get(tid, "")` defaults to
+    # the empty string, and "" contains no "::" and is in no paralog set -- so a transcript
+    # missing from ref_cds_features.tsv silently skips BOTH gene-level screens: the read-through
+    # exclusion here and the paralog leakage screen below. Nothing counted them, so their number
+    # was unknown, and "0 flagged" was indistinguishable from "0 checked".
+    _n_no_gene = sum(1 for tid in tx_ids if not str(_gene_of.get(tid, "")))
+    if _n_no_gene:
+        print(f"\n  {_n_no_gene:,} of {len(tx_ids):,} transcripts have no gene_id in "
+              f"ref_cds_features.tsv. These are NOT screened for read-through composites and "
+              f"NOT screened for paralog leakage -- they cannot be, there is no gene to key on.")
+    else:
+        print(f"\n  gene_id present for all {len(tx_ids):,} transcripts "
+              f"(both gene-level screens see the whole universe).")
     _readthrough = np.array([("::" in str(_gene_of.get(tid, ""))) for tid in tx_ids])
     if _readthrough.any():
         _loci = {_gene_of[t] for t, f in zip(tx_ids, _readthrough) if f}
@@ -676,9 +747,17 @@ def build_dataset(results_dir, n_workers=8):
     gene_lookup = dict(zip(ref_features["isoform_id"], ref_features["gene_id"])) \
         if "gene_id" in ref_features.columns else {}
 
+    # A TRANSCRIPT WITH NO CHROMOSOME SILENTLY BECOMES TRAINING DATA (counted from 2026-07-30).
+    # chr_map.get(tid, "") returns "", which is in neither HOLDOUT_CHRS nor VAL_CHRS, so it falls
+    # through to the `else` and joins train. That may well be the right default -- but it was
+    # happening unrecorded, so the training set could absorb transcripts of unknown location
+    # without the log showing a thing.
+    n_no_chr = 0
     splits = []
     for tid in tx_ids:
         ch = chr_map.get(tid, "")
+        if not str(ch):
+            n_no_chr += 1
         gene = gene_lookup.get(tid, "")
         # EACH BRANCH CONSULTS ITS OWN SIDE'S SET. A single `is_paralog` computed against the
         # test-side set was the bug: it can never fire for a chr2/chr4 gene.
@@ -697,8 +776,20 @@ def build_dataset(results_dir, n_workers=8):
             splits.append("train")
 
     splits = np.array(splits)
+    if n_no_chr:
+        print(f"  {n_no_chr:,} transcripts had NO chromosome and were assigned to train "
+              f"by fall-through. Verify that is intended.")
     for s in ["train", "val", "val_paralog", "test", "test_paralog"]:
         print(f"  {s}: {(splits == s).sum():,}")
+    # THE SPLITS MUST ACCOUNT FOR EVERY TRANSCRIPT. Cheap, and it turns the five counts above
+    # into a closed set rather than five numbers a reader has to add up and trust.
+    _named = sum((splits == s).sum()
+                 for s in ["train", "val", "val_paralog", "test", "test_paralog"])
+    if _named != len(tx_ids):
+        raise ValueError(f"splits account for {_named:,} transcripts but the master list has "
+                         f"{len(tx_ids):,}; an unexpected split label was assigned: "
+                         f"{sorted(set(splits.tolist()))}")
+    print(f"  total: {_named:,}  (= master transcript list, checked)")
 
     # -------------------------------------------------------------------------
     # Per-ORF structural features (vectorized)
