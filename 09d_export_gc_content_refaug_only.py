@@ -35,12 +35,12 @@ PER_WINDOW = N_CHANNELS * WINDOW
 IS_REF_CDS_STRUCT_IDX = 2   # 5-feature block: frac_start, frac_stop, is_ref_cds, is_sqanti_cds, n_downstream_ejc
 
 
-def load_joint_run(results_dir, tag, run=1):
+def load_joint_run(results_dir, tag, split, run=1):
     """Load one joint DeepSHAP NPZ. The joint file lays out shap_values and inputs
     as (N, 9005) where the first 9*500 cols are the ATG window, the next 9*500
     are the stop window, and the trailing 5 cols are per-ORF structural features
     (for ORF0 = priority ORF)."""
-    path = results_dir / f"deepshap_joint_{tag}_run{run}.npz"
+    path = results_dir / f"deepshap_joint_{tag}_{split}_run{run}.npz"
     print(f"Loading {path}")
     d = np.load(path, allow_pickle=True)
     inputs = d["inputs"]
@@ -106,6 +106,8 @@ def main():
     parser.add_argument("--config", default="config.yaml",
                            help="Where the selected window configuration is read from")
     parser.add_argument("--run", type=int, default=1)
+    parser.add_argument("--split", required=True,
+                        help="the split deepshap.py explained; part of the artifact name")
     parser.add_argument("--results-dir", default="results_4ct")
     parser.add_argument("--gc-window", type=int, default=50)
     parser.add_argument("--gc-step", type=int, default=10)
@@ -115,7 +117,7 @@ def main():
     if args.tag is None:
         args.tag = selected_tag(load_config(args.config))
     rdir = Path(args.results_dir)
-    bundle = load_joint_run(rdir, args.tag, args.run)
+    bundle = load_joint_run(rdir, args.tag, args.split, args.run)
 
     n_total_nmd = int((bundle["labels"] == 1).sum())
     n_nmd_refaug = int(((bundle["labels"] == 1) & bundle["is_ref_cds"]).sum())

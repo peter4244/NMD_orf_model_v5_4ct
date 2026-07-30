@@ -28,7 +28,7 @@ import pandas as pd
 from paths_config import load_config, selected_tag
 
 
-def load_joint_runs(results_dir, tag, n_runs=5):
+def load_joint_runs(results_dir, tag, split, n_runs=5):
     """Load and mean-pool signed SHAP × input for the rolling_gc channel
     across all runs, returning per-window (atg, stop) matrices."""
     # Match the 9005-column layout used by 09b: 9 channels × 500 atg + 9 × 500 stop + 5 structural.
@@ -40,7 +40,7 @@ def load_joint_runs(results_dir, tag, n_runs=5):
     labels = None
     gc_idx = None
     for r in range(1, n_runs + 1):
-        path = results_dir / f"deepshap_joint_{tag}_run{r}.npz"
+        path = results_dir / f"deepshap_joint_{tag}_{split}_run{r}.npz"
         d = np.load(path, allow_pickle=True)
         sv = d["shap_values"].squeeze(-1)
         inp = d["inputs"]
@@ -95,6 +95,10 @@ def main():
                        help="Where the selected window configuration is read from")
     ap.add_argument("--results-dir", default="results_4ct")
     ap.add_argument("--n-runs", type=int, default=5)
+    # REQUIRED, matching deepshap.py: the split now travels in the artifact name, so a consumer
+    # that guesses it reads the wrong population's attributions or nothing at all.
+    ap.add_argument("--split", required=True,
+                    help="the split deepshap.py explained; part of the artifact name")
     args = ap.parse_args()
 
     # Resolve the tag from the ONE place that names the selected configuration.
@@ -103,7 +107,7 @@ def main():
     rdir = Path(args.results_dir)
     print(f"Loading {args.n_runs} joint DeepSHAP NPZs for tag={args.tag}, "
           f"extracting signed SHAP × input for rolling_gc channel ...")
-    atg_signed, stop_signed, labels = load_joint_runs(rdir, args.tag, args.n_runs)
+    atg_signed, stop_signed, labels = load_joint_runs(rdir, args.tag, args.split, args.n_runs)
     print(f"\nWriting outputs ...")
     write_signed_gc_profile(atg_signed,  labels, window=500,
                              out_path=rdir / f"shap_signed_gc_atg_joint_{args.tag}.tsv")

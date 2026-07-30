@@ -18,6 +18,7 @@ import torch
 import torch.nn as nn
 
 from model import NMDOrfModel, build_model
+from evaluate import enforce_split_gate
 from utils import (NMDDataset, load_config, member_tag, resolve_checkpoint,
                    set_seed)
 
@@ -169,7 +170,7 @@ class JointBranchWrapper(nn.Module):
 def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
                   atg_window=None, stop_window=None, seed=None, run_id=None,
                   branches=None, orf_index=0,
-                 results_dir="results_4ct", member_seed=None):
+                 results_dir="results_4ct", member_seed=None, split=None):
     config = load_config(config_path)
     seed = seed if seed is not None else config["training"]["seed"]
     set_seed(seed)
@@ -187,7 +188,11 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     # member_tag(tag, None) == tag, so every existing invocation writes byte-identical filenames
     # and 06_export_deepshap_tsv.py / 09b / 09c / 09d keep matching. The name changes only when a
     # member is actually named, which is exactly when the collision occurs.
-    otag = member_tag(tag, member_seed)
+    # THE SPLIT TRAVELS WITH THE ARTIFACT, in the name and not only in a log. Pete's instruction,
+    # 2026-07-30: the data flags must match the other scoring entry points and that information has
+    # to track with the outputs. A DeepSHAP npz computed over `all` and one over `test_clean` were
+    # previously the same filename with nothing inside distinguishing them.
+    otag = f"{member_tag(tag, member_seed)}_{split}"
     run_suffix = f"_run{run_id}" if run_id is not None else ""
     # W52. The SUMMARY filename must carry the decomposition, exactly as the npz already does
     # at :305 -- deepshap_{branch}_{tag}... Without it, `deepshap_summary_{tag}_run1.tsv` means
@@ -215,9 +220,25 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
 
-    # Load data
-    print("Loading test and training data ...")
-    test_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="test_clean")
+    if split is None:
+        raise ValueError(
+            "run_deepshap requires an explicit split. There is deliberately no default: a default "
+            "of any value is how 'test_clean' stayed invisible in this file until 2026-07-30.")
+
+    # THE EXPLAINED SPLIT IS A PARAMETER (2026-07-30). It was the literal "test_clean" here, with
+    # no --split flag anywhere in this file -- the same defect evaluate.py carried until
+    # 2026-07-29, and with the same consequence: every DeepSHAP result in this project was computed
+    # on the HELD-OUT SET, with no affirmation and nothing in the output saying so. D31 and claim
+    # 5.6.4 rest on the test set being touched once, deliberately; an interpretation script that
+    # reads it on every invocation is not that. 11_kernel_shap_branches.py already had
+    # --explain-split and carried it in the filename, so the two interpretation entry points
+    # disagreed about their own population.
+    #
+    # The BACKGROUND stays "train" and is NOT parameterised: it is the reference distribution
+    # DeepSHAP integrates against, not the population being explained, and METHODS documents it as
+    # 500 sampled training transcripts.
+    print(f"Loading explained split ({split}) and training background ...")
+    test_ds = NMDDataset(h5_path, ws_atg, ws_stop, split=split)
     train_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="train")
 
     print(f"ORF index: {orf_index}")
@@ -709,8 +730,23 @@ if __name__ == "__main__":
                         help="Ensemble member to load, by training seed. Omitted = the legacy "
                              "un-seeded checkpoint. Never silently guesses a member; see "
                              "utils.resolve_checkpoint.")
+    # SAME DATA FLAGS AS evaluate.py / ensemble_evaluate.py, and NO DEFAULT, deliberately. A
+    # default of any value is how "test_clean" became invisible here in the first place.
+    parser.add_argument("--split", required=True,
+                        choices=["train", "val", "val_clean", "val_all",
+                                 "test", "test_clean", "test_all", "test_paralog", "all"],
+                        help="which population to EXPLAIN. Required. Test splits also need "
+                             "--final; --split all also needs --full-cohort.")
+    parser.add_argument("--final", action="store_true",
+                        help="affirm a final, pre-registered evaluation on a test split")
+    parser.add_argument("--full-cohort", action="store_true",
+                        help="affirm a pooled train+test interpretation run (--split all)")
     args = parser.parse_args()
+
+    # ONE gate, imported not restated. See evaluate.enforce_split_gate.
+    enforce_split_gate(parser, args)
+
     run_deepshap(args.config, args.n_explain, args.n_background,
                  args.atg_window, args.stop_window, args.seed, args.run_id,
                  args.branches, args.orf_index, results_dir=args.results_dir,
-                 member_seed=args.member_seed)
+                 member_seed=args.member_seed, split=args.split)
