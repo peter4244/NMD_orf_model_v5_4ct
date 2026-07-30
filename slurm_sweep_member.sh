@@ -58,6 +58,15 @@ set -euo pipefail
 cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
 
+# UNBUFFERED, so a killed cell still leaves a diagnostic trail (2026-07-30).
+# Jobs 8828520/21/22 were SIGKILLed at 8:42 and their logs ended at the "=== TRAIN ===" banner
+# with NOT ONE line of Python output -- not the device, not the split sizes, not an epoch. That
+# was stdout buffering, not the failure point: Python block-buffers when stdout is a file, and a
+# SIGKILL discards the buffer. So the one artifact that would say how far the cell got, and
+# whether it died during the RAM-hungry NMDDataset load, was destroyed by the kill itself.
+# A crash you cannot diagnose costs more than the buffering saves.
+export PYTHONUNBUFFERED=1
+
 : "${SW_ATG:?SW_ATG not set -- submit via submit_sweep.sh}"
 : "${SW_STOP:?SW_STOP not set}"
 : "${SW_SEED:?SW_SEED not set}"
