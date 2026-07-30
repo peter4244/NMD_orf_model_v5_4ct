@@ -74,21 +74,42 @@ def main():
         best = rows[0]
         print(f"=== ranked by {metric} (mean +/- sd across seeds) ===")
         print(f"  {'config':22}{'mean':>10}{'sd':>10}{'n':>4}   indistinguishable from leader?")
+        # A MISSING sd MEANS "CANNOT ASSESS", NEVER "RESOLVED" (fixed 2026-07-29).
+        # The first version compared a 1-seed config (sd = nan) against a 5-seed one and, because
+        # every nan comparison is False, fell through to "leads by more than 1 sd; the ranking is
+        # resolved". That is the published sweep's exact error rebuilt in the analysis: declaring
+        # a ranking resolved from single seeds, when a single seed cannot bound run-to-run
+        # variation at all. It would have fired on every config at the end of the seed-100 pass.
+        def assessable(r):
+            return r["n_seeds"] >= 2 and r[skey] == r[skey]
         for r in rows:
             gap = best[mkey] - r[mkey]
-            pooled = max(best[skey], r[skey]) if r[skey] == r[skey] else float("nan")
-            tie = "" if r is best else ("  YES  (gap %.5f <= 1 sd %.5f)" % (gap, pooled)
-                                        if pooled == pooled and gap <= pooled else
-                                        "  no   (gap %.5f)" % gap)
-            print(f"  {r['tag']:22}{r[mkey]:>10.5f}{r[skey]:>10.5f}{r['n_seeds']:>4}{tie}")
+            if r is best:
+                tie = ""
+            elif not (assessable(best) and assessable(r)):
+                tie = "  ?    CANNOT ASSESS (needs >=2 seeds on both)"
+            else:
+                pooled = max(best[skey], r[skey])
+                tie = ("  YES  (gap %.5f <= 1 sd %.5f)" % (gap, pooled) if gap <= pooled
+                       else "  no   (gap %.5f)" % gap)
+            sd_txt = f"{r[skey]:>10.5f}" if r[skey] == r[skey] else f"{'--':>10}"
+            print(f"  {r['tag']:22}{r[mkey]:>10.5f}{sd_txt}{r['n_seeds']:>4}{tie}")
+        unassessable = [r["tag"] for r in rows if not assessable(r)]
         ties = [r["tag"] for r in rows[1:]
-                if r[skey] == r[skey] and (best[mkey] - r[mkey]) <= max(best[skey], r[skey])]
+                if assessable(best) and assessable(r)
+                and (best[mkey] - r[mkey]) <= max(best[skey], r[skey])]
         print(f"  leader: {best['tag']}")
+        if unassessable:
+            print(f"  *** {len(unassessable)} config(s) have <2 seeds, so NO ranking claim can be")
+            print(f"      made about them yet: {', '.join(unassessable[:6])}"
+                  + (" ..." if len(unassessable) > 6 else ""))
+            print(f"  *** A single seed cannot bound run-to-run variation. This is exactly what")
+            print(f"      made the published ranking unreproducible (D11 fixed one seed).")
         if ties:
             print(f"  *** {len(ties)} config(s) within 1 sd of it: {', '.join(ties)}")
             print(f"  *** The sweep does NOT resolve a winner by {metric}. Whatever tie-break")
             print(f"      rule is recorded is what selects the configuration -- say so.")
-        else:
+        elif not unassessable:
             print(f"  {best['tag']} leads by more than 1 sd; the ranking is resolved by {metric}.")
         print()
 
