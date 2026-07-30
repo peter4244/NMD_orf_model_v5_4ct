@@ -92,15 +92,35 @@ def paired_analysis(cells, tags, seeds, key, alpha):
         return leader, {t: {"gap": means[leader] - means[t], "excluded": False} for t in contrasts}, {}
 
     # Per-seed paired differences against the leader, then POOL their variance across contrasts.
-    # Pooling is what buys the degrees of freedom: 11 contrasts x (5-1) = 44 rather than 4.
-    ss, df = 0.0, 0
+    per_sd, ss, naive_df = {}, 0.0, 0
     for t in contrasts:
         d = vals[leader] - vals[t]
+        per_sd[t] = float(d.std(ddof=1))
         ss += float(((d - d.mean()) ** 2).sum())
-        df += n - 1
-    sigma_d = math.sqrt(ss / df) if df > 0 else float("nan")
-
+        naive_df += n - 1
     k = len(contrasts)
+    sigma_d = math.sqrt(ss / naive_df) if naive_df > 0 else float("nan")
+
+    # THE POOLED SS IS UNBIASED BUT IS NOT CHI-SQUARE ON k(n-1) (corrected 2026-07-30, review).
+    # Every difference vector d_t = X_leader - X_t contains the SAME leader residuals, so the k
+    # contrasts are correlated: with equal variances Var(d)=2s^2 and Cov(d_t,d_u)=s^2, i.e. rho=1/2
+    # between difference vectors and rho^2=1/4 between their squared deviations. Moment-matching
+    # the sum of k correlated chi-square(n-1) terms:
+    #
+    #   E[SS]  = k(n-1)Var(d)
+    #   Var[SS]= 2(n-1)Var(d)^2 [ k + k(k-1)/4 ]
+    #   nu     = 2E[SS]^2/Var[SS] = k(n-1) / (1 + (k-1)/4) = 4k(n-1)/(k+3)
+    #
+    # At k=15, n=5 that is 13.3, not 60. Verified by simulation of this exact procedure under a
+    # global null (20,000 reps): E[SS/Var(d)] = 59.8 -- unbiased, as derived -- but Var = 535
+    # against 120 for chi-square_60, giving an effective df of 13.4. Pooling buys at most ~4x the
+    # single-contrast df, never k times it.
+    #
+    # Consequence of having used 60: t_crit was 2.81 instead of 3.21, so the AUC threshold was
+    # 0.00421 instead of 0.00480 and at least one configuration was reported excluded when it is
+    # not. Coverage of the overall procedure happened to look right at ~0.95 only because this
+    # error and the looseness of the Bonferroni union bound ran in opposite directions.
+    df = 4 * k * (n - 1) / (k + 3) if k > 0 else float("nan")
     t_crit = float(stats.t.ppf(1 - alpha / k, df))          # Bonferroni over the k contrasts
     thresh = t_crit * sigma_d / math.sqrt(n)
 
@@ -115,8 +135,23 @@ def paired_analysis(cells, tags, seeds, key, alpha):
     off = cc[np.triu_indices_from(cc, k=1)]
     mdd80 = (t_crit + float(stats.t.ppf(0.80, df))) * sigma_d / math.sqrt(n)
     srt = sorted(means.values(), reverse=True)
+    # mdd80 WAS COMPUTED AND THEN NEVER REPORTED. It was absent from `diag`, and the print guarded
+    # itself with `if "mdd80" in diag` -- so the line emitted an empty string on every run since it
+    # was written, and "this design's resolution" was quoted from the ALPHA threshold instead. The
+    # two differ by ~30%: the honest statement of what a non-excluded configuration might cost is
+    # the MDD, not the exclusion threshold.
+    # HETEROSCEDASTICITY IS REPORTED, NOT ASSUMED AWAY. Pooling one sigma_d across contrasts
+    # assumes Var(X_leader - X_t) is constant in t. When it is not, the configurations with the
+    # TIGHTEST contrasts are over-retained -- they get a threshold wider than their own variance
+    # warrants -- and those are exactly the configurations a cost-based tie-break then favours.
+    sds = sorted(per_sd.values())
     diag = {
-        "n": n, "k": k, "df": df, "sigma_d": sigma_d, "t_crit": t_crit, "thresh": thresh,
+        "n": n, "k": k, "df": df, "naive_df_would_be": naive_df,
+        "sigma_d": sigma_d, "t_crit": t_crit, "thresh": thresh,
+        "mdd80": mdd80,
+        "per_contrast_sd_min": sds[0] if sds else float("nan"),
+        "per_contrast_sd_max": sds[-1] if sds else float("nan"),
+        "per_contrast_sd_ratio": (sds[-1] / sds[0]) if sds and sds[0] > 0 else float("nan"),
         "mean_corr": float(np.nanmean(off)) if off.size else float("nan"),
         "top2_spacing": (srt[0] - srt[1]) if len(srt) > 1 else float("nan"),
         "single_run_sd_median": st.median([float(v.std(ddof=1)) for v in vals.values()]),
@@ -136,7 +171,10 @@ def report(metric, key, cells, tags, seeds, alpha):
             print(f"  {t:22}{means[t]:>10.5f}{sds[t]:>10.5f}{'':>10}   leader")
             continue
         r = res[t]
-        verdict = "excluded" if r["excluded"] else "CANNOT EXCLUDE as best"
+        # "excluded" invited reading each row as a valid pairwise test that t is WORSE than the
+        # leader. It is not: the procedure controls only the simultaneous coverage of the best, so
+        # the only defensible per-row statement is set membership.
+        verdict = "not in set" if r["excluded"] else "IN SET (cannot exclude as best)"
         print(f"  {t:22}{means[t]:>10.5f}{sds[t]:>10.5f}{r['gap']:>10.5f}   {verdict}")
 
     survivors = [leader] + [t for t in tags if t != leader and not res[t]["excluded"]]
@@ -148,7 +186,14 @@ def report(metric, key, cells, tags, seeds, alpha):
         print(f"  across-config seed corr   {diag['mean_corr']:+.3f}  (high = pairing is buying a lot)")
         print(f"  exclusion threshold       {diag['thresh']:.5f}  "
               f"(t={diag['t_crit']:.3f}, alpha={alpha}/{diag['k']}, n={diag['n']})")
-        print(f"  min detectable diff @80%  {diag['mdd80']:.5f}" if "mdd80" in diag else "")
+        print(f"  min detectable diff @80%  {diag['mdd80']:.5f}  <- what a non-excluded config "
+              f"could actually be worse by")
+        print(f"  per-contrast sd spread    {diag['per_contrast_sd_min']:.5f}-"
+              f"{diag['per_contrast_sd_max']:.5f}  ratio {diag['per_contrast_sd_ratio']:.2f}"
+              + ("   *** pooling favours the tightest contrasts"
+                 if diag['per_contrast_sd_ratio'] > 2 else ""))
+        print(f"  effective df              {diag['df']:.1f}  (k(n-1) would be "
+              f"{diag['naive_df_would_be']}; contrasts share the leader)")
         print(f"  observed top-two spacing  {diag['top2_spacing']:.5f}")
 
     print()
