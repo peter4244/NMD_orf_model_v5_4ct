@@ -47,16 +47,22 @@ from utils import (NMDDataset, compute_metrics, load_config, member_tag,
                    resolve_checkpoint, set_seed)
 
 
-def score_member(h5_path, cfg, ws_atg, ws_stop, split, ckpt_path, device, batch):
-    """Logits for one member over `split`, in dataset order."""
+def score_member(loader, cfg, ws_atg, ws_stop, ckpt_path, device):
+    """Logits for one member over an ALREADY-LOADED dataset, in dataset order.
+
+    THE DATASET IS A PARAMETER, NOT BUILT HERE (fixed 2026-07-30, before this ever ran). The first
+    version constructed a fresh NMDDataset per member. Every member scores the SAME split with the
+    SAME window sizes, so that was five identical loads: NMDDataset materialises the whole split in
+    RAM as float32, ~1.65 GB for atg2000_stop100 on val_clean, so a five-member run churned ~8 GB
+    to read one dataset. It also removed the possibility of a member scoring a different transcript
+    set, which the alignment guard below then had to detect after the fact. Loading once makes that
+    unrepresentable rather than merely checked.
+    """
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model = build_model({**cfg["model"],
                          "window_size_atg": ws_atg, "window_size_stop": ws_stop}).to(device)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
-
-    ds = NMDDataset(h5_path, ws_atg, ws_stop, split=split)
-    loader = DataLoader(ds, batch_size=batch, shuffle=False, num_workers=0)
     logits, labels = [], []
     with torch.no_grad():
         for b in loader:
@@ -64,7 +70,7 @@ def score_member(h5_path, cfg, ws_atg, ws_stop, split, ckpt_path, device, batch)
                         b["orf_features"].to(device), b["orf_mask"].to(device))
             logits.extend(out.squeeze(-1).cpu().numpy())
             labels.extend(b["label"].numpy())
-    return np.asarray(logits, float), np.asarray(labels, float), ds.indices, int(ckpt["epoch"])
+    return np.asarray(logits, float), np.asarray(labels, float), int(ckpt["epoch"])
 
 
 def main():
@@ -111,26 +117,49 @@ def main():
     paths = [resolve_checkpoint(rd, tag, s) for s in seeds]
     print(f"ensemble: {tag}, {len(seeds)} members {seeds}, split={a.split}")
 
+    # DISTINCT FILES, CHECKED BEFORE SCORING. resolve_checkpoint refuses to guess a member, but it
+    # cannot know that two seeds resolved to the same path.
+    if len({str(p) for p in paths}) != len(paths):
+        raise ValueError(f"member checkpoints are not distinct files: {[str(p) for p in paths]}")
+
     h5 = cfg["data"]["hdf5_path"]
-    per_member, labels_ref, idx_ref, epochs = [], None, None, []
+    ds = NMDDataset(h5, a.atg_window, a.stop_window, split=a.split)   # ONCE, reused by every member
+    loader = DataLoader(ds, batch_size=cfg["training"]["batch_size"], shuffle=False, num_workers=0)
+    idx_ref = ds.indices
+
+    per_member, labels_ref, epochs = [], None, []
     for s, p in zip(seeds, paths):
-        lg, lb, idx, ep = score_member(h5, cfg, a.atg_window, a.stop_window, a.split,
-                                       p, device, cfg["training"]["batch_size"])
-        # Every member must have scored the SAME transcripts in the SAME order, or the mean is
-        # taken across misaligned rows and still produces a plausible number.
+        lg, lb, ep = score_member(loader, cfg, a.atg_window, a.stop_window, p, device)
         if labels_ref is None:
-            labels_ref, idx_ref = lb, idx
-        else:
-            if not np.array_equal(idx, idx_ref):
-                raise ValueError(f"member seed {s} scored a different transcript set")
-            if not np.array_equal(lb, labels_ref):
-                raise ValueError(f"member seed {s} disagrees on labels")
+            labels_ref = lb
+        elif not np.array_equal(lb, labels_ref):
+            raise ValueError(f"member seed {s} disagrees on labels")
         per_member.append(lg)
         epochs.append(ep)
         m = compute_metrics(lb, lg)
         print(f"  seed {s:<4} epoch {ep:<3} AUC {m['auc']:.5f}  AUPRC {m['auprc']:.5f}")
 
     L = np.vstack(per_member)                    # (n_members, n_transcripts)
+
+    # THE MEMBERS MUST ACTUALLY DIFFER -- this repo has already shipped the failure this catches.
+    # utils.member_tag records it: 03_train.py once took its seed from config only and wrote
+    # best_model_{tag}.pt with no seed slot, so five array tasks torch.save'd to ONE filename and
+    # "the five members of the ensemble are one checkpoint written five times". Averaging five
+    # identical models yields a believable ensemble AUC and a member sd of exactly 0.0, which reads
+    # as a stability result and is a filename collision. Distinct paths do not prove distinct
+    # weights, so compare the OUTPUTS.
+    dup = [(seeds[i], seeds[j])
+           for i in range(len(L)) for j in range(i + 1, len(L))
+           if np.array_equal(L[i], L[j])]
+    if dup:
+        raise ValueError(
+            f"members produced IDENTICAL logits for seed pair(s) {dup}. These are not independent "
+            f"members -- either the checkpoints are copies, or training ignored --seed. An "
+            f"'ensemble' of one model repeated reports member sd = 0 and looks like stability.")
+    off = [abs(float(np.corrcoef(L[i], L[j])[0, 1]))
+           for i in range(len(L)) for j in range(i + 1, len(L))]
+    print(f"  member-to-member logit correlation: min {min(off):.4f} max {max(off):.4f} "
+          f"(1.0000 across the board would mean the members are not independent)")
     ens_logit = L.mean(axis=0)                   # D30: mean LOGIT, never averaged weights
     ens = compute_metrics(labels_ref, ens_logit)
     mem_auc = np.array([compute_metrics(labels_ref, l)["auc"] for l in L])
