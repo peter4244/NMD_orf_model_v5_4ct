@@ -119,10 +119,14 @@ quantity — they are three different quantities, and each belongs to a named po
 | **42,043** | isoforms the scan **returned ORFs for** — the deposit-native scaffold, and the universe a deposit-native rebuild trains on |
 | **39,938** | the **published** model's labeled universe (8,840 NMD + 31,098 non-NMD) |
 
-42,063 − 42,043 = **20 transcripts with no ORF at all**, recorded as `no_orfs` in the scan's own
-metadata rather than lost. The 39,938 figure belongs to the published tree only; on the
-deposit-native scaffold the relabel step is a verified no-op (42,043 rows in and out, 0 dropped,
-0 label disagreements), so nothing is filtered between scan and training there.
+42,063 − 42,043 = **20 transcripts with no ORF at all** — measured and carried as a category, not
+lost: all 20 yield zero ORFs under `startCodon=ATG` / `minimumLength=9`, with sequences 335-940 nt.
+See **C47** in the analysis repo's ledger for the derivation and for the mechanism (`05s` raises a
+named `NO_ORFS_IN_BATCH` sentinel rather than dereferencing a NULL, and `05s_b` keys on it).
+
+The 39,938 figure belongs to the published tree only; on the deposit-native scaffold the relabel
+step is a verified no-op (42,043 rows in and out, 0 dropped, 0 label disagreements — log at
+`verification/phaseC/relabel_is_noop.out`), so nothing is filtered between scan and training there.
 
 **Which denominator applies to the 278 depends on which tree, and the two differ.**
 `data_prep.py` divides by the isoform count after the FASTA intersection, so on a **deposit-native
@@ -498,6 +502,12 @@ The **sign** of mean grad x input indicates direction: positive means the featur
 > "Sequence window extraction" and "9-channel sequence encoding"). These numbers are the record of
 > what was published; they are **not** comparable to anything a deposit-native rebuild produces,
 > and they are not re-derivable from the current code. Regenerate before quoting.
+>
+> **The deposit-native values recorded in the ledger are also pre-clip** — every section-5 claim was
+> checked 2026-07-27, before `2658732`, `553d4c0` and `cf19dd6` landed on 2026-07-29. So they are
+> baselines, not targets: a retrain that **reproduces** them is evidence the clip did not take
+> effect, not evidence of agreement. Assay the encoding directly with `verify_clip_in_h5.py` rather
+> than inferring it from whether a downstream percentage moved.
 
 
 ### Method
@@ -572,6 +582,12 @@ The legacy flow extracts per-nucleotide SHAP logos at ±15bp around biologically
 > "Sequence window extraction" and "9-channel sequence encoding"). These numbers are the record of
 > what was published; they are **not** comparable to anything a deposit-native rebuild produces,
 > and they are not re-derivable from the current code. Regenerate before quoting.
+>
+> **The deposit-native values recorded in the ledger are also pre-clip** — every section-5 claim was
+> checked 2026-07-27, before `2658732`, `553d4c0` and `cf19dd6` landed on 2026-07-29. So they are
+> baselines, not targets: a retrain that **reproduces** them is evidence the clip did not take
+> effect, not evidence of agreement. Assay the encoding directly with `verify_clip_in_h5.py` rather
+> than inferring it from whether a downstream percentage moved.
 
 
 > **Naming corrected 2026-07-27.** The script, its docstring and every downstream description
@@ -706,6 +722,12 @@ A supplementary report uses gene-matched isoform pairs from the isopair analysis
 > "Sequence window extraction" and "9-channel sequence encoding"). These numbers are the record of
 > what was published; they are **not** comparable to anything a deposit-native rebuild produces,
 > and they are not re-derivable from the current code. Regenerate before quoting.
+>
+> **The deposit-native values recorded in the ledger are also pre-clip** — every section-5 claim was
+> checked 2026-07-27, before `2658732`, `553d4c0` and `cf19dd6` landed on 2026-07-29. So they are
+> baselines, not targets: a retrain that **reproduces** them is evidence the clip did not take
+> effect, not evidence of agreement. Assay the encoding directly with `verify_clip_in_h5.py` rather
+> than inferring it from whether a downstream percentage moved.
 
 
 A transcriptome-wide attribution analysis testing whether the attention layer can distinguish NMD-triggering upstream ORFs (uORFs) from main-ORF PTC mechanisms.

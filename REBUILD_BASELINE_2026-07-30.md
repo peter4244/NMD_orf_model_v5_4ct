@@ -10,6 +10,24 @@ baseline is worse than a wrong one.
 
 ---
 
+## 0. Check the ENCODING first, before any count
+
+```bash
+python3 verify_clip_in_h5.py results_4ct_dn/nmd_orf_data.h5 --window 2000
+```
+
+This is step zero because the three 2026-07-29 data_prep fixes have **never run**, and the
+pipeline's history is of being wrong at exit 0. The assay reads the clip's arithmetic signature out
+of the frame channels — `atg_filled + stop_filled == W + (L-3)` where both windows clip, versus
+`2W` everywhere pre-clip — so it needs no anchor arrays and no downstream output. Proven against
+synthetic pre- and post-clip files built with the real encoder: post-clip 75.7% of ORFs below 2W
+(PASS), pre-clip 0% (FAIL).
+
+**Do not assay the clip by checking whether the branch decomposition moved.** Every section-5
+deposit-native value in the ledger was measured 2026-07-27, before the fixes landed, so those are
+**pre-clip baselines, not targets**. A retrain that reproduces 61.6/26.1/12.3 is evidence the clip
+did not take effect. Stasis is the alarm.
+
 ## 1. What the rebuild should produce
 
 The rebuild runs `sbatch slurm_build_h5_dn.sh`, which passes `--results-dir results_4ct_dn`, so it
@@ -21,7 +39,7 @@ not the 2026-07-27 vintage).
 | `Master transcript list: N isoforms` | **N = 42,043 − k**, exactly, where `k` is the count on the `Excluding read-through loci:` line |
 | total transcripts | **41,765** if `k` = 278; the arithmetic must close either way |
 | `Excluding read-through loci:` | ~278 transcripts on ~233 composite gene ids, ~0.66% |
-| `test_paralog` | **below 122** — two of its genes were read-through loci |
+| `test_paralog` | **below 122** — two of its genes were read-through loci. Claim 5.6.4 rests on 122, so a move is a **finding needing a ledger row**, not a threshold quietly satisfied (Track A, W129) |
 | `val_paralog` | **> 0**; expected near 56 isoforms from 19 val-side genes |
 | `train + val + val_paralog + test + test_paralog` | **= N** (asserted in code as of `420a264`; raises otherwise) |
 | NMD fraction | ~22% overall and in each split |
