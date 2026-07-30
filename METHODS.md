@@ -17,19 +17,34 @@ Multivariate adaptive shrinkage (mashr) was re-run using only the 4 retained cel
 - Isoforms classified as both NMD and non-NMD (none observed) would be excluded.
 - Isoforms in neither set are excluded from training.
 
-### Dataset summary
+### Dataset summary **[PUBLISHED TREE]**
+These are the **published** model's counts. A deposit-native rebuild trains on the 42,043-row
+scaffold instead, less the 278 read-through transcripts — see "Isoform universe" for why the
+two differ and which belongs where.
+
 - **Total isoforms:** 39,938 (vs 61,669 in original v5)
 - **NMD:** 8,840 (vs 9,274)
 - **Non-NMD:** 31,098 (vs 52,395)
 - **Class ratio:** 1:3.5 NMD:non-NMD (vs 1:5.6)
 - **Label changes from original:** 15 isoforms dropped (NMD → neither), 2 flipped (NMD → non-NMD), 10 flipped (non-NMD → NMD), 21,731 dropped (non-NMD → neither due to stricter intersection)
 
-### Relabeling procedure
-The relabeling is performed by `relabel_tx_summary_4ct.R`, which reads the 4 per-cell-type mashr CSVs, computes the union/intersection aggregate, and updates the `is_nmd` column in `tx_summary.tsv`. ORF features, junction positions, and other structural data are unchanged from the original v5 pipeline.
+### Relabeling procedure **[RETIRED — historical record]**
+The published labels were produced by `relabel_tx_summary_4ct.R`, which read the 4 per-cell-type
+mashr CSVs, computed the union/intersection aggregate, and updated the `is_nmd` column in
+`tx_summary.tsv`. ORF features, junction positions and other structural data were unchanged from
+the original v5 pipeline.
+
+**That step is retired (D18) and is not part of the rebuild.** `export_rds.R` is the sole writer of
+`tx_summary.tsv`, so there is one writer per artifact rather than two; and on the deposit-native
+scaffold the relabel was verified inert — 42,043 rows in and out, 0 dropped, 0 label
+disagreements — so retiring it removed a second writer, not a capability. It is described here
+because it produced the published labels, and that record has to survive its retirement. What the
+sidecar `tx_summary_provenance.json` now records is which *scan* the labels came from, which is the
+part nothing captured.
 
 ### Pipeline / build order
 
-For the canonical sequence in which to run the SLURM wrappers (relabel → data_prep → patch_stop_codon → train → evaluate → deepshap_joint → deepshap_structural → 09b → export_joint_motif_logos → 09 → 08 → 11 → render), see **README.md "Build order"**. METHODS does not duplicate the list to avoid drift.
+For the canonical sequence in which to run the SLURM wrappers (export_rds → data_prep → patch_stop_codon → train → evaluate → deepshap_joint → deepshap_structural → 09b → export_joint_motif_logos → 09 → 08 → 11 → render), see **README.md "Build order"**. METHODS does not duplicate the list to avoid drift. Note the first step is `export_rds.R`, not the retired relabel (D18); this line named the relabel until 2026-07-30.
 
 ---
 
@@ -50,12 +65,12 @@ Up to K=5 candidate ORFs per transcript pass through an `ORFEncoder` whose weigh
 three sub-encoders for the rank-k ORF, and they do **not** share weights with one another: a start
 CNN over the 9-channel start window, a stop CNN over the 9-channel stop window, and a structural
 branch `Linear(5, 32) → ReLU` over the 5 per-ORF features. `atg_cnn` and `stop_cnn` are separate
-`SequenceCNN` instances (`model.py:95,97`) with zero shared parameter tensors, 12,736 parameters
+`SequenceCNN` instances (`model.py:101,103`) with zero shared parameter tensors, 12,736 parameters
 each. The three 32-dim sub-embeddings are concatenated (96 dim) and fused via
 `Linear(96, 64) → ReLU → Dropout(0.2)`. The K ORF embeddings are pooled by a learned attention
 layer (softmax over valid ORFs) and passed to a classification head
-(`Linear(64,32) → ReLU → Dropout(0.3) → Linear(32,1)`, `model.py:203-208`). See `ORFEncoder`
-(`model.py:84`) and `NMDOrfModel` (`model.py:164`).
+(`Linear(64,32) → ReLU → Dropout(0.3) → Linear(32,1)`, `model.py:209-214`). See `ORFEncoder`
+(`model.py:90`) and `NMDOrfModel` (`model.py:170`).
 
 Parameter counts depend on the window sizes, because kernel sizes do. **At 500/500: 34,050
 trainable parameters, 12,736 per sequence CNN.** Measured at other grid points: 25,346 total and
@@ -65,7 +80,7 @@ configurations use a 100-position start window, so the 500/500 figures are not t
 Each `SequenceCNN` is `Conv1d(9, 32, k1) → BatchNorm → ReLU → [MaxPool(4) if window > 100] →
 Conv1d(32, 32, k2) → BatchNorm → ReLU → max over the length axis → Linear(32, 32)`, with
 `k1, k2 = 15, 7` for windows above 100, `7, 5` at 100, and `5, 3` at 20 or below
-(`model.py:38-46`); the third branch is unused by the current grid.
+(`model.py:41-46`); the third branch is unused by the current grid.
 
 **The global pooling op changed on 2026-07-27 [CHANGED].** It was `AdaptiveMaxPool1d(1)` followed
 by `squeeze`, replaced by `x.max(dim=-1).values` because the former has no deterministic CUDA
@@ -92,17 +107,36 @@ becomes a string matching nothing and the locus is invisible to the paralog sear
 had a measured consequence: two chr2 genes have a ≥80%-identity paralog whose only presence in this
 universe is inside a composite locus, so the screen never flagged them — real leakage, one into
 train and one into test. Excluding the composites deletes the twin sequence, so the leakage does not
-exist to be flagged. 278 transcripts on 233 loci. As a fraction, `data_prep.py` divides by the isoform count after the
-FASTA intersection; against the labeled universe of 39,938 (above) that is 0.70%. Note three
-different universe sizes appear in this repo — 39,938 (labeled), 42,043 and 42,063 — which are
-different vintages; the discrepancy is unresolved and worth settling before any of them is quoted
-in the manuscript.
+exist to be flagged. 278 transcripts on 233 loci.
+
+**The three universe sizes, resolved (2026-07-30).** An earlier revision of this section listed
+39,938, 42,043 and 42,063 as "different vintages, unresolved". They are not vintages of one
+quantity — they are three different quantities, and each belongs to a named population:
+
+| size | what it is |
+|---|---|
+| **42,063** | isoforms **eligible** for the ORF scan |
+| **42,043** | isoforms the scan **returned ORFs for** — the deposit-native scaffold, and the universe a deposit-native rebuild trains on |
+| **39,938** | the **published** model's labeled universe (8,840 NMD + 31,098 non-NMD) |
+
+42,063 − 42,043 = **20 transcripts with no ORF at all**, recorded as `no_orfs` in the scan's own
+metadata rather than lost. The 39,938 figure belongs to the published tree only; on the
+deposit-native scaffold the relabel step is a verified no-op (42,043 rows in and out, 0 dropped,
+0 label disagreements), so nothing is filtered between scan and training there.
+
+**Which denominator applies to the 278 depends on which tree, and the two differ.**
+`data_prep.py` divides by the isoform count after the FASTA intersection, so on a **deposit-native
+rebuild** the exclusion is 278 / 42,043 = **0.66%**, and the expected post-exclusion universe is
+**41,765**. Against the **published** universe of 39,938 the same 278 would be 0.70% — a figure
+this section previously quoted without saying which tree it described, which is exactly the
+confusion that makes an unstated population a defect rather than a detail. Quote 0.66% / 41,765
+for the rebuild.
 
 ### Priority ORF selection
 ORFs are ranked: (1) reference CDS ORF, where the gene's dominant non-NMD isoform's start codon can
 be mapped; (2) SQANTI/TransDecoder2 CDS ORF, if different; (3) remaining ORFs by Kozak score, to
 K=5. Implemented in `data_prep.py::select_priority_orfs()`. K=5 was supported by an ORF-coverage analysis (`orf_coverage_diagnostics`,
-`data_prep.py:532-558`), but note what it measures: the count of **all** ORFik ORFs per transcript,
+`data_prep.py:593-624`), but note what it measures: the count of **all** ORFik ORFs per transcript,
 not of priority-eligible ones, since it is never passed `select_priority_orfs`' output. Its output
 table is not present in this repo, so the quoted fraction and median cannot currently be checked.
 See also the report's attention-rank dominance figures.
@@ -237,8 +271,8 @@ rather than silently returning the unscreened validation set (`utils.py`).
   unscreened HDF5 instead of silently returning contaminated data. `patience=10`, maximum 100
   epochs. The published run's best epoch was 3.
 - **Overfit monitor:** appends an `*** OVERFIT` flag to the epoch log when
-  `train AUC − validation AUC > 0.05` (`overfit_gap_threshold`, read at `03_train.py:173`, used only
-  at `:212`). It does **not** stop training, despite the name — the only stopping rules are early
+  `train AUC − validation AUC > 0.05` (`overfit_gap_threshold`, read at `03_train.py:188`, used only
+  at `:227`). It does **not** stop training, despite the name — the only stopping rules are early
   stopping on validation AUC and the 100-epoch cap.
 - **Batch size:** 256, with `drop_last=True` on the training loader (`03_train.py:144`), so the
   final partial batch of each epoch is discarded.
@@ -350,9 +384,9 @@ produced a reported number must be stated. The emission contract records it as a
 
 ## Per-ORF Structural Features
 
-The v5 model receives **5 per-ORF structural features** and **no transcript-level features** — a substantial simplification from earlier versions, which fed parallel ref-CDS and TD2 transcript-level feature blocks. The v5 model recovers cross-ORF context from the per-ORF features alone, plus the two CNN branches and the attention aggregator. The forward signature is `model(atg_windows, stop_windows, orf_features, orf_mask)` (`model.py:200-244`); there is **no** `tx_features` argument.
+The v5 model receives **5 per-ORF structural features** and **no transcript-level features** — a substantial simplification from earlier versions, which fed parallel ref-CDS and TD2 transcript-level feature blocks. The v5 model recovers cross-ORF context from the per-ORF features alone, plus the two CNN branches and the attention aggregator. The forward signature is `model(atg_windows, stop_windows, orf_features, orf_mask)` (`model.py:216-264`); there is **no** `tx_features` argument.
 
-### The 5 features (`data_prep.py:47-53`)
+### The 5 features (`data_prep.py:52-58`)
 
 | Feature | Definition |
 |---------|-----------|
@@ -360,9 +394,9 @@ The v5 model receives **5 per-ORF structural features** and **no transcript-leve
 | `frac_stop` | Fractional stop position: `orf_end / tx_length` (1 = 3' end). |
 | `is_ref_cds` | Binary: 1 if this ORF's start matches the reference CDS ATG (the gene's dominant non-NMD isoform's ATG, traced through the target isoform). |
 | `is_sqanti_cds` | Binary: 1 if this ORF's start matches the SQANTI/TransDecoder2 CDS call. |
-| `n_downstream_ejc` | Count of exon-exon junctions downstream of this ORF's stop codon. **Primary PTC indicator.** Included because junctions beyond the stop window are otherwise invisible to the CNN (`data_prep.py:46`). |
+| `n_downstream_ejc` | Count of exon-exon junctions downstream of this ORF's stop codon. **Primary PTC indicator.** Included because junctions beyond the stop window are otherwise invisible to the CNN (`data_prep.py:51`). |
 
-All 5 features are z-score normalized by training set statistics before entering the model. The structural sub-encoder is a single linear layer `Linear(5, 32) → ReLU` (`model.py:85,106`).
+All 5 features are z-score normalized by training set statistics before entering the model. The structural sub-encoder is a single linear layer `Linear(5, 32) → ReLU` (`model.py:105,126`).
 
 ### CDS identity sourcing
 
@@ -375,7 +409,7 @@ If the upstream repo moves, regenerate these files in the upstream tree and re-l
 
 ### What is NOT in the model
 
-The following are present in `selected_orfs.tsv` (and used by `04_interpret_attention.py` for downstream ORF-level analyses) but **do not enter** `NMDOrfModel`: `orf_length`, `frac_position` (different from `frac_start`), `frac_tx_covered`, `kozak_score`, `n_upstream_atgs`, `has_downstream_ejc`. The transcript-level `ref_*` and `td2_*` blocks (8 + 8 + 1 indicator) described in pre-v5 docs were removed in v5 (`model.py:199` "v5: no tx_features input"; `data_prep.py:692-693` "v5: no tx_features dataset"; `utils.py:31` "No tx_features (removed in v5)").
+The following are present in `selected_orfs.tsv` (and used by `04_interpret_attention.py` for downstream ORF-level analyses) but **do not enter** `NMDOrfModel`: `orf_length`, `frac_position` (different from `frac_start`), `frac_tx_covered`, `kozak_score`, `n_upstream_atgs`, `has_downstream_ejc`. The transcript-level `ref_*` and `td2_*` blocks (8 + 8 + 1 indicator) described in pre-v5 docs were removed in v5 (`model.py:219` "v5: no tx_features input"; `data_prep.py:919` "v5: no tx_features dataset"; `utils.py:143` "No tx_features (removed in v5)").
 
 ### Relationship to the prior structural elastic net
 
@@ -458,6 +492,14 @@ The **sign** of mean grad x input indicates direction: positive means the featur
 
 ## DeepSHAP Sequence Interpretation (`deepshap.py`)
 
+> **[PUBLISHED-TREE NUMBERS — NOT YET REGENERATED]** Every figure in this section was computed on
+> the **published** universe of 39,938 isoforms, under the **pre-clip** window encoding and before
+> read-through loci were excluded. All three changed on 2026-07-29 (see "Isoform universe",
+> "Sequence window extraction" and "9-channel sequence encoding"). These numbers are the record of
+> what was published; they are **not** comparable to anything a deposit-native rebuild produces,
+> and they are not re-derivable from the current code. Regenerate before quoting.
+
+
 ### Method
 
 DeepSHAP (Lundberg & Lee, 2017) computes per-position, per-channel attribution values for the 9-channel sequence encoding. We use the `shap.DeepExplainer` implementation, which applies the DeepLIFT algorithm through the CNN layers.
@@ -514,7 +556,7 @@ CNN-based SHAP values are elevated at the first and last ~25bp of the sequence w
 Two helper scripts pool the 5 joint NPZ files into the TSVs the report consumes (added during Step-2/Step-4 reproducibility work; absent from earlier METHODS):
 
 - **`scripts/export_joint_motif_logos.py`** — pools the 5 NPZs into per-position-per-channel mean SHAP × input + nucleotide frequency for the ATG and stop windows. Outputs: `motif_logo_atg_joint_{tag}.tsv` (§3.1) and `motif_logo_stop_joint_{tag}.tsv` (§4.1). Population: all test samples (n_nmd ≈ 2,268, n_ctrl ≈ 7,863), 5-run averaged.
-- **`09b_export_subgroup_profiles.py`** — pools the 5 NPZs into 6 TSVs feeding the subgroup analyses: `sample_shap_structural_{tag}.tsv` (per-sample 5-feature SHAP), `shap_profile_{atg,stop}_joint_{tag}.tsv` (per-position class-average), `shap_profile_{atg,stop}_subgroup_joint_{tag}.tsv` (per-position per-subgroup), `motif_logo_{atg,stop}_subgroup_joint_{tag}.tsv` (per-position per-channel per-subgroup). Subgroup classification logic at `09b_export_subgroup_profiles.py:30-43` mirrors the report's §7.1 case_when (see "Subgroup definitions" below).
+- **`09b_export_subgroup_profiles.py`** — pools the 5 NPZs into 6 TSVs feeding the subgroup analyses: `sample_shap_structural_{tag}.tsv` (per-sample 5-feature SHAP), `shap_profile_{atg,stop}_joint_{tag}.tsv` (per-position class-average), `shap_profile_{atg,stop}_subgroup_joint_{tag}.tsv` (per-position per-subgroup), `motif_logo_{atg,stop}_subgroup_joint_{tag}.tsv` (per-position per-channel per-subgroup). Subgroup classification logic at `09b_export_subgroup_profiles.py:32-47` mirrors the report's §7.1 case_when (see "Subgroup definitions" below).
 
 ### Landmark motif analysis (marginal flow, `07_motif_analysis.py`)
 
@@ -524,9 +566,17 @@ The legacy flow extracts per-nucleotide SHAP logos at ±15bp around biologically
 
 ## Branch Decomposition — exact Shapley, not KernelSHAP (`11_kernel_shap_branches.py`)
 
+> **[PUBLISHED-TREE NUMBERS — NOT YET REGENERATED]** Every figure in this section was computed on
+> the **published** universe of 39,938 isoforms, under the **pre-clip** window encoding and before
+> read-through loci were excluded. All three changed on 2026-07-29 (see "Isoform universe",
+> "Sequence window extraction" and "9-channel sequence encoding"). These numbers are the record of
+> what was published; they are **not** comparable to anything a deposit-native rebuild produces,
+> and they are not re-derivable from the current code. Regenerate before quoting.
+
+
 > **Naming corrected 2026-07-27.** The script, its docstring and every downstream description
 > call this "KernelSHAP". It is not: it enumerates all 2³ coalitions directly
-> (`11_kernel_shap_branches.py:319`, `coalitions = list(product([False, True], repeat=3))`) and
+> (`11_kernel_shap_branches.py:324`, `coalitions = list(product([False, True], repeat=3))`) and
 > computes **exact** Shapley values. KernelSHAP is the weighted-least-squares *approximation*
 > used when the player count makes enumeration infeasible; with 3 players it is unnecessary.
 > The misnomer *understates* the rigour, which is an odd way to be wrong, but a replicator who
@@ -541,7 +591,7 @@ their exact additive Shapley contributions.
 what these percentages describe, and both are properties of the code rather than choices made at
 reporting time:
 
-- **Rank-0 ORF only.** `11_kernel_shap_branches.py:39` hardcodes `orf_index = 0` and `main()`
+- **Rank-0 ORF only.** `11_kernel_shap_branches.py:40` hardcodes `orf_index = 0` and `main()`
   exposes no `--orf-index` flag. ORFs of rank 1–4 are computed and held as *fixed context*, never
   as players. So the shares describe the rank-0 ORF's contribution, not the transcript's.
 - **Test split, not the full cohort.** The published 60.7 / 28.8 / 10.5 come from
@@ -580,8 +630,8 @@ invisible to all three φ.
 ### Method
 
 For each test transcript:
-1. Pre-compute the 3 rank-0 ORF sub-embeddings (32-dim each) from `model.orf_encoder` (`11_kernel_shap_branches.py:33-118`).
-2. Evaluate all `2^3 = 8` coalitions of present/absent branches. For absent branches, integrate over background sub-embeddings (uniform sample from the same `n_background=500` training set; `11_kernel_shap_branches.py:251`) — not a mean approximation, since the ReLU fusion layer is nonlinear.
+1. Pre-compute the 3 rank-0 ORF sub-embeddings (32-dim each) from `model.orf_encoder` (`11_kernel_shap_branches.py:34-131`).
+2. Evaluate all `2^3 = 8` coalitions of present/absent branches. For absent branches, integrate over background sub-embeddings (uniform sample from the same `n_background=500` training set; `11_kernel_shap_branches.py:259,305`) — not a mean approximation, since the ReLU fusion layer is nonlinear.
 3. Compute exact Shapley values `φ_ATG + φ_stop + φ_struct = f(x) - E[f(x)]` per transcript.
 
 Additivity check: residual `|φ_ATG + φ_stop + φ_struct - (f(x) - E[f(x)])|` ≤ 1.8e-15 (machine epsilon) across the test set (Step-2 verified).
@@ -620,7 +670,7 @@ NMD isoforms in the test set are classified into three subgroups based on the `c
 - **NMD PTC-, ref ATG lost**: `category ∈ {ref_atg_lost, no_ref_isoform, not_atg_in_target, no_stop_in_target}` with `td2_downstream_ejc == 0` or NA.
 - Non-NMD transcripts are labeled **Control**.
 
-This logic mirrors the report's `case_when` assignment in §7.1 of `orf_model_report_v5.Rmd` and is implemented in `09b_export_subgroup_profiles.py:30-43` (`assign_subgroup()`). NMD isoforms that fall outside all three subgroups are labeled "NMD other" and excluded from subgroup analyses (currently 0 isoforms in the 4ct test set; the four named subgroups sum to 10,131 — Step-1 verified).
+This logic mirrors the report's `case_when` assignment in §7.1 of `orf_model_report_v5.Rmd` and is implemented in `09b_export_subgroup_profiles.py:32-47` (`assign_subgroup()`). NMD isoforms that fall outside all three subgroups are labeled "NMD other" and excluded from subgroup analyses (currently 0 isoforms in the 4ct test set; the four named subgroups sum to 10,131 — Step-1 verified).
 
 ### Joint subgroup flow method
 
@@ -649,6 +699,14 @@ A supplementary report uses gene-matched isoform pairs from the isopair analysis
 ---
 
 ## uORF-Attention Attribution Analysis (`infer_uorf_attention.py`, `compute_uorf_attention_metrics.R`)
+
+> **[PUBLISHED-TREE NUMBERS — NOT YET REGENERATED]** Every figure in this section was computed on
+> the **published** universe of 39,938 isoforms, under the **pre-clip** window encoding and before
+> read-through loci were excluded. All three changed on 2026-07-29 (see "Isoform universe",
+> "Sequence window extraction" and "9-channel sequence encoding"). These numbers are the record of
+> what was published; they are **not** comparable to anything a deposit-native rebuild produces,
+> and they are not re-derivable from the current code. Regenerate before quoting.
+
 
 A transcriptome-wide attribution analysis testing whether the attention layer can distinguish NMD-triggering upstream ORFs (uORFs) from main-ORF PTC mechanisms.
 

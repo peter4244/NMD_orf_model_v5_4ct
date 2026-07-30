@@ -146,7 +146,10 @@ reads regenerated `results_4ct/` exports that are not shipped.
 
 - **Sequences:** SQANTI-corrected FASTA from Isopair pipeline v6.0
 - **ORF/structural features:** `export_rds.R` from the Isopair `Version_6.0` analysis cache (ORFik scan shared with original v5)
-- **NMD labels:** 4-cell-type mashr DE results at `/projects/talisman/shared-data/nmd/mashr/` (relabeled by `relabel_tx_summary_4ct.R`)
+- **NMD labels:** carried by the ORFik scan and written by `export_rds.R`; vintage recorded in
+  `tx_summary_provenance.json`. The *published* labels came from 4-cell-type mashr DE results at
+  `/projects/talisman/shared-data/nmd/mashr/` via `relabel_tx_summary_4ct.R`, which is now
+  retired (D18) and is not a build step.
 - **Starting data:** GEO **GSE329233**
 - **Original v5:** [peter4244/NMD_orf_model_v5](https://github.com/peter4244/NMD_orf_model_v5) — deprecated (6-CT scope; do not cite)
 

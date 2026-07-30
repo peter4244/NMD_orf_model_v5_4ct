@@ -1,0 +1,41 @@
+doc	cite	file	anchor_text
+METHODS.md	03_train.py:140	03_train.py	val_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="val_clean")
+METHODS.md	03_train.py:144	03_train.py	drop_last=True)
+METHODS.md	03_train.py:188	03_train.py	gap_threshold = config["training"].get("overfit_gap_threshold", 0.05)
+METHODS.md	03_train.py:30	03_train.py	def make_optimizer(model, config):
+METHODS.md	06_export_deepshap_tsv.py:240	06_export_deepshap_tsv.py	run_files = sorted(results_dir.glob(f"deepshap_summary_{tag}_{mode}_run*.tsv"))
+METHODS.md	09b_export_subgroup_profiles.py:32	09b_export_subgroup_profiles.py	def assign_subgroup(row):
+METHODS.md	11_kernel_shap_branches.py:259	11_kernel_shap_branches.py	parser.add_argument("--n-background", type=int, default=500)
+METHODS.md	11_kernel_shap_branches.py:305	11_kernel_shap_branches.py	bg_idx = rng.choice(len(train_ds), size=min(args.n_background, len(train_ds)),
+METHODS.md	11_kernel_shap_branches.py:324	11_kernel_shap_branches.py	coalitions = list(product([False, True], repeat=3))
+METHODS.md	11_kernel_shap_branches.py:34	11_kernel_shap_branches.py	def extract_sub_embeddings(model, dataset, indices, device, batch_size=256):
+METHODS.md	11_kernel_shap_branches.py:40	11_kernel_shap_branches.py	orf_index = 0
+METHODS.md	data_prep.py:110	data_prep.py	def encode_window_v5(seq_uint8, junctions_set, center, half_win,
+METHODS.md	data_prep.py:216	data_prep.py	def encode_transcript_orfs(args):
+METHODS.md	data_prep.py:51	data_prep.py	# n_downstream_ejc included because junctions beyond the stop window are invisible to the CNN
+METHODS.md	data_prep.py:52	data_prep.py	ORF_FEATURE_COLS = [
+METHODS.md	data_prep.py:593	data_prep.py	def orf_coverage_diagnostics(orf_df, tx_summary, max_k=MAX_ORFS):
+METHODS.md	data_prep.py:87	data_prep.py	def compute_rolling_gc(seq_uint8, window=GC_ROLLING_WINDOW):
+METHODS.md	data_prep.py:919	data_prep.py	# v5: no tx_features dataset
+METHODS.md	deepshap.py:105	deepshap.py	class JointBranchWrapper(nn.Module):
+METHODS.md	deepshap.py:189	deepshap.py	mode_suffix = f"_{_mode}"
+METHODS.md	deepshap.py:24	deepshap.py	class BranchWrapper(nn.Module):
+METHODS.md	deepshap.py:320	deepshap.py	channel_names=["A", "C", "G", "T", "junction",
+METHODS.md	deepshap.py:515	deepshap.py	channel_names=["A", "C", "G", "T", "junction",
+METHODS.md	deepshap.py:67	deepshap.py	class StructuralBranchWrapper(nn.Module):
+METHODS.md	model.py:101	model.py	self.atg_cnn = SequenceCNN(n_seq_channels, conv_channels, seq_embed_dim,
+METHODS.md	model.py:103	model.py	self.stop_cnn = SequenceCNN(n_seq_channels, conv_channels, seq_embed_dim,
+METHODS.md	model.py:105	model.py	self.struct_fc = nn.Linear(n_orf_features, seq_embed_dim)
+METHODS.md	model.py:126	model.py	struct_emb = F.relu(self.struct_fc(orf_features))
+METHODS.md	model.py:170	model.py	class NMDOrfModel(nn.Module):
+METHODS.md	model.py:209	model.py	self.head = nn.Sequential(
+METHODS.md	model.py:216	model.py	def forward(self, atg_windows, stop_windows, orf_features, orf_mask,
+METHODS.md	model.py:219	model.py	v5: no tx_features input.
+METHODS.md	model.py:41	model.py	if window_size <= 20:
+METHODS.md	model.py:90	model.py	class ORFEncoder(nn.Module):
+METHODS.md	orf_model_report_v5.Rmd:189	orf_model_report_v5.Rmd	# deepshap_summary_{tag}_{mode}_run{N}.tsv since the W52 fix, so this pattern -- the legacy
+METHODS.md	slurm_deepshap_joint.sh:19	slurm_deepshap_joint.sh	SEED=$((SLURM_ARRAY_TASK_ID * 100))
+METHODS.md	slurm_deepshap_joint.sh:25	slurm_deepshap_joint.sh	--n-explain 0 \
+METHODS.md	utils.py:143	utils.py	No tx_features (removed in v5).
+METHODS.md	utils.py:217	utils.py	def compute_pos_weight(dataset):
+METHODS.md	utils.py:57	utils.py	if os.environ.get("NMD_ALLOW_NONDETERMINISM") == "1":
