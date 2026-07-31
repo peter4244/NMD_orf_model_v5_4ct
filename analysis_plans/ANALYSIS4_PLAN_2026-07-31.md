@@ -239,13 +239,31 @@ nothing left for it to test. The retrain proceeds only if the random-weight cont
 
 The **pre-registered positions of step 7 must fail to appear** in both of the first two.
 
-**How many control models, and an admission that one is thin.** The permuted-label control is
-specified at **three seeds per configuration**, not one. A single control model is one draw from a
-distribution this project has repeatedly measured as wide — `F_member` runs 331 to 12,699 against a
-3.0069 critical value, and member shares span several percentage points everywhere. A single
-label-permuted model showing no Kozak signal would be weak evidence of the same kind the rest of
-this work refuses to accept. Three is the smallest number that shows whether the absence is itself
-stable.
+**Each control is an ENSEMBLE of five, because that is the object being controlled.** The analysis
+attributes the ensemble — the mean logit across five members — so a control built from a single
+model controls a different object than the claim is about. That is the same category error as
+attaching a member-level spread to an ensemble-level centre, which §4e's spread reporting already
+exists to avoid.
+
+So: **five randomly-initialized members**, and **five members trained on permuted labels**, each
+ensembled exactly as the real members are, and each attributed against the same five reference
+draws.
+
+This also settles how many control models are enough, which an earlier draft of this section
+answered badly with "three seeds". Five is not a larger arbitrary number — it is the number the
+design already uses, and it yields the five per-member views for free alongside the ensemble. The
+question that matters, *is the absence of signal stable across members or did one control model
+happen to be quiet*, is then answered by the control's own structure rather than by a separate
+argument.
+
+**What this does not give**, stated rather than glossed: it is still one ensemble per control. The
+distribution *of* ensembles would require several independent sets of five and is not worth its
+cost. The per-member view within each control is the practical substitute.
+
+**Scope.** The permuted-label control runs at **one configuration first**, not both. The
+pre-registered Kozak and stop positions sit near the anchor at either window width, so a control at
+one should generalize; if its result is ambiguous the second configuration remains available. The
+random-weight control runs at both, since it costs no training.
 
 **The cost of a training run has never been measured here** — every analysis so far has consumed
 checkpoints rather than produced them. Early stopping fired at epochs 4 to 7 for the ten existing
