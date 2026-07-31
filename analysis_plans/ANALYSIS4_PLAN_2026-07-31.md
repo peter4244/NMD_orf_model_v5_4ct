@@ -213,9 +213,34 @@ diagnostic: a position whose attribution is not stable across draws is not a pos
 anything is claimed. The claim-bearing positions of step 7 are reported with their across-draw
 spread beside them, and a spread exceeding the effect is stated as such.
 
-**4. A negative control.** The same pipeline is run on **shuffled labels** for one cell per
-configuration. It must not produce the pre-registered Kozak or stop codon signal. This is the check
-that distinguishes "the model learned a motif" from "this pipeline produces motif-shaped output".
+**4. Negative controls — three of them, because they break different things.**
+
+The risk being controlled for is specific. The nucleotide figures are **signed attribution × input**
+logos, and the input one-hot is a multiplicand, so a logo displays whatever motif the *sequences*
+contain largely independently of whether the model uses it. A Kozak-shaped picture is therefore not
+by itself evidence that anything was learned.
+
+**A label permutation does not control for this**, and the reason is worth stating because the
+opposite is easy to assume: attribution never sees a label. Labels are carried alongside and used
+only at summarisation, so permuting them leaves every per-isoform attribution bit-identical and the
+NMD profile becomes a random subsample of the same numbers. Any motif present survives untouched.
+
+| control | what it breaks | what it tests | cost |
+|---|---|---|---|
+| **random-weight model** — same architecture and initialization, never trained | all learned structure | whether the pipeline and the input distribution alone produce the pre-registered signal | one attribution run per configuration |
+| **model trained on permuted labels** — one member per configuration | the label–sequence association, while the optimizer still adapts to input structure | whether a model that *cannot* have learned NMD biology still produces the signal | one training run per configuration, early stopping fires at epochs 4–7 |
+| **label permutation at summarisation** | only the NMD/Control split | the null distribution for the comparative half of claim 5.3.2, and nothing else | free |
+
+The **pre-registered positions of step 7 must fail to appear** in the first two. If the Kozak
+positions carry signal in a random-weight model, the finding belongs to the input distribution and
+the claim is not supportable from these figures at all.
+
+The third is not a control on the motif claim and is not reported as one. It is the null for
+"more importance for NMD than Control", which is a genuinely label-dependent statement.
+
+*Corrected 2026-07-31, before implementation. The first draft of this plan specified the label
+permutation alone and described it as distinguishing "the model learned a motif" from "this pipeline
+produces motif-shaped output". It cannot do that, for the reason given above.*
 
 **Why four rather than one.** The exact anchor tests alignment and completeness; convergence tests
 whether 500 references suffice; stability tests whether the answer is determined; the negative
