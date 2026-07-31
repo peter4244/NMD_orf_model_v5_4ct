@@ -261,15 +261,37 @@ by enumeration — no sampling and no approximation.
       write Dataset C row per isoform
 ```
 
-### Step 5 — accept or reject each file
+### Step 5 — accept or reject each file, and record the tally
 
-The decomposition is exact, so a residual materially above machine precision means a broken run
-rather than a noisy one.
+**The residual is a checksum, not a constraint.** With three branches all eight coalitions are
+enumerated and the Shapley values solved exactly, so
+`phi_start + phi_stop + phi_struct = prediction - expected_value` is an algebraic consequence of the
+arithmetic. Nothing rescales to make it hold. The residual can therefore only be floating-point
+rounding — around 1e-15 — and anything materially larger means the file did not come from the
+calculation it claims to: coalitions evaluated against different reference sets, a model left in
+training mode, a mislabelled coalition, or a file assembled from two runs. It does not say which.
+
+This is why a hard reject is affordable here and would not be for an approximate method, where a
+small non-zero residual is expected and tells you nothing.
 
 ```
-    assert max|residual| < 1e-12 across the file       # expect ~1e-15
-    assert row count == 41,765 and label vector matches step 1
+    accepted = 0; rejected = []
+    for each of the 50 files:
+        assert row count == 41,765 and label vector matches step 1
+        r = max|residual|
+        if r < 1e-12:  accepted += 1
+        else:          rejected.append((tag, member, draw, r))   # reason recorded, not just count
+
+    report accepted, len(rejected), and every rejected cell with its residual
+    if rejected: STOP -- a rejected cell is a defect to diagnose, not a cell to drop
 ```
+
+**The tally is reported whether or not anything is rejected**, in the run log and in the summary
+file. A silently dropped cell would leave the spreads computed over fewer than 25 cells while the
+output still said 25, and an unreported exclusion is the reporting failure rather than the fix.
+
+Rejection stops the analysis rather than proceeding on the survivors. A residual above tolerance
+means an upstream fault that would also affect the cells that happened to pass.
 
 ### Step 6 — reduce each file to three numbers
 
