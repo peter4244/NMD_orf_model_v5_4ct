@@ -37,8 +37,8 @@ together form the structural branch's entire input. In array order:
 |---|---|---|---|
 | 0 | `frac_start` | ORF start position ÷ transcript length | 0.000–0.970, mean 0.188 |
 | 1 | `frac_stop` | ORF end position ÷ transcript length | 0.015–1.000, mean 0.535 |
-| 2 | `is_ref_cds` | 1 if the ORF's start matches the reference CDS start | binary; 1 in 68.3% |
-| 3 | `is_sqanti_cds` | 1 if it matches the TransDecoder2 CDS start | binary; 1 in 79.9% |
+| 2 | `is_ref_cds` | 1 if the ORF's start matches the reference CDS start, projected onto this isoform | binary; 1 in 68.3% |
+| 3 | `is_sqanti_cds` | 1 if it matches the TransDecoder2 CDS start called on this isoform | binary; 1 in 79.9% |
 | 4 | `n_downstream_ejc` | count of exon junctions downstream of this ORF's stop codon | 0–33, mean 1.077 |
 
 *Measured here 2026-07-31 from `results_4ct_dn/nmd_orf_data.h5`, at ORF rank 0 over all 41,765
@@ -48,6 +48,31 @@ isoforms.* The five enter the model through one linear layer, `nn.Linear(5, 32)`
 `n_downstream_ejc` is the feature carrying the best-established trigger of nonsense-mediated decay.
 It exists because junctions beyond the stop window are invisible to the sequence encoders
 (`data_prep.py:51`).
+
+**The two flags are not the same kind of variable, and only one of them is about agreement.**
+Both are exact-position equality against an externally supplied start (`data_prep.py:534-537`), and
+both default to no-match when the annotation is unavailable — so a zero conflates "the annotation
+disagrees" with "there is no annotation". Measured at ORF rank 0, those two cases are in opposite
+proportions:
+
+| a zero means | `is_ref_cds` | `is_sqanti_cds` |
+|---|---|---|
+| the annotation exists and names a different ORF | **0.4%** | **75.1%** |
+| the annotation is unavailable on this isoform | **99.6%** | ≤ 24.9% |
+
+*Measured here 2026-07-31 from `results_4ct_dn/selected_orfs.tsv` and `ref_cds_features.tsv`. The
+`is_sqanti_cds` remainder is an upper bound: the SQANTI classification is a cluster path, so
+"not called coding" cannot be separated from "matches an unselected ORF" locally.*
+
+`is_ref_cds` therefore **cannot discriminate which ORF is annotated**: tier 1 of the ORF ranking
+rule guarantees that whenever a reference start exists, rank 0 is it. The flag says *whether the
+annotated start codon survives in this transcript* — a structural property of the isoform, and the
+same distinction section 4 draws as *Ref AUG absent*. `is_sqanti_cds` is a genuine per-ORF
+agreement flag and does vary within an isoform.
+
+This is also the mechanism behind their anti-correlation: where the reference start is absent,
+tier 2 fires and selects the TransDecoder2 ORF, so a zero in the first tends to force a one in the
+second.
 
 **Feature attribution.** How much one structural feature contributed to one isoform's prediction,
 in log-odds. Absence is operationalized exactly as in Analysis 2 — by substituting the value that
@@ -104,10 +129,13 @@ that evidence divided among the five features?**
 
 The question is a test of whether the model recovered the mechanism rather than a correlate. The
 junction-dependent account of nonsense-mediated decay predicts that `n_downstream_ejc` should
-dominate: a stop codon with exon junctions downstream is the canonical trigger. Two of the other
-four features, `is_ref_cds` and `is_sqanti_cds`, are annotation-agreement flags rather than
-mechanism, and weight on them would indicate the model leaning on how an ORF was called rather than
-on where it sits.
+dominate: a stop codon with exon junctions downstream is the canonical trigger.
+
+**Weight on the two flags does not have one interpretation, because the flags are not one kind of
+variable** (§2.1). Weight on `is_sqanti_cds` does indicate the model leaning on how an ORF was
+called. Weight on `is_ref_cds` indicates something else: whether the transcript still contains its
+annotated start codon, which is structural rather than bookkeeping and is not obviously separable
+from mechanism. The two are reported separately and are not described with one word.
 
 And, as everywhere in this work: **how much would the answer have differed under a different
 training run, or a different draw of reference isoforms?**

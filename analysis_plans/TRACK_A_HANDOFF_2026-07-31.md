@@ -247,10 +247,22 @@ Test-split sensitivity (n = 2,405, the published figures' population) moves noth
 
 **One thing worth the manuscript's attention that the claim does not mention.** The two annotation
 flags together carry **22.5% and 23.0%** — computed as a four-player game in which they move as one
-player, not by adding their separate shares. That is a substantial share of the structural evidence
-resting on *how an ORF was called* rather than on where it sits. It is not a defect, but a sentence
-crediting the model with recovering junction-dependent decay should probably not pass over it in
-silence.
+player, not by adding their separate shares.
+
+**Do not describe that share as "how the ORF was called".** Corrected 2026-07-31: the two flags are
+not the same kind of variable. At ORF rank 0, a zero in `is_sqanti_cds` means the TransDecoder2
+start names a different ORF 75.1% of the time — a real disagreement. A zero in `is_ref_cds` means
+the reference start does not exist on this isoform **99.6%** of the time, and names a different ORF
+0.4% of the time. The ORF ranking rule guarantees this: tier 1 selects the reference-matching ORF
+whenever one exists, so the flag cannot discriminate *which* ORF is annotated and instead reports
+*whether the annotated start codon survives in this transcript* — the same distinction section 4
+draws as *Ref AUG absent*.
+
+So a substantial part of the 23% is the model reading **isoform structure**, not annotation
+bookkeeping, and it is not obviously separable from mechanism. It also explains the flags'
+anti-correlation: where the reference start is absent, tier 2 fires and selects the TransDecoder2
+ORF. *Measured from `results_4ct_dn/selected_orfs.tsv` and `ref_cds_features.tsv`; no computed share
+changes, only its interpretation.*
 
 *A note on that number, because the obvious shortcut is wrong.* Adding the two features' individual
 shares gives 26.64% and 26.56% — an overstatement of 4.13 and 3.62 percentage points, because
