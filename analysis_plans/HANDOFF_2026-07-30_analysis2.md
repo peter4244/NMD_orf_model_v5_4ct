@@ -81,6 +81,38 @@ exit code reporting success while the log reported failure, because the script e
 process killed silently by a login node; an oversized time request excluded from backfill and left
 pending an hour beside idle nodes. Ask Pete before every cluster login.
 
+## Outstanding: statistical review of Steps 7 and 8
+
+**Pete is doing this in the new window.** It has not been done. Four things I noticed while reading
+those steps, recorded as questions for that review rather than as findings, so they are not lost and
+not pre-judged:
+
+1. **The two spreads describe different objects.** The interpretation spread is the spread of the
+   ENSEMBLE's percentage across five reference draws; the training spread is the spread of MEMBER
+   percentages across five members. Averaging five members reduces draw noise, so the first is
+   ensemble-level and the second member-level. Reported side by side as `value ± a ± b` they invite a
+   comparison that may not be valid. Related: the ensemble has one training realization, so its own
+   training uncertainty is not estimable from these data at all — the member spread bounds it only
+   loosely, since members share training data and are not independent.
+
+2. **The design is crossed, and the estimators are marginal.** The same five reference draws are used
+   for every member, so member × draw is a fully crossed 5×5. That supports separating member
+   variance, draw variance and their interaction. The marginal standard deviations as specified fold
+   the interaction into the components rather than isolating it.
+
+3. **The three shares are compositional.** They sum to 100% by construction, so they are not
+   independent and a standard deviation on each is descriptive only — a rise in one is necessarily a
+   fall in another, and any joint statement about two of them is one fact, not two. The plan notes the
+   sum constraint but does not draw this consequence.
+
+4. **The ratio's summary may not suit its distribution.** A ratio of two positive quantities is
+   right-skewed, so a mean and standard deviation over the 25 cells may describe it poorly. A median
+   with a range, or moments on the log ratio, would be more robust.
+
+And one gap in Step 8 rather than a question: **it records the summary but not the 25 per-cell
+values.** Without those, the spreads cannot be recomputed or re-estimated by a different method, and
+the summary has to be taken on trust. The per-cell table should be written alongside it.
+
 ## Open decisions
 
 - **Whether the reference draw stays uniform.** Kept, so any movement in the branch shares is
