@@ -22,3 +22,6 @@ figures_baseline/
 
 # Analysis outputs: data, not code. These go to the Zenodo deposit, not to git.
 results_interp_all/
+
+# Trained members: data, not code. Same rule as results_interp_all/ above.
+results_4ct_sweep/
