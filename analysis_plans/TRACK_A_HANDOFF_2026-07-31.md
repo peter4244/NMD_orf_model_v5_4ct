@@ -210,6 +210,36 @@ time to learn.
 
 ---
 
+## 11. ⚠ Figure legend 5.6.6 — the magnitude reproduces, the superlative does not
+
+Published legend: *"(D) Mean |SHAP| per structural feature (5 DeepSHAP replicates); downstream EJC
+count dominates (2.153), ~15× the next feature."*
+
+| | EJC mean \|φ\| | ratio to the next feature |
+|---|---|---|
+| legend | 2.153 | **~15×** |
+| `atg2000_stop2000` | 2.080 | **4.04×** |
+| `atg1000_stop1000` | 1.642 | **3.61×** |
+
+The magnitude is close at the wider configuration — 2.080 against 2.153, 3.4% — while the **ratio is
+wrong by a factor of about four**. This is the shape the ledger already has a defect for at 2.6.3:
+the values reproduce and the superlative fails.
+
+A likely cause, offered as speculation rather than finding: the legend says *5 DeepSHAP replicates*,
+so the published figure used an approximate method on the structural branch where Analysis 3 uses
+exact enumeration of all 32 coalitions. 2.153 / 15 ≈ 0.14, which is close to Analysis 3's
+`frac_start` (0.134 at `atg1000_stop1000`), so the published ordering may have placed the two
+annotation flags far lower than the exact decomposition does. That would be consistent with §10 —
+those two flags are where the exact and approximate methods would be most likely to differ.
+
+**This is a legend, so it inherits from 5.2.4 the way 5.6.5 and 5.6.6 inherit from 5.2.2 and 5.2.3.**
+Claim 5.2.4 itself ("EJC count was by far the most important") is SUPPORTED — see §10. It is the
+legend's quantified superlative that is not.
+
+*Source: `results_interp_all/feature_shares_per_cell.tsv`, ensemble rows, `five_player_m_*` columns.*
+
+---
+
 ## 9. What is NOT in here
 
 - **No ledger rows have been written, and `build_current_state.py` has not been run.**
