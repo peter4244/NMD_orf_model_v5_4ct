@@ -7,6 +7,17 @@ Written 2026-07-31 from the model repo (`peter4244/NMD_orf_model_v5_4ct`, branch
 C-rows, D-rows and W-rows, or to reject. Every number carries the measurement behind it and the
 artifact it came from, so nothing here has to be taken on trust.
 
+**THIS DOCUMENT ACCUMULATES; IT IS NOT SENT PIECEMEAL.** Decided by Pete 2026-07-31. Findings are
+added here as they are made and the document is handed over once, rather than dispatched to the
+other window one at a time. The exception is anything CRITICAL — a result that would change work
+already in progress there, or a defect in something already recorded — which goes immediately and is
+also recorded here. Sections added after the first handover carry the date they were added, so a
+reader who has seen an earlier revision can find what is new.
+
+**Sections added after the 2026-07-31 handover at `fd5303b`:** §10 (claim 5.2.4, Analysis 3
+complete), §11 (figure legend 5.6.6). Section 2 gained the 5.6.5/5.6.6 legend consequence and §10
+gained the `is_ref_cds` correction; both are marked in place.
+
 **CLAIM IDS ARE THE LEDGER'S `section.paragraph.sentence` SCHEME**, corrected 2026-07-31 after
 Track A caught the mismatch. An earlier revision of this document used the leading column of
 `docs/claims_to_code.tsv` (`5.9`, `5.11`, `5.12`, `5.14`), which is a sequential row id within
