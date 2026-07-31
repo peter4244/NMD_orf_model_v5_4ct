@@ -7,6 +7,14 @@ Written 2026-07-31 from the model repo (`peter4244/NMD_orf_model_v5_4ct`, branch
 C-rows, D-rows and W-rows, or to reject. Every number carries the measurement behind it and the
 artifact it came from, so nothing here has to be taken on trust.
 
+**CLAIM IDS ARE THE LEDGER'S `section.paragraph.sentence` SCHEME**, corrected 2026-07-31 after
+Track A caught the mismatch. An earlier revision of this document used the leading column of
+`docs/claims_to_code.tsv` (`5.9`, `5.11`, `5.12`, `5.14`), which is a sequential row id within
+section 5 and **not** a claim id. Reading that `5.12` as `5.1.2` would have attached a model
+finding to a sentence about input data blocks, and both numbers exist. Crosswalk, for anyone
+holding the earlier revision: **5.9 → 5.2.1, 5.11 → 5.2.2, 5.12 → 5.2.3, 5.14 → 5.2.4.** Track B
+uses the ledger's scheme from here on.
+
 **Two things are flagged as MANUSCRIPT DEFECTS rather than rebuild observations** — they are
 statements in the paper that the measurements do not support, independently of any deposit
 question. They are marked ⚠ below.
@@ -36,7 +44,7 @@ is unaffected and still stands.
 
 ---
 
-## 2. ⚠ Claim 5.12 is configuration-dependent, and false at one configuration
+## 2. ⚠ Claim 5.2.3 (was cited as 5.12) is configuration-dependent, and false at one configuration
 
 Published: *"STOP sequence ~3× as important as START sequence."*
 
@@ -57,9 +65,14 @@ as biology is not supportable as written.
 *Ratios are geometric means over five reference draws at ensemble level, formed within each cell.
 Source: the two `branch_decomposition_*.json` files.*
 
+**Figure legends 5.6.5 and 5.6.6 restate these same quantities** and inherit whatever is decided
+here — flagged by Track A in C76. A fix to the body text that leaves the legends alone
+reintroduces the defect in a caption. The corrected values for both live in
+`branch_decomposition_*.json`.
+
 ---
 
-## 3. ⚠ Claim 5.11's "roughly ⅔ structural" is much less determined than one number suggests
+## 3. ⚠ Claim 5.2.2's (was cited as 5.11) "roughly ⅔ structural" is much less determined than one number suggests
 
 Published: *"Roughly ⅔ of predictive information from ORF structural data, ⅓ from START+STOP
 sequence."*
@@ -87,7 +100,7 @@ Three wording problems independent of the number, all of which need fixing along
 
 ---
 
-## 4. Analysis 1 supersedes the basis of claim 5.9
+## 4. Analysis 1 supersedes the basis of claim 5.2.1
 
 Published: *"AUC=0.93, AUPRC=0.833 on held-out test set."*
 
@@ -207,7 +220,7 @@ time to learn.
 
 ---
 
-## 10. Claim 5.14 — SUPPORTED, and more stable than the branch-level claims
+## 10. Claim 5.2.4 (was cited as 5.14) — SUPPORTED, and more stable than the branch-level claims
 
 Published: *"Of individual ORF structural features, EJC count was by far the most important."*
 
@@ -225,8 +238,8 @@ isoforms:
 
 **The claim holds, and it holds better than anything in §2 or §3.** The junction count is the
 largest feature in both configurations, its share agrees between them to within 3.5 points, and no
-cell of the fifty puts it below 56.7%. Contrast claim 5.12, which inverts between configurations,
-and claim 5.11, whose value spans 18 points. Reference-draw spreads are 0.10–0.62 pp and
+cell of the fifty puts it below 56.7%. Contrast claim 5.2.3, which inverts between configurations,
+and claim 5.2.2, whose value spans 18 points. Reference-draw spreads are 0.10–0.62 pp and
 ensemble-size biases are under 0.25 pp throughout.
 
 Test-split sensitivity (n = 2,405, the published figures' population) moves nothing: 61.70% and
