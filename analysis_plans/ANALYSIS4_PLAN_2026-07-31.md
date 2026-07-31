@@ -152,9 +152,12 @@ is reported.
 **Not in scope.** Claim 5.3.3 (*UGA more common in NMD-susceptible transcripts, 56% vs 48%*) is a
 sequence-composition claim, not a model claim, and is already a recorded ledger defect.
 
-**Population.** Sensitivity is a per-isoform property, so ISM runs on a **stratified subsample** —
-size fixed in §7 after the cost measurement, strata by label class and PTC status. Reported as
-distributions over the subsample, never as exemplars.
+**Population.** Sensitivity is a per-isoform property, so ISM runs on a **stratified subsample of
+2,000 isoforms**, stratified by label class and by PTC status, reported as distributions over the
+subsample and never as exemplars. *Size fixed 2026-07-31 from the measurement in §7: 2,000 isoforms
+costs 24 CPU-hours at `atg1000_stop1000` and roughly 97 at `atg2000_stop2000`, about six hours of
+wall clock across both at twenty-way parallelism. The full 9,321-isoform population would be roughly
+five times that and buys precision on a distribution that 2,000 already characterises.*
 
 ---
 
@@ -168,8 +171,16 @@ for TAG, for each of the five members:
       for each position p unpadded in i:
           for each alternative base b != observed:
               rebuild the window with b at p, RECOMPUTING the GC channel over its support
-              effect[i,p,b] = model(perturbed) - model(observed)      # log-odds
+              effect[i,p,b] = model(perturbed) - model(BASELINE)      # log-odds
 ```
+
+**The baseline is built through the same recomputation path as the perturbations** — the observed
+window with its GC channel recomputed, not the window as stored. Channel 5 is stored as float16 and
+recomputed in float32, so comparing a recomputed perturbation against a stored baseline puts a
+systematic offset into every effect. *Measured 2026-07-31: a no-op substitution against the stored
+baseline gives 2.6e-06 to 1.3e-05 log-odds; against a recomputed baseline it gives exactly 0.0 on
+every isoform tested. The offset is small but it is systematic and shared by every perturbation, so
+it does not average away in a positional profile.*
 
 Batched over (position x base) so each isoform costs a bounded number of forward passes.
 
@@ -263,8 +274,10 @@ channels are unchanged.
 
 **3. Determinism.** The same perturbation scored twice gives the same number. ISM has no RNG.
 
-**4. A no-op perturbation.** Substituting the observed base for itself must give exactly zero. Free,
-and it catches an indexing error a plausible profile would not.
+**4. A no-op perturbation.** Substituting the observed base for itself must give **exactly** zero,
+not approximately. Free, and it has already earned its place: it caught the float16 baseline offset
+above, which no positional profile would have revealed. Exact zero is achievable and is therefore the
+bar — anything else means the baseline and the perturbation are not going through the same path.
 
 **5. A reference band for post hoc positions.** The same statistic over far-field unpadded positions
 (|pos| > 200) with its 2.5th and 97.5th percentiles. A post hoc position is notable only outside that
@@ -274,14 +287,32 @@ band — selection-aware, no hypothesis test.
 
 # 7. Cost, and what is measured before anything is committed
 
-ISM is 3 substitutions per position, so a 2,000-position window is 6,000 forward passes per isoform
-per branch. It batches, and it is bounded per isoform rather than per (isoform x background) as
-DeepSHAP was — that design measured at 238-638 CPU-hours per member-draw, which is what made
-full-cohort attribution unaffordable.
+ISM is 3 substitutions per unpadded position. **Measured 2026-07-31** on the development machine's
+CPU, `atg1000_stop1000` member 100, 8 isoforms, batch 512:
 
-**Nothing is submitted before one member on a small subsample is timed here**, and §4 subsample size
-is fixed from that measurement and recorded. This is the discipline that has already caught a 35.3
-GiB peak against a 32 GB request and a per-isoform rate wrong by 6x.
+| | measured |
+|---|---|
+| unpadded positions per window | **648 of 1,000 (64.8%)** |
+| wall time per isoform, one branch | **4.38 s** |
+| per isoform, both branches x five members | **43.8 s** |
+| peak memory | **2.02 GiB** |
+
+| subsample | `atg1000_stop1000` | wall at 20-way |
+|---|---|---|
+| 500 | 6.1 CPU-h | 0.3 h |
+| **2,000** | **24.3 CPU-h** | **1.2 h** |
+| 9,321 (the full population) | 113.5 CPU-h | 5.7 h |
+
+`atg2000_stop2000` roughly **quadruples** this: the window doubles, so both the position count and
+the per-row cost double. The chosen 2,000-isoform subsample is therefore about 121 CPU-hours across
+both configurations, roughly six hours of wall clock at twenty-way parallelism.
+
+*Run log: `analysis_plans/probe_ism_cost_runlog.txt`. The 64.8% unpadded figure independently
+corroborates the padding measurement in §3.1 and is the reason positions are filtered rather than
+averaged over.*
+
+This measurement is the discipline that has already caught a 35.3 GiB peak against a 32 GB request
+and a per-isoform rate wrong by 6x.
 
 `deepshap.py` is **not** used, so its eager dual-split read — 28 GB at W=1000 and 57 GB at W=2000,
 never given the chunked fix — is not on this path. The ISM producer reads windows through the chunked

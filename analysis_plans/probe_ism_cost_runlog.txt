@@ -1,0 +1,53 @@
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=1000, Stop=1000
+  ORF embed dim: 64
+  Conv channels: 32
+model best_model_atg1000_stop1000_seed100.pt   window 1000
+  all[8 of 41,765]: 8 samples, 6 NMD+ (75.0%)
+
+=== GC channel recomputed from the window's own one-hot, vs the stored channel ===
+  max |recomputed - stored| over 8 isoforms: 2.394e-04
+  -> EXACT (float16 storage precision)
+
+=== ISM cost, start branch, 8 isoforms ===
+  isoform 0:   693 unpadded positions,  2,080 forward rows,   5.51 s
+  isoform 1:   855 unpadded positions,  2,566 forward rows,   5.65 s
+  isoform 2:   699 unpadded positions,  2,098 forward rows,   4.58 s
+  isoform 3:   705 unpadded positions,  2,116 forward rows,   5.00 s
+  isoform 4:   645 unpadded positions,  1,936 forward rows,   4.28 s
+  isoform 5:   630 unpadded positions,  1,891 forward rows,   4.21 s
+  isoform 6:   639 unpadded positions,  1,918 forward rows,   3.98 s
+  isoform 7:   316 unpadded positions,    949 forward rows,   1.85 s
+
+=== no-op perturbation (observed base substituted for itself) ===
+  max |effect| = 3.314e-05   -> NON-ZERO -- indexing error
+
+=== COST ===
+  mean unpadded positions per window : 648 of 1,000  (64.8%)
+  mean wall time per isoform, 1 branch: 4.38 s
+  -> per isoform, BOTH branches       : 8.77 s
+  -> per isoform, both x 5 members    : 43.8 s
+       500 isoforms, both branches x 5 members:     6.1 CPU-hours (  0.3 h wall at 20-way parallel)
+     2,000 isoforms, both branches x 5 members:    24.3 CPU-hours (  1.2 h wall at 20-way parallel)
+     9,321 isoforms, both branches x 5 members:   113.5 CPU-hours (  5.7 h wall at 20-way parallel)
+
+  NOTE: measured on this laptop's CPU at W=1000. The wider configuration doubles the
+        window and therefore roughly doubles both position count and per-row cost.
+       42.68 real       130.39 user        76.61 sys
+          1381830656  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+            29029963  page reclaims
+               24149  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                8668  voluntary context switches
+             3478304  involuntary context switches
+       1983805757653  instructions retired
+        674286935605  cycles elapsed
+          2171309888  peak memory footprint
