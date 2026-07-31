@@ -1,0 +1,167 @@
+Intel MKL WARNING: Support of Intel(R) Streaming SIMD Extensions 4.2 (Intel(R) SSE4.2) enabled only processors has been deprecated. Intel oneAPI Math Kernel Library 2025.0 will require Intel(R) Advanced Vector Extensions (Intel(R) AVX) instructions.
+Intel MKL WARNING: Support of Intel(R) Streaming SIMD Extensions 4.2 (Intel(R) SSE4.2) enabled only processors has been deprecated. Intel oneAPI Math Kernel Library 2025.0 will require Intel(R) Advanced Vector Extensions (Intel(R) AVX) instructions.
+Analysis 1 — held-out performance.  started 2026-07-30T19:17:12
+torch 2.13.0, numpy 2.4.6
+
+==============================================================================
+STEP 1 — define the population
+==============================================================================
+  file: /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_4ct_dn/nmd_orf_data.h5
+  [OK  ] arrays share one length: 41,765 entries
+  [OK  ] every isoform is on a held-out chromosome: [np.str_('chr1'), np.str_('chr3'), np.str_('chr5'), np.str_('chr7')]
+  [OK  ] no test_paralog isoform is included: 0 present
+  [OK  ] n matches the plan: 10,520
+  [OK  ] indices are strictly increasing (required for HDF5 reads): yes
+        NMD susceptible: 2,405 of 10,520  (22.9%)
+        alignment key  : isoform_id, first = ENSG00000000457.15.novel2, last = ENST00000971027.1
+
+==============================================================================
+STEP 2 — draw the bootstrap resamples
+==============================================================================
+  [OK  ] resample count: 2,000 resamples of 10,520 isoforms
+  [OK  ] both classes present in every resample: NMD per resample ranges 2,245–2,551 (observed 2,405)
+        seed 20260730, shared across both configurations and both metrics
+
+==============================================================================
+STEP 3 — score the five members — atg2000_stop2000
+==============================================================================
+  widths from tag: start 2000, stop 2000
+  feature normalization applied: mean [0.374 0.547 0.137 0.191 1.673]  sd [0.265 0.262 0.343 0.394 3.508]
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=2000, Stop=2000
+  ORF embed dim: 64
+  Conv channels: 32
+  [OK  ] seed 100 loaded, eval mode, buffers present: 42 tensors, epoch 5, stored val_auc 0.93212
+  [OK  ] seed 100 scored every isoform, in order: 10,520 log-odds, range -5.340 to 8.955
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=2000, Stop=2000
+  ORF embed dim: 64
+  Conv channels: 32
+  [OK  ] seed 200 loaded, eval mode, buffers present: 42 tensors, epoch 7, stored val_auc 0.93519
+  [OK  ] seed 200 scored every isoform, in order: 10,520 log-odds, range -5.719 to 8.651
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=2000, Stop=2000
+  ORF embed dim: 64
+  Conv channels: 32
+  [OK  ] seed 300 loaded, eval mode, buffers present: 42 tensors, epoch 7, stored val_auc 0.92893
+  [OK  ] seed 300 scored every isoform, in order: 10,520 log-odds, range -5.696 to 8.873
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=2000, Stop=2000
+  ORF embed dim: 64
+  Conv channels: 32
+  [OK  ] seed 400 loaded, eval mode, buffers present: 42 tensors, epoch 6, stored val_auc 0.93009
+  [OK  ] seed 400 scored every isoform, in order: 10,520 log-odds, range -5.854 to 8.393
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=2000, Stop=2000
+  ORF embed dim: 64
+  Conv channels: 32
+  [OK  ] seed 500 loaded, eval mode, buffers present: 42 tensors, epoch 7, stored val_auc 0.93357
+  [OK  ] seed 500 scored every isoform, in order: 10,520 log-odds, range -6.398 to 10.053
+  [OK  ] the five members are five different models: largest per-isoform disagreement between any two members = 5.6010 log-odds
+
+==============================================================================
+STEP 4 — ensemble and point estimates — atg2000_stop2000
+==============================================================================
+  [OK  ] ensemble formed on the log-odds scale: mean log-odds range -5.617 to 8.663
+        ENSEMBLE  AUC 0.93254   AUPRC 0.83065
+          seed 100:  AUC 0.92504   AUPRC 0.81522
+          seed 200:  AUC 0.92783   AUPRC 0.82104
+          seed 300:  AUC 0.92375   AUPRC 0.81296
+          seed 400:  AUC 0.92373   AUPRC 0.81184
+          seed 500:  AUC 0.92720   AUPRC 0.82216
+        member mean  AUC 0.92551 (sd 0.00192)   AUPRC 0.81665 (sd 0.00470)
+
+==============================================================================
+STEP 5 — bootstrap interval on the ensemble — atg2000_stop2000
+==============================================================================
+        500/2,000 resamples
+        1,000/2,000 resamples
+        1,500/2,000 resamples
+        2,000/2,000 resamples
+        AUC   0.93254  95% CI [0.92648, 0.93796]
+        AUPRC 0.83065  95% CI [0.81511, 0.84427]
+
+==============================================================================
+STEP 6 — aggregation sensitivity — atg2000_stop2000
+==============================================================================
+        mean-probability  AUC 0.93234   AUPRC 0.83054
+        difference from primary (mean log-odds): AUC -0.00019   AUPRC -0.00011
+
+==============================================================================
+STEP 7 — write — atg2000_stop2000
+==============================================================================
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/ensemble_metrics_atg2000_stop2000_ens5_test_clean.json  (1,494 bytes)
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/ensemble_predictions_atg2000_stop2000_ens5_test_clean.tsv  (876,235 bytes, 10,520 rows)
+
+==============================================================================
+STEP 3 — score the five members — atg1000_stop1000
+==============================================================================
+  widths from tag: start 1000, stop 1000
+  feature normalization applied: mean [0.374 0.547 0.137 0.191 1.673]  sd [0.265 0.262 0.343 0.394 3.508]
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=1000, Stop=1000
+  ORF embed dim: 64
+  Conv channels: 32
+  [OK  ] seed 100 loaded, eval mode, buffers present: 42 tensors, epoch 4, stored val_auc 0.92434
+  [OK  ] seed 100 scored every isoform, in order: 10,520 log-odds, range -4.977 to 7.511
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=1000, Stop=1000
+  ORF embed dim: 64
+  Conv channels: 32
+  [OK  ] seed 200 loaded, eval mode, buffers present: 42 tensors, epoch 7, stored val_auc 0.93176
+  [OK  ] seed 200 scored every isoform, in order: 10,520 log-odds, range -5.827 to 8.948
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=1000, Stop=1000
+  ORF embed dim: 64
+  Conv channels: 32
+  [OK  ] seed 300 loaded, eval mode, buffers present: 42 tensors, epoch 6, stored val_auc 0.92729
+  [OK  ] seed 300 scored every isoform, in order: 10,520 log-odds, range -6.786 to 9.409
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=1000, Stop=1000
+  ORF embed dim: 64
+  Conv channels: 32
+  [OK  ] seed 400 loaded, eval mode, buffers present: 42 tensors, epoch 4, stored val_auc 0.93056
+  [OK  ] seed 400 scored every isoform, in order: 10,520 log-odds, range -5.425 to 8.461
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=1000, Stop=1000
+  ORF embed dim: 64
+  Conv channels: 32
+  [OK  ] seed 500 loaded, eval mode, buffers present: 42 tensors, epoch 5, stored val_auc 0.92400
+  [OK  ] seed 500 scored every isoform, in order: 10,520 log-odds, range -5.446 to 6.977
+  [OK  ] the five members are five different models: largest per-isoform disagreement between any two members = 5.5910 log-odds
+
+==============================================================================
+STEP 4 — ensemble and point estimates — atg1000_stop1000
+==============================================================================
+  [OK  ] ensemble formed on the log-odds scale: mean log-odds range -5.049 to 7.937
+        ENSEMBLE  AUC 0.93102   AUPRC 0.83510
+          seed 100:  AUC 0.91965   AUPRC 0.81414
+          seed 200:  AUC 0.92416   AUPRC 0.81797
+          seed 300:  AUC 0.92361   AUPRC 0.82090
+          seed 400:  AUC 0.92621   AUPRC 0.82260
+          seed 500:  AUC 0.92429   AUPRC 0.82035
+        member mean  AUC 0.92359 (sd 0.00241)   AUPRC 0.81919 (sd 0.00327)
+
+==============================================================================
+STEP 5 — bootstrap interval on the ensemble — atg1000_stop1000
+==============================================================================
+        500/2,000 resamples
+        1,000/2,000 resamples
+        1,500/2,000 resamples
+        2,000/2,000 resamples
+        AUC   0.93102  95% CI [0.92501, 0.93697]
+        AUPRC 0.83510  95% CI [0.82046, 0.84861]
+
+==============================================================================
+STEP 6 — aggregation sensitivity — atg1000_stop1000
+==============================================================================
+        mean-probability  AUC 0.93067   AUPRC 0.83545
+        difference from primary (mean log-odds): AUC -0.00034   AUPRC +0.00036
+
+==============================================================================
+STEP 7 — write — atg1000_stop1000
+==============================================================================
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/ensemble_metrics_atg1000_stop1000_ens5_test_clean.json  (1,496 bytes)
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/ensemble_predictions_atg1000_stop1000_ens5_test_clean.tsv  (872,672 bytes, 10,520 rows)
+
+Done. 2026-07-30T19:36:15

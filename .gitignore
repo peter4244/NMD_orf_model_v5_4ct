@@ -19,3 +19,6 @@ results_4ct_dn/
 results_4ct_dn_race/
 figures_baseline/
 *.pre_determinism_backup
+
+# Analysis outputs: data, not code. These go to the Zenodo deposit, not to git.
+results_interp_all/
