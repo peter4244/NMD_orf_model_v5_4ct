@@ -70,9 +70,24 @@ interpretation is **ISM, TF-MoDISco on the ISM scores, and insertional analysis*
 methods, no gradient attribution anywhere.
 
 **So Analysis 4 measures the model response to perturbation instead of attributing its output.** The
-consequence is mostly simplifying: a measurement of the model own output has no completeness property
-to verify, no reference distribution, and no method error. §6 replaces the acceptance criterion
-accordingly.
+consequence is mostly simplifying: a measurement of the model's own output has no completeness
+property to verify, no reference distribution, and no method error. §6 replaces the acceptance
+criterion accordingly.
+
+**But a perturbation must be one a real sequence could produce, and a window-local one is not.** The
+five ORF slots' windows overlap heavily in transcript coordinates, because the ORFs themselves
+overlap. *Measured here 2026-07-31 over 3,000 isoforms: rank 0's start window shares at least 30 nt
+with another slot's window in 92.4% of multi-ORF isoforms at W=1000 and 98.8% at W=2000, median
+overlap 78% and 89% of the window; 99.89% of isoforms carry more than one ORF.* Perturbing only rank
+0's window would present the same transcript base to the model as two different bases in two branches
+at once — an input no sequence can generate, which is the off-manifold condition this method was
+adopted to avoid. **Every perturbation is therefore propagated to every window containing that
+transcript coordinate** (§5a). *Measured: a perturbation touches 5.1 of the 10 windows on average at
+W=1000 and 7.5 at W=2000.*
+
+The midpoint clip guarantees that ONE ORF's own start and stop windows are disjoint, and it does
+that correctly; it says nothing about rank 0's start window overlapping another ORF's stop window,
+which happens for 78% of isoforms at W=1000 and 95% at W=2000.
 
 ---
 
@@ -141,11 +156,30 @@ configuration. The model contract of the preceding plans applies unchanged.
 | `faithfulness_{tag}.tsv` | the occlusion panel of §5d |
 | `ism_summary_{tag}.json` | positional summaries, the training spread, the pre-registered contrasts, the control comparisons |
 
-**There is no reference draw and no interpretation spread here.** ISM has no background distribution:
-the comparison is to the unperturbed sequence. The five reference draws that carried interpretation
-variance in Analyses 2 and 3 have no role, and **the only variance component is the training spread
-across five members.** This is a real difference between the analyses and is stated wherever a spread
-is reported.
+**There is no reference draw**, because the comparison is to the unperturbed sequence rather than to
+a background distribution. The five reference draws that carried interpretation variance in Analyses
+2 and 3 have no role here. But that does not leave one variance component; it leaves three, and the
+plan reports all three:
+
+| component | source | how estimated |
+|---|---|---|
+| **training** | five members | spread across members, at its own level, with the delete-one-member jackknife for the ensemble's own uncertainty |
+| **sampling** | the 2,000-isoform subsample is a SAMPLE, not a census | nonparametric bootstrap over isoforms, needing no additional forward passes |
+| **occlusion** | three dinucleotide shuffles per block | spread across shuffles, reported per block |
+
+**The census licence of Analyses 2 and 3 does not transfer.** Those summarised the whole labelled
+universe and were right to attach no isoform-level standard error. This analysis draws 2,000 from a
+larger frame, so a sampling error exists and omitting it would be a reporting failure. *Measured:
+between-isoform CV of a per-position mean is ~1.3, so the standard error at n = 2,000 is about 3.2%
+of the value — small, which is why omitting it would be indefensible rather than defensible.* The
+bootstrap resamples ISOFORMS, not positions, which also handles position-to-position dependence
+correctly — *measured lag-1 autocorrelation of the positional profile is 0.60, so positions are very
+far from independent.*
+
+**Three levels, as in Analyses 2 and 3.** Member, ensemble, and leave-one-member-out. Signed effects
+are averaged across members first; absolute values and any normalisation afterwards. `mean_abs` and
+the concentration fraction are non-linear in the effects, so the ensemble and member centres differ
+by a bias and not only by noise — the same property Analysis 2 documented.
 
 ---
 
@@ -169,16 +203,51 @@ five times that and buys precision on a distribution that 2,000 already characte
 
 # 5. Approach
 
-### Step a — saturation ISM over both windows
+### Step a — block occlusion, the primary instrument
+
+The question claim 5.3.1 asks is **where**, at the scale of a motif rather than a base. Block
+occlusion answers it directly and at a third of saturation ISM's cost.
 
 ```
+BLOCK   = 3 nt
+STRIDE  = 3, ANCHORED ON THE CODON  -- so inside the ORF each block is exactly one codon
+SHUFFLE = 3 dinucleotide-preserving shuffles per block, averaged
+
 for TAG, for each of the five members:
   for each isoform i in the subsample, for each branch:
-      for each position p unpadded in i:
-          for each alternative base b != observed:
-              rebuild the window with b at p, RECOMPUTING the GC channel over its support
-              effect[i,p,b] = model(perturbed) - model(BASELINE)      # log-odds
+      for each block B tiling the reportable positions:
+          for s in 1..SHUFFLE:
+              replace B's bases with a dinucleotide-preserving shuffle of B
+              PROPAGATE that substitution to every ORF window containing those
+                  transcript coordinates, recomputing each window's GC channel
+              score the model
+          effect[i,B] = mean over s of (score - BASELINE)
 ```
+
+**The occluded block is replaced with shuffled real bases, never with zeros.** Padded positions are
+all-zero in channels 0-3, so zeroing a block makes the model see the pattern it has learned means
+"no sequence here". That would produce large artifacts strongest near the window edges — exactly
+where the concentration claim is made. A dinucleotide-preserving shuffle also holds local composition
+fixed, so the contrast isolates arrangement rather than confounding with GC content.
+
+**Three shuffles per block, averaged**, so a block's effect is not one arbitrary draw. The shuffle is
+the only stochastic element of the measurement and is seeded per (isoform, block) for reproducibility.
+
+**Codon alignment is anchored, not assumed.** Blocks tile outward from the anchor codon in steps of
+3, so within the ORF a block is one codon — the unit Saluki showed carries stability signal. Upstream
+of the start codon and downstream of the stop codon a block is simply a 3-nt tile, which is harmless.
+Both windows straddle that boundary, so alignment is meaningful for roughly half of each.
+
+*A stride of 1 is available and costs three times as much for ~1-nt resolution via averaging the
+three blocks covering each position. It is not used for claim 5.3.1, which concerns a ~50-nt scale.*
+
+### Step a2 — base-level ISM, at pre-registered positions only
+
+Saturation ISM is no longer the primary instrument. It is retained **only where single-base
+resolution is the question** — the Kozak positions and the stop codon of §5c — where it is a handful
+of substitutions per isoform rather than thousands.
+
+
 
 **The baseline is built through the same recomputation path as the perturbations** — the observed
 window with its GC channel recomputed, not the window as stored. Channel 5 is stored as float16 and
@@ -193,12 +262,34 @@ Batched over (position x base) so each isoform costs a bounded number of forward
 ### Step b — the positional profile, padding-aware
 
 ```
-      mean_effect[p] = mean over unpadded isoforms of mean over b of effect[i,p,b]
-      mean_abs[p]    = mean over unpadded isoforms of mean over b of |effect[i,p,b]|
-      n_unpadded[p]  = how many isoforms contributed
+      mean_effect[B] = mean over isoforms unpadded at B of effect[i,B]
+      mean_abs[B]    = mean over isoforms unpadded at B of |effect[i,B]|
+      n_unpadded[B]  = how many isoforms contributed
+      in_frame[B]    = whether B is codon-aligned AND inside the ORF
 ```
-Reported separately for `label == 1` and `label == 0`, only where at least half the subsample is
-unpadded.
+Reported separately for `label == 1` and `label == 0`, and the in-frame subset reported separately
+again, where a block is one codon.
+
+**The reportable position set is fixed in advance, and it is not what the window width implies.**
+*Measured here 2026-07-31 over 1,500 isoforms, positions where at least half the subsample is
+unpadded:*
+
+| branch | W=1000 | W=2000 | new at the wider width |
+|---|---|---|---|
+| start | 727 positions, −323 … +404 | 727, −323 … +404 | **0** |
+| stop | 904, −403 … +501 | 1,404, −403 … **+1001** | **500** |
+
+The start window is bounded by the ORF-midpoint clip and the transcript start, so widening it adds
+nothing. The stop window is not: the wider configuration reaches 500 positions further downstream,
+which is the exon-junction region Analysis 3 found dominates the structural evidence. **That is why
+`atg2000_stop2000` is retained**, and why blocks are tiled over the reportable set rather than the
+whole window — computing what will not be reported buys nothing.
+
+**The class contrast is confounded by geometry unless it is matched.** Padding differs by label
+class — *measured: 64.0% of start-window positions unpadded for `label == 1` against 68.6% for
+`label == 0` at W=1000* — so the ≥50% rule keeps a different position set for each class. The
+primary class contrast is therefore computed on a **padding-matched cohort**, with the unmatched
+version reported beside it.
 
 **Concentration (claim 5.3.1)** is the fraction of total `mean_abs` within +/-50 of the anchor over
 unpadded positions only, reported beside the unpadded profile so a reader can see the denominator is
@@ -214,11 +305,25 @@ analysis and the Optimus 5-Prime enumeration of `NNNAUGNN` contexts (Sample et a
 ```
   START CONTEXT. Hold everything fixed and substitute the pre-registered Kozak positions
   -3 and +4 through all 4 x 4 = 16 combinations.
-      record predicted log-odds for each
-      report the marginal effect of purine vs pyrimidine at -3, and G vs not-G at +4
+      record predicted log-odds for each of the 16 cells, PAIRED WITHIN ISOFORM
+      report both main effects AND their interaction, under a stated uniform weighting
+
+  EXCLUSIONS, enumerated per isoform before any contrast is formed. A substitution that
+  creates a different motif is not measuring initiation context:
+      +4 = T creates an in-frame stop codon at +4..+6 in 18.9% of isoforms
+      -3 = A creates an in-frame AUG at -3..-1 in  4.0%
+  Cells flagged for a created stop or AUG are excluded from the primary contrast and the
+  excluded fraction is reported; the unexcluded version is a sensitivity.
+
+  The +4 contrast moves the recomputed GC channel in one direction by construction ({G} is
+  100% GC, {A,C,T} 33%), so a GC-matched G-vs-C contrast is reported beside it. The -3
+  purine/pyrimidine contrast is already GC-balanced.
 
   STOP IDENTITY. Substitute the stop codon through UAA / UAG / UGA, context unchanged.
       report predicted log-odds by identity, and the UGA-vs-others contrast
+      ALSO report UGA vs UAG, which is the GC-matched version of the same question
+      ALSO substitute one NON-stop codon (UGG), which separates "does the model detect a
+        stop at all" from "does it distinguish among stops" -- one extra pass per isoform
 ```
 
 **Positions +2 and +3 both vary between stop codons** — UAA/UAG/UGA are A,A,G at +2 and A,G,A at +3 —
@@ -226,20 +331,38 @@ so the whole codon is substituted and the contrast is by identity. *An earlier d
 +3 alone to separate UGA from the others, where UGA and UAA are both A; it could not have answered its
 own question.*
 
-Anything else described later is labelled post hoc and reported against §6 reference band.
+**A direction is not stated unless the five members agree on its sign.** *Measured on a 150-isoform
+pilot at `atg1000_stop1000`: the five members' −3 purine contrasts are +0.0043, +0.0019, −0.0050,
++0.0053, +0.0029 — they disagree in sign — and the training spread is 12× the subsample sampling
+error. The ensemble estimate is smaller than one member standard deviation.* So sign disagreement is
+the expected outcome, not a remote risk, and reporting it is a result rather than a failure. All five
+member values are printed alongside every ensemble contrast.
+
+Anything else described later is labelled post hoc and reported against §6's reference band.
 
 ### Step d — the faithfulness panel
 
 ```
-  COMPREHENSIVENESS: substitute the k positions of largest |mean effect| with the base
-      minimising predicted log-odds; measure the actual change.
-  SUFFICIENCY: substitute all OTHER unpadded positions likewise, retaining only the top k.
-  BASELINE: the same for k random unpadded positions, and for k positions matched on
-      observed base composition.
-  for k in {1, 5, 10, 25, 50, 100}
+  COMPREHENSIVENESS: occlude the top-k BLOCKS jointly; measure the actual change.
+  SUFFICIENCY:       occlude every OTHER reportable block, retaining only the top k.
+  BASELINES:         k random reportable blocks; k composition-matched blocks; and
+                     the top-k chosen by a DIFFERENT member.
+  for k in {1, 3, 5, 10, 25}
 ```
-This converts "the model evidence sits here" from a description of a profile into a measurement of
-the model output.
+
+**Selection and evaluation must not use the same numbers, or the result is guaranteed.** The top-k
+are chosen on four members' block effects and evaluated on the held-out fifth, five folds. Without
+that, comprehensiveness at small k is arithmetic rather than evidence.
+
+**Report the joint change AND the sum of the k individual block effects.** Their ratio is a direct
+measurement of epistasis in the model — how far from additive the positions are — which is new
+information the plan would otherwise discard, at no extra cost.
+
+**Sufficiency uses composition-preserving corruption, not an argmin base.** Occluding ~500 blocks
+with a prediction-minimising substitution produces a sequence unlike any mRNA, so the model's output
+there is an extrapolation rather than a measurement. Shuffled occlusion keeps the corrupted input in
+the neighbourhood of real sequence, and where the corrupted predictions sit relative to the
+distribution of real predictions is reported so a reader can see how far the model was pushed.
 
 ### Step e — controls
 
@@ -247,7 +370,21 @@ the model output.
 |---|---|---|
 | **dinucleotide-preserving shuffle** of the window, scored under the **trained** model | motif structure, composition preserved | whether the signal is the motif or the model positional prior |
 | **five randomly-initialized members**, reported per member and NOT ensembled | all learned structure | whether the architecture and input distribution alone produce the pattern |
-| **label permutation at summarisation** | only the NMD/Control split | the reference distribution for the comparative half of 5.3.2, and nothing else |
+| **label permutation at summarisation**, permuted WITHIN padding-extent strata | only the NMD/Control split | the reference distribution for the comparative half of 5.3.2, and nothing else |
+| **anchor-shift**: recompute the profile with the window deliberately re-centred off the codon (+37 nt) | the anchor's meaning, keeping geometry and padding identical | whether the ±50 concentration is a property of the start codon or of window geometry |
+
+**The anchor-shift control is the one that threatens claim 5.3.1 directly.** If concentration
+survives an anchor pointing at nothing, the concentration is geometry, not biology. It is the
+perturbation-era analogue of the reference-draw control the earlier analyses had.
+
+**The label permutation must be stratified.** Padding differs systematically by label class, so an
+unstratified permutation breaks a real label-to-geometry association and yields a null that is too
+narrow for a padding-dependent contrast.
+
+**The dinucleotide shuffle control preserves the anchor codon** and shuffles around it. A whole-window
+shuffle would destroy the start or stop codon, break §6's coordinate assertions on the control, and
+make "±50 of the anchor" meaningless. It is a shuffled-sequence *profile*, compared against the real
+profile — not a single prediction.
 
 The permuted-label retrain of the earlier draft is **dropped**. Its purpose was to control an
 attribution artifact; ISM measures the model own output, so that artifact does not arise, and it is
@@ -280,21 +417,53 @@ channels are unchanged.
 
 **3. Determinism.** The same perturbation scored twice gives the same number. ISM has no RNG.
 
-**4. A no-op perturbation.** Substituting the observed base for itself must give **exactly** zero,
-not approximately. Free, and it has already earned its place: it caught the float16 baseline offset
-above, which no positional profile would have revealed. Exact zero is achievable and is therefore the
-bar — anything else means the baseline and the perturbation are not going through the same path.
+**4. A no-op perturbation, checked where exactness is actually achievable.** Substituting a block for
+itself must give zero. *Measured: against a recomputed baseline scored at batch 1 the residual is
+2.4e-07 to 4.8e-07, not zero — the model's CPU path is batch-shape dependent, so a baseline scored
+alone and a perturbation scored inside a chunk of 512 do not agree bitwise.* An "exactly zero"
+criterion in output space would therefore stop the analysis on its first cell.
 
-**5. A reference band for post hoc positions.** The same statistic over far-field unpadded positions
-(|pos| > 200) with its 2.5th and 97.5th percentiles. A post hoc position is notable only outside that
-band — selection-aware, no hypothesis test.
+So the check moves to where exactness holds and stays able to fail:
+- **Input space, exact:** the no-op perturbed window must be **bit-identical** to the baseline window.
+- **Output space, calibrated:** the no-op is placed as **row 0 of every scoring chunk**, so baseline
+  and perturbation share a batch shape; within a chunk the residual must then be exactly zero.
+- The float16 offset the earlier draft found is still real and is still handled by routing the
+  baseline through the same recomputation path.
+
+**5. Propagation validity.** For a sample of perturbations, assert that every window whose transcript
+span contains the perturbed coordinate was updated, and that no window outside that set changed.
+This is the check for §5a's propagation, and it is the one guarding the plan's central claim to be
+on-manifold.
+
+**6. A reference band for post hoc positions — a MAXIMUM-statistic band, not a marginal one.** The
+same statistic over far-field reportable positions (|pos| > 200), but the band is the distribution of
+the **maximum over blocks of a region the size of the screened one**, obtained by block resampling. A
+marginal 2.5/97.5 band would be exceeded by ~5% of screened positions under the null by construction,
+which is not a filter. *Measured on a pilot: far-field lag-1 autocorrelation 0.60 and roughly 13
+effective independent positions out of 383, so a marginal percentile band rests on far fewer
+observations than it appears to.* A post hoc position is notable only if it clears both the
+max-statistic band and a pre-registered effect-size floor, and the near-field exceedance count is
+reported as a calibration statistic so a reader can see whether the filter is doing anything.
 
 ---
 
 # 7. Cost, and what is measured before anything is committed
 
-ISM is 3 substitutions per unpadded position. **Measured 2026-07-31** on the development machine's
-CPU, `atg1000_stop1000` member 100, 8 isoforms, batch 512:
+**Block occlusion at stride 3 with three shuffles costs about a third of saturation ISM.** Stride,
+not block size, is the cost lever: at stride 1 the three shuffles would put the cost back to ISM's.
+
+| | blocks per isoform, both branches | passes (x3 shuffles) | CPU-hours for the full design |
+|---|---|---|---|
+| `atg1000_stop1000` | 545 | 1,635 | **12** |
+| `atg2000_stop2000` | 711 | 2,133 | **36** |
+| **total** | | | **48 CPU-h, ~2.4 h wall at 20-way** |
+
+*Computed from the measured per-pass cost below and the reportable-position counts in §5b; the full
+design is 2,000 isoforms x 5 members x 2 branches.* Base-level ISM at the pre-registered positions
+adds about 20 passes per isoform, which is negligible.
+
+The per-pass cost that these rest on, **measured 2026-07-31** on the development machine's CPU,
+`atg1000_stop1000` member 100, 8 isoforms, batch 512:
 
 | | measured |
 |---|---|
