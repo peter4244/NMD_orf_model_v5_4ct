@@ -207,7 +207,23 @@ class NMDDataset(Dataset):
     No tx_features (removed in v5).
     """
 
-    def __init__(self, h5_path, window_size_atg, window_size_stop, split="train"):
+    def __init__(self, h5_path, window_size_atg, window_size_stop, split="train",
+                 restrict_to=None):
+        """restrict_to: positions WITHIN the split to keep, or None for all of it.
+
+        WHY IT EXISTS (2026-07-30). This class materialises a split's window arrays as float32
+        on construction. 11_kernel_shap_branches.py builds the whole `train` split -- 9.0 GB at
+        atg1000_stop1000, 17.9 GB at atg2000_stop2000 -- in order to use 500 of its 26,711 rows
+        as the SHAP reference set. Together with the explained cohort that is 46 GB for one run
+        at the wider configuration, against a 32 GB SLURM request.
+
+        Restricting here rather than reading the rows in the caller keeps normalization and the
+        padded-ORF zeroing on ONE code path. A second reader would be a second place for the
+        model contract to drift, and getting either wrong changes predictions silently.
+
+        Default None reproduces the previous behaviour exactly, so evaluate.py, deepshap.py and
+        ensemble_evaluate.py are unaffected.
+        """
         self.h5_path = Path(h5_path)
 
         with h5py.File(self.h5_path, "r") as f:
@@ -242,6 +258,22 @@ class NMDDataset(Dataset):
                 mask = splits == split
 
             self.indices = np.where(mask)[0]
+            if restrict_to is not None:
+                sel = np.asarray(restrict_to, dtype=int)
+                if sel.ndim != 1 or len(sel) == 0:
+                    raise ValueError("restrict_to must be a non-empty 1-D array of positions")
+                if len(np.unique(sel)) != len(sel):
+                    raise ValueError(f"restrict_to has {len(sel) - len(np.unique(sel))} "
+                                     f"duplicate position(s); a reference isoform would be "
+                                     f"counted twice")
+                if sel.min() < 0 or sel.max() >= len(self.indices):
+                    raise ValueError(f"restrict_to holds positions outside split '{split}', "
+                                     f"which has {len(self.indices):,} rows: min {sel.min()}, "
+                                     f"max {sel.max()}")
+                # Sorted for the HDF5 read below, which requires increasing indices. The rows
+                # are used as an unordered reference set -- evaluate_coalition averages over
+                # them -- so ordering carries no meaning to preserve.
+                self.indices = self.indices[np.sort(sel)]
             n = len(self.indices)
 
             # Load window data into RAM
@@ -262,7 +294,8 @@ class NMDDataset(Dataset):
         # Zero out normalized features for padded ORFs
         self.orf_features[~self.orf_mask] = 0.0
 
-        print(f"  {split}: {n:,} samples, {self.labels.sum():.0f} NMD+ "
+        scope = split if restrict_to is None else f"{split}[{n:,} of {int(mask.sum()):,}]"
+        print(f"  {scope}: {n:,} samples, {self.labels.sum():.0f} NMD+ "
               f"({self.labels.mean()*100:.1f}%)")
 
     def __len__(self):
