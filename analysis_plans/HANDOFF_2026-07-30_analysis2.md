@@ -44,21 +44,25 @@ reference set. With the explained cohort alongside, one run at the wider configu
 against a 32 GB SLURM request. Found by running it, not by reading it. Every added executable line is
 inside `if restrict_to is not None`, so the default path is unchanged by construction.
 
-**`11_kernel_shap_branches.py` has NOT yet been changed to use it.** That is the first task below.
+**`11_kernel_shap_branches.py` is wired to use it**, and the equivalence was measured rather than
+assumed. The reference isoforms are the same set and their branch embeddings are identical to exactly
+zero. The Shapley values differ by 1.2e-08 — the reference set is now held in sorted rather than drawn
+order, and `evaluate_coalition` averages over it, so floating-point summation order changes the last
+bits. That is an order of magnitude below float32 machine epsilon (1.19e-07) and four orders below
+the 1e-12 residual tolerance. Mathematically identical, numerically identical to within summation
+order; not bitwise identical, and it should not be.
+
+Reference set: 172 MB instead of 9.0 GB. One full-cohort run at `atg2000_stop2000` now needs ~28 GB
+rather than 46.
 
 ## First tasks, in order
 
-1. **Wire the reference draw through `restrict_to`.** Count the train rows from the `split` array
-   without constructing a dataset, draw the 500 positions, then build
-   `NMDDataset(..., split="train", restrict_to=positions)`. Prove it by scoring one member before and
-   after and asserting the predictions match to full precision — not against a stored file, which is
-   written at `%.6f` and cannot support a claim tighter than 5e-07.
-2. **Re-measure memory and wall time** for one run at each configuration over `--explain-split all`.
-   The explained cohort alone is ~28 GB at `atg2000_stop2000`, which still fits a 32 GB request with
-   little headroom. Size the SLURM request from the measurement, not from the existing script.
-3. **Run one cell end to end on the cluster** — one configuration, one member, one draw — and check
+1. **Re-measure memory and wall time** for one run at each configuration over `--explain-split all`.
+   ~28 GB at `atg2000_stop2000` fits a 32 GB request with little headroom. Size the request from the
+   measurement, not from the existing script.
+2. **Run one cell end to end on the cluster** — one configuration, one member, one draw — and check
    the residual is at machine precision before committing to the other 49.
-4. **Then the remaining 49.**
+3. **Then the remaining 49.**
 
 ## Traps that have already cost time here
 

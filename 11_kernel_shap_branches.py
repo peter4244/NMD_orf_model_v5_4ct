@@ -327,8 +327,19 @@ def main():
 
     # Load data — explained set (default test; 'all' = full cohort) + train (background)
     test_ds = NMDDataset(h5_path, ws_atg, ws_stop, split=args.explain_split)
-    train_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="train")
-    print(f"Explain ({args.explain_split}): {len(test_ds)}, Train(bg): {len(train_ds)}")
+
+    # THE REFERENCE SET IS 500 ROWS, NOT A SPLIT (2026-07-30). NMDDataset materialises a split's
+    # windows as float32 on construction, so building all of `train` to use 500 of its 26,711 rows
+    # cost 9.0 GB at atg1000_stop1000 and 17.9 GB at atg2000_stop2000 -- and with the explained
+    # cohort alongside, 46 GB for one full-cohort run at the wider configuration, against a 32 GB
+    # SLURM request. Measured 2026-07-30 by running this script, not by reading it.
+    #
+    # The row count comes from the `split` array directly so the draw can happen before any window
+    # data is read. choice(n_train, ...) is the SAME call on the SAME RandomState as before, so the
+    # positions drawn are identical -- see the equivalence check in analysis_plans/.
+    with h5py.File(h5_path, "r") as _f:
+        _splits = np.array([x.decode() if isinstance(x, bytes) else x for x in _f["split"][:]])
+    n_train = int((_splits == "train").sum())
 
     # Load isoform IDs
     with h5py.File(h5_path, 'r') as f:
@@ -347,8 +358,10 @@ def main():
     # run_id=None gives RandomState(args.seed) -- the exact draw every existing artifact was
     # computed from, so nothing already deposited becomes unreproducible.
     bg_rng = np.random.RandomState(args.seed + 1000 * (args.run_id or 0))
-    bg_idx = bg_rng.choice(len(train_ds), size=min(args.n_background, len(train_ds)),
-                           replace=False)
+    bg_pos = bg_rng.choice(n_train, size=min(args.n_background, n_train), replace=False)
+    train_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="train", restrict_to=bg_pos)
+    print(f"Explain ({args.explain_split}): {len(test_ds)}, "
+          f"Reference: {len(train_ds)} of {n_train:,} train rows")
 
     # Pre-compute embeddings
     print("\nPre-computing test embeddings ...")
@@ -357,7 +370,10 @@ def main():
     print(f"  Test: atg={test_embs['atg_emb'].shape}, labels={test_embs['labels'].shape}")
 
     print("Pre-computing background embeddings ...")
-    bg_embs_raw = extract_sub_embeddings(model, train_ds, bg_idx, device)
+    # restrict_to already selected the drawn rows, so every row of train_ds is a reference isoform.
+    # They are held in sorted order; evaluate_coalition averages over them, so order carries no
+    # meaning -- only the floating-point summation order differs, at machine epsilon.
+    bg_embs_raw = extract_sub_embeddings(model, train_ds, np.arange(len(train_ds)), device)
     bg_embs = {
         "atg": bg_embs_raw["atg_emb"].to(device),     # (N_bg, 32)
         "stop": bg_embs_raw["stop_emb"].to(device),
