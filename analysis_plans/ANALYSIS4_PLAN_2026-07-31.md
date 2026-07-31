@@ -231,9 +231,33 @@ NMD profile becomes a random subsample of the same numbers. Any motif present su
 | **model trained on permuted labels** — one member per configuration | the label–sequence association, while the optimizer still adapts to input structure | whether a model that *cannot* have learned NMD biology still produces the signal | one training run per configuration, early stopping fires at epochs 4–7 |
 | **label permutation at summarisation** | only the NMD/Control split | the null distribution for the comparative half of claim 5.3.2, and nothing else | free |
 
-The **pre-registered positions of step 7 must fail to appear** in the first two. If the Kozak
-positions carry signal in a random-weight model, the finding belongs to the input distribution and
-the claim is not supportable from these figures at all.
+**The order is conditional, and the cheapest way to be wrong runs first.** The random-weight control
+costs one attribution run and no training. If the pre-registered Kozak positions carry signal in a
+model with random weights, the signal belongs to the input distribution, claim 5.3.2 is not
+supportable from these figures at all, and the permuted-label retrain is not run — there would be
+nothing left for it to test. The retrain proceeds only if the random-weight control passes.
+
+The **pre-registered positions of step 7 must fail to appear** in both of the first two.
+
+**How many control models, and an admission that one is thin.** The permuted-label control is
+specified at **three seeds per configuration**, not one. A single control model is one draw from a
+distribution this project has repeatedly measured as wide — `F_member` runs 331 to 12,699 against a
+3.0069 critical value, and member shares span several percentage points everywhere. A single
+label-permuted model showing no Kozak signal would be weak evidence of the same kind the rest of
+this work refuses to accept. Three is the smallest number that shows whether the absence is itself
+stable.
+
+**The cost of a training run has never been measured here** — every analysis so far has consumed
+checkpoints rather than produced them. Early stopping fired at epochs 4 to 7 for the ten existing
+members, which suggests minutes rather than hours, but that is inference from a log and not a
+measurement. One training run is timed before six are committed.
+
+**Control artifacts must not be able to collide with real ones.** `resolve_checkpoint` refuses to
+guess a member precisely because a consumer silently scoring the wrong checkpoint is this
+repository's recorded failure mode. Control checkpoints therefore carry a name that cannot match
+`best_model_{tag}_seed{S}.pt`, and every control attribution output carries a marker in its filename
+in the same way `--limit` marks a cost probe, so a control run and an analysis run cannot produce
+the same path.
 
 The third is not a control on the motif claim and is not reported as one. It is the null for
 "more importance for NMD than Control", which is a genuinely label-dependent statement.
