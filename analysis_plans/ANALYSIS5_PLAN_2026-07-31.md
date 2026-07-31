@@ -131,6 +131,61 @@ collapsed to an interval.
 
 ---
 
+## 3.3 Mechanism classes, and their relationship to section 4
+
+Section 4 classifies **isopairs** — an NMD isoform together with its gene-matched comparator — and
+asks *why this NMD isoform differs from its comparator*. Section 5 classifies **isoforms** and asks
+*what NMD-triggering feature this isoform contains*. Same biology, different question, different
+unit, and a hundredfold difference in n. The classes are therefore not interchangeable, and the two
+definitions that could silently drift between the sections are taken from section 4 rather than
+chosen here.
+
+**Taken from section 4** (`figures/multipanel/figure4_ptcneg_and_model/RATIONALE.md` §3):
+
+1. **A PTC is a stop with an exon junction more than 50 nt downstream** — not "at least one
+   downstream junction". *Measured here: 7.6% of slots with `n_downstream_ejc` ≥ 1 fail the 50-nt
+   rule, and counting them as PTCs costs the PTC+ class 8 points of NMD+ rate.*
+2. **The CDS anchor is the GENCODE-projected reference AUG, never the TD2 call.** Section 4's
+   classification is 100% ref-AUG-derived for this reason. *Measured here: anchoring on
+   `is_sqanti_cds` instead moves 1,556 isoforms out of PTC+ (−23%) and inflates the uORF class by
+   135%, because TD2's ATG lies downstream of the reference AUG in 99.1% of occult-PTC pairs, so a
+   main-ORF PTC is re-read as an upstream ORF.*
+
+| section 4 group (isopairs, n = 1,385) | n | section 5 class (isoforms, n = 41,765) | n | NMD+ |
+|---|---:|---|---:|---:|
+| **NMD+/PTC+** | 1,080 | **PTC+** | 6,863 | 70.0% |
+| **NMD+/PTC− ORF match** — mechanism inferred by elimination as uORF burden | 52 | **PTC− uORF-PTC** — the upstream PTC-bearing ORF detected directly | 5,913 | 12.6% |
+| **NMD+/PTC− ORF diff** | 38 | *(no counterpart; pooled into the two PTC− classes)* | — | — |
+| **Ref AUG absent** — excluded from mechanism inference | 214 | **Ref AUG absent** — reported separately, never pooled | 13,223 | 25.9% |
+| **Control** — gene-matched non-NMD comparators | 885 | *(no counterpart; section 5 partitions rather than contrasts)* | — | — |
+| | | **PTC− no trigger** | 15,766 | 2.2% |
+
+**Three structural differences, so the correspondence is read correctly.**
+
+- **Label conditioning.** Section 4's group names begin "NMD+" because section 4 classifies NMD+
+  pairs. The section 5 classes partition every isoform without reference to the label, so a class's
+  NMD+ rate is a **result**, not part of its definition. PTC+ at 70.0% and PTC− no trigger at 2.2%
+  are therefore evidence that the classification captures mechanism.
+- **The ORF match / ORF diff split does not exist here.** Section 4 subdivides its PTC− pairs by
+  whether the comparator encodes the reference protein, which needs an ORF-length comparison against
+  the reference that this plan does not compute. Until it does, both section 5 PTC− classes contain
+  a mixture of section 4's ORF match and ORF diff.
+- **`Ref AUG absent` is the one exact correspondence**, in definition and in treatment: section 4
+  excludes it from mechanism inference, and section 5 reports it separately and never pools it.
+
+**One class is a gain rather than a translation.** Section 4's cleanest mechanism claim — that the
+residual PTC− NMD is uORF burden — rests on n = 52 and is reached *by elimination*: not PTC, not
+3′UTR length, therefore 5′UTR features. `PTC− uORF-PTC` detects the upstream PTC-bearing ORF
+directly, at n = 5,913, of which 88.1% stop before the reference AUG and so are proper uORFs. If the
+model treats this class as a distinct mechanism, that is direct positive evidence for a claim the
+manuscript currently makes by exclusion.
+
+**Every result in this plan is reported per class, and `Ref AUG absent` is never pooled with the
+other three.** *Producer: `build_mechanism_classes.py`, run log
+`build_mechanism_classes_runlog.txt`, output `results_interp_all/mechanism_classes.{npz,tsv}`.*
+
+---
+
 # 4. Scientific questions
 
 1. **Does the model use the −3 position of the start codon context?** (claim 5.3.2, legend 5.6.7)
