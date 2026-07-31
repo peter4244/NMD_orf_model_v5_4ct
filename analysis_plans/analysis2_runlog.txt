@@ -1,0 +1,49 @@
+Analysis 2 — branch decomposition.  2026-07-30T23:08:14
+numpy 2.4.6, pandas 3.0.5
+
+==============================================================================
+STEP 5 — accept or reject each file, and record the tally
+==============================================================================
+  [OK  ] step 1 population re-read from Dataset A: n=41,765, label==1 9,321
+  accepted 50   rejected 0   of 50
+        every cell restricted to the 9,321 label==1 isoforms for summarisation
+
+==============================================================================
+STEP 6 — reduce every cell — member, ensemble, and leave-one-out ensemble
+==============================================================================
+  [OK  ] per-cell table has the specified shape: 110 rows = 2 configs x (25 member + 5 ensemble + 25 leave-one-out)
+  [OK  ] the three shares sum to 100 in every row: max |sum - 100| = 2.84e-14
+  [OK  ] efficiency identity holds in every row: max |mean_gap - sum(mean_signed)| = 8.882e-16
+
+==============================================================================
+STEP 7 — spreads, ensemble jackknife, ratio, and the licensing diagnostic
+==============================================================================
+  
+--- atg2000_stop2000 ---
+    structural   76.24%   draw-sd 0.543  seed-jackknife 1.283  | members 69.68-76.94 (centre 74.13, sd 2.998)
+                ensemble centre - member centre = +2.112 pp   [F_member 2549.44, F_draw 80.75, crit 3.01 on (4,16)]
+    stop         12.13%   draw-sd 0.153  seed-jackknife 1.284  | members 10.31-17.80 (centre 13.39, sd 2.903)
+                ensemble centre - member centre = -1.259 pp   [F_member 1419.56, F_draw 5.12, crit 3.01 on (4,16)]
+    start        11.63%   draw-sd 0.443  seed-jackknife 0.164  | members 11.67-12.85 (centre 12.49, sd 0.477)
+                ensemble centre - member centre = -0.854 pp   [F_member 49.62, F_draw 35.23, crit 3.01 on (4,16)]
+    stop/start  1.043   draw x/÷ 1.0337  seed-jackknife x/÷ 1.1155  | members 0.802-1.422  CV 0.1982
+    compositional check: arithmetic vs closed geometric differ by at most 0.0058 pp -> report percentages
+  
+--- atg1000_stop1000 ---
+    structural   66.31%   draw-sd 0.417  seed-jackknife 1.515  | members 59.72-68.30 (centre 64.54, sd 3.329)
+                ensemble centre - member centre = +1.773 pp   [F_member 1795.61, F_draw 27.65, crit 3.01 on (4,16)]
+    stop         23.88%   draw-sd 0.267  seed-jackknife 1.749  | members 18.92-30.26 (centre 24.41, sd 4.032)
+                ensemble centre - member centre = -0.537 pp   [F_member 4321.50, F_draw 16.42, crit 3.01 on (4,16)]
+    start         9.81%   draw-sd 0.346  seed-jackknife 0.652  | members 9.29-12.77 (centre 11.05, sd 1.393)
+                ensemble centre - member centre = -1.237 pp   [F_member 1307.12, F_draw 71.39, crit 3.01 on (4,16)]
+    stop/start  2.435   draw x/÷ 1.0389  seed-jackknife x/÷ 1.1295  | members 1.482-3.023  CV 0.2342
+    compositional check: arithmetic vs closed geometric differ by at most 0.0042 pp -> report percentages
+
+==============================================================================
+STEP 8 — write
+==============================================================================
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/branch_shares_per_cell.tsv  (67,951 bytes, 110 rows, 37 columns)
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/branch_decomposition_atg2000_stop2000.json  (4,689 bytes)
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/branch_decomposition_atg1000_stop1000.json  (4,686 bytes)
+
+Done. 2026-07-30T23:08:17
