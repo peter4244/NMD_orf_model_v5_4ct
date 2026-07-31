@@ -388,41 +388,54 @@ biological. The comparison is reported as a direction and magnitude, not as a te
 
 ### Memory is the binding constraint, not time
 
-`NMDDataset` materialises a whole split's window arrays as float32 when it is constructed
-(`utils.py:248-249`). Analysis 2 constructs two of them per run — the explained cohort, and the
-train split from which 500 reference isoforms are drawn:
+`NMDDataset` materialises a split's window arrays as float32 when it is constructed. Both of the
+sets a run needs are therefore read as **rows**, not as whole splits.
 
-| | train split | explained cohort (`all`) | **per run** |
+The reference set is 500 rows of `train`. The explained cohort is read in **chunks of 2,048
+rows**, in the split's own order, each row read exactly once and each chunk released before the
+next is read. Both restrictions go through the one code path that serves the whole split, so
+normalization and padded-ORF handling cannot drift between them.
+
+What a run retains is each isoform's three 32-dimensional branch embeddings, its ranks 1–4
+context and its ORF mask — **59 MB over all 41,765 isoforms**. *Computed here 2026-07-30 from the
+array shapes.* Window data is read once, consumed once and released.
+
+| | one chunk, held | reference set | **peak per run** |
 |---|---|---|---|
-| `atg1000_stop1000` | 9.0 GB | 14.0 GB | **23 GB** |
-| `atg2000_stop2000` | 17.9 GB | 28.0 GB | **46 GB** |
+| `atg1000_stop1000` | 0.69 GiB | 0.17 GiB | **1.9 GiB** |
+| `atg2000_stop2000` | 1.37 GiB | 0.34 GiB | **2.4 GiB** |
 
-*Measured here 2026-07-30 from the array shapes; confirmed by two test runs at
-`atg1000_stop1000` that spent minutes at full CPU without emitting a line, which was the load
-rather than the computation.*
+*Chunk and reference figures computed here 2026-07-30 from the array shapes. Peak per run
+predicted here 2026-07-30 from those figures plus the retained embeddings and interpreter
+baseline; the prediction method was checked at n = 6,000 / w2000, where it gave 5.31 GiB against
+a measured 5.38.*
 
-The train split is loaded in full to use **500 of its 26,711 rows**. That is the whole of the
-excess, and it explains a note in the record that reads as caution but is not:
-`slurm_kernel_shap_dn.sh` requests 32 GB, and the handoff observes that kernel SHAP's "narrow
-margin is memory, not time". At 46 GB a full-cohort run at the wider configuration would exceed
-that request.
+Read eagerly instead, one full-cohort run holds 14.00 GiB at `atg1000_stop1000` and 28.01 GiB at
+`atg2000_stop2000`, and peaks half an array higher again — 35.3 GiB — because the float16 read
+buffer and the float32 result are alive together. `slurm_kernel_shap_dn.sh` requests 32 GB.
 
-**Before any of the fifty runs, the reference set is read as 500 rows rather than as a split.**
-The normalization and padded-ORF handling must come from the same code path that serves the
-explained cohort, so the change belongs inside `NMDDataset` as an optional restriction to a subset
-of a split's rows, not as a second reader in this script. `NMDDataset` is shared with
-`evaluate.py`, `deepshap.py` and `ensemble_evaluate.py`, so the change is additive with an
-unchanged default, and is verified by scoring one member before and after and asserting identical
-predictions.
+The chunk width is a multiple of the 256-row extraction batch, so each forward pass receives the
+same rows in the same order it would receive from a single read of the whole split.
 
 ### Cost, and where this runs
 
-Measured 2026-07-30 on this machine's CPU: the coalition evaluation is about 5 ms per isoform, and
-the branch encoding that precedes it dominates, at roughly 10 minutes per run over 41,765 isoforms.
-That is **~13 minutes per run and ~11 hours for all fifty** locally, against roughly an hour on the
-cluster with the runs in parallel.
+Measured 2026-07-30 on this machine's CPU, at two subset sizes per configuration so the
+per-isoform rate is established rather than assumed: **6.2 ms per isoform** at
+`atg1000_stop1000` and **10.0–11.9 ms** at `atg2000_stop2000`, divided roughly evenly between
+branch encoding and coalition evaluation. One full-cohort run is **4.4 minutes** at the narrower
+configuration and **7–11 minutes** at the wider one; the fifty run in about **six hours** in
+sequence.
 
-The code is written and proven on a small subset locally before any cluster submission. The
-recorded failures on that cluster — a job that died before its log existed, an exit code that
-reported success while the log reported failure, a process killed silently on a login node — were all
-found by submission rather than by running, which is the slowest way to find them.
+Each configuration is run at full cohort on this machine before any cell of it is submitted. The
+fifty runs are then submitted to the cluster's **CPU** partition, one job per cell. The work is
+eight forward passes per isoform over a 500-row reference set — about 334,000 launch-bound calls
+per run — which is the shape a GPU is worst at: the recorded full-cohort GPU run at
+`atg500_stop500` took 31 minutes, against 4.4 minutes predicted here on CPU at a wider window.
+*Measured elsewhere: Explorer job 7474306, `sacct` elapsed 00:31:13, MaxRSS 12.98 GiB, allocated
+`gres/gpu=1`.*
+
+Every run's progress output is unbuffered, so a log distinguishes a working job from a dead one
+while it is still running. The recorded failures on that cluster — a job that died before its log
+existed, an exit code that reported success while the log reported failure, a process killed
+silently on a login node — were all found by submission rather than by running, which is the
+slowest way to find them.

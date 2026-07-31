@@ -17,6 +17,7 @@ import argparse
 import gc
 import json
 import math
+import sys
 from pathlib import Path
 from itertools import product
 
@@ -314,6 +315,14 @@ def compute_shapley_3(values):
 
 
 def main():
+    # A LOG THAT ARRIVES WHILE THE JOB IS ALIVE (2026-07-30). Python block-buffers stdout when it
+    # is not a terminal, so under SLURM every print below sat in a 4 KB buffer and the log stayed
+    # empty for minutes. That makes a healthy run and a dead one look identical -- which is the
+    # first of this script's recorded operational failures, "a job that died at 17 seconds having
+    # produced no log". Set here rather than as `python -u` in the SLURM script, because the
+    # property should hold however the script is invoked.
+    sys.stdout.reconfigure(line_buffering=True)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yaml")
     # Parameterised 2026-07-27 for the same reason as 03_train.py: hardcoded, this reads the
