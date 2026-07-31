@@ -1,0 +1,321 @@
+$ python analyse_position_bank.py --npz ../results_interp_all/bank_slot0_n500.npz --strata all
+reference: 19 control positions at frame offset 0, matching the hypothesis positions
+../results_interp_all/bank_slot0_n500.npz: 500 isoforms, 32 positions (19 controls), 5 members, tag atg1000_stop1000
+method floor (no-op |effect|, per member max): [4.8e-07 7.2e-07 4.8e-07 4.8e-07 7.2e-07]  -- every effect below ~7e-07 is arithmetic noise
+observed-base purine fraction: -3 0.742  +4 0.694   controls median 0.509
+
+============================================================================================
+### GC_vs_AT
+  control reference (n=19 positions): |mean| median 0.00461   |t| median 5.78, 90th 12.96, max 24.30   all-5-signs-agree 95% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=500  mean  +0.00584  sd 0.00385  |t|   3.39  signs agree
+           vs controls: |t| exceeds  11%   |mean| exceeds  74%   magnitude 1.27x median control
+           members [0.00827 0.00463 0.01125 0.00303 0.00201]
+  TARGET  +4  n=500  mean  +0.00097  sd 0.00221  |t|   0.99  signs DISAGREE
+           vs controls: |t| exceeds   0%   |mean| exceeds   0%   magnitude 0.21x median control
+           members [ 0.00406  0.00116  0.00154  0.00011 -0.00200]
+
+============================================================================================
+### purine
+  control reference (n=19 positions): |mean| median 0.00219   |t| median 3.36, 90th 5.52, max 10.26   all-5-signs-agree 53% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=499  mean  +0.00396  sd 0.00161  |t|   5.49  signs agree
+           vs controls: |t| exceeds  89%   |mean| exceeds  84%   magnitude 1.81x median control
+           members [0.00389 0.00668 0.00372 0.00294 0.00258]
+  TARGET  +4  n=500  mean  +0.00281  sd 0.00227  |t|   2.77  signs DISAGREE
+           vs controls: |t| exceeds  42%   |mean| exceeds  68%   magnitude 1.29x median control
+           members [ 0.00366  0.00370 -0.00083  0.00234  0.00519]
+
+============================================================================================
+### A_vs_T
+  control reference (n=19 positions): |mean| median 0.00101   |t| median 0.65, 90th 2.01, max 2.40   all-5-signs-agree 0% (chance 6.2%)
+  control mean effects are 53% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=334  mean  +0.00262  sd 0.00180  |t|   3.26  signs DISAGREE
+           vs controls: |t| exceeds 100%   |mean| exceeds  95%   magnitude 2.61x median control
+           members [-0.00023  0.00340  0.00363  0.00200  0.00432]
+  TARGET  +4  n=353  mean  -0.00125  sd 0.00352  |t|   0.79  signs DISAGREE
+           vs controls: |t| exceeds  58%   |mean| exceeds  63%   magnitude 1.24x median control
+           members [-0.00165  0.00283 -0.00590 -0.00305  0.00155]
+
+============================================================================================
+### G_vs_C
+  control reference (n=19 positions): |mean| median 0.00427   |t| median 4.32, 90th 10.23, max 13.87   all-5-signs-agree 79% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=483  mean  +0.00635  sd 0.00331  |t|   4.29  signs agree
+           vs controls: |t| exceeds  42%   |mean| exceeds  74%   magnitude 1.49x median control
+           members [0.00758 0.01081 0.00715 0.00378 0.00245]
+  TARGET  +4  n=500  mean  +0.00553  sd 0.00138  |t|   8.95  signs agree
+           vs controls: |t| exceeds  84%   |mean| exceeds  68%   magnitude 1.29x median control
+           members [0.00736 0.00512 0.00368 0.00518 0.00629]
+
+============================================================================================
+### G_vs_notG
+  control reference (n=19 positions): |mean| median 0.00635   |t| median 5.98, 90th 16.35, max 25.41   all-5-signs-agree 84% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=483  mean  +0.00803  sd 0.00407  |t|   4.41  signs agree
+           vs controls: |t| exceeds  37%   |mean| exceeds  74%   magnitude 1.26x median control
+           members [0.01060 0.01016 0.01198 0.00470 0.00269]
+  TARGET  +4  n=500  mean  +0.00452  sd 0.00189  |t|   5.35  signs agree
+           vs controls: |t| exceeds  42%   |mean| exceeds  26%   magnitude 0.71x median control
+           members [0.00782 0.00430 0.00334 0.00381 0.00332]
+
+$ python analyse_position_bank.py --npz ../results_interp_all/bank_slot0_n500.npz --strata attention
+reference: 19 control positions at frame offset 0, matching the hypothesis positions
+../results_interp_all/bank_slot0_n500.npz: 500 isoforms, 32 positions (19 controls), 5 members, tag atg1000_stop1000
+method floor (no-op |effect|, per member max): [4.8e-07 7.2e-07 4.8e-07 4.8e-07 7.2e-07]  -- every effect below ~7e-07 is arithmetic noise
+observed-base purine fraction: -3 0.742  +4 0.694   controls median 0.509
+
+============================================================================================
+### GC_vs_AT
+  control reference (n=19 positions): |mean| median 0.00461   |t| median 5.78, 90th 12.96, max 24.30   all-5-signs-agree 95% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=500  mean  +0.00584  sd 0.00385  |t|   3.39  signs agree
+           vs controls: |t| exceeds  11%   |mean| exceeds  74%   magnitude 1.27x median control
+           members [0.00827 0.00463 0.01125 0.00303 0.00201]
+  TARGET  +4  n=500  mean  +0.00097  sd 0.00221  |t|   0.99  signs DISAGREE
+           vs controls: |t| exceeds   0%   |mean| exceeds   0%   magnitude 0.21x median control
+           members [ 0.00406  0.00116  0.00154  0.00011 -0.00200]
+  attn tercile 0 (mean 0.343, n=167)  controls: |t| median 3.14, agree 68%
+       -3: mean  +0.00452  |t|   3.16  signs agree  exceeds 53% of controls
+       +4: mean  +0.00148  |t|   1.79  signs    no  exceeds 16% of controls
+  attn tercile 1 (mean 0.709, n=166)  controls: |t| median 5.36, agree 95%
+       -3: mean  +0.00908  |t|   4.54  signs agree  exceeds 21% of controls
+       +4: mean  +0.00333  |t|   2.63  signs agree  exceeds 0% of controls
+  attn tercile 2 (mean 0.910, n=167)  controls: |t| median 1.72, agree 21%
+       -3: mean  +0.00394  |t|   1.69  signs    no  exceeds 42% of controls
+       +4: mean  -0.00187  |t|   1.29  signs    no  exceeds 11% of controls
+
+============================================================================================
+### purine
+  control reference (n=19 positions): |mean| median 0.00219   |t| median 3.36, 90th 5.52, max 10.26   all-5-signs-agree 53% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=499  mean  +0.00396  sd 0.00161  |t|   5.49  signs agree
+           vs controls: |t| exceeds  89%   |mean| exceeds  84%   magnitude 1.81x median control
+           members [0.00389 0.00668 0.00372 0.00294 0.00258]
+  TARGET  +4  n=500  mean  +0.00281  sd 0.00227  |t|   2.77  signs DISAGREE
+           vs controls: |t| exceeds  42%   |mean| exceeds  68%   magnitude 1.29x median control
+           members [ 0.00366  0.00370 -0.00083  0.00234  0.00519]
+  attn tercile 0 (mean 0.343, n=167)  controls: |t| median 1.92, agree 26%
+       -3: mean  +0.00451  |t|   2.26  signs agree  exceeds 58% of controls
+       +4: mean  +0.00232  |t|   5.16  signs agree  exceeds 89% of controls
+  attn tercile 1 (mean 0.709, n=166)  controls: |t| median 3.45, agree 68%
+       -3: mean  +0.00848  |t|   5.31  signs agree  exceeds 74% of controls
+       +4: mean  +0.00445  |t|   1.87  signs    no  exceeds 21% of controls
+  attn tercile 2 (mean 0.910, n=167)  controls: |t| median 1.45, agree 16%
+       -3: mean  -0.00108  |t|   1.04  signs    no  exceeds 32% of controls
+       +4: mean  +0.00168  |t|   2.90  signs agree  exceeds 95% of controls
+
+============================================================================================
+### A_vs_T
+  control reference (n=19 positions): |mean| median 0.00101   |t| median 0.65, 90th 2.01, max 2.40   all-5-signs-agree 0% (chance 6.2%)
+  control mean effects are 53% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=334  mean  +0.00262  sd 0.00180  |t|   3.26  signs DISAGREE
+           vs controls: |t| exceeds 100%   |mean| exceeds  95%   magnitude 2.61x median control
+           members [-0.00023  0.00340  0.00363  0.00200  0.00432]
+  TARGET  +4  n=353  mean  -0.00125  sd 0.00352  |t|   0.79  signs DISAGREE
+           vs controls: |t| exceeds  58%   |mean| exceeds  63%   magnitude 1.24x median control
+           members [-0.00165  0.00283 -0.00590 -0.00305  0.00155]
+  attn tercile 0 (mean 0.343, n=167)  controls: |t| median 0.74, agree 16%
+       -3: mean  +0.00469  |t|   1.79  signs    no  exceeds 68% of controls
+       +4: mean  -0.00291  |t|   2.25  signs    no  exceeds 79% of controls
+  attn tercile 1 (mean 0.709, n=166)  controls: |t| median 1.42, agree 16%
+       -3: mean  +0.00580  |t|   4.27  signs agree  exceeds 100% of controls
+       +4: mean  +0.00140  |t|   0.46  signs    no  exceeds 16% of controls
+  attn tercile 2 (mean 0.910, n=167)  controls: |t| median 1.69, agree 37%
+       -3: mean  -0.00236  |t|   1.59  signs    no  exceeds 47% of controls
+       +4: mean  -0.00204  |t|   1.09  signs    no  exceeds 37% of controls
+
+============================================================================================
+### G_vs_C
+  control reference (n=19 positions): |mean| median 0.00427   |t| median 4.32, 90th 10.23, max 13.87   all-5-signs-agree 79% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=483  mean  +0.00635  sd 0.00331  |t|   4.29  signs agree
+           vs controls: |t| exceeds  42%   |mean| exceeds  74%   magnitude 1.49x median control
+           members [0.00758 0.01081 0.00715 0.00378 0.00245]
+  TARGET  +4  n=500  mean  +0.00553  sd 0.00138  |t|   8.95  signs agree
+           vs controls: |t| exceeds  84%   |mean| exceeds  68%   magnitude 1.29x median control
+           members [0.00736 0.00512 0.00368 0.00518 0.00629]
+  attn tercile 0 (mean 0.343, n=167)  controls: |t| median 2.24, agree 32%
+       -3: mean  +0.00585  |t|   3.57  signs agree  exceeds 84% of controls
+       +4: mean  +0.00591  |t|   6.75  signs agree  exceeds 100% of controls
+  attn tercile 1 (mean 0.709, n=166)  controls: |t| median 3.88, agree 84%
+       -3: mean  +0.01217  |t|   3.84  signs agree  exceeds 47% of controls
+       +4: mean  +0.00703  |t|   3.45  signs    no  exceeds 32% of controls
+  attn tercile 2 (mean 0.910, n=167)  controls: |t| median 2.05, agree 21%
+       -3: mean  +0.00114  |t|   1.29  signs    no  exceeds 32% of controls
+       +4: mean  +0.00365  |t|   3.36  signs    no  exceeds 95% of controls
+
+============================================================================================
+### G_vs_notG
+  control reference (n=19 positions): |mean| median 0.00635   |t| median 5.98, 90th 16.35, max 25.41   all-5-signs-agree 84% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=483  mean  +0.00803  sd 0.00407  |t|   4.41  signs agree
+           vs controls: |t| exceeds  37%   |mean| exceeds  74%   magnitude 1.26x median control
+           members [0.01060 0.01016 0.01198 0.00470 0.00269]
+  TARGET  +4  n=500  mean  +0.00452  sd 0.00189  |t|   5.35  signs agree
+           vs controls: |t| exceeds  42%   |mean| exceeds  26%   magnitude 0.71x median control
+           members [0.00782 0.00430 0.00334 0.00381 0.00332]
+  attn tercile 0 (mean 0.343, n=167)  controls: |t| median 3.87, agree 63%
+       -3: mean  +0.00711  |t|   5.96  signs agree  exceeds 74% of controls
+       +4: mean  +0.00510  |t|   6.44  signs agree  exceeds 74% of controls
+  attn tercile 1 (mean 0.709, n=166)  controls: |t| median 7.31, agree 89%
+       -3: mean  +0.01406  |t|   4.41  signs agree  exceeds 26% of controls
+       +4: mean  +0.00706  |t|   3.73  signs agree  exceeds 11% of controls
+  attn tercile 2 (mean 0.910, n=167)  controls: |t| median 2.07, agree 37%
+       -3: mean  +0.00300  |t|   1.74  signs    no  exceeds 32% of controls
+       +4: mean  +0.00140  |t|   1.15  signs    no  exceeds 26% of controls
+
+$ python analyse_position_bank.py --npz ../results_interp_all/bank_slot0_n500.npz --strata flags
+reference: 19 control positions at frame offset 0, matching the hypothesis positions
+../results_interp_all/bank_slot0_n500.npz: 500 isoforms, 32 positions (19 controls), 5 members, tag atg1000_stop1000
+method floor (no-op |effect|, per member max): [4.8e-07 7.2e-07 4.8e-07 4.8e-07 7.2e-07]  -- every effect below ~7e-07 is arithmetic noise
+slot-0 annotation flags: is_ref_cds 60.4%, is_sqanti_cds 74.8%, neither 2.4%
+  mean slot attention by stratum: neither flag 0.250  is_sqanti_cds only 0.637  is_ref_cds (any) 0.681  either flag 0.664
+observed-base purine fraction: -3 0.742  +4 0.694   controls median 0.509
+
+============================================================================================
+### GC_vs_AT
+  control reference (n=19 positions): |mean| median 0.00461   |t| median 5.78, 90th 12.96, max 24.30   all-5-signs-agree 95% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=500  mean  +0.00584  sd 0.00385  |t|   3.39  signs agree
+           vs controls: |t| exceeds  11%   |mean| exceeds  74%   magnitude 1.27x median control
+           members [0.00827 0.00463 0.01125 0.00303 0.00201]
+  TARGET  +4  n=500  mean  +0.00097  sd 0.00221  |t|   0.99  signs DISAGREE
+           vs controls: |t| exceeds   0%   |mean| exceeds   0%   magnitude 0.21x median control
+           members [ 0.00406  0.00116  0.00154  0.00011 -0.00200]
+  neither flag               n=12   controls |t| median 2.61, agree 58%   -3 mean +0.00108 |t|  0.91 exceeds   5%   +4 mean +0.00311 |t|  1.70 exceeds  21%
+  is_sqanti_cds only         n=186  controls |t| median 7.41, agree 100%   -3 mean +0.00757 |t|  5.65 exceeds  21%   +4 mean +0.00484 |t|  4.00 exceeds   0%
+  is_ref_cds (any)           n=302  controls |t| median 2.35, agree 37%   -3 mean +0.00496 |t|  2.41 exceeds  58%   +4 mean -0.00149 |t|  1.00 exceeds  11%
+  either flag                n=488  controls |t| median 5.77, agree 95%   -3 mean +0.00596 |t|  3.38 exceeds  16%   +4 mean +0.00092 |t|  0.91 exceeds   0%
+
+============================================================================================
+### purine
+  control reference (n=19 positions): |mean| median 0.00219   |t| median 3.36, 90th 5.52, max 10.26   all-5-signs-agree 53% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=499  mean  +0.00396  sd 0.00161  |t|   5.49  signs agree
+           vs controls: |t| exceeds  89%   |mean| exceeds  84%   magnitude 1.81x median control
+           members [0.00389 0.00668 0.00372 0.00294 0.00258]
+  TARGET  +4  n=500  mean  +0.00281  sd 0.00227  |t|   2.77  signs DISAGREE
+           vs controls: |t| exceeds  42%   |mean| exceeds  68%   magnitude 1.29x median control
+           members [ 0.00366  0.00370 -0.00083  0.00234  0.00519]
+  neither flag               n=12   controls |t| median 2.45, agree 42%   -3 mean +0.00039 |t|  0.60 exceeds   0%   +4 mean +0.00312 |t|  4.57 exceeds  95%
+  is_sqanti_cds only         n=186  controls |t| median 4.01, agree 74%   -3 mean +0.00736 |t|  6.50 exceeds  84%   +4 mean +0.00557 |t|  4.81 exceeds  63%
+  is_ref_cds (any)           n=302  controls |t| median 0.94, agree 16%   -3 mean +0.00200 |t|  3.29 exceeds  89%   +4 mean +0.00110 |t|  1.01 exceeds  53%
+  either flag                n=488  controls |t| median 3.36, agree 53%   -3 mean +0.00404 |t|  5.40 exceeds  84%   +4 mean +0.00280 |t|  2.69 exceeds  42%
+
+============================================================================================
+### A_vs_T
+  control reference (n=19 positions): |mean| median 0.00101   |t| median 0.65, 90th 2.01, max 2.40   all-5-signs-agree 0% (chance 6.2%)
+  control mean effects are 53% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=334  mean  +0.00262  sd 0.00180  |t|   3.26  signs DISAGREE
+           vs controls: |t| exceeds 100%   |mean| exceeds  95%   magnitude 2.61x median control
+           members [-0.00023  0.00340  0.00363  0.00200  0.00432]
+  TARGET  +4  n=353  mean  -0.00125  sd 0.00352  |t|   0.79  signs DISAGREE
+           vs controls: |t| exceeds  58%   |mean| exceeds  63%   magnitude 1.24x median control
+           members [-0.00165  0.00283 -0.00590 -0.00305  0.00155]
+  neither flag               n=12   controls |t| median 1.49, agree 16%   -3 mean +0.00123 |t|  1.02 exceeds  21%   +4 mean -0.00305 |t|  0.76 exceeds   5%
+  is_sqanti_cds only         n=186  controls |t| median 1.49, agree 42%   -3 mean +0.00538 |t|  4.16 exceeds  95%   +4 mean +0.00131 |t|  0.79 exceeds  26%
+  is_ref_cds (any)           n=302  controls |t| median 1.23, agree 11%   -3 mean +0.00095 |t|  1.44 exceeds  63%   +4 mean -0.00267 |t|  1.45 exceeds  63%
+  either flag                n=488  controls |t| median 0.82, agree  0%   -3 mean +0.00265 |t|  3.28 exceeds 100%   +4 mean -0.00122 |t|  0.75 exceeds  42%
+
+============================================================================================
+### G_vs_C
+  control reference (n=19 positions): |mean| median 0.00427   |t| median 4.32, 90th 10.23, max 13.87   all-5-signs-agree 79% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=483  mean  +0.00635  sd 0.00331  |t|   4.29  signs agree
+           vs controls: |t| exceeds  42%   |mean| exceeds  74%   magnitude 1.49x median control
+           members [0.00758 0.01081 0.00715 0.00378 0.00245]
+  TARGET  +4  n=500  mean  +0.00553  sd 0.00138  |t|   8.95  signs agree
+           vs controls: |t| exceeds  84%   |mean| exceeds  68%   magnitude 1.29x median control
+           members [0.00736 0.00512 0.00368 0.00518 0.00629]
+  neither flag               n=12   controls |t| median 1.87, agree 42%   -3 mean -0.00021 |t|  0.21 exceeds   5%   +4 mean +0.00710 |t|  3.25 exceeds  89%
+  is_sqanti_cds only         n=186  controls |t| median 3.77, agree 74%   -3 mean +0.00984 |t|  4.18 exceeds  58%   +4 mean +0.00918 |t|  6.11 exceeds  79%
+  is_ref_cds (any)           n=302  controls |t| median 2.67, agree 42%   -3 mean +0.00460 |t|  4.21 exceeds  84%   +4 mean +0.00321 |t|  3.78 exceeds  79%
+  either flag                n=488  controls |t| median 4.33, agree 74%   -3 mean +0.00651 |t|  4.26 exceeds  42%   +4 mean +0.00549 |t|  8.55 exceeds  84%
+
+============================================================================================
+### G_vs_notG
+  control reference (n=19 positions): |mean| median 0.00635   |t| median 5.98, 90th 16.35, max 25.41   all-5-signs-agree 84% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=483  mean  +0.00803  sd 0.00407  |t|   4.41  signs agree
+           vs controls: |t| exceeds  37%   |mean| exceeds  74%   magnitude 1.26x median control
+           members [0.01060 0.01016 0.01198 0.00470 0.00269]
+  TARGET  +4  n=500  mean  +0.00452  sd 0.00189  |t|   5.35  signs agree
+           vs controls: |t| exceeds  42%   |mean| exceeds  26%   magnitude 0.71x median control
+           members [0.00782 0.00430 0.00334 0.00381 0.00332]
+  neither flag               n=12   controls |t| median 2.84, agree 68%   -3 mean +0.00054 |t|  0.47 exceeds   0%   +4 mean +0.00694 |t|  2.71 exceeds  42%
+  is_sqanti_cds only         n=186  controls |t| median 7.01, agree 100%   -3 mean +0.01172 |t|  5.16 exceeds  32%   +4 mean +0.00944 |t|  6.05 exceeds  47%
+  is_ref_cds (any)           n=302  controls |t| median 2.53, agree 58%   -3 mean +0.00619 |t|  3.66 exceeds  58%   +4 mean +0.00139 |t|  1.02 exceeds  16%
+  either flag                n=488  controls |t| median 5.93, agree 79%   -3 mean +0.00820 |t|  4.36 exceeds  37%   +4 mean +0.00446 |t|  5.13 exceeds  42%
+
+$ python analyse_position_bank.py --npz ../results_interp_all/bank_slot0_n500.npz --strata observed_base
+reference: 19 control positions at frame offset 0, matching the hypothesis positions
+../results_interp_all/bank_slot0_n500.npz: 500 isoforms, 32 positions (19 controls), 5 members, tag atg1000_stop1000
+method floor (no-op |effect|, per member max): [4.8e-07 7.2e-07 4.8e-07 4.8e-07 7.2e-07]  -- every effect below ~7e-07 is arithmetic noise
+observed-base purine fraction: -3 0.742  +4 0.694   controls median 0.509
+
+============================================================================================
+### GC_vs_AT
+  control reference (n=19 positions): |mean| median 0.00461   |t| median 5.78, 90th 12.96, max 24.30   all-5-signs-agree 95% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=500  mean  +0.00584  sd 0.00385  |t|   3.39  signs agree
+           vs controls: |t| exceeds  11%   |mean| exceeds  74%   magnitude 1.27x median control
+           members [0.00827 0.00463 0.01125 0.00303 0.00201]
+  TARGET  +4  n=500  mean  +0.00097  sd 0.00221  |t|   0.99  signs DISAGREE
+           vs controls: |t| exceeds   0%   |mean| exceeds   0%   magnitude 0.21x median control
+           members [ 0.00406  0.00116  0.00154  0.00011 -0.00200]
+      obs purine: controls |t| median 3.55, agree 68%   -3 mean +0.00591 |t| 2.82 exceeds 21%   +4 mean +0.00081 |t| 0.77 exceeds 0%
+  obs pyrimidine: controls |t| median 4.67, agree 84%   -3 mean +0.00564 |t| 6.80 exceeds 68%   +4 mean +0.00134 |t| 1.27 exceeds 0%
+
+============================================================================================
+### purine
+  control reference (n=19 positions): |mean| median 0.00219   |t| median 3.36, 90th 5.52, max 10.26   all-5-signs-agree 53% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=499  mean  +0.00396  sd 0.00161  |t|   5.49  signs agree
+           vs controls: |t| exceeds  89%   |mean| exceeds  84%   magnitude 1.81x median control
+           members [0.00389 0.00668 0.00372 0.00294 0.00258]
+  TARGET  +4  n=500  mean  +0.00281  sd 0.00227  |t|   2.77  signs DISAGREE
+           vs controls: |t| exceeds  42%   |mean| exceeds  68%   magnitude 1.29x median control
+           members [ 0.00366  0.00370 -0.00083  0.00234  0.00519]
+      obs purine: controls |t| median 1.65, agree 26%   -3 mean +0.00313 |t| 3.71 exceeds 79%   +4 mean +0.00283 |t| 2.73 exceeds 68%
+  obs pyrimidine: controls |t| median 1.75, agree 26%   -3 mean +0.00633 |t| 4.44 exceeds 79%   +4 mean +0.00277 |t| 1.98 exceeds 58%
+
+============================================================================================
+### A_vs_T
+  control reference (n=19 positions): |mean| median 0.00101   |t| median 0.65, 90th 2.01, max 2.40   all-5-signs-agree 0% (chance 6.2%)
+  control mean effects are 53% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=334  mean  +0.00262  sd 0.00180  |t|   3.26  signs DISAGREE
+           vs controls: |t| exceeds 100%   |mean| exceeds  95%   magnitude 2.61x median control
+           members [-0.00023  0.00340  0.00363  0.00200  0.00432]
+  TARGET  +4  n=353  mean  -0.00125  sd 0.00352  |t|   0.79  signs DISAGREE
+           vs controls: |t| exceeds  58%   |mean| exceeds  63%   magnitude 1.24x median control
+           members [-0.00165  0.00283 -0.00590 -0.00305  0.00155]
+      obs purine: controls |t| median 0.93, agree 11%   -3 mean +0.00181 |t| 2.01 exceeds 95%   +4 mean -0.00289 |t| 1.71 exceeds 84%
+  obs pyrimidine: controls |t| median 1.23, agree 0%   -3 mean +0.00461 |t| 3.35 exceeds 100%   +4 mean +0.00220 |t| 1.11 exceeds 37%
+
+============================================================================================
+### G_vs_C
+  control reference (n=19 positions): |mean| median 0.00427   |t| median 4.32, 90th 10.23, max 13.87   all-5-signs-agree 79% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=483  mean  +0.00635  sd 0.00331  |t|   4.29  signs agree
+           vs controls: |t| exceeds  42%   |mean| exceeds  74%   magnitude 1.49x median control
+           members [0.00758 0.01081 0.00715 0.00378 0.00245]
+  TARGET  +4  n=500  mean  +0.00553  sd 0.00138  |t|   8.95  signs agree
+           vs controls: |t| exceeds  84%   |mean| exceeds  68%   magnitude 1.29x median control
+           members [0.00736 0.00512 0.00368 0.00518 0.00629]
+      obs purine: controls |t| median 3.13, agree 63%   -3 mean +0.00624 |t| 4.95 exceeds 68%   +4 mean +0.00673 |t| 8.82 exceeds 89%
+  obs pyrimidine: controls |t| median 2.83, agree 53%   -3 mean +0.00666 |t| 2.91 exceeds 53%   +4 mean +0.00280 |t| 1.71 exceeds 26%
+
+============================================================================================
+### G_vs_notG
+  control reference (n=19 positions): |mean| median 0.00635   |t| median 5.98, 90th 16.35, max 25.41   all-5-signs-agree 84% (chance 6.2%)
+  control mean effects are 100% same-signed -- a value near 50% means the operator has no systematic direction; well above means it does
+  TARGET  -3  n=483  mean  +0.00803  sd 0.00407  |t|   4.41  signs agree
+           vs controls: |t| exceeds  37%   |mean| exceeds  74%   magnitude 1.26x median control
+           members [0.01060 0.01016 0.01198 0.00470 0.00269]
+  TARGET  +4  n=500  mean  +0.00452  sd 0.00189  |t|   5.35  signs agree
+           vs controls: |t| exceeds  42%   |mean| exceeds  26%   magnitude 0.71x median control
+           members [0.00782 0.00430 0.00334 0.00381 0.00332]
+      obs purine: controls |t| median 4.35, agree 74%   -3 mean +0.00797 |t| 4.28 exceeds 42%   +4 mean +0.00518 |t| 5.48 exceeds 63%
+  obs pyrimidine: controls |t| median 4.61, agree 79%   -3 mean +0.00817 |t| 4.39 exceeds 42%   +4 mean +0.00301 |t| 2.00 exceeds 16%
+

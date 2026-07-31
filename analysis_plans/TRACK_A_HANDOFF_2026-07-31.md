@@ -292,6 +292,72 @@ TF-MoDISco on ISM scores, and insertional analysis, and no gradient attribution.
 
 ---
 
+## 13. ⚠ Claim 5.3.2 — the −3 half is supportable, the +4 half is not (added 2026-07-31)
+
+§12 retired the method behind the nucleotide-level claims. This is the replacement measurement for
+the Kozak half of claim 5.3.2 and legend 5.6.7, made by perturbation rather than attribution.
+
+**Measured 2026-07-31**, `atg1000_stop1000`, five members (seeds 100–500), 500 isoforms from
+`split="all"`, substitution applied to ORF slot 0's start window with channel 5 recomputed, scored
+against **19 control positions** within ±60 of the start codon that share the hypothesis positions'
+codon frame offset. Every control carries the identical operator, created-motif exclusions,
+recomputation and eligibility test. *Frame matching is load-bearing rather than tidy: the exclusion
+rate for a T substitution is 23.6% at the targets' offset and 8.7% at another, so a mixed-offset
+reference removes a different share of one side of the contrast than the target does.*
+
+**The finding that governs both halves: a single-base substitution moves composition as well as
+identity, and composition is the larger term at every position.** Control-position behavior by
+operator — a usable operator is one whose control reference looks like a null:
+
+| operator | control \|t\| median | controls same-signed | all-5 members agree |
+|---|---|---|---|
+| `G_vs_notG` — the operator the +4 claim is posed in | 5.98 | 100% | 84% |
+| `purine` {A,G}−{C,T} | 3.36 | 100% | 53% |
+| **`A_vs_T` — GC-matched** | **0.65** | **53%** | **0%** |
+
+Independent member signs would agree 6.25% of the time. **Members agree at meaningless positions far
+more than chance under every operator except the GC-matched one**, because they share training data
+and architecture. Across-member agreement is evidence against training noise only, and only when
+read against the control rate.
+
+**Kozak −3: supportable.** Under `A_vs_T`, mean +0.00262, across-member |t| 3.26, **exceeds 100% of
+the 19 control positions**, 2.61× the median control magnitude. It survives conditioning on the
+observed base — the target is 74.2% purine against a control median of 50.9% — at the 95th
+percentile within observed-purine isoforms and the 100th within observed-pyrimidine ones. One of
+five members sits at −0.0002, so the member signs do not all agree.
+
+**Kozak +4: not supportable as stated.** Under `A_vs_T` it is null (|t| 0.79, 58th percentile).
+Under `G_vs_notG` it reaches |t| 5.35 but only the 42nd percentile of that operator's own controls —
+indistinguishable from the model's preference for G everywhere. Under `G_vs_C` it reaches the 84th
+percentile, inside a reference that is itself 100% same-signed. **Any +4 statement in the manuscript
+needs the GC-matched version or it is reporting composition.**
+
+**A fifth confounder for the pooled estimate.** Stratified by the attention slot 0 receives, the −3
+`A_vs_T` effect is +0.00580 (|t| 4.27, 100th percentile) in the middle tercile and **reverses to
+−0.00236** in the top tercile, where the model is most committed to slot 0. Each tercile is scored
+against its own control null, whose median |t| itself moves 0.74 → 1.42 → 1.69. Pooling averages a
+real positive against a reversal.
+
+**And a first answer on whether the annotation features override initiation context.** Under
+`A_vs_T` at −3, split by the flags on slot 0: `is_sqanti_cds` only (n=186) gives +0.00538, |t| 4.16,
+95th percentile; `is_ref_cds` present (n=302) gives +0.00095, |t| 1.44, 63rd percentile. **5.7×
+larger where the reference-CDS flag is absent.** This is a between-isoform comparison in the native
+model, so it is not the global attention re-weighting an inference-time ablation produces — but it is
+confounded by everything else that differs between reference-annotated and novel isoforms, and it is
+offered as evidence, not as a demonstration.
+
+**Provenance note, and it is why this section exists.** The Kozak numbers in
+`HANDOFF_2026-07-31_interpretation.md` (n=370, −3 mean +0.00356, |t| 6.89, "exceeds 100% of
+controls") have no script, no run log and no commit behind them — searched across the repo, `git log
+--all`, and every surviving session scratchpad. The one committed Kozak artifact,
+`probe_kozak_ablation.py`, is a different experiment (n=300, no controls, −3 +0.00519). Everything in
+this section replaces those numbers and is reproducible from committed code.
+
+*Source: `analysis_plans/measure_position_bank.py`, `analysis_plans/analyse_position_bank.py`, and
+their run logs. Plan: `analysis_plans/ANALYSIS5_PLAN_2026-07-31.md`.*
+
+---
+
 ## 9. What is NOT in here
 
 - **No ledger rows have been written, and `build_current_state.py` has not been run.**

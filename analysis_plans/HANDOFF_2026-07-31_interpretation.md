@@ -60,7 +60,12 @@ entirely.** This is the most important single thing to fix.
 | **2 — branch decomposition** | Complete. 50 cells, all accepted, reduced by `analysis2.py`. Structural 76.2%/66.3%. |
 | **3 — structural features** | Complete. 50 cells, all accepted, reduced by `analysis3.py`. EJC 61.0%/64.4%; annotation pair 22.5%/23.0%. |
 | **4 — positional** | **Plan only, and it needs a fifth revision.** Two defects below. |
-| **5 — Kozak / ORF selection** | **Does not exist as a plan, but has a positive result.** Should be split out. |
+| **5 — Kozak / ORF selection** | **Plan written 2026-07-31**, `ANALYSIS5_PLAN_2026-07-31.md`, from measurements made against matched control positions. Production run not yet made. |
+
+**Analysis 4 inherits three things from Analysis 5's measurements**, none of them folded in yet:
+the composition confound is the main term rather than a sensitivity (§5c treats GC-matching as the
+latter); the method floor is ~7×10⁻⁷ at production batch size, not exactly 0.0 as §5a2 states; and
+`mean_abs` remains the headline positional statistic.
 
 Track A (the ledger window) has the Analyses 1–3 findings: `TRACK_A_HANDOFF_2026-07-31.md`, landed
 there as D41, W143–W145, C76. Twelve sections; §11 and §12 were added after their commit and they
@@ -95,8 +100,16 @@ components, sign-stability precondition) — do not redo those.
 
 ## The Kozak result, and the four confounders that hid it
 
-**Result** (n=370, `atg1000_stop1000`, all five members, rank-0 window-local substitution, 15 control
-positions within ±60 of the anchor):
+> **SUPERSEDED 2026-07-31, later the same day. The block below has no code behind it.** No script,
+> run log, commit or surviving scratchpad produces these numbers; the search covered the repo, `git
+> log --all` and every `/private/tmp/claude-*/…/scratchpad` on disk. The one committed Kozak
+> artifact, `probe_kozak_ablation.py`, is a different experiment (n=300, no controls, −3 +0.00519).
+> **Replaced by `ANALYSIS5_PLAN_2026-07-31.md` §8 and Track A handoff §13**, both reproducible from
+> `measure_position_bank.py` / `analyse_position_bank.py` and their run logs. The re-measurement at
+> n=500 with 30 matched controls agrees in direction and is weaker: −3 exceeds 93% of controls on
+> the `purine` operator, not 100%. The confounder list below is sound and still applies; a fifth and
+> a sixth have since been added (ORF attention, observed-base composition), and the operator itself
+> turned out to be the largest defect — see §8 of the Analysis 5 plan.
 
 ```
 Kozak −3   mean +0.00356   across-member |t| 6.89   all 5 signs agree   exceeds 100% of controls
