@@ -1,0 +1,21 @@
+normalised-absent flag values: is_ref_cds -0.398, is_sqanti_cds -0.486
+  all[300 of 41,765]: 300 samples, 94 NMD+ (31.3%)
+  seed 100: n=300  -3 native +0.00383 ablated +0.00050   +4 native +0.01023 ablated +0.00196
+  seed 200: n=300  -3 native +0.00766 ablated +0.00465   +4 native +0.00696 ablated +0.00169
+  seed 300: n=300  -3 native +0.00629 ablated +0.00329   +4 native +0.00379 ablated +0.00151
+  seed 400: n=300  -3 native +0.00535 ablated +0.00140   +4 native +0.00337 ablated +0.00013
+  seed 500: n=300  -3 native +0.00283 ablated +0.00097   +4 native +0.00093 ablated +0.00022
+
+=== KOZAK CONTRASTS, native vs annotation-flags-ablated ===
+
+  -3 purine - pyrimidine
+    native : mean +0.00519  sd 0.00192  members [0.00383 0.00766 0.00629 0.00535 0.00283]
+    ablated: mean +0.00216  sd 0.00175  members [0.00050 0.00465 0.00329 0.00140 0.00097]
+    signs agree: native YES, ablated YES
+    |ablated| / |native| = 0.42x
+
+  +4 G - notG
+    native : mean +0.00506  sd 0.00360  members [0.01023 0.00696 0.00379 0.00337 0.00093]
+    ablated: mean +0.00110  sd 0.00086  members [0.00196 0.00169 0.00151 0.00013 0.00022]
+    signs agree: native YES, ablated YES
+    |ablated| / |native| = 0.22x
