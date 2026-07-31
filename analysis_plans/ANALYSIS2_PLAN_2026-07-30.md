@@ -400,20 +400,19 @@ What a run retains is each isoform's three 32-dimensional branch embeddings, its
 context and its ORF mask — **59 MB over all 41,765 isoforms**. *Computed here 2026-07-30 from the
 array shapes.* Window data is read once, consumed once and released.
 
-| | one chunk, held | reference set | **peak per run** |
-|---|---|---|---|
-| `atg1000_stop1000` | 0.69 GiB | 0.17 GiB | 2.1 GiB |
-| `atg2000_stop2000` | 1.37 GiB | 0.34 GiB | **3.26 GiB** |
+| | one chunk, held | reference set | **peak per run** | mean over 25 |
+|---|---|---|---|---|
+| `atg1000_stop1000` | 0.69 GiB | 0.17 GiB | **2.10 GiB** | 1.66 GiB |
+| `atg2000_stop2000` | 1.37 GiB | 0.34 GiB | **3.66 GiB** | 3.29 GiB |
 
-*Chunk and reference figures computed here 2026-07-30 from the array shapes. Peak at
-`atg2000_stop2000` measured on Explorer 2026-07-31, `sacct` MaxRSS for job 8849989, which is the
-figure the request is sized from because it is the machine the request is made to. Peak at
-`atg1000_stop1000` predicted, by scaling that measurement by the ratio the two configurations
-showed on the development machine.*
+*Chunk and reference figures computed here 2026-07-30 from the array shapes. Peak measured on
+Explorer 2026-07-31 as the largest `sacct` MaxRSS over the twenty-five cells of each
+configuration, array job 8850292 — the largest rather than the mean, because a request is sized
+against the worst cell it must hold, and on the machine the request is made to.*
 
-The request is **8 GB**, which is 2.5× the measured peak. Peak exceeds the sum of the parts above
-because twenty-one sequential chunk allocations leave the allocator's high-water mark above any
-single chunk's footprint.
+The request is **8 GB**, 2.2× the largest measured peak. Peak exceeds the sum of the parts above
+because the sequential chunk allocations leave the allocator's high-water mark above any single
+chunk's footprint.
 
 Read eagerly instead, one full-cohort run holds 14.00 GiB at `atg1000_stop1000` and 28.01 GiB at
 `atg2000_stop2000`, and peaks half an array higher again — 35.3 GiB — because the float16 read
@@ -424,12 +423,11 @@ same rows in the same order it would receive from a single read of the whole spl
 
 ### Cost, and where this runs
 
-Measured 2026-07-30 on this machine's CPU, at two subset sizes per configuration so the
-per-isoform rate is established rather than assumed: **6.2 ms per isoform** at
-`atg1000_stop1000` and **10.0–11.9 ms** at `atg2000_stop2000`, divided roughly evenly between
-branch encoding and coalition evaluation. One full-cohort run is **4.4 minutes** at the narrower
-configuration and **7–11 minutes** at the wider one; the fifty run in about **six hours** in
-sequence.
+One full-cohort run takes **5m31s to 10m58s**, and the fifty run as one array in **24 minutes**
+of wall clock. *Measured on Explorer 2026-07-31, array job 8850292, fifty tasks at up to
+twenty-three concurrent across fifteen nodes.* On the development machine's CPU the same runs
+take 6m16s and 8m50s at the two configurations, which is what makes a full-cohort cell a local
+debugging step rather than a cluster round trip.
 
 Each configuration is run at full cohort on the development machine before any cell of it is
 submitted. The fifty are then submitted to the cluster's **CPU** partition as one array, one task
