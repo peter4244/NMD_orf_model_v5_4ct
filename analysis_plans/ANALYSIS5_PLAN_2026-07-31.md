@@ -38,18 +38,18 @@ composition, because channel 5 is a rolling GC fraction recomputed over the wind
 perturbation (`data_prep.py:178-205`). The composition term is not a residual. It is the dominant
 term, and it is present at every position.
 
-*Measured here 2026-07-31, `atg1000_stop1000`, five members (seeds 100–500), 500 isoforms, the 19
+*Measured here 2026-07-31, `atg1000_stop1000`, five members (seeds 100–500), 500 isoforms, the 37
 frame-matched control positions of §5a. Each row is the same contrast applied at control positions
 only — positions where no motif is hypothesized, so a reference behaving as a null is what a usable
 operator looks like:*
 
 | operator | control \|mean\| median | control \|t\| median | control \|t\| max | controls same-signed | all-5 members agree |
 |---|---|---|---|---|---|
-| `GC_vs_AT`  {G,C}−{A,T} | 0.00461 | 5.78 | 24.30 | 100% | 95% |
-| `G_vs_notG` G−{A,C,T}   | 0.00635 | 5.98 | 25.41 | 100% | 84% |
-| `purine`    {A,G}−{C,T} | 0.00219 | 3.36 | 10.26 | 100% | 53% |
-| `G_vs_C`    G−C         | 0.00427 | 4.32 | 13.87 | 100% | 79% |
-| **`A_vs_T`  A−T**       | **0.00101** | **0.65** | **2.40** | **53%** | **0%** |
+| `GC_vs_AT`  {G,C}−{A,T} | 0.00567 | 5.66 | 12.08 | 100% | 86% |
+| `G_vs_notG` G−{A,C,T}   | 0.00735 | 5.79 | 37.04 | 100% | 92% |
+| `purine`    {A,G}−{C,T} | 0.00348 | 3.65 | 7.13 | 100% | 65% |
+| `G_vs_C`    G−C         | 0.00497 | 4.30 | 13.87 | 100% | 81% |
+| **`A_vs_T`  A−T**       | **0.00111** | **1.00** | **4.03** | **73%** | **8%** |
 
 Independent member signs would agree 6.25% of the time. **Members agree at control positions far
 more often than that under every operator except `A_vs_T`**, so across-member agreement is not by
@@ -91,9 +91,9 @@ Producer: step c. Consumer: §6 and every claim in §8.
 **Reliability statistic.** The across-member `|t|` of a contrast — |mean| over the five members
 divided by their standard error — and whether all five member signs agree. It measures consistency
 across training runs, not isoform-level evidence. It is the headline statistic because magnitude
-ranks the operators the wrong way round: *measured here, Kozak −3 has a mean effect of +0.00803
-under `G_vs_notG` and +0.00262 under `A_vs_T` — three times larger under the first — while against
-frame-matched controls it sits at the 37th percentile of reliability under the first and the 100th
+ranks the operators the wrong way round: *measured here, Kozak −3 has a mean effect of +0.00898
+under `G_vs_notG` and +0.00262 under `A_vs_T` — 3.4× larger under the first — while against
+frame-matched controls it sits at the 22nd percentile of reliability under the first and the 97th
 under the second.* Selecting on magnitude selects the confounded operator.
 
 **Composition-neutral operator.** A contrast whose two sides have equal GC content, so channel 5
@@ -102,13 +102,18 @@ moves only by the sampling of individual isoforms and not by construction. `A_vs
 **Created-motif exclusion.** A substituted cell is dropped when the substitution creates an in-frame
 stop codon in the codon containing the position, or creates an AUG in any of the three 3-mers
 containing it. Applied identically at every position in the bank, evaluated per isoform before any
-contrast is formed. *Measured here: at −3 this drops 33% of the isoform-cells entering `A_vs_T`,
-almost all of them T-cells creating TAA/TAG/TGA in the codon spanning −3…−1.*
+contrast is formed. *Measured here: at −3 this drops 33% of the isoform-cells entering `A_vs_T` (n=334 of 500),
+almost all of them T-cells creating TAA/TAG/TGA in the codon spanning −3…−1. Exclusion is
+strongly base-asymmetric — at −3 the rates are A 0.044, C 0.000, G 0.034, T 0.288 — which is why
+a contrast is formed only when BOTH sides survive intact (§5c). Guarding each side with "at least
+one base survives" instead would turn `purine` into mean(A,G) − C, whose low side is 100% GC
+rather than 50%: the exact confound the operator exists to avoid, on about a third of isoforms.*
 
 **Method floor.** The effect measured when the observed base is substituted back onto itself,
-through the same GC-recomputation path. *Measured here: max |effect| 4.8×10⁻⁷ to 7.2×10⁻⁷ per
-member over 500 isoforms × 32 positions, from float32 reduction order rather than from the
-perturbation. Effects below ~10⁻⁶ are arithmetic noise.* It is exactly 0.0 only at batch sizes small
+through the same GC-recomputation path. *Measured here: max |effect| 9.5×10⁻⁷ to 1.4×10⁻⁶ per
+member over 500 isoforms × 39 positions, from float32 reduction order rather than from the
+perturbation. Effects below ~10⁻⁶ are arithmetic noise, and the floor rises with batch size —
+it was 4.8×10⁻⁷ at 32 positions.* It is exactly 0.0 only at batch sizes small
 enough to avoid the reordering, so it is reported per run rather than asserted.
 
 ## 3.2 Datasets
@@ -153,12 +158,24 @@ chosen here.
 
 | section 4 group (isopairs, n = 1,385) | n | section 5 class (isoforms, n = 41,765) | n | NMD+ |
 |---|---:|---|---:|---:|
-| **NMD+/PTC+** | 1,080 | **PTC+** | 6,863 | 70.0% |
-| **NMD+/PTC− ORF match** — mechanism inferred by elimination as uORF burden | 52 | **PTC− uORF-PTC** — the upstream PTC-bearing ORF detected directly | 5,913 | 12.6% |
-| **NMD+/PTC− ORF diff** | 38 | *(no counterpart; pooled into the two PTC− classes)* | — | — |
+| **NMD+/PTC+** | 1,080 | **PTC+** | 6,864 | 70.0% |
+| **NMD+/PTC− ORF match** — mechanism inferred by elimination as uORF burden | 53 | **PTC− uORF-PTC** — the upstream PTC-bearing ORF detected directly | 5,913 | 12.6% |
+| **NMD+/PTC− ORF diff** — extended 4 + truncated 34 | 38 | *(no counterpart; pooled into the two PTC− classes)* | — | — |
 | **Ref AUG absent** — excluded from mechanism inference | 214 | **Ref AUG absent** — reported separately, never pooled | 13,223 | 25.9% |
 | **Control** — gene-matched non-NMD comparators | 885 | *(no counterpart; section 5 partitions rather than contrasts)* | — | — |
-| | | **PTC− no trigger** | 15,766 | 2.2% |
+| | | **PTC− no trigger** | 15,765 | 2.2% |
+
+**The section 4 column is published-§4 scope and is NOT deposit-native.** Those counts were
+recomputed by Track A from `isopair_wrapper/data_mashr`, which is the tree section 4 publishes
+from; the deposit-native rebuild of the same population gives 1,578 against 1,548 for claim 4.1.2,
+and that gap is claim 4.1.2's own recorded defect. The section 5 column is computed entirely from
+`results_4ct_dn`. The two columns are therefore on different trees and the correspondence is
+structural, not arithmetic.
+
+**And `Ref AUG absent` is not the same object on the two sides.** Section 4's 214 pools 93 pairs
+where ref-AUG tracing ran and found no usable reference AUG with 121 that produced no tracing
+record at all. The section 5 class is the first kind only — a slot set with no match to the
+reference isoform's projected AUG.
 
 **Three structural differences, so the correspondence is read correctly.**
 
@@ -168,17 +185,35 @@ chosen here.
   are therefore evidence that the classification captures mechanism.
 - **The ORF match / ORF diff split does not exist here.** Section 4 subdivides its PTC− pairs by
   whether the comparator encodes the reference protein, which needs an ORF-length comparison against
-  the reference that this plan does not compute. Until it does, both section 5 PTC− classes contain
-  a mixture of section 4's ORF match and ORF diff.
+  the reference. `ref_cds_features.tsv` carries `ref_orf_length` and `comp_orf_length_from_ref_atg`,
+  but *measured here, both are present for only 67.9% of the model universe, and the missingness is
+  label-dependent — 62.5% coverage among NMD+ isoforms against 69.4% among negatives* — so
+  conditioning on it biases. Until that is resolved, both section 5 PTC− classes mix section 4's
+  ORF match and ORF diff.
 - **`Ref AUG absent` is the one exact correspondence**, in definition and in treatment: section 4
   excludes it from mechanism inference, and section 5 reports it separately and never pools it.
 
 **One class is a gain rather than a translation.** Section 4's cleanest mechanism claim — that the
-residual PTC− NMD is uORF burden — rests on n = 52 and is reached *by elimination*: not PTC, not
+residual PTC− NMD is uORF burden — rests on n = 53 and is reached *by elimination*: not PTC, not
 3′UTR length, therefore 5′UTR features. `PTC− uORF-PTC` detects the upstream PTC-bearing ORF
-directly, at n = 5,913, of which 88.1% stop before the reference AUG and so are proper uORFs. If the
-model treats this class as a distinct mechanism, that is direct positive evidence for a claim the
-manuscript currently makes by exclusion.
+directly, at n = 5,913.
+
+**The class carries a mechanism split, not a purity check.** An out-of-frame **oORF** reads past the
+main AUG in the wrong frame, so there is no reinitiation rescue; a **uORF** terminating in the 5′UTR
+permits reinitiation and is the weaker trigger. *Measured here: uORF 5,287 (89.4%) at 12.6% NMD+,
+oORF 626 (10.6%) at 12.8%.* An in-frame upstream ORF cannot appear at all — it terminates at the
+main ORF's own stop and inherits its PTC status, and the class requires that stop to be clean;
+measured, 0 of the class.
+
+**Half the true uORF population is invisible to the model, and the invisible half is the weak
+half.** *Measured here: asking the same question of the full ORFik scan rather than the 5 model
+slots gives 12,010 isoforms rather than 5,913, so 6,097 (50.8% of the true set) carry an upstream
+PTC-bearing ORF the model cannot see. Those isoforms are 3.9% NMD+, against 12.6% for the visible
+ones and 2.2% for the no-trigger baseline.* The slot fill is Kozak-priority and the enrichment is
+strong between tiers — *78.7% of selected qualifying upstream ORFs are top-tier against 7.9% of
+unselected* — so the candidates it keeps are the ones plausibly initiated. Both versions are
+computed and written; the gap between them is the uORF evidence the model is structurally unable
+to use.
 
 **Every result in this plan is reported per class, and `Ref AUG absent` is never pooled with the
 other three.** *Producer: `build_mechanism_classes.py`, run log
@@ -201,10 +236,9 @@ status, reported as distributions and never as exemplars. Both configurations, `
 and `atg2000_stop2000`.
 
 **Slots.** The perturbation is applied to ORF slot 0 and the analysis is stratified by the attention
-weight that slot receives. *Measured here at `atg1000_stop1000`, n=500: mean slot-0 attention 0.649,
-median 0.712, and slot 0 is the highest-attention slot in 81.7% of isoforms — so a substitution in
-slot 0's window reaches most but not all of the prediction, and the fraction it reaches varies
-enough between isoforms to change the answer.*
+weight that slot receives. *Measured here at `atg1000_stop1000`, n=500: the slot-0 attention terciles have means 0.343, 0.709
+and 0.910 — so a substitution in slot 0's window reaches most but not all of the prediction, and the
+fraction it reaches varies enough between isoforms to reverse the sign of the answer (§8).*
 
 ---
 
@@ -217,7 +251,8 @@ BANK = hypothesis positions {-3, +4} + control positions
 FRAME OFFSET of a position = (array_index - (W/2 - 1)) mod 3
 CONTROLS are every position within +/-60 of the start codon whose frame offset EQUALS the
   hypothesis positions' offset, excluding the codon itself and the hypothesis positions.
-  In the codon convention that is p = -6, -9, ... upstream and p = +7, +10, ... downstream.
+  In the codon convention that is p = -6, -9, ... -60 upstream (19 positions) and
+  p = +7, +10, ... +58 downstream (18), so 37 controls.
 ```
 
 **Controls are selected on frame offset, not on spacing.** The created-motif exclusion depends on
@@ -226,15 +261,16 @@ exclusion rate from the target and is not a matched reference. *Measured here: a
 substitution is excluded for creating a stop codon in 23.6% of isoform-cells, against 8.7% at offset
 2 — a 2.7× difference in how much of one side of the contrast is removed.* Uniform 3-nt spacing does
 **not** achieve this, because the codon convention has no zero and skips the codon: spacing by 3
-from −60 lands on offset 0 upstream but offset 2 downstream.
+from −60 lands on offset 0 upstream but offset 2 downstream, which is how an earlier bank ended up
+with a reference that was 100% upstream and left the downstream hypothesis position with no
+region-matched control at all.
 
 *At the codon convention of §3.1 of the Analysis 4 plan, −3 and +4 both sit at offset 0.*
 
-**Matching the offset also matches the region**, since offset-0 positions within ±60 are
-predominantly upstream of the start codon. That makes the reference substantially harder, which is
-the point: *measured here, moving from 30 mixed-offset controls to 19 frame-matched ones raises the
-control `|t|` median from 3.58 to 5.98 under `G_vs_notG` and from 4.32 to 5.78 under `GC_vs_AT`,
-and moves both hypothesis positions below the 45th percentile under every operator except `A_vs_T`.*
+**Both arms are represented deliberately**, because Kozak −3 is upstream and Kozak +4 is
+downstream and a reference drawn from one side is not matched to a target on the other. *Measured
+here, upstream and downstream controls behave differently under every operator, so the arms are
+reported separately as well as pooled.*
 
 Reported positions use that same codon convention — the A of the start codon is +1, the base before
 it −1, no zero — so Kozak −3 is array index `W/2 − 4` and Kozak +4 is `W/2 + 2`.
@@ -290,7 +326,7 @@ percentiles afterwards.
 
 The same contrast is recomputed within strata, **each against the control reference recomputed in
 the same stratum**, because the reference moves with the stratum. *Measured here: the control `|t|`
-median under `A_vs_T` is 1.36 in isoforms carrying only `is_sqanti_cds` and 1.01 in isoforms
+median under `A_vs_T` is 1.52 in isoforms carrying only `is_sqanti_cds` and 1.09 in isoforms
 carrying `is_ref_cds`.*
 
 ```
@@ -333,17 +369,23 @@ is that the perturbation was constructed correctly and the reference is the matc
 7. All five member values are printed beside every across-member statistic.
 
 **A direction is stated only when the five members agree on its sign AND the position exceeds the
-control reference on reliability.** Either alone is insufficient: agreement alone is met by 43–70%
+control reference on reliability.** Either alone is insufficient: agreement alone is met by 65–92%
 of control positions under the confounded operators.
+
+8. **The percentile's resolution and its multiplicity are stated wherever it is used.** With 37
+   controls the statistic takes 38 values, so "exceeds 97%" means rank 2 of 38 and the ceiling is
+   attainable by chance at roughly 1 in 38. The operator is chosen after the forward passes (§2),
+   so a best-of-10 selection across operator × position cells is a family-wise error near 0.4. No
+   cell is reported as significant; percentiles are comparisons, not tests.
 
 ---
 
 # 7. Cost
 
 *Measured here 2026-07-31 on the local CPU (`~/miniforge3/envs/nmd_model_local/bin/python`), 500
-isoforms × 32 positions × 4 bases at `atg1000_stop1000`: 84–147 s per member, 9.5 minutes for five
-members.* Cost is linear in isoforms and in bank size, so the production run at 2,000 isoforms is
-~38 minutes at this configuration for the window-local pass. Two costs are **predicted, not
+isoforms × 39 positions × 4 bases at `atg1000_stop1000`: 116.6, 160.7, 170.9, 166.5 and 177.6 s per
+member, 13.2 minutes for five members.* Cost is linear in isoforms and in bank size, so the
+production run at 2,000 isoforms is ~53 minutes at this configuration for the window-local pass. Two costs are **predicted, not
 measured**: `atg2000_stop2000` scales with window width, and the propagated pass multiplies the
 forward passes by the number of windows a coordinate touches — *measured for Analysis 4: 5.1 of 10
 windows at W=1000 and 7.5 at W=2000.* Time one propagated cell before scoping the full run. Nothing
@@ -353,40 +395,69 @@ here needs the cluster.
 
 # 8. What this supports in the manuscript
 
-**Claim 5.3.2 and legend 5.6.7** are the consumers. On the evidence measured while writing this plan
-the −3 statement is supportable and the +4 statement is not, and the plan is written so that the
-production run can overturn either.
+**Claim 5.3.2 and legend 5.6.7** are the consumers. On the evidence measured while writing this
+plan **neither half is statable**: −3 meets the reference test and fails the sign-agreement test,
+and +4 fails both. The plan is written so that the production run can overturn either — including
+by supporting them.
 
 *Measured here 2026-07-31, `atg1000_stop1000`, five members, 500 isoforms, window-local, slot 0,
-scored against the 19 frame-matched controls of §5a:*
+scored against the 37 frame-matched controls of §5a, complete-case:*
 
 | operator | control \|t\| median | controls same-signed | Kozak −3 | Kozak +4 |
 |---|---|---|---|---|
-| **`A_vs_T`** | **0.65** | **53%** | \|t\| 3.26, **exceeds 100%** | \|t\| 0.79, exceeds 58% |
-| `purine` | 3.36 | 100% | \|t\| 5.49, exceeds 89% | \|t\| 2.77, exceeds 42% |
-| `G_vs_C` | 4.32 | 100% | \|t\| 4.29, exceeds 42% | \|t\| 8.95, exceeds 84% |
-| `G_vs_notG` | 5.98 | 100% | \|t\| 4.41, exceeds 37% | \|t\| 5.35, exceeds 42% |
-| `GC_vs_AT` | 5.78 | 100% | \|t\| 3.39, exceeds 11% | \|t\| 0.99, exceeds 0% |
+| **`A_vs_T`** | **1.00** | **73%** | n=334, \|t\| 3.26, **exceeds 97%** | n=353, \|t\| 0.79, exceeds 43% |
+| `purine` | 3.65 | 100% | n=323, \|t\| 5.36, exceeds 78% | n=353, \|t\| 2.39, exceeds 32% |
+| `G_vs_C` | 4.30 | 100% | n=483, \|t\| 4.29, exceeds 49% | n=500, \|t\| 8.95, exceeds 84% |
+| `G_vs_notG` | 5.79 | 100% | n=323, \|t\| 4.28, exceeds 22% | n=353, \|t\| 5.59, exceeds 49% |
+| `GC_vs_AT` | 5.66 | 100% | n=323, \|t\| 3.28, exceeds 16% | n=353, \|t\| 2.06, exceeds 3% |
 
-**`A_vs_T` is the only operator whose control reference is a null** — 53% same-signed and no
-position at which all five members agree — and it is the only one on which a hypothesis position
-clears its reference. Kozak −3 is at the 100th percentile of it, with a mean of +0.00262 and 2.96×
-the median control magnitude; one of five members sits at −0.0002, so the member signs do not all
-agree.
+**`A_vs_T` is the only operator whose control reference approaches a null** — 73% same-signed and
+all five members agreeing at 8% of control positions against a 6.25% chance rate. Every other
+operator's reference is 100% same-signed, which is the composition gradient of §2.
 
-**Kozak +4 clears nothing.** Its natural operator, `G_vs_notG`, puts it at the 42nd percentile of a
-reference that is 100% same-signed with a `|t|` median of 5.98 — the model prefers G nearly
-everywhere, and +4 is not distinguished from that. `G_vs_C` holds GC fixed and puts +4 at the 84th
-percentile, which is the strongest evidence for +4 that exists and is not enough to state a
-direction under §6.
+**Kozak −3 meets the reference test and fails the agreement test.** Under `A_vs_T`: mean +0.00262,
+\|t\| 3.26, the 97th percentile of the control reference, 2.37× the median control magnitude. But
+the five member values are −0.00023, +0.00340, +0.00363, +0.00200, +0.00432 — one member is
+effectively zero and negative, so the signs do not all agree. **§6 requires both, so no direction is
+stated for −3.** This is the strongest cell measured and it is not sufficient.
+
+**And the percentile is a weak statistic here.** 97% of 37 controls is rank 2 of 38, selected after
+the fact from 10 operator × position cells. A best-of-10 result at roughly p = 0.05 has a
+family-wise error near 0.4, and nothing in this design controls it. The percentile is reported
+because it is the right comparison, not because it is significant.
+
+**Kozak +4 is unsupported pooled**, under every operator. Its natural operator `G_vs_notG` puts it
+at the 49th percentile of a reference that is 100% same-signed with a \|t\| median of 5.79 — the
+model prefers G nearly everywhere and +4 is not distinguished from that. `G_vs_C` holds GC fixed and
+reaches the 84th percentile, which is the strongest pooled evidence for +4 and is not enough.
+
+**But one +4 cell clears both criteria, and omitting it would be selective reporting.** `G_vs_C` in
+the lowest slot-attention tercile (mean attention 0.343, n=167): mean +0.00591, \|t\| 6.75,
+**exceeds 100% of that stratum's controls, all five members agreeing**. On §6's own terms that is
+stronger than the −3 headline, which fails the agreement half. It is a post hoc stratum of a
+secondary operator and is reported as such, not promoted.
+
+**The −3 effect reverses with attention, so the pooled estimate averages opposing populations.**
+Under `A_vs_T`, by slot-0 attention tercile, each against its own within-stratum control null:
++0.00469 (\|t\| 1.79, 65th pct, signs disagree) at attention 0.343; **+0.00580 (\|t\| 4.27, 100th
+pct, signs agree)** at 0.709; **−0.00236** (\|t\| 1.59, 73rd pct, signs disagree) at 0.910. The
+middle tercile is the only cell in this analysis that satisfies §6 outright.
+
+**The result survives conditioning on the observed base**, which differs between target and
+controls — 74.2% purine at −3 against a control median of 54.5%. Within observed-purine isoforms
+−3 reaches the 92nd percentile; within observed-pyrimidine, the 97th.
 
 **The override question (question 3) has a first answer, and it is the one that motivates a
 retrain.** *Measured here under `A_vs_T` at −3, stratified by the annotation flags on slot 0:*
 
-| stratum | n | mean | \|t\| | exceeds |
+| stratum | stratum n | mean | \|t\| | exceeds |
 |---|---|---|---|---|
 | `is_sqanti_cds` only, no `is_ref_cds` | 186 | **+0.00538** | 4.16 | **97% of controls** |
-| `is_ref_cds` present | 302 | +0.00095 | 1.44 | 70% of controls |
+| `is_ref_cds` present | 302 | +0.00095 | 1.44 | 68% of controls |
+
+*The n column is stratum size. The isoforms actually contributing are fewer, because the
+created-motif exclusion removes roughly a third before any contrast is formed; the production run
+reports contributing n per cell, and this table does not.*
 
 **The −3 effect is 5.7× larger where the reference-CDS flag is absent.** This is a between-isoform
 comparison in the native model, so it is not the global re-weighting an ablation produces; it is

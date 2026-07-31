@@ -292,69 +292,89 @@ TF-MoDISco on ISM scores, and insertional analysis, and no gradient attribution.
 
 ---
 
-## 13. ⚠ Claim 5.3.2 — the −3 half is supportable, the +4 half is not (added 2026-07-31)
+## 13. ⚠ Claim 5.3.2 — neither half is statable as written (added 2026-07-31, revised same day)
 
 §12 retired the method behind the nucleotide-level claims. This is the replacement measurement for
 the Kozak half of claim 5.3.2 and legend 5.6.7, made by perturbation rather than attribution.
 
+**Revised after three narrow reviews.** An earlier revision of this section reported −3 as
+"supportable" and said Kozak +4 was *understated* by a defective control set. Both were wrong, and
+the corrections run in opposite directions. Numbers below are from
+`position_bank_measure_runlog.txt` and `position_bank_analysis_runlog.txt` at commit `ca2bb9f`.
+
 **Measured 2026-07-31**, `atg1000_stop1000`, five members (seeds 100–500), 500 isoforms from
 `split="all"`, substitution applied to ORF slot 0's start window with channel 5 recomputed, scored
-against **19 control positions** within ±60 of the start codon that share the hypothesis positions'
-codon frame offset. Every control carries the identical operator, created-motif exclusions,
-recomputation and eligibility test. *Frame matching is load-bearing rather than tidy: the exclusion
-rate for a T substitution is 23.6% at the targets' offset and 8.7% at another, so a mixed-offset
-reference removes a different share of one side of the contrast than the target does.*
+against **37 control positions** within ±60 that share the hypothesis positions' codon frame offset
+— 19 upstream and 18 downstream. Frame matching is load-bearing: *the exclusion rate for a T
+substitution is 23.6% at the targets' offset and 8.7% at another*, so a mixed-offset reference
+removes a different share of one side of the contrast than the target does.
 
-**The finding that governs both halves: a single-base substitution moves composition as well as
-identity, and composition is the larger term at every position.** Control-position behavior by
-operator — a usable operator is one whose control reference looks like a null:
+**A single-base substitution moves composition as well as identity, and composition is the larger
+term at every position.** Control-position behavior by operator — a usable operator is one whose
+control reference looks like a null:
 
 | operator | control \|t\| median | controls same-signed | all-5 members agree |
 |---|---|---|---|
-| `G_vs_notG` — the operator the +4 claim is posed in | 5.98 | 100% | 84% |
-| `purine` {A,G}−{C,T} | 3.36 | 100% | 53% |
-| **`A_vs_T` — GC-matched** | **0.65** | **53%** | **0%** |
+| `G_vs_notG` — the operator the +4 claim is posed in | 5.79 | 100% | 92% |
+| `purine` {A,G}−{C,T} | 3.65 | 100% | 65% |
+| **`A_vs_T` — GC-matched** | **1.00** | **73%** | **8%** |
 
 Independent member signs would agree 6.25% of the time. **Members agree at meaningless positions far
-more than chance under every operator except the GC-matched one**, because they share training data
-and architecture. Across-member agreement is evidence against training noise only, and only when
-read against the control rate.
+more than chance under every operator**, because they share training data and architecture.
+Across-member agreement is evidence against training noise only, and only against the control rate.
 
-**Kozak −3: supportable.** Under `A_vs_T`, mean +0.00262, across-member |t| 3.26, **exceeds 100% of
-the 19 control positions**, 2.61× the median control magnitude. It survives conditioning on the
-observed base — the target is 74.2% purine against a control median of 50.9% — at the 95th
-percentile within observed-purine isoforms and the 100th within observed-pyrimidine ones. One of
-five members sits at −0.0002, so the member signs do not all agree.
+**Kozak −3: meets the reference test, fails the agreement test.** Under `A_vs_T`, mean +0.00262,
+across-member \|t\| 3.26, the **97th percentile** of the 37 controls, 2.37× the median control
+magnitude, and it survives conditioning on the observed base (92nd percentile within
+observed-purine isoforms, 97th within observed-pyrimidine). But the member values are −0.00023,
++0.00340, +0.00363, +0.00200, +0.00432 — one is effectively zero and negative. Our own acceptance
+rule requires sign agreement *and* the reference test, so **no direction is stated for −3**. The
+earlier revision of this section called it supportable; that was inconsistent with the rule stated
+in the same plan.
 
-**Kozak +4: not supportable as stated.** Under `A_vs_T` it is null (|t| 0.79, 58th percentile).
-Under `G_vs_notG` it reaches |t| 5.35 but only the 42nd percentile of that operator's own controls —
-indistinguishable from the model's preference for G everywhere. Under `G_vs_C` it reaches the 84th
-percentile, inside a reference that is itself 100% same-signed. **Any +4 statement in the manuscript
-needs the GC-matched version or it is reporting composition.**
+**And the percentile is weak.** 97% of 37 controls is rank 2 of 38, chosen after the fact from 10
+operator × position cells; family-wise error is near 0.4 and nothing controls it.
 
-**A fifth confounder for the pooled estimate.** Stratified by the attention slot 0 receives, the −3
-`A_vs_T` effect is +0.00580 (|t| 4.27, 100th percentile) in the middle tercile and **reverses to
-−0.00236** in the top tercile, where the model is most committed to slot 0. Each tercile is scored
-against its own control null, whose median |t| itself moves 0.74 → 1.42 → 1.69. Pooling averages a
-real positive against a reversal.
+**Kozak +4: unsupported, and NOT understated.** Under `A_vs_T` it is null (\|t\| 0.79, 43rd
+percentile). Under `G_vs_notG` it reaches \|t\| 5.59 but the 49th percentile of that operator's own
+controls. `G_vs_C` holds GC fixed and reaches the 84th percentile — the strongest pooled evidence
+for +4 and not enough. **Correction to what this section previously said:** a review re-sliced the
+old bank against off-frame downstream controls and projected +4 rising to the 90th–100th
+percentile. Rebuilding the bank properly — frame-matched on both arms — gives 49% and 84%. The
+off-frame controls had a different created-motif regime and a lower \|t\| median, which flattered
+the target.
 
-**And a first answer on whether the annotation features override initiation context.** Under
-`A_vs_T` at −3, split by the flags on slot 0: `is_sqanti_cds` only (n=186) gives +0.00538, |t| 4.16,
-95th percentile; `is_ref_cds` present (n=302) gives +0.00095, |t| 1.44, 63rd percentile. **5.7×
-larger where the reference-CDS flag is absent.** This is a between-isoform comparison in the native
-model, so it is not the global attention re-weighting an inference-time ablation produces — but it is
-confounded by everything else that differs between reference-annotated and novel isoforms, and it is
-offered as evidence, not as a demonstration.
+**One +4 cell does clear both criteria and is reported rather than omitted.** `G_vs_C` in the lowest
+slot-attention tercile (n=167): mean +0.00591, \|t\| 6.75, exceeds 100% of that stratum's controls,
+all five members agreeing. That is stronger than the −3 headline on our own criteria. It is a post
+hoc stratum of a secondary operator and is not promoted, but selective omission of it would have
+been the defect.
+
+**The −3 effect reverses with attention, so the pooled estimate averages opposing populations.**
+Under `A_vs_T`, by slot-0 attention tercile against within-stratum controls: +0.00469 (43rd pct,
+signs disagree) at attention 0.343; **+0.00580 (\|t\| 4.27, 100th pct, signs agree)** at 0.709;
+**−0.00236** (73rd pct, signs disagree) at 0.910. The middle tercile is the only cell satisfying
+both criteria outright.
+
+**A first answer on whether the annotation features override initiation context.** Under `A_vs_T` at
+−3, split by the flags on slot 0: `is_sqanti_cds` only (stratum n=186) gives +0.00538, \|t\| 4.16,
+97th percentile; `is_ref_cds` present (n=302) gives +0.00095, \|t\| 1.44, 68th. **5.7× larger where
+the reference-CDS flag is absent.** A between-isoform comparison in the native model, so not the
+global attention re-weighting an inference-time ablation produces — but confounded by everything
+else that differs between reference-annotated and novel isoforms, and offered as evidence rather
+than demonstration. The stratum n is not the contributing n; the created-motif exclusion removes
+roughly a third before any contrast is formed.
 
 **Provenance note, and it is why this section exists.** The Kozak numbers in
-`HANDOFF_2026-07-31_interpretation.md` (n=370, −3 mean +0.00356, |t| 6.89, "exceeds 100% of
+`HANDOFF_2026-07-31_interpretation.md` (n=370, −3 mean +0.00356, \|t\| 6.89, "exceeds 100% of
 controls") have no script, no run log and no commit behind them — searched across the repo, `git log
 --all`, and every surviving session scratchpad. The one committed Kozak artifact,
-`probe_kozak_ablation.py`, is a different experiment (n=300, no controls, −3 +0.00519). Everything in
-this section replaces those numbers and is reproducible from committed code.
+`probe_kozak_ablation.py`, is a different experiment (n=300, no controls, −3 +0.00519). Everything
+in this section replaces those numbers and is reproducible from committed code.
 
-*Source: `analysis_plans/measure_position_bank.py`, `analysis_plans/analyse_position_bank.py`, and
-their run logs. Plan: `analysis_plans/ANALYSIS5_PLAN_2026-07-31.md`.*
+*Source: `analysis_plans/measure_position_bank.py`, `analysis_plans/analyse_position_bank.py`,
+`analysis_plans/build_mechanism_classes.py`, and their run logs, at commit `ca2bb9f`. Plan:
+`analysis_plans/ANALYSIS5_PLAN_2026-07-31.md`.*
 
 ---
 
