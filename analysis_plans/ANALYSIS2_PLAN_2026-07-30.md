@@ -176,7 +176,7 @@ TAGS   = [atg2000_stop2000, atg1000_stop1000]
 SEEDS  = [100, 200, 300, 400, 500]      # which trained member
 DRAWS  = [1, 2, 3, 4, 5]                # which reference draw
 NBG    = 500                            # reference isoforms per draw
-DSEED  = 20260730                       # base seed for the reference draws, fixed
+BASE   = 42                             # config training seed; draw R uses BASE + 1000*R
 ```
 
 ### Step 1 — define the population
@@ -195,16 +195,35 @@ record  n_test_clean = count(split == "test")          # expect 10,520, used at 
 
 ### Step 2 — fix the reference draws
 
-Draw the five sets of reference isoforms once, before any scoring, and reuse them across both
-configurations and all members. Sharing them means a difference between two members is a difference
-between models rather than between the reference sets they happened to get.
+The reference set is what "branch absent" means. Five sets of 500 are drawn from the **train split
+only**, so no isoform is ever its own reference and no held-out data enters the comparison. The draw
+is uniform and without replacement, and the same five sets are reused across both configurations and
+all members — so a difference between two members is a difference between models rather than between
+the reference sets they happened to get.
+
+Within a run, all 41,765 explained isoforms are attributed against the same 500. The draw is the
+only stochastic element in the analysis, which is what makes it a clean interpretation-variance knob.
 
 ```
-train_idx = entries where split == "train"             # expect 26,711
+train_pos = positions within the train split           # 26,711 isoforms
 for R in DRAWS:
-    ref[R] = NBG indices sampled from train_idx without replacement, seed DSEED + R
-    assert ref[R] are distinct from each other across R
+    ref[R] = 500 positions drawn from train_pos, uniformly, without replacement,
+             using RandomState(BASE_SEED + 1000 * R)   # BASE_SEED = 42, the config's training seed
+    assert the five sets are distinct from one another
+    record the label composition of each
 ```
+
+**The draw is not stratified**, so each reference set inherits the training split's composition:
+about 22% NMD susceptible, 78% control. *Measured here 2026-07-30 over three draws from
+`results_4ct_dn/nmd_orf_data.h5`: 109, 117 and 104 NMD of 500, against 5,959 of 26,711 (22.3%) in
+train.*
+
+So "absent" operationally means *this branch looked like a randomly chosen training transcript* — a
+mixture that is mostly, but not entirely, controls — and `expected_value` is the model's mean
+prediction over that mixture. A control-only reference would answer a cleaner question, how far a
+branch pushes the prediction away from a non-NMD transcript. The uniform draw is retained because it
+is what the published figures used and changing it would break comparability, but the choice is
+recorded here rather than inherited silently.
 
 ### Step 3 — encode every isoform once per configuration
 
