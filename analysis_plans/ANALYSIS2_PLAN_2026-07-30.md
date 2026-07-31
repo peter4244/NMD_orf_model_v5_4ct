@@ -458,12 +458,24 @@ They describe different objects — the interval belongs to the ensemble, the sp
 and are reported side by side rather than combined. Each is estimated from five observations and is
 reported as a descriptive spread.
 
-### An expected difference between configurations, named so it is not read as a finding
+### A difference between configurations that was predicted, and came out the other way
 
-At the larger window width the two sequence branches receive more input while the structural branch
-stays at five features. The structural share is therefore expected to be lower at
-`atg2000_stop2000` than at `atg1000_stop1000` for a reason that is mechanical rather than
-biological. The comparison is reported as a direction and magnitude, not as a test.
+**The prediction, registered before any cell was run.** At the larger window width the two sequence
+branches receive more input while the structural branch stays at five features, so the structural
+share was expected to be **lower** at `atg2000_stop2000` than at `atg1000_stop1000`, for a reason
+mechanical rather than biological. It was named in advance precisely so it would not later be read
+as a finding.
+
+**Measured, it is higher: 76.24% against 66.31%**, a difference of 9.93 percentage points in the
+opposite direction, and larger than every spread in this analysis by more than an order of magnitude
+— the ensemble draw standard deviations are 0.54 and 0.42 pp, and the seed jackknife standard errors
+1.28 and 1.52 pp. *Measured here 2026-07-31 from the fifty accepted cells.*
+
+The prediction is recorded rather than deleted because a registered expectation that fails is
+evidence, and because the direction is no longer available as a mechanical explanation for anything
+downstream. **The comparison is reported as a measured direction and magnitude, not as a test, and
+not as an expected artifact.** Why widening the sequence windows *reduces* the sequence branches'
+share of attributed evidence is not established here and is not claimed.
 
 ### Memory is the binding constraint, not time
 

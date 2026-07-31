@@ -202,10 +202,19 @@ them. The exact Shapley value of each feature follows from the 32 coalition valu
 ```
 
 Only the structural branch's own encoder is re-evaluated per coalition; the sequence encodings are
-not. The 32 coalitions cost roughly four times Analysis 2's eight, against an unchanged encoding
-cost, so a run is expected to take between one and two times Analysis 2's — *predicted here
-2026-07-31 from Analysis 2's measured split between encoding and coalition evaluation; to be
-replaced by measurement before the fifty are submitted.*
+not, and all 32 coalitions are evaluated in one batched pass per isoform rather than sequentially.
+
+**Coalition evaluation costs 7.0 ms per isoform** at `atg1000_stop1000`. *Measured here 2026-07-31
+as the slope between two probe runs explaining 100 and 600 isoforms of the same split — 48.6 s and
+52.1 s — so the fixed encoding cost cancels and the figure is per-isoform work rather than a total
+divided by a count.* Against Analysis 2's 2.8 ms for eight coalitions this is the expected factor
+for thirty-two, and a full-cohort run is therefore between one and two times Analysis 2's.
+
+Batching the coalitions changes no value beyond float32 reassociation: every row remains one
+(coalition, reference) pair evaluated independently, and the model is in evaluation mode so a row
+never depends on its batch-mates. *Measured: against a sequential implementation, agreement to
+1.4e-07 over 500 isoforms — the same order as the cross-architecture difference in Analysis 2, and
+four orders below any reported quantity.*
 
 ### Step 5 — accept or reject each file, and record the tally
 
@@ -213,7 +222,11 @@ Identical in form to Analysis 2 step 5, and affordable for the same reason: all 
 enumerated and the Shapley values solved exactly, so the sum identity is an algebraic consequence of
 the arithmetic and the residual can only be floating-point rounding.
 
-**The 1e-12 tolerance is inherited as a prediction, not a measurement.** Shapley weights over five
+**The 1e-12 tolerance was inherited as a prediction and is now measured.** Over a 500-isoform probe
+at 32 coalitions the maximum residual is **8.88e-16**, the same order as the three-player game's
+1.78e-15 and four orders inside the bar. The concern below is therefore settled, and the bar stands.
+
+**Why it was checked rather than assumed.** Shapley weights over five
 players accumulate more rounding than over three. It is verified on the first cell before the fifty
 are submitted; landing at 1e-11 would be a tolerance to restate, not a defect — and discovering it
 after fifty jobs would be waste. The two tolerances are kept distinct: 1e-12 for the within-file
