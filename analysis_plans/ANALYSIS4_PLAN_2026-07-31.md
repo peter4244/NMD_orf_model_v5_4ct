@@ -18,7 +18,13 @@ This document specifies what is done to the data. Code is written from it.
 > the answer could have come out differently — a different training run, and a different draw of the
 > reference transcripts used to compute an attribution.
 
-**Approved by Pete, 2026-07-30. Do not edit this paragraph.**
+**Approved by Pete, 2026-07-30.** *Amended for Analysis 4 with Pete's approval, 2026-07-31: the
+paragraph is the shared purpose of Analyses 1–4 and its second uncertainty does not apply here.
+Analysis 4 measures the model's response to a sequence perturbation rather than computing an
+attribution against reference transcripts, so it has no reference draw. Its uncertainty is the
+training spread across members, the sampling error of the subsample it is measured on, and the
+stochastic elements of its controls — enumerated in §3.2. The paragraph is otherwise unchanged and
+remains binding on Analyses 1–3.*
 
 Analyses 2 and 3 divided the evidence among branches and among structural features. Analysis 4 opens
 the two sequence branches: **where inside each window the model output is sensitive, and to what.**
