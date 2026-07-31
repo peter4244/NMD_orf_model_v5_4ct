@@ -201,6 +201,56 @@ def resolve_checkpoint(results_dir, tag, seed=None):
     raise FileNotFoundError(f"No checkpoint found: {legacy} (and no seeded members either).")
 
 
+def _split_mask(splits, split):
+    """THE ONE DEFINITION of what a split NAME selects, over a decoded `split` array.
+
+    EXTRACTED 2026-07-30, same reasoning as evaluate.enforce_split_gate. It lived inside
+    NMDDataset.__init__, so the only way to ask "which rows is split X?" was to construct the
+    dataset -- which materialises that split's windows as float32, up to 28 GiB. A caller that
+    only wants the row positions (to chunk them, or to label output rows) had the choice of
+    paying that, or restating these seven branches. A restated copy is a second definition of
+    what `test_clean` means, in a repo where D31 rests on `test` being touched once.
+    """
+    if split == "test_clean":
+        return splits == "test"
+    if split == "test_all":
+        return (splits == "test") | (splits == "test_paralog")
+    if split == "val_clean":
+        # MIRRORS test_clean, AND REFUSES TO BE SILENTLY MEANINGLESS (2026-07-29).
+        # data_prep only began screening VAL_CHRS for paralogs on 2026-07-29. On an
+        # HDF5 built before that, `val` holds every chr2/chr4 transcript and NO
+        # `val_paralog` label exists -- so `splits == "val"` would return the
+        # UNSCREENED set while the name promised a screened one. Selecting a window
+        # config on that set would reintroduce the leak the sweep exists to remove,
+        # silently and at exit 0. An absent val_paralog label is therefore an error,
+        # not an empty category: rebuild the HDF5.
+        if not (splits == "val_paralog").any():
+            raise ValueError(
+                "split='val_clean' requested but this HDF5 contains no 'val_paralog' "
+                "label, so `val` is UNSCREENED and val_clean would silently equal val. "
+                "Rebuild the HDF5 with the current data_prep.py (which screens VAL_CHRS "
+                "symmetrically with HOLDOUT_CHRS), or ask for split='val' explicitly if "
+                "an unscreened validation set is genuinely what you want.")
+        return splits == "val"
+    if split == "val_all":
+        return (splits == "val") | (splits == "val_paralog")
+    if split == "all":
+        return np.ones(len(splits), dtype=bool)   # every isoform (for full-cohort interpretation)
+    return splits == split
+
+
+def split_indices(h5_path, split):
+    """Global row positions of a named split, WITHOUT materialising any window data.
+
+    Reads only the `split` array -- 41,765 short strings -- so a caller can chunk a split, or
+    name the isoforms it is about to explain, at negligible cost. Same names, same meanings and
+    same val_clean guard as NMDDataset, because both go through _split_mask.
+    """
+    with h5py.File(Path(h5_path), "r") as f:
+        splits = np.array([s.decode() if isinstance(s, bytes) else s for s in f["split"][:]])
+    return np.where(_split_mask(splits, split))[0]
+
+
 class NMDDataset(Dataset):
     """
     v5: PyTorch dataset — loads windows + minimal ORF features from HDF5.
@@ -229,33 +279,7 @@ class NMDDataset(Dataset):
         with h5py.File(self.h5_path, "r") as f:
             splits = np.array([s.decode() if isinstance(s, bytes) else s
                                for s in f["split"][:]])
-            if split == "test_clean":
-                mask = splits == "test"
-            elif split == "test_all":
-                mask = (splits == "test") | (splits == "test_paralog")
-            elif split == "val_clean":
-                # MIRRORS test_clean, AND REFUSES TO BE SILENTLY MEANINGLESS (2026-07-29).
-                # data_prep only began screening VAL_CHRS for paralogs on 2026-07-29. On an
-                # HDF5 built before that, `val` holds every chr2/chr4 transcript and NO
-                # `val_paralog` label exists -- so `splits == "val"` would return the
-                # UNSCREENED set while the name promised a screened one. Selecting a window
-                # config on that set would reintroduce the leak the sweep exists to remove,
-                # silently and at exit 0. An absent val_paralog label is therefore an error,
-                # not an empty category: rebuild the HDF5.
-                if not (splits == "val_paralog").any():
-                    raise ValueError(
-                        "split='val_clean' requested but this HDF5 contains no 'val_paralog' "
-                        "label, so `val` is UNSCREENED and val_clean would silently equal val. "
-                        "Rebuild the HDF5 with the current data_prep.py (which screens VAL_CHRS "
-                        "symmetrically with HOLDOUT_CHRS), or ask for split='val' explicitly if "
-                        "an unscreened validation set is genuinely what you want.")
-                mask = splits == "val"
-            elif split == "val_all":
-                mask = (splits == "val") | (splits == "val_paralog")
-            elif split == "all":
-                mask = np.ones(len(splits), dtype=bool)   # every isoform (for full-cohort interpretation)
-            else:
-                mask = splits == split
+            mask = _split_mask(splits, split)
 
             self.indices = np.where(mask)[0]
             if restrict_to is not None:

@@ -328,6 +328,92 @@ def test_gate_is_wired():
           lambda: run("--explain-split", "train", "--final"))
 
 
+def test_chunked_read():
+    """The explained split is now read in chunks. Three ways that silently changes an answer.
+
+    Chunking exists because one full-cohort run peaked at 35.3 GiB against a 32 GB request. It
+    is only safe because of three properties, and each fails silently rather than loudly: rows
+    lost at a boundary (misaligns every downstream isoform_id), chunks that do not reconstruct
+    the split's own order (same), and a chunk size that is not a batch multiple (re-partitions
+    the forward passes, so the run is no longer bit-comparable with an unchunked one).
+
+    These test the arithmetic, not the model -- a full equivalence run costs a minute and lives
+    in the run log. The arithmetic is what a future edit will break.
+    """
+    import numpy as np
+    from utils import _split_mask, split_indices
+
+    print("\n=== 7. chunked reading of the explained split ===")
+    BATCH = 256
+
+    def chunk_bounds(n, size):
+        return [(lo, min(lo + size, n)) for lo in range(0, n, size)]
+
+    def covers_exactly(n, size):
+        rows = np.concatenate([np.arange(lo, hi) for lo, hi in chunk_bounds(n, size)])
+        return len(rows) == n and (rows == np.arange(n)).all()
+
+    check("chunks cover every row exactly once, in order (41,765 @ 2048)",
+          lambda: covers_exactly(41765, 2048) or (_ for _ in ()).throw(AssertionError()),
+          must_raise=False)
+    check("chunks cover every row exactly once, in order (4,356 @ 1024)",
+          lambda: covers_exactly(4356, 1024) or (_ for _ in ()).throw(AssertionError()),
+          must_raise=False)
+
+    # PLANTED DEFECT: a stride shorter than the chunk width -- the shape of an off-by-one in the
+    # loop bound. It duplicates rows rather than dropping them, so the row COUNT still looks
+    # plausible at a glance; only order and uniqueness catch it.
+    def overlapping():
+        rows = np.concatenate([np.arange(lo, min(lo + 2048, 41765))
+                               for lo in range(0, 41765, 2047)])
+        if len(rows) == 41765 and (rows == np.arange(41765)).all():
+            return True
+        raise AssertionError("overlapping chunks detected, as they should be")
+    check("an overlapping stride is detected", overlapping)
+
+    # PLANTED DEFECT: chunks concatenated out of order. Every row is present exactly once, so a
+    # count check passes and a set check passes; only an ORDER check fails.
+    def shuffled():
+        b = chunk_bounds(41765, 2048)
+        rows = np.concatenate([np.arange(lo, hi) for lo, hi in [b[1], b[0]] + b[2:]])
+        if (rows == np.arange(41765)).all():
+            return True
+        raise AssertionError("out-of-order chunks detected, as they should be")
+    check("chunks concatenated out of order are detected", shuffled)
+
+    # The batch-multiple rule. Every chunk boundary must also be a batch boundary, or the
+    # forward passes are re-partitioned and bitwise comparison against an eager run is void.
+    def boundaries_are_batch_aligned(size):
+        if size % BATCH:
+            raise AssertionError(f"{size} is not a multiple of {BATCH}")
+        return True
+    check("2048 is batch-aligned", lambda: boundaries_are_batch_aligned(2048),
+          must_raise=False)
+    check("a non-multiple chunk size is rejected", lambda: boundaries_are_batch_aligned(100))
+
+    # ONE WRITER for what a split name means. split_indices exists so a caller can chunk a
+    # split without materialising 28 GiB to discover which rows it holds -- and it is only safe
+    # while it agrees with NMDDataset, which now shares _split_mask with it. A future edit that
+    # reintroduces a second copy of these seven branches is what this catches.
+    splits = np.array(["train"] * 10 + ["val"] * 4 + ["val_paralog"] * 2
+                      + ["test"] * 5 + ["test_paralog"] * 3)
+    expected = {"train": 10, "val": 4, "val_clean": 4, "val_all": 6, "test": 5,
+                "test_clean": 5, "test_all": 8, "test_paralog": 3, "all": 24}
+    def masks_agree():
+        for name, n in expected.items():
+            got = int(_split_mask(splits, name).sum())
+            if got != n:
+                raise AssertionError(f"_split_mask('{name}') selected {got}, expected {n}")
+        return True
+    check("every split name selects the documented rows", masks_agree, must_raise=False)
+
+    # val_clean's guard must still fire when val_paralog is absent -- it is the one branch whose
+    # failure mode is a silently UNSCREENED validation set, not an error.
+    no_paralog = np.array(["train"] * 5 + ["val"] * 4)
+    check("val_clean on an unscreened HDF5 is refused",
+          lambda: _split_mask(no_paralog, "val_clean"))
+
+
 if __name__ == "__main__":
     print("planted-defect tests -- a guard that does not reject its defect is not a guard")
     test_alignment()
@@ -336,6 +422,7 @@ if __name__ == "__main__":
     test_artifact_naming()
     test_no_member_pooling()
     test_gate_is_wired()
+    test_chunked_read()
     print("\n" + ("=" * 70))
     if FAILURES:
         print(f"FAIL — {len(FAILURES)} guard(s) did not behave: {FAILURES}")

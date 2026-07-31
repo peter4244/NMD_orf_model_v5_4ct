@@ -14,6 +14,7 @@ embeddings (not mean approximation) to correctly handle ReLU nonlinearity.
 """
 
 import argparse
+import gc
 import json
 import math
 from pathlib import Path
@@ -29,7 +30,7 @@ from torch.utils.data import DataLoader
 from model import build_model
 from evaluate import enforce_split_gate
 from utils import (NMDDataset, load_config, member_tag, resolve_checkpoint, run_suffix,
-                   selected_tag, set_seed)
+                   selected_tag, set_seed, split_indices)
 
 
 def extract_sub_embeddings(model, dataset, indices, device, batch_size=256):
@@ -128,6 +129,72 @@ def extract_sub_embeddings(model, dataset, indices, device, batch_size=256):
         "masks": torch.cat(all_masks),             # (N, K)
         "labels": np.array(all_labels),
     }
+
+
+def extract_sub_embeddings_chunked(model, h5_path, ws_atg, ws_stop, split, device,
+                                   chunk_size, batch_size=256):
+    """extract_sub_embeddings over a split, reading the windows a chunk of rows at a time.
+
+    WHY (2026-07-30, measured). NMDDataset materialises a split's windows as float32 on
+    construction: 14.00 GiB for the full cohort at atg1000_stop1000, 28.01 GiB at
+    atg2000_stop2000. And because `f[...][idx].astype(np.float32)` holds the float16 read
+    buffer and the float32 result at the same time, the TRANSIENT peak is half an array higher
+    again -- 35.3 GiB at the wider configuration, against the 32 GB slurm_kernel_shap_dn.sh
+    asks for. Measured, not derived: at n=6,000/w2000 the model predicts 5.31 GiB and the
+    process peaked at 5.38.
+
+    None of it is needed. This function keeps only the three 32-dim branch embeddings, the
+    ranks 1-4 context and the mask -- about 59 MB for all 41,765 isoforms. The windows are read
+    once, consumed once and dropped. Peak falls to roughly 2.4 GiB at any window width, which
+    is what puts a full-cohort run back on a laptop, where the plan's working loop assumes
+    development happens.
+
+    IT CHANGES NO NUMBER, and the reason is arithmetic rather than assertion. Chunks are
+    contiguous ascending ranges of split positions, so restrict_to's sort is the identity and
+    concatenation restores the split's own row order exactly. chunk_size is required to be a
+    multiple of batch_size, so every chunk boundary is also a batch boundary and each forward
+    pass sees the SAME rows in the SAME order as the unchunked run -- identical reduction
+    order, not merely an identical set. The model is built once, outside the loop, and stays in
+    eval mode, so batch normalization uses stored running statistics either way. There is no
+    RNG on this path.
+    """
+    idx = split_indices(h5_path, split)
+    n = len(idx)
+
+    if chunk_size is None or chunk_size <= 0 or chunk_size >= n:
+        ds = NMDDataset(h5_path, ws_atg, ws_stop, split=split)
+        return extract_sub_embeddings(model, ds, np.arange(len(ds)), device, batch_size)
+
+    if chunk_size % batch_size:
+        raise ValueError(
+            f"--chunk-size {chunk_size} is not a multiple of the extraction batch size "
+            f"{batch_size}. A chunk boundary that is not a batch boundary re-partitions the "
+            f"forward passes, which changes floating-point reduction order and makes this run "
+            f"non-comparable with an unchunked one at the last bits. Use a multiple of "
+            f"{batch_size}.")
+
+    parts = []
+    n_chunks = (n + chunk_size - 1) // chunk_size
+    for c, lo in enumerate(range(0, n, chunk_size), start=1):
+        hi = min(lo + chunk_size, n)
+        print(f"  chunk {c}/{n_chunks}: split rows {lo:,}-{hi - 1:,}")
+        ds = NMDDataset(h5_path, ws_atg, ws_stop, split=split,
+                        restrict_to=np.arange(lo, hi))
+        parts.append(extract_sub_embeddings(model, ds, np.arange(len(ds)), device, batch_size))
+        del ds
+        gc.collect()
+
+    out = {k: torch.cat([p[k] for p in parts])
+           for k in ("atg_emb", "stop_emb", "struct_emb", "other_orf_emb", "masks")}
+    out["labels"] = np.concatenate([p["labels"] for p in parts])
+
+    # The split's row count is fixed before the loop; a short concatenation would mean a chunk
+    # silently returned fewer rows than it was given, and every downstream row would be
+    # misaligned against test_ids.
+    if len(out["labels"]) != n:
+        raise RuntimeError(f"chunked extraction returned {len(out['labels']):,} rows for a "
+                           f"split of {n:,} -- rows were lost, and isoform_id alignment is void")
+    return out
 
 
 def evaluate_coalition(model, coalition, obs_embs, bg_embs, other_orf_emb,
@@ -282,6 +349,14 @@ def main():
     parser.add_argument("--checkpoint-dir", default=None,
                         help="where trained members live, if not --results-dir. Outputs always go "
                              "to --results-dir.")
+    # MEMORY, WHICH IS THE BINDING CONSTRAINT HERE AND NOT TIME (2026-07-30). Reading the
+    # explained split's windows in chunks instead of all at once. Must be a multiple of the 256
+    # extraction batch size so batch composition -- and therefore floating-point reduction order
+    # -- is unchanged; see extract_sub_embeddings_chunked. 0 restores the single eager read.
+    parser.add_argument("--chunk-size", type=int, default=2048,
+                        help="explained-split rows held in memory at once (multiple of 256). "
+                             "0 = read the whole split eagerly, the pre-2026-07-30 behaviour, "
+                             "which peaks at 35.3 GiB on a full cohort at atg2000_stop2000.")
     # THE SPLIT GATE, IMPORTED NOT RESTATED (2026-07-30). This file scored any split with no
     # affirmation at all: `--explain-split test` was a final evaluation nothing marked as one, and
     # `--explain-split all` pooled train and held-out data with nothing saying so. That is the hole
@@ -325,8 +400,11 @@ def main():
     model.eval()
     print(f"Model loaded from {ckpt_path}")
 
-    # Load data — explained set (default test; 'all' = full cohort) + train (background)
-    test_ds = NMDDataset(h5_path, ws_atg, ws_stop, split=args.explain_split)
+    # THE EXPLAINED SET IS RESOLVED AS ROW POSITIONS, NOT MATERIALISED (2026-07-30). Naming the
+    # isoforms about to be explained used to require constructing the whole split -- up to 28.01
+    # GiB of float32 windows -- to reach its `.indices`. split_indices reads the `split` array
+    # only. The windows are read later, in chunks, by extract_sub_embeddings_chunked.
+    expl_idx = split_indices(h5_path, args.explain_split)
 
     # THE REFERENCE SET IS 500 ROWS, NOT A SPLIT (2026-07-30). NMDDataset materialises a split's
     # windows as float32 on construction, so building all of `train` to use 500 of its 26,711 rows
@@ -337,15 +415,13 @@ def main():
     # The row count comes from the `split` array directly so the draw can happen before any window
     # data is read. choice(n_train, ...) is the SAME call on the SAME RandomState as before, so the
     # positions drawn are identical -- see the equivalence check in analysis_plans/.
-    with h5py.File(h5_path, "r") as _f:
-        _splits = np.array([x.decode() if isinstance(x, bytes) else x for x in _f["split"][:]])
-    n_train = int((_splits == "train").sum())
+    n_train = len(split_indices(h5_path, "train"))
 
     # Load isoform IDs
     with h5py.File(h5_path, 'r') as f:
         all_ids = np.array([x.decode() if isinstance(x, bytes) else x
                             for x in f['isoform_id'][:]])
-    test_ids = all_ids[test_ds.indices]
+    test_ids = all_ids[expl_idx]
 
     # Select background.
     #
@@ -360,14 +436,19 @@ def main():
     bg_rng = np.random.RandomState(args.seed + 1000 * (args.run_id or 0))
     bg_pos = bg_rng.choice(n_train, size=min(args.n_background, n_train), replace=False)
     train_ds = NMDDataset(h5_path, ws_atg, ws_stop, split="train", restrict_to=bg_pos)
-    print(f"Explain ({args.explain_split}): {len(test_ds)}, "
+    print(f"Explain ({args.explain_split}): {len(expl_idx)}, "
           f"Reference: {len(train_ds)} of {n_train:,} train rows")
 
-    # Pre-compute embeddings
-    print("\nPre-computing test embeddings ...")
-    test_embs = extract_sub_embeddings(model, test_ds, np.arange(len(test_ds)),
-                                        device)
+    # Pre-compute embeddings. The explained split is read in chunks; the reference set is 500
+    # rows and is read whole.
+    print(f"\nPre-computing test embeddings (chunk size {args.chunk_size or 'off — eager'}) ...")
+    test_embs = extract_sub_embeddings_chunked(model, h5_path, ws_atg, ws_stop,
+                                               args.explain_split, device, args.chunk_size)
     print(f"  Test: atg={test_embs['atg_emb'].shape}, labels={test_embs['labels'].shape}")
+    if len(test_embs["labels"]) != len(expl_idx):
+        raise RuntimeError(
+            f"explained embeddings hold {len(test_embs['labels']):,} rows but the split has "
+            f"{len(expl_idx):,}; test_ids would be misaligned against them")
 
     print("Pre-computing background embeddings ...")
     # restrict_to already selected the drawn rows, so every row of train_ds is a reference isoform.
@@ -385,9 +466,9 @@ def main():
     coalitions = list(product([False, True], repeat=3))
 
     # Compute Shapley values for all test samples
-    print(f"\nComputing Shapley values for {len(test_ds)} samples ...")
+    print(f"\nComputing Shapley values for {len(expl_idx)} samples ...")
     results = []
-    n_test = len(test_ds)
+    n_test = len(expl_idx)
 
     for idx in range(n_test):
         obs = {

@@ -1,0 +1,83 @@
+Chunked explained-split read — equivalence against the eager read.
+Captured 2026-07-31T01:37:32Z on Mac15,12, 8 GiB RAM.
+Repo 226148c, branch master.
+
+Split 'val' (4,356 rows) at atg1000_stop1000, member seed 100, reference draw 1.
+val is used because it is the largest split this 8 GiB machine can hold EAGERLY at any
+width -- the full cohort needs 14.00 GiB at this configuration and 28.01 GiB at the wider
+one, which is the whole reason for the change. Equivalence is a property of the chunk
+arithmetic, not of the split, so it transfers.
+
+================================================================================
+GUARD — a chunk size that is not a multiple of the 256 extraction batch is refused
+================================================================================
+    raise ValueError(
+ValueError: --chunk-size 100 is not a multiple of the extraction batch size 256. A chunk boundary that is not a batch boundary re-partitions the forward passes, which changes floating-point reduction order and makes this run non-comparable with an unchunked one at the last bits. Use a multiple of 256.
+
+================================================================================
+RUN A — eager (--chunk-size 0): the behaviour before this change
+================================================================================
+Explain (val): 4356, Reference: 500 of 26,711 train rows
+  Max |residual|:  0.00000000
+  shap_atg            : NMD=0.2923, Control=0.3760
+  shap_stop           : NMD=0.7672, Control=0.6380
+  shap_structural     : NMD=1.6519, Control=1.2337
+  shap_atg            : 10.8%
+  shap_stop           : 28.3%
+  shap_structural     : 60.9%
+-> /private/tmp/claude-502/-Users-petecastaldi/63125bbd-295d-47ce-8f34-a78623a76676/scratchpad/eq_eager/kernel_shap_branch_atg1000_stop1000_seed100_val_run1.tsv (4356 rows)
+          3128257152  peak memory footprint
+
+================================================================================
+RUN B — chunked (--chunk-size 1024)
+================================================================================
+Explain (val): 4356, Reference: 500 of 26,711 train rows
+Pre-computing test embeddings (chunk size 1024) ...
+  chunk 1/5: split rows 0-1,023
+  chunk 2/5: split rows 1,024-2,047
+  chunk 3/5: split rows 2,048-3,071
+  chunk 4/5: split rows 3,072-4,095
+  chunk 5/5: split rows 4,096-4,355
+  Max |residual|:  0.00000000
+  shap_atg            : NMD=0.2923, Control=0.3760
+  shap_stop           : NMD=0.7672, Control=0.6380
+  shap_structural     : NMD=1.6519, Control=1.2337
+  shap_atg            : 10.8%
+  shap_stop           : 28.3%
+  shap_structural     : 60.9%
+-> /private/tmp/claude-502/-Users-petecastaldi/63125bbd-295d-47ce-8f34-a78623a76676/scratchpad/eq_chunked/kernel_shap_branch_atg1000_stop1000_seed100_val_run1.tsv (4356 rows)
+          1967286144  peak memory footprint
+
+================================================================================
+COMPARISON
+================================================================================
+md5 eager   416fcfb51c7c5a7cc4a02d77c9eec831
+md5 chunked 416fcfb51c7c5a7cc4a02d77c9eec831
+cmp: IDENTICAL byte for byte
+rows: eager 4,356  chunked 4,356
+isoform_id order identical: True
+  prediction       max |eager-chunked| 0.000e+00   exact 4,356/4,356
+  expected_value   max |eager-chunked| 0.000e+00   exact 4,356/4,356
+  shap_atg         max |eager-chunked| 0.000e+00   exact 4,356/4,356
+  shap_stop        max |eager-chunked| 0.000e+00   exact 4,356/4,356
+  shap_structural  max |eager-chunked| 0.000e+00   exact 4,356/4,356
+  residual         max |eager-chunked| 0.000e+00   exact 4,356/4,356
+float32 machine epsilon, for scale: 1.19e-07
+
+================================================================================
+GUARD SUITE
+================================================================================
+  PASS  guard rejects: 11_: --final on a non-test split
+
+=== 7. chunked reading of the explained split ===
+  PASS  guard accepts: chunks cover every row exactly once, in order (41,765 @ 2048)
+  PASS  guard accepts: chunks cover every row exactly once, in order (4,356 @ 1024)
+  PASS  guard rejects: an overlapping stride is detected
+  PASS  guard rejects: chunks concatenated out of order are detected
+  PASS  guard accepts: 2048 is batch-aligned
+  PASS  guard rejects: a non-multiple chunk size is rejected
+  PASS  guard accepts: every split name selects the documented rows
+  PASS  guard rejects: val_clean on an unscreened HDF5 is refused
+
+======================================================================
+PASS — every guard rejected its planted defect and accepted the valid case
