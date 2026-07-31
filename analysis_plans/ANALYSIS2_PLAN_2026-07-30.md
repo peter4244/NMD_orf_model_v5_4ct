@@ -402,13 +402,18 @@ array shapes.* Window data is read once, consumed once and released.
 
 | | one chunk, held | reference set | **peak per run** |
 |---|---|---|---|
-| `atg1000_stop1000` | 0.69 GiB | 0.17 GiB | **1.9 GiB** |
-| `atg2000_stop2000` | 1.37 GiB | 0.34 GiB | **2.4 GiB** |
+| `atg1000_stop1000` | 0.69 GiB | 0.17 GiB | 2.1 GiB |
+| `atg2000_stop2000` | 1.37 GiB | 0.34 GiB | **3.26 GiB** |
 
-*Chunk and reference figures computed here 2026-07-30 from the array shapes. Peak per run
-predicted here 2026-07-30 from those figures plus the retained embeddings and interpreter
-baseline; the prediction method was checked at n = 6,000 / w2000, where it gave 5.31 GiB against
-a measured 5.38.*
+*Chunk and reference figures computed here 2026-07-30 from the array shapes. Peak at
+`atg2000_stop2000` measured on Explorer 2026-07-31, `sacct` MaxRSS for job 8849989, which is the
+figure the request is sized from because it is the machine the request is made to. Peak at
+`atg1000_stop1000` predicted, by scaling that measurement by the ratio the two configurations
+showed on the development machine.*
+
+The request is **8 GB**, which is 2.5× the measured peak. Peak exceeds the sum of the parts above
+because twenty-one sequential chunk allocations leave the allocator's high-water mark above any
+single chunk's footprint.
 
 Read eagerly instead, one full-cohort run holds 14.00 GiB at `atg1000_stop1000` and 28.01 GiB at
 `atg2000_stop2000`, and peaks half an array higher again — 35.3 GiB — because the float16 read
@@ -426,13 +431,17 @@ branch encoding and coalition evaluation. One full-cohort run is **4.4 minutes**
 configuration and **7–11 minutes** at the wider one; the fifty run in about **six hours** in
 sequence.
 
-Each configuration is run at full cohort on this machine before any cell of it is submitted. The
-fifty runs are then submitted to the cluster's **CPU** partition, one job per cell. The work is
-eight forward passes per isoform over a 500-row reference set — about 334,000 launch-bound calls
-per run — which is the shape a GPU is worst at: the recorded full-cohort GPU run at
-`atg500_stop500` took 31 minutes, against 4.4 minutes predicted here on CPU at a wider window.
-*Measured elsewhere: Explorer job 7474306, `sacct` elapsed 00:31:13, MaxRSS 12.98 GiB, allocated
-`gres/gpu=1`.*
+Each configuration is run at full cohort on the development machine before any cell of it is
+submitted. The fifty are then submitted to the cluster's **CPU** partition as one array, one task
+per cell.
+
+**The device is chosen on queue capacity, not on per-job speed.** The same cell — 
+`atg2000_stop2000`, member 100, draw 1 — was run on both: **7 min 53 s on a GPU node, 8 min 36 s
+on a CPU node**, so a GPU is about 8% faster per job. It is also the scarcer resource, at 24
+usable nodes against roughly 125, with a fivefold spread between GPU node families on record
+here. Fifty jobs therefore finish sooner on the CPU partition despite the per-job penalty.
+*Measured on Explorer 2026-07-31: jobs 8849990 (gpu, node d1012) and 8849989 (short, node
+c0625), `sacct` elapsed.*
 
 Every run's progress output is unbuffered, so a log distinguishes a working job from a dead one
 while it is still running. The recorded failures on that cluster — a job that died before its log

@@ -24,11 +24,16 @@
 # those two functions rather than something this script should work around by fanning out into
 # fifty directories.
 #
-# ONE DEVICE FOR ALL FIFTY. CPU and GPU do not produce bit-identical floating point, and the
-# quantity this analysis estimates is a SPREAD across members and draws. A device that varied
-# between cells would enter that spread as a confound indistinguishable from the training and
-# interpretation variance being measured. The partition is therefore fixed on the command line
-# for the whole array, not chosen per task.
+# ONE DEVICE FOR ALL FIFTY, and the honest size of the reason. CPU and GPU do not produce
+# bit-identical floating point: the same cell run on both differs by up to 5.9e-06 in the
+# prediction and 3.3e-06 in the Shapley values, which is ~50x float32 epsilon. But it does NOT
+# propagate to what this analysis reports -- the branch shares from the two devices agree to
+# 0.0000 percentage points, three or more orders below any spread the design is estimating.
+# Measured on Explorer 2026-07-31, jobs 8849989 (short) and 8849990 (gpu).
+#
+# So a mixed-device array would very probably have been fine. The partition is fixed anyway,
+# because it costs nothing and it removes a question from the provenance of the fifty rather
+# than leaving one that has to be re-answered later.
 #
 # %20 caps concurrency: fifty tasks each stream a 2.9 GB HDF5 in chunks, and there is no reason
 # to make that the shared filesystem's problem all at once.
