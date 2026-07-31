@@ -1,0 +1,35 @@
+$ python probe_head_swap.py --split test
+split 'test': 10,520 isoforms; members [100, 200, 300, 400, 500]; tag atg1000_stop1000
+guard: manual current-form reproduces model(...) to 1.43e-06  OK
+isoforms 10,520; NMD+ 22.9%; masked-in slots per isoform min 1 max 5 mean 4.98
+
+  member  AUC current   AUC factor     dAUC  AUPRC cur  AUPRC fac   dAUPRC
+     100       0.9197       0.9187  -0.0010     0.8141     0.8131  -0.0011
+     200       0.9242       0.9236  -0.0006     0.8180     0.8179  -0.0001
+     300       0.9236       0.9218  -0.0018     0.8209     0.8174  -0.0035
+     400       0.9262       0.9252  -0.0010     0.8226     0.8212  -0.0014
+     500       0.9243       0.9225  -0.0017     0.8203     0.8173  -0.0031
+ensemble       0.9310       0.9303  -0.0008     0.8351     0.8342  -0.0009
+
+LOGIT GAP (factorized - current), ensemble
+  mean -0.0295   median -0.0038   sd 0.0983   |gap| 90th pct 0.1333
+  sign: 40.5% positive   (Jensen predicts one-signed if W2 were one-signed; W2 has 50% positive weights)
+  rank correlation of predictions: 0.9995
+
+PREDICTION 1 — the forms coincide exactly where every attended ORF shares a sign
+  tested PER MEMBER, since it is a statement about that member's own hidden units
+  member  mixed-unit frac  n with none mixed  mean |gap| there  mean |gap| elsewhere
+     100            0.533                 41          0.00e+00                0.0576
+     200            0.598                 49          0.00e+00                0.0652
+     300            0.538                152          0.00e+00                0.0700
+     400            0.547                 26          0.00e+00                0.0507
+     500            0.581                 54          0.00e+00                0.0681
+
+  member 100:    mixed-unit frac      n  mean |gap|
+            0.000-0.281        2082      0.0081
+            0.281-0.438        1851      0.0276
+            0.438-0.688        2097      0.0469
+            0.688-0.781        1751      0.0648
+            0.781-0.875        2739      0.1180
+  member 100: corr(|gap|, mixed-unit fraction) = +0.349   corr(|gap|, per-ORF verdict spread) = +0.308
+  member 200: corr(|gap|, mixed-unit fraction) = +0.340   corr(|gap|, per-ORF verdict spread) = +0.279
