@@ -114,6 +114,43 @@ def extract_fixed_chunked(model, h5_path, wa, ws, split, device, chunk_size, bat
 
 
 SUBSETS = [frozenset(c) for k in range(NF + 1) for c in combinations(range(NF), k)]
+
+# THE MERGED-ANNOTATION GAME, FREE FROM COALITIONS ALREADY EVALUATED (ANALYSIS3_PLAN §3d).
+# is_ref_cds and is_sqanti_cds are moved together as ONE player, giving a four-player game over
+# {frac_start, frac_stop, annotation, n_downstream_ejc}. Its 16 coalitions are exactly the 16 of
+# the 32 in which the two flags are both present or both absent, so it costs no extra model
+# evaluation -- only bookkeeping.
+#
+# WHY IT IS COMPUTED HERE AND NOT DERIVED LATER. Adding two mean-absolute SHARES would overstate
+# the merged contribution wherever the two attributions differ in sign, which is the
+# absolute-value-before-sum error this analysis forbids between members; and merging players
+# changes the normaliser, so a four-part share is not a sum of five-part shares either. The only
+# correct route is a separate Shapley solve, and that needs the coalition VALUES -- which exist
+# inside this loop and nowhere in the output. Deriving it afterwards is impossible without
+# re-running the model.
+MERGED = [["frac_start"], ["frac_stop"], ["is_ref_cds", "is_sqanti_cds"], ["n_downstream_ejc"]]
+MERGED_NAMES = ["frac_start", "frac_stop", "annotation", "n_downstream_ejc"]
+NM = len(MERGED)
+_MI = [[FEATS.index(f) for f in grp] for grp in MERGED]
+SUBSETS4 = [frozenset(c) for k in range(NM + 1) for c in combinations(range(NM), k)]
+_W4 = {s: math.factorial(len(s)) * math.factorial(NM - len(s) - 1) / math.factorial(NM)
+       for s in {frozenset(c) for k in range(NM) for c in combinations(range(NM), k)}}
+
+
+def _expand(T):
+    """A four-player coalition -> the five-player coalition it names."""
+    return frozenset(i for k in T for i in _MI[k])
+
+
+def shapley_merged(v):
+    """Exact Shapley for the four merged players, from the SAME 32 coalition values."""
+    phi = np.zeros(NM)
+    for i in range(NM):
+        for T in SUBSETS4:
+            if i in T:
+                continue
+            phi[i] += _W4[T] * (v[_expand(T | {i})] - v[_expand(T)])
+    return phi
 _W = {s: math.factorial(len(s)) * math.factorial(NF - len(s) - 1) / math.factorial(NF)
       for s in {frozenset(c) for k in range(NF) for c in combinations(range(NF), k)}}
 
@@ -237,23 +274,37 @@ def main():
         v = {S: float(means[k]) for k, S in enumerate(SUBSETS)}
 
         phi = shapley_from_subsets(v)
+        phi4 = shapley_merged(v)
         full = v[frozenset(range(NF))]; base = v[frozenset()]
         rows.append(dict(isoform_id=ids[i], label=float(E["label"][i]),
                          prediction=full, baseline_struct_reference=base,
                          **{f"shap_{f}": phi[k] for k, f in enumerate(FEATS)},
-                         shap_sum=phi.sum(), residual=full - base - phi.sum()))
+                         shap_sum=phi.sum(), residual=full - base - phi.sum(),
+                         **{f"shap4_{f}": phi4[k] for k, f in enumerate(MERGED_NAMES)},
+                         shap4_sum=phi4.sum(), residual4=full - base - phi4.sum()))
         if (i + 1) % 500 == 0 or i == n_total - 1:
             print(f"  {i+1}/{n_total} (last residual: {rows[-1]['residual']:.3e})", flush=True)
 
     df = pd.DataFrame(rows)
-    print(f"\nAdditivity: mean |residual| {df.residual.abs().mean():.3e}   "
-          f"max |residual| {df.residual.abs().max():.3e}   (step 5 bar 1e-12)")
+    print(f"\nAdditivity, 5-player: mean |residual| {df.residual.abs().mean():.3e}   "
+          f"max {df.residual.abs().max():.3e}   (step 5 bar 1e-12)")
+    print(f"Additivity, 4-player: mean |residual| {df.residual4.abs().mean():.3e}   "
+          f"max {df.residual4.abs().max():.3e}   (same bar; both games are exact)")
     nmd = df[df.label > 0.5]
     m = {f: nmd[f"shap_{f}"].abs().mean() for f in FEATS}
     tot = sum(m.values())
-    print(f"\nFeature shares over {len(nmd):,} NMD-labelled isoforms:")
+    print(f"\nFive-player shares over {len(nmd):,} NMD-labelled isoforms:")
     for f in FEATS:
         print(f"  {f:20s} {100*m[f]/tot:5.1f}%   mean|phi| {m[f]:.4f}")
+    m4 = {f: nmd[f"shap4_{f}"].abs().mean() for f in MERGED_NAMES}
+    t4 = sum(m4.values())
+    print(f"Four-player shares (annotation merged) -- a DIFFERENT game, not a regrouping of the "
+          f"above:")
+    for f in MERGED_NAMES:
+        print(f"  {f:20s} {100*m4[f]/t4:5.1f}%   mean|phi| {m4[f]:.4f}")
+    naive = 100 * (m["is_ref_cds"] + m["is_sqanti_cds"]) / tot
+    print(f"  [the WRONG way, for the record: adding the two five-player shares gives "
+          f"{naive:.1f}% against the correct {100*m4['annotation']/t4:.1f}%]")
 
     suffix = "" if args.explain_split == "test" else f"_{args.explain_split}"
     lim = f"_first{n_total}" if args.limit else ""
