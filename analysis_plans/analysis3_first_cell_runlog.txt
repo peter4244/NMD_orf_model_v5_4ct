@@ -1,0 +1,190 @@
+Intel MKL WARNING: Support of Intel(R) Streaming SIMD Extensions 4.2 (Intel(R) SSE4.2) enabled only processors has been deprecated. Intel oneAPI Math Kernel Library 2025.0 will require Intel(R) Advanced Vector Extensions (Intel(R) AVX) instructions.
+Intel MKL WARNING: Support of Intel(R) Streaming SIMD Extensions 4.2 (Intel(R) SSE4.2) enabled only processors has been deprecated. Intel oneAPI Math Kernel Library 2025.0 will require Intel(R) Advanced Vector Extensions (Intel(R) AVX) instructions.
+  set_seed: seed=42, deterministic algorithms ON (cudnn.deterministic=True, benchmark=False)
+=== Structural-feature Shapley (5 players, 32 coalitions) ===
+Tag atg1000_stop1000  member 100  draw 1  device cpu
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=1000, Stop=1000
+  ORF embed dim: 64
+  Conv channels: 32
+Model loaded from results_4ct_sweep/best_model_atg1000_stop1000_seed100.pt
+  train[500 of 26,711]: 500 samples, 117 NMD+ (23.4%)
+Explain (all): 41765   Reference: 500 of 26,711
+
+Encoding what does not vary ...
+  chunk 1/21: split rows 0-2,047
+  all[2,048 of 41,765]: 2,048 samples, 546 NMD+ (26.7%)
+  encoded 2048/2048
+  chunk 2/21: split rows 2,048-4,095
+  all[2,048 of 41,765]: 2,048 samples, 521 NMD+ (25.4%)
+  encoded 2048/2048
+  chunk 3/21: split rows 4,096-6,143
+  all[2,048 of 41,765]: 2,048 samples, 617 NMD+ (30.1%)
+  encoded 2048/2048
+  chunk 4/21: split rows 6,144-8,191
+  all[2,048 of 41,765]: 2,048 samples, 590 NMD+ (28.8%)
+  encoded 2048/2048
+  chunk 5/21: split rows 8,192-10,239
+  all[2,048 of 41,765]: 2,048 samples, 630 NMD+ (30.8%)
+  encoded 2048/2048
+  chunk 6/21: split rows 10,240-12,287
+  all[2,048 of 41,765]: 2,048 samples, 541 NMD+ (26.4%)
+  encoded 2048/2048
+  chunk 7/21: split rows 12,288-14,335
+  all[2,048 of 41,765]: 2,048 samples, 558 NMD+ (27.2%)
+  encoded 2048/2048
+  chunk 8/21: split rows 14,336-16,383
+  all[2,048 of 41,765]: 2,048 samples, 567 NMD+ (27.7%)
+  encoded 2048/2048
+  chunk 9/21: split rows 16,384-18,431
+  all[2,048 of 41,765]: 2,048 samples, 608 NMD+ (29.7%)
+  encoded 2048/2048
+  chunk 10/21: split rows 18,432-20,479
+  all[2,048 of 41,765]: 2,048 samples, 545 NMD+ (26.6%)
+  encoded 2048/2048
+  chunk 11/21: split rows 20,480-22,527
+  all[2,048 of 41,765]: 2,048 samples, 539 NMD+ (26.3%)
+  encoded 2048/2048
+  chunk 12/21: split rows 22,528-24,575
+  all[2,048 of 41,765]: 2,048 samples, 549 NMD+ (26.8%)
+  encoded 2048/2048
+  chunk 13/21: split rows 24,576-26,623
+  all[2,048 of 41,765]: 2,048 samples, 500 NMD+ (24.4%)
+  encoded 2048/2048
+  chunk 14/21: split rows 26,624-28,671
+  all[2,048 of 41,765]: 2,048 samples, 76 NMD+ (3.7%)
+  encoded 2048/2048
+  chunk 15/21: split rows 28,672-30,719
+  all[2,048 of 41,765]: 2,048 samples, 110 NMD+ (5.4%)
+  encoded 2048/2048
+  chunk 16/21: split rows 30,720-32,767
+  all[2,048 of 41,765]: 2,048 samples, 212 NMD+ (10.4%)
+  encoded 2048/2048
+  chunk 17/21: split rows 32,768-34,815
+  all[2,048 of 41,765]: 2,048 samples, 402 NMD+ (19.6%)
+  encoded 2048/2048
+  chunk 18/21: split rows 34,816-36,863
+  all[2,048 of 41,765]: 2,048 samples, 397 NMD+ (19.4%)
+  encoded 2048/2048
+  chunk 19/21: split rows 36,864-38,911
+  all[2,048 of 41,765]: 2,048 samples, 470 NMD+ (22.9%)
+  encoded 2048/2048
+  chunk 20/21: split rows 38,912-40,959
+  all[2,048 of 41,765]: 2,048 samples, 309 NMD+ (15.1%)
+  encoded 2048/2048
+  chunk 21/21: split rows 40,960-41,764
+  all[805 of 41,765]: 805 samples, 34 NMD+ (4.2%)
+  encoded 805/805
+  500/41765 (last residual: -1.110e-16)
+  1000/41765 (last residual: 0.000e+00)
+  1500/41765 (last residual: 0.000e+00)
+  2000/41765 (last residual: 0.000e+00)
+  2500/41765 (last residual: -4.441e-16)
+  3000/41765 (last residual: 0.000e+00)
+  3500/41765 (last residual: 0.000e+00)
+  4000/41765 (last residual: 1.665e-16)
+  4500/41765 (last residual: -4.441e-16)
+  5000/41765 (last residual: 0.000e+00)
+  5500/41765 (last residual: 0.000e+00)
+  6000/41765 (last residual: 2.220e-16)
+  6500/41765 (last residual: 0.000e+00)
+  7000/41765 (last residual: -1.110e-16)
+  7500/41765 (last residual: -2.220e-16)
+  8000/41765 (last residual: 2.220e-16)
+  8500/41765 (last residual: 0.000e+00)
+  9000/41765 (last residual: 0.000e+00)
+  9500/41765 (last residual: -4.441e-16)
+  10000/41765 (last residual: 1.110e-16)
+  10500/41765 (last residual: -4.441e-16)
+  11000/41765 (last residual: 0.000e+00)
+  11500/41765 (last residual: 0.000e+00)
+  12000/41765 (last residual: 2.220e-16)
+  12500/41765 (last residual: -1.110e-16)
+  13000/41765 (last residual: 0.000e+00)
+  13500/41765 (last residual: 0.000e+00)
+  14000/41765 (last residual: 2.220e-16)
+  14500/41765 (last residual: 0.000e+00)
+  15000/41765 (last residual: 2.220e-16)
+  15500/41765 (last residual: 0.000e+00)
+  16000/41765 (last residual: -1.110e-16)
+  16500/41765 (last residual: 0.000e+00)
+  17000/41765 (last residual: -2.220e-16)
+  17500/41765 (last residual: 0.000e+00)
+  18000/41765 (last residual: 0.000e+00)
+  18500/41765 (last residual: -4.441e-16)
+  19000/41765 (last residual: 0.000e+00)
+  19500/41765 (last residual: -1.110e-16)
+  20000/41765 (last residual: 0.000e+00)
+  20500/41765 (last residual: -4.441e-16)
+  21000/41765 (last residual: 2.220e-16)
+  21500/41765 (last residual: 1.110e-16)
+  22000/41765 (last residual: 0.000e+00)
+  22500/41765 (last residual: 1.110e-16)
+  23000/41765 (last residual: 0.000e+00)
+  23500/41765 (last residual: 2.220e-16)
+  24000/41765 (last residual: 0.000e+00)
+  24500/41765 (last residual: 2.220e-16)
+  25000/41765 (last residual: 0.000e+00)
+  25500/41765 (last residual: 0.000e+00)
+  26000/41765 (last residual: 4.441e-16)
+  26500/41765 (last residual: 0.000e+00)
+  27000/41765 (last residual: -1.110e-16)
+  27500/41765 (last residual: 0.000e+00)
+  28000/41765 (last residual: -2.220e-16)
+  28500/41765 (last residual: 1.110e-16)
+  29000/41765 (last residual: 0.000e+00)
+  29500/41765 (last residual: 0.000e+00)
+  30000/41765 (last residual: 2.220e-16)
+  30500/41765 (last residual: 0.000e+00)
+  31000/41765 (last residual: 0.000e+00)
+  31500/41765 (last residual: 0.000e+00)
+  32000/41765 (last residual: 0.000e+00)
+  32500/41765 (last residual: -1.110e-16)
+  33000/41765 (last residual: 0.000e+00)
+  33500/41765 (last residual: 0.000e+00)
+  34000/41765 (last residual: -4.441e-16)
+  34500/41765 (last residual: 0.000e+00)
+  35000/41765 (last residual: 0.000e+00)
+  35500/41765 (last residual: 0.000e+00)
+  36000/41765 (last residual: 0.000e+00)
+  36500/41765 (last residual: 0.000e+00)
+  37000/41765 (last residual: 0.000e+00)
+  37500/41765 (last residual: 0.000e+00)
+  38000/41765 (last residual: 0.000e+00)
+  38500/41765 (last residual: 2.220e-16)
+  39000/41765 (last residual: 0.000e+00)
+  39500/41765 (last residual: 0.000e+00)
+  40000/41765 (last residual: 0.000e+00)
+  40500/41765 (last residual: 2.220e-16)
+  41000/41765 (last residual: 0.000e+00)
+  41500/41765 (last residual: 0.000e+00)
+  41765/41765 (last residual: 0.000e+00)
+
+Additivity: mean |residual| 8.902e-17   max |residual| 1.776e-15   (step 5 bar 1e-12)
+
+Feature shares over 9,321 NMD-labelled isoforms:
+  frac_start             7.5%   mean|phi| 0.1802
+  frac_stop              3.5%   mean|phi| 0.0841
+  is_ref_cds            18.1%   mean|phi| 0.4355
+  is_sqanti_cds         13.8%   mean|phi| 0.3316
+  n_downstream_ejc      57.2%   mean|phi| 1.3798
+
+-> results_interp_all/feature_shap_atg1000_stop1000_seed100_all_run1.tsv (41765 rows)
+      597.41 real      2751.17 user       528.59 sys
+          1130942464  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+            82454216  page reclaims
+               22343  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+               12858  voluntary context switches
+            65078142  involuntary context switches
+      30830846865996  instructions retired
+       9555854261655  cycles elapsed
+          2271883584  peak memory footprint
