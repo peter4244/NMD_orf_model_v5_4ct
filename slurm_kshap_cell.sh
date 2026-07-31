@@ -45,7 +45,14 @@ MEMBER=${MEMBER:-100}
 RUN=${RUN:-1}
 CHUNK=${CHUNK:-2048}
 PROJECT=/home/p.castaldi/cc/nmd_orf_model_v5_4ct
-OUTDIR=${OUTDIR:-results_interp_all/probe_${SLURM_JOB_PARTITION:-unknown}}
+# If OUTDIR is not given, the probes are separated BY PARTITION -- so an unset SLURM_JOB_PARTITION
+# would resolve both jobs to one directory and let one silently overwrite the other, which is the
+# collision this separation exists to prevent. Refuse rather than default to a shared name.
+if [ -z "${OUTDIR:-}" ]; then
+    : "${SLURM_JOB_PARTITION:?unset, so the CPU and GPU probes would share an output directory and
+one would overwrite the other; pass OUTDIR= explicitly}"
+    OUTDIR="results_interp_all/probe_${SLURM_JOB_PARTITION}_${SLURM_JOB_ID:-manual}"
+fi
 
 cd "$PROJECT" || exit 1
 mkdir -p "$OUTDIR" slurm_logs

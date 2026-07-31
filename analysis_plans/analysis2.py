@@ -57,9 +57,20 @@ SEEDS  = [100, 200, 300, 400, 500]
 DRAWS  = [1, 2, 3, 4, 5]
 BRANCH = ["structural", "stop", "atg"]          # `atg` is the START branch; legacy column name
 NICE   = {"structural": "structural", "stop": "stop", "atg": "start"}
-TOL    = 1e-12                                   # step 5 residual bar
+TOL    = 1e-12                                   # step 5 residual bar: an ALGEBRAIC identity
+# Cross-code-path, cross-ARCHITECTURE float32 comparison -- a different kind of check needing a
+# different kind of bar, and conflating the two tolerances would be its own error. Analysis 1 ran
+# on macOS/ARM, the fifty cells on Explorer/x86, and honest agreement across all 50 spans
+# 3.0e-06 to 1.05e-05 in one continuous distribution. A misattributed file gives deviations of
+# order the spread of the predictions themselves -- log-odds run about -6 to +10, so ~1e+01,
+# measured at 1.2e+01 on a permuted file. The bar is set BETWEEN the two measured regimes: two
+# orders above the noise, four below the signal. It is not fitted to the observed maximum.
+XREF_TOL = 1e-3
 N_ALL  = 41765
 N_NMD  = 9321
+N_TEST_NMD = 2405        # split=="test" AND label==1; the published figures' population
+N_CELLS = len(TAGS) * len(SEEDS) * len(DRAWS)
+F_CRIT_4_16_95 = 3.0069  # F(4,16) upper 5% point; the df are in the name deliberately
 
 _ind = [""]
 
@@ -107,10 +118,30 @@ def step5_accept():
     with h5py.File(H5, "r") as f:
         sp = np.array([x.decode() if isinstance(x, bytes) else x for x in f["split"][:]])
     test_mask = (sp[y0 == 1] == "test")          # over the 9,321, which are in test_clean
-    check("test-split sensitivity population", int(test_mask.sum()) == 2405,
+    check("test-split sensitivity population", int(test_mask.sum()) == N_TEST_NMD,
           f"{int(test_mask.sum()):,} of {len(test_mask):,} summarised isoforms lie in split=='test'")
 
-    store, accepted, rejected = {}, 0, []
+    # THE CHECK THAT TIES VALUES TO THE ISOFORM THEY BELONG TO (2026-07-31, from review).
+    # Row count, isoform_id order, label vector and the residual are ALL satisfied by a file whose
+    # seven value columns have been permuted together -- each row stays internally consistent, it
+    # is simply attached to the wrong isoform. Demonstrated: such a file accepts, and moves the
+    # structural share by 3.05 pp, about 7x the reported draw spread. Recomputing the residual per
+    # row does NOT catch it either (verified); only an INDEPENDENT source of per-isoform values
+    # does. Analysis 1 wrote one: ensemble_predictions_*.tsv holds each member's logit per test
+    # isoform, produced by a different script from a different code path.
+    # Tolerance is ~1e-5, not the 1e-12 used within a file: that file is written at %.6f, and this
+    # is a cross-code-path float32 comparison rather than an algebraic identity among numbers
+    # computed together. Conflating the two tolerances would be its own error.
+    xref = {}
+    for tag in TAGS:
+        q = CELLS / f"ensemble_predictions_{tag}_ens5_test_clean.tsv"
+        if q.exists():
+            xref[tag] = pd.read_csv(q, sep="\t").set_index("isoform_id")
+    check("independent per-isoform predictions available for cross-check",
+          len(xref) == len(TAGS),
+          f"{len(xref)} of {len(TAGS)} configurations have an Analysis 1 predictions file")
+
+    store, accepted, rejected, xdev = {}, 0, [], {}
     for tag in TAGS:
         for s in SEEDS:
             for r in DRAWS:
@@ -124,6 +155,12 @@ def step5_accept():
                 elif not (d.label.values.astype(int) == y0).all():     bad = "label vector"
                 mx = float(d.residual.abs().max())
                 if bad is None and mx >= TOL:                          bad = "residual"
+                if bad is None and tag in xref:
+                    ref = xref[tag][f"logit_seed{s}"]
+                    got = d.set_index("isoform_id").loc[ref.index, "prediction"]
+                    dev = float(np.abs(got.to_numpy() - ref.to_numpy()).max())
+                    xdev[(tag, s, r)] = dev
+                    if dev >= XREF_TOL:               bad = f"prediction vs Analysis 1 ({dev:.2e})"
                 if bad: rejected.append((tag, s, r, bad, mx))
                 else:
                     accepted += 1
@@ -131,11 +168,17 @@ def step5_accept():
                                                          "shap_structural", "shap_stop",
                                                          "shap_atg"]].to_numpy(np.float64)
 
-    log(f"accepted {accepted}   rejected {len(rejected)}   of 50")
+    log(f"accepted {accepted}   rejected {len(rejected)}   of {N_CELLS}")
     for t, s, r, why, mx in rejected:
         log(f"      REJECT {t} seed{s} run{r}: {why} (max|residual| {mx:.3e})")
     if rejected:
         raise SystemExit("STOPPED: a rejected cell is a defect to diagnose, not a cell to drop")
+    if xdev:
+        v = np.array(list(xdev.values()))
+        log(f"      predictions agree with Analysis 1 on {len(xdev)} cells x 10,520 test "
+            f"isoforms: max deviation {v.max():.2e} (bar {XREF_TOL:.0e})")
+    check("every cell of the grid is present and accepted", accepted == N_CELLS,
+          f"{accepted} of {N_CELLS} = {len(TAGS)} configs x {len(SEEDS)} members x {len(DRAWS)} draws")
     log(f"      every cell restricted to the {N_NMD:,} label==1 isoforms for summarisation")
     return store, test_mask
 
@@ -210,9 +253,13 @@ def step6_reduce(store, mask=None, quiet=False):
     check("per-cell table has the specified shape",
           len(df) == 110 and len(df[df.level == "member"]) == 50,
           f"{len(df)} rows = 2 configs x (25 member + 5 ensemble + 25 leave-one-out)")
-    s = df[["pct_structural", "pct_stop", "pct_start"]].sum(axis=1)
-    check("the three shares sum to 100 in every row",
-          bool(np.abs(s - 100).max() < 1e-9), f"max |sum - 100| = {np.abs(s - 100).max():.2e}")
+    # NOT a sum-to-100 check: pct is defined as 100*m/sum(m) a few lines above, so that
+    # condition cannot fail and would be a division restated as evidence. This tests a genuine
+    # relation between four SEPARATELY WRITTEN columns -- if m_total ever stopped being the
+    # normaliser the shares were formed from, this fires and the shares would not.
+    gap = (df[["m_structural", "m_stop", "m_start"]].sum(axis=1) - df.m_total).abs().max()
+    check("m_total is the normaliser the shares were actually formed from",
+          float(gap) < 1e-12, f"max |sum(m_b) - m_total| = {gap:.2e}")
     check("efficiency identity holds in every row",
           float(df.additivity_gap_vs_signed_sum.max()) < 1e-9,
           f"max |mean_gap - sum(mean_signed)| = {df.additivity_gap_vs_signed_sum.max():.3e}")
@@ -236,11 +283,13 @@ def anova2(y):
     return dict(ms_member=ms_a, ms_draw=ms_b, ms_interaction=ms_ab,
                 var_member=max(0.0, (ms_a - ms_ab) / b),
                 var_draw=max(0.0, (ms_b - ms_ab) / a),
+                var_member_truncated=bool(ms_a < ms_ab),
+                var_draw_truncated=bool(ms_b < ms_ab),
                 var_interaction=ms_ab,
                 f_member=ms_a / ms_ab if ms_ab > 0 else float("inf"),
                 f_draw=ms_b / ms_ab if ms_ab > 0 else float("inf"),
                 df=(a - 1, b - 1, (a - 1) * (b - 1)),
-                f_crit_95=3.01)
+                f_crit_95=F_CRIT_4_16_95)
 
 
 def step7_summarise(df, sens=None):
@@ -266,21 +315,41 @@ def step7_summarise(df, sens=None):
             j = np.array([loo[loo.member_seed_excluded == str(s)][f"pct_{nb}"].mean()
                           for s in SEEDS])
             sd_seed_ens = float(np.sqrt((len(SEEDS) - 1) / len(SEEDS) * ((j - j.mean()) ** 2).sum()))
+            # AN SD AND AN SE ARE NOT THE SAME OBJECT, and printing them side by side invites
+            # exactly the comparison the first review caught one level down. sd_draw_ensemble is
+            # the spread of ONE draw's ensemble share; the jackknife is the standard ERROR of a
+            # statistic already averaged over five draws. The like-for-like partner of the
+            # jackknife is se_draw = sd_draw/sqrt(5). Both are emitted, each labelled.
+            se_draw_ens = sd_draw_ens / np.sqrt(len(DRAWS))
+            # Jackknife bias of the 5-member ensemble. |mean_s phi_s| <= mean_s |phi_s|, so a
+            # finite ensemble carries less attribution mass than an infinite one; this estimates
+            # by how much, from the leave-one-out rows already computed. It is the same size as
+            # the draw spread, so reporting that spread while sitting on this would not be honest.
+            bias = float((len(SEEDS) - 1) * (j.mean() - point))
             g = mem[f"pct_{nb}"].to_numpy()                       # 5 members x 5 draws
             member_pct, draw_pct = g.mean(axis=1), g.mean(axis=0)
             res[nb] = dict(
                 point_estimate=float(point),
                 sd_draw_ensemble=float(sd_draw_ens), range_draw_ensemble=[float(e.min()), float(e.max())],
+                se_draw_ensemble=float(se_draw_ens),
                 sd_seed_ensemble_jackknife=sd_seed_ens,
+                range_seed_ensemble_jackknife=[float(j.min()), float(j.max())],
+                ensemble_size_bias_jackknife=bias,
+                infinite_ensemble_estimate=float(point - bias),
                 member_centre=float(member_pct.mean()),
                 sd_train_member=float(member_pct.std(ddof=1)),
                 range_train_member=[float(member_pct.min()), float(member_pct.max())],
                 sd_draw_member=float(draw_pct.std(ddof=1)),
+                range_draw_member=[float(draw_pct.min()), float(draw_pct.max())],
+                range_all_cells=[float(g.min()), float(g.max())],
                 ensemble_minus_member_centre=float(point - member_pct.mean()),
                 anova=anova2(g))
-            log(f"  {nb:11s} {point:6.2f}%   draw-sd {sd_draw_ens:.3f}  seed-jackknife "
-                f"{sd_seed_ens:.3f}  | members {member_pct.min():.2f}-{member_pct.max():.2f} "
+            log(f"  {nb:11s} {point:6.2f}%   draw-SD {sd_draw_ens:.3f} (SE {se_draw_ens:.3f})  "
+                f"seed-jackknife SE {sd_seed_ens:.3f}  | members "
+                f"{member_pct.min():.2f}-{member_pct.max():.2f} "
                 f"(centre {member_pct.mean():.2f}, sd {member_pct.std(ddof=1):.3f})")
+            log(f"              like-for-like SE ratio seed/draw = {sd_seed_ens/se_draw_ens:.2f}"
+                f"   ensemble-size bias {bias:+.3f} pp -> infinite-ensemble {point - bias:.2f}%")
             log(f"              ensemble centre - member centre = "
                 f"{point - member_pct.mean():+.3f} pp   "
                 f"[F_member {res[nb]['anova']['f_member']:.2f}, "
@@ -291,8 +360,13 @@ def step7_summarise(df, sens=None):
         lj = np.array([np.log(loo[loo.member_seed_excluded == str(s)]["ratio_stop_start"]).mean()
                        for s in SEEDS])
         rm_ = np.exp(np.log(mem["ratio_stop_start"].to_numpy()).mean(axis=1))
+        _lr = np.log(re_)
+        _rbias = float((len(SEEDS) - 1) * (lj.mean() - _lr.mean()))
         res["ratio_stop_start"] = dict(
-            geometric_mean=float(np.exp(np.log(re_).mean())),
+            geometric_mean=float(np.exp(_lr.mean())),
+            se_draw_ensemble_log_factor=float(np.exp(_lr.std(ddof=1) / np.sqrt(len(DRAWS)))),
+            ensemble_size_bias_log=_rbias,
+            infinite_ensemble_estimate=float(np.exp(_lr.mean() - _rbias)),
             sd_draw_ensemble_log_factor=float(np.exp(np.log(re_).std(ddof=1))),
             range_draw_ensemble=[float(re_.min()), float(re_.max())],
             sd_seed_ensemble_jackknife_log_factor=float(np.exp(np.sqrt(
@@ -300,8 +374,13 @@ def step7_summarise(df, sens=None):
             member_geometric_mean=float(np.exp(np.log(rm_).mean())),
             range_train_member=[float(rm_.min()), float(rm_.max())],
             sd_train_member_log_factor=float(np.exp(np.log(rm_).std(ddof=1))),
-            cv_member_cells=float(mem["ratio_stop_start"].to_numpy().std(ddof=1)
-                                  / mem["ratio_stop_start"].to_numpy().mean()),
+            # Spread over all 25 member cells, on the SAME log scale as its neighbours. It is
+            # NOT a CV, and it is not 25 independent observations -- member and draw are crossed
+            # and the member factor supplies almost all of it; see anova_log_ratio.
+            spread_all_cells_log_factor=float(np.exp(
+                np.log(mem["ratio_stop_start"].to_numpy()).std(ddof=1))),
+            range_all_cells=[float(mem["ratio_stop_start"].to_numpy().min()),
+                             float(mem["ratio_stop_start"].to_numpy().max())],
             definition="ratio of two MEANS of |phi| over the summarised isoforms, "
                        "not the mean of per-isoform ratios",
             anova_log_ratio=anova2(np.log(mem["ratio_stop_start"].to_numpy())))
@@ -316,14 +395,28 @@ def step7_summarise(df, sens=None):
         p = ens[[f"pct_{NICE[b]}" for b in BRANCH]].to_numpy() / 100
         arith = 100 * p.mean(axis=0)
         g_ = np.exp(np.log(p).mean(axis=0)); closed = 100 * g_ / g_.sum()
+        # AT BOTH LEVELS. The ensemble check licenses the headline; it does NOT license the
+        # member centre, which is an arithmetic mean of far more dispersed compositions and is
+        # reported in this same block.
+        pm = np.array([[mem[f"pct_{NICE[b]}"].to_numpy()[k].mean() for b in BRANCH]
+                       for k in range(len(SEEDS))]) / 100
+        gm_ = np.exp(np.log(pm).mean(axis=0)); closed_m = 100 * gm_ / gm_.sum()
+        arith_m = 100 * pm.mean(axis=0)
         res["compositional_check"] = dict(
-            arithmetic_mean=arith.tolist(), closed_geometric_mean=closed.tolist(),
-            max_abs_difference_pp=float(np.abs(arith - closed).max()),
+            ensemble_arithmetic_mean=arith.tolist(), ensemble_closed_geometric_mean=closed.tolist(),
+            ensemble_max_abs_difference_pp=float(np.abs(arith - closed).max()),
+            member_arithmetic_mean=arith_m.tolist(), member_closed_geometric_mean=closed_m.tolist(),
+            member_max_abs_difference_pp=float(np.abs(arith_m - closed_m).max()),
+            threshold_pp=0.05,
             decision="report percentages" if np.abs(arith - closed).max() < 0.05
-                     else "spread large enough that log-ratio coordinates matter")
-        log(f"  compositional check: arithmetic vs closed geometric differ by at most "
-            f"{res['compositional_check']['max_abs_difference_pp']:.4f} pp -> "
-            f"{res['compositional_check']['decision']}")
+                     else "spread large enough that log-ratio coordinates matter",
+            member_centre_note="the member centre is an arithmetic mean of dispersed "
+                               "compositions; the gap to its closed geometric mean is reported "
+                               "so it is not read as licensed by the ensemble-level check")
+        c = res["compositional_check"]
+        log(f"  compositional check: ensemble level {c['ensemble_max_abs_difference_pp']:.4f} pp, "
+            f"member level {c['member_max_abs_difference_pp']:.4f} pp "
+            f"(threshold {c['threshold_pp']}) -> {c['decision']}")
         # SENSITIVITY: the population the published figures used.
         if sens is not None:
             sd = sens[(sens.config == tag) & (sens.level == "ensemble")].sort_values("draw_id")

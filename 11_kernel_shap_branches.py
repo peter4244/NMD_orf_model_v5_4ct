@@ -15,7 +15,6 @@ embeddings (not mean approximation) to correctly handle ReLU nonlinearity.
 
 import argparse
 import gc
-import json
 import math
 import sys
 from pathlib import Path
@@ -26,7 +25,6 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 
 from model import build_model
 from evaluate import enforce_split_gate
@@ -119,7 +117,7 @@ def extract_sub_embeddings(model, dataset, indices, device, batch_size=256):
         all_masks.append(mask_t.cpu())
         all_labels.extend(labels)
 
-        if end % 2000 == 0 or end == len(indices):
+        if end % (batch_size * 8) == 0 or end == len(indices):
             print(f"  Extracted {end}/{len(indices)} embeddings")
 
     return {
@@ -130,6 +128,30 @@ def extract_sub_embeddings(model, dataset, indices, device, batch_size=256):
         "masks": torch.cat(all_masks),             # (N, K)
         "labels": np.array(all_labels),
     }
+
+
+def chunk_bounds(n, chunk_size, batch_size=256):
+    """The chunk decomposition, as ONE function, so a test can drive THIS and not a copy of it.
+
+    It lived inline in extract_sub_embeddings_chunked, which meant test_guards could only
+    re-implement the loop bound and check its own copy -- and a copy of the logic is exactly the
+    root cause this file's own docstrings keep naming. An off-by-one here now fails the guard.
+
+    Returns [(lo, hi)] half-open ranges of split positions, ascending, covering 0..n exactly once.
+    chunk_size must be a multiple of batch_size: every chunk boundary is then a batch boundary, so
+    each forward pass receives the same rows in the same batch shape as an unchunked run -- and
+    therefore selects the same library kernels, which is what keeps the two bit-comparable.
+    """
+    if chunk_size is None or chunk_size <= 0 or chunk_size >= n:
+        return [(0, n)]
+    if chunk_size % batch_size:
+        raise ValueError(
+            f"--chunk-size {chunk_size} is not a multiple of the extraction batch size "
+            f"{batch_size}. A chunk boundary that is not a batch boundary re-partitions the "
+            f"forward passes into different batch shapes, which can select different library "
+            f"kernels and makes this run non-comparable with an unchunked one at the last bits. "
+            f"Use a multiple of {batch_size}.")
+    return [(lo, min(lo + chunk_size, n)) for lo in range(0, n, chunk_size)]
 
 
 def extract_sub_embeddings_chunked(model, h5_path, ws_atg, ws_stop, split, device,
@@ -146,38 +168,34 @@ def extract_sub_embeddings_chunked(model, h5_path, ws_atg, ws_stop, split, devic
 
     None of it is needed. This function keeps only the three 32-dim branch embeddings, the
     ranks 1-4 context and the mask -- about 59 MB for all 41,765 isoforms. The windows are read
-    once, consumed once and dropped. Peak falls to roughly 2.4 GiB at any window width, which
-    is what puts a full-cohort run back on a laptop, where the plan's working loop assumes
-    development happens.
+    once, consumed once and dropped. Peak falls to 2.10 GiB at atg1000_stop1000 and 3.66 GiB at
+    atg2000_stop2000 -- it is NOT width-independent -- which is what puts a full-cohort run back
+    on a laptop, where the plan's working loop assumes development happens. Measured on Explorer
+    2026-07-31, largest sacct MaxRSS over the 25 cells of each configuration, array job 8850292.
 
-    IT CHANGES NO NUMBER, and the reason is arithmetic rather than assertion. Chunks are
-    contiguous ascending ranges of split positions, so restrict_to's sort is the identity and
-    concatenation restores the split's own row order exactly. chunk_size is required to be a
-    multiple of batch_size, so every chunk boundary is also a batch boundary and each forward
-    pass sees the SAME rows in the SAME order as the unchunked run -- identical reduction
-    order, not merely an identical set. The model is built once, outside the loop, and stays in
-    eval mode, so batch normalization uses stored running statistics either way. There is no
-    RNG on this path.
+    IT CHANGES NO NUMBER. Chunks are contiguous ascending ranges of split positions, so
+    restrict_to's sort is the identity and concatenation restores the split's own row order
+    exactly. chunk_size is a multiple of batch_size, so every chunk boundary is a batch boundary
+    and each forward pass receives the same rows in the same batch SHAPE as the unchunked run --
+    which matters because batch shape selects the library kernel, not because of any
+    cross-sample reduction: there is none on this path. The encoders are convolution, batch
+    norm and a max over length, and the model is in eval mode, so a row's embedding never
+    depends on its batch-mates. The model is built once, outside the loop. There is no RNG here.
+    Measured: on `val` at atg1000_stop1000 the chunked and eager outputs are byte-identical --
+    same md5, all 4,356 rows agreeing to exactly zero. See chunked_read_equivalence_runlog.txt.
     """
     idx = split_indices(h5_path, split)
     n = len(idx)
+    bounds = chunk_bounds(n, chunk_size, batch_size)
 
-    if chunk_size is None or chunk_size <= 0 or chunk_size >= n:
+    if len(bounds) == 1 and bounds[0] == (0, n) and (chunk_size is None or chunk_size <= 0
+                                                     or chunk_size >= n):
         ds = NMDDataset(h5_path, ws_atg, ws_stop, split=split)
         return extract_sub_embeddings(model, ds, np.arange(len(ds)), device, batch_size)
 
-    if chunk_size % batch_size:
-        raise ValueError(
-            f"--chunk-size {chunk_size} is not a multiple of the extraction batch size "
-            f"{batch_size}. A chunk boundary that is not a batch boundary re-partitions the "
-            f"forward passes, which changes floating-point reduction order and makes this run "
-            f"non-comparable with an unchunked one at the last bits. Use a multiple of "
-            f"{batch_size}.")
-
     parts = []
-    n_chunks = (n + chunk_size - 1) // chunk_size
-    for c, lo in enumerate(range(0, n, chunk_size), start=1):
-        hi = min(lo + chunk_size, n)
+    n_chunks = len(bounds)
+    for c, (lo, hi) in enumerate(bounds, start=1):
         print(f"  chunk {c}/{n_chunks}: split rows {lo:,}-{hi - 1:,}")
         ds = NMDDataset(h5_path, ws_atg, ws_stop, split=split,
                         restrict_to=np.arange(lo, hi))
@@ -378,6 +396,13 @@ def main():
     parser.add_argument("--full-cohort", action="store_true",
                         help="affirm a pooled train+test interpretation run (--explain-split all)")
     args = parser.parse_args()
+
+    # An empty reference set makes evaluate_coalition average over zero rows -> NaN attributions,
+    # a full run of them, and exit 0. Validated here rather than at first use, so a typo costs a
+    # message instead of a checkpoint load and a window read.
+    if args.n_background < 1:
+        parser.error(f"--n-background {args.n_background}: the reference set would be empty and "
+                     f"every attribution would be NaN at exit 0.")
 
     # evaluate.enforce_split_gate reads args.split; this file's flag is --explain-split for
     # continuity with the wrappers that already pass it. Aliasing here rather than renaming the

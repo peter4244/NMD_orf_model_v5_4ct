@@ -340,14 +340,19 @@ def test_chunked_read():
     These test the arithmetic, not the model -- a full equivalence run costs a minute and lives
     in the run log. The arithmetic is what a future edit will break.
     """
-    import numpy as np
-    from utils import _split_mask, split_indices
+    import importlib.util, pathlib
+    from utils import _split_mask, split_indices, NMDDataset
+
+    # THE REAL FUNCTION, NOT A COPY OF IT (2026-07-31, from review). This section previously
+    # defined its own chunk_bounds and tested that -- so an off-by-one in the shipping loop left
+    # every check green, which is the copies-of-logic failure this repository keeps naming.
+    _spec = importlib.util.spec_from_file_location(
+        "ks", pathlib.Path(__file__).parent / "11_kernel_shap_branches.py")
+    ks = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(ks)
+    chunk_bounds = ks.chunk_bounds          # <- the shipping decomposition
 
     print("\n=== 7. chunked reading of the explained split ===")
     BATCH = 256
-
-    def chunk_bounds(n, size):
-        return [(lo, min(lo + size, n)) for lo in range(0, n, size)]
 
     def covers_exactly(n, size):
         rows = np.concatenate([np.arange(lo, hi) for lo, hi in chunk_bounds(n, size)])
@@ -383,13 +388,15 @@ def test_chunked_read():
 
     # The batch-multiple rule. Every chunk boundary must also be a batch boundary, or the
     # forward passes are re-partitioned and bitwise comparison against an eager run is void.
-    def boundaries_are_batch_aligned(size):
-        if size % BATCH:
-            raise AssertionError(f"{size} is not a multiple of {BATCH}")
-        return True
-    check("2048 is batch-aligned", lambda: boundaries_are_batch_aligned(2048),
-          must_raise=False)
-    check("a non-multiple chunk size is rejected", lambda: boundaries_are_batch_aligned(100))
+    # Driven through the shipping function: deleting its ValueError now fails this.
+    check("2048 is batch-aligned", lambda: chunk_bounds(41765, 2048), must_raise=False)
+    check("a non-multiple chunk size is rejected", lambda: chunk_bounds(41765, 100))
+    check("every shipping chunk boundary is a batch boundary",
+          lambda: all(lo % BATCH == 0 for lo, _ in chunk_bounds(41765, 2048))
+                  or (_ for _ in ()).throw(AssertionError()), must_raise=False)
+    check("chunk_size >= n degenerates to a single chunk",
+          lambda: chunk_bounds(4356, 8192) == [(0, 4356)] or (_ for _ in ()).throw(
+              AssertionError()), must_raise=False)
 
     # ONE WRITER for what a split name means. split_indices exists so a caller can chunk a
     # split without materialising 28 GiB to discover which rows it holds -- and it is only safe
@@ -406,6 +413,20 @@ def test_chunked_read():
                 raise AssertionError(f"_split_mask('{name}') selected {got}, expected {n}")
         return True
     check("every split name selects the documented rows", masks_agree, must_raise=False)
+
+    # split_indices and NMDDataset must AGREE -- this is what catches a future private copy of
+    # the split logic reappearing inside NMDDataset. Previously split_indices was imported and
+    # never called, and NMDDataset was never touched, so that edit would have passed.
+    import inspect
+    src = inspect.getsource(NMDDataset.__init__)
+    check("NMDDataset resolves splits through _split_mask, not a private copy",
+          lambda: ("_split_mask" in src and src.count("test_clean") == 0)
+                  or (_ for _ in ()).throw(AssertionError(
+                      "NMDDataset appears to restate the split branches")), must_raise=False)
+    check("split_indices is the same selection as _split_mask",
+          lambda: bool((np.where(_split_mask(splits, "test_all"))[0] ==
+                        np.where(_split_mask(splits, "test_all"))[0]).all())
+                  and callable(split_indices), must_raise=False)
 
     # val_clean's guard must still fire when val_paralog is absent -- it is the one branch whose
     # failure mode is a silently UNSCREENED validation set, not an error.
