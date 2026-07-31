@@ -1,0 +1,49 @@
+$ python kozak_pwm_rescore.py
+orf_features: 1,540,674 ORFs over 42,043 isoforms
+
+reading /Users/petecastaldi/claude_projects/nmd_deposit_2026/source_data/sqanti/nmd_lungcells_corrected.fasta
+  42,043 sequences; overlap with scan isoforms: 100.0%
+  orf_start points at ATG in 100.00% of 3000 sampled ORFs
+
+VALIDATION GATE
+  validated against Isopair::scoreKozakPWM on 400 sites: max |diff| 4.994e-13
+  NA agreement: R 0 vs python 0
+
+scoring all ORFs with the continuous PWM ...
+  scored 1,540,674 of 1,540,674
+  PWM score: min -4.759  median -0.506  max 4.173  distinct values 20,881
+  3-level score distinct values: 3
+  Spearman(PWM, 3-level) = 0.698
+  ties at the isoform maximum, 3-level: mean 6.32, isoforms with >4 tied 60.8%
+  ties at the isoform maximum, continuous PWM: mean 1.00, isoforms with >4 tied 0.0%
+
+PRE-REGISTERED TEST — population n=12,602, NMD 7.90%
+
+  BASELINE: 3-level strong-AUG fraction (the published cut)
+  AUG count        n                          low                         high    ratio
+  2             2014     2.35% (n= 1275, utr  365)     4.87% (n=  739, utr  341)    2.07x
+  3-4           2067     5.29% (n= 1304, utr  488)     6.55% (n=  763, utr  464)    1.24x
+  5-9           1959    10.72% (n= 1026, utr  765)    15.01% (n=  933, utr  735)    1.40x
+  10+           2898    17.36% (n= 1538, utr 1806)    18.09% (n= 1360, utr 1770)    1.04x
+
+  CONTINUOUS: mean PWM score over upstream AUGs
+  AUG count        n                          low                         high    ratio
+  2             2014     1.98% (n= 1009, utr  363)     4.58% (n= 1005, utr  354)    2.31x
+  3-4           2067     3.97% (n= 1034, utr  460)     7.55% (n= 1033, utr  494)    1.90x
+  5-9           1959    10.61% (n=  980, utr  725)    14.91% (n=  979, utr  776)    1.41x
+  10+           2898    17.18% (n= 1449, utr 1873)    18.22% (n= 1449, utr 1749)    1.06x
+
+  CONTINUOUS: max PWM score over upstream AUGs
+  AUG count        n                          low                         high    ratio
+  2             2014     1.99% (n= 1007, utr  363)     4.57% (n= 1007, utr  353)    2.30x
+  3-4           2067     4.35% (n= 1034, utr  460)     7.16% (n= 1033, utr  497)    1.65x
+  5-9           1959     9.59% (n=  980, utr  732)    15.93% (n=  979, utr  770)    1.66x
+  10+           2898    16.29% (n= 1449, utr 1620)    19.12% (n= 1449, utr 1990)    1.17x
+
+  stratum      3-level  mean PWM   max PWM   prediction was that the continuous scores RISE
+  2              2.07x     2.31x     2.30x
+  3-4            1.24x     1.90x     1.65x
+  5-9            1.40x     1.41x     1.66x
+  10+            1.04x     1.06x     1.17x
+
+  mean-PWM beats the 3-level score in 4 of 4 strata
