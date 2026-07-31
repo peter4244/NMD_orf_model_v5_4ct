@@ -87,7 +87,7 @@ passed, evaluation mode, window widths from the tag and never from the checkpoin
 
 | file | one row |
 |---|---|
-| `feature_shap_{tag}_seed{S}_all_run{R}.tsv` | one isoform: `isoform_id`, `label`, `prediction`, `expected_value`, `shap_frac_start`, `shap_frac_stop`, `shap_is_ref_cds`, `shap_is_sqanti_cds`, `shap_n_downstream_ejc`, `shap_sum`, `residual` |
+| `feature_shap_{tag}_seed{S}_all_run{R}.tsv` | one isoform: `isoform_id`, `label`, `prediction`, `baseline_struct_reference`, `shap_frac_start`, `shap_frac_stop`, `shap_is_ref_cds`, `shap_is_sqanti_cds`, `shap_n_downstream_ejc`, `shap_sum`, `residual` |
 | `feature_shares_per_cell.tsv` | one cell at one level, as in Analysis 2: identity, scope, the five feature measures, their distribution over isoforms, verification anchors |
 | `feature_decomposition_{tag}.json` | one configuration: the five shares, each spread named for its level, the variance components, the compositional check, the test-split sensitivity, `n`, the population in words, the reference-draw seeds |
 
@@ -146,9 +146,18 @@ positives; record the split per isoform for the step 7 sensitivity.
 ### Step 2 — fix the reference draws
 
 **The same five reference sets as Analysis 2**, drawn from the train split only, uniformly and
-without replacement, using `RandomState(42 + 1000*R)`. Reusing them is what makes a feature share
-and a branch share comparable across the two analyses: a difference between them is then a
-difference between the games, not between the baselines they were played against.
+without replacement, using `RandomState(42 + 1000*R)`.
+
+Reusing them does **not** make a feature share and a branch share comparable — those are fractions
+of different totals in different games, and §2.1 forbids composing them. What it buys is narrower
+and real: the two analyses are played against identical baselines, so the empty coalition of this
+five-player game is exactly the structural-absent state of the three-player game, the draw-to-draw
+variation is paired across the two analyses, and any difference between them is a property of the
+games rather than of the reference sets they happened to get.
+
+**All absent features take their values from the same reference isoform, jointly.** Not
+independently per feature. This is what makes the five-player game nest inside the three-player one;
+drawn independently, the reused draws would buy nothing.
 
 The draw is unstratified, so "absent" means *this feature took the value it takes in a typical
 training transcript* — a mixture that is about 22% NMD susceptible, not a control.
@@ -184,8 +193,11 @@ them. The exact Shapley value of each feature follows from the 32 coalition valu
                    model(start_vec[i], stop_vec[i], struct_fc(that vector), ctx[i], m[i])
         phi[0..4]      = shapley_from_32_coalitions(v)
         prediction     = v[FEATS]
-        expected_value = v[{}]
-        residual       = prediction - expected_value - sum(phi)
+        baseline_struct_reference = v[{}]          # NOT Analysis 2's expected_value: there all
+                                                   # three branches are absent, here only the
+                                                   # structural features are. Different quantity,
+                                                   # so deliberately a different column name.
+        residual       = prediction - baseline_struct_reference - sum(phi)
       write Dataset C row per isoform
 ```
 
@@ -197,13 +209,24 @@ replaced by measurement before the fifty are submitted.*
 
 ### Step 5 — accept or reject each file, and record the tally
 
-Identical in form and in tolerance to Analysis 2 step 5, and affordable for the same reason: all 32
-coalitions are enumerated and the Shapley values solved exactly, so the sum identity is an algebraic
-consequence of the arithmetic and the residual can only be floating-point rounding.
+Identical in form to Analysis 2 step 5, and affordable for the same reason: all 32 coalitions are
+enumerated and the Shapley values solved exactly, so the sum identity is an algebraic consequence of
+the arithmetic and the residual can only be floating-point rounding.
+
+**The 1e-12 tolerance is inherited as a prediction, not a measurement.** Shapley weights over five
+players accumulate more rounding than over three. It is verified on the first cell before the fifty
+are submitted; landing at 1e-11 would be a tolerance to restate, not a defect — and discovering it
+after fifty jobs would be waste. The two tolerances are kept distinct: 1e-12 for the within-file
+algebraic identity, and the wider cross-code-path bar for the prediction agreement above.
 
 ```
     for each of the 50 files:
-        assert row count == 41,765 and the label vector matches step 1
+        assert row count == 41,765
+        assert the isoform_id vector equals Dataset A's order      # every later step is positional
+        assert the label vector matches step 1
+        assert prediction agrees with Analysis 2's for the same (tag, member), which is an
+               INDEPENDENT per-isoform value and is what catches a file whose value columns
+               are attached to the wrong isoforms
         r = max|residual|
         accept if r < 1e-12, else record (tag, member, draw, r) and STOP
     report accepted, rejected, and every rejected cell with its residual
@@ -237,6 +260,14 @@ and `label == 1`, n = 2,405.
 construction, so a rise in one is a fall in the others, and the five spreads are never combined in
 quadrature.
 
+**And here the compositional check has a failure branch, because it may actually fail.** Analysis 2
+passed it by two orders of magnitude with three comparable parts. Five parts, one of which is
+expected to dominate, may not. If the arithmetic mean and the closed geometric mean of the
+compositions differ by 0.05 percentage points or more, the shares are additionally reported in
+centred log-ratio coordinates, whose centre is the closed geometric mean by construction, and the
+percentages are described as descriptive only. A part measuring exactly zero is reported as such
+and excluded from the log-ratio form rather than allowed to produce an infinity.
+
 **No ratio is formed.** Analysis 2's stop-to-start ratio existed because two comparably sized
 branches invited a ranking. Here the question is whether one feature dominates, which the shares
 answer directly; a ratio between two of five parts would name a comparison nobody asked for.
@@ -259,17 +290,33 @@ isoforms. It is a share of **mean absolute log-odds displacement** — not varia
 information-theoretic quantity, and not "importance" in any sense that survives being quoted without
 its definition.
 
-### Two features are near-duplicates, and Shapley will divide their credit
+### The two annotation flags are anti-correlated, not duplicated
 
 `is_ref_cds` and `is_sqanti_cds` both assert that the ORF's start matches an externally annotated
-coding sequence, and they agree on most isoforms. Shapley values divide credit between players
-carrying overlapping information rather than assigning it to one, so each will receive roughly half
-of whatever the pair jointly contributes, and neither share is interpretable on its own. **Their sum
-is the interpretable quantity** and is reported as a sixth number, `annotation agreement`, alongside
-the five.
+coding sequence, which invites treating them as near-duplicates whose credit Shapley would split.
+**Measured, they are not.** At ORF rank 0 they agree on 56.9% of all 41,765 isoforms and on only
+**31.0%** of the 9,321 summarized ones, where their phi coefficient is **−0.477**.
+*Measured here 2026-07-31 from `results_4ct_dn/nmd_orf_data.h5`.*
 
-This is a property of the decomposition, not a defect in it, and it is stated here so the result is
-not read as either feature being individually unimportant.
+The mechanism is the ORF ranking rule. Tier 1 selects an ORF whose start matches the reference CDS;
+tier 2 selects one matching the TransDecoder2 CDS **when it differs from the reference**. The rule
+that chooses rank 0 therefore makes the two flags alternatives wherever the annotations disagree,
+and both are 1 only on the 52.6% of isoforms where the two annotations coincide.
+
+Two consequences, both of which change what is reported:
+
+- **The two shares are individually meaningful.** There is no duplicate-splitting artifact to
+  correct for, and neither share should be described as half of a shared contribution.
+- **A merged player answers a different question** — how much annotation agreement of any kind
+  contributes — and it is computed exactly rather than by adding shares. Summing two
+  mean-absolute shares overstates the merged contribution wherever the two attributions differ in
+  sign, which is the absolute-value-before-sum error this plan forbids between members.
+
+**The merged player costs nothing.** The four-player game over `{frac_start, frac_stop, annotation,
+n_downstream_ejc}` needs only the coalitions in which both flags are present or both absent — 16 of
+the 32 already evaluated, and no additional model evaluations. Its four-part composition is
+reported beside the five-part one **as a separate game, not a derived row**: merging two players
+changes the normalizer, so a four-part share is not the sum of two five-part shares.
 
 ### What the decomposition does and does not establish
 
@@ -288,4 +335,6 @@ about the sequence branches, which are held at observed values and are not playe
 Claim 5.14, *"Of individual ORF structural features, EJC count was by far the most important"*, and
 Figure 5 Panel C, the ranked per-feature structural importance. Both are rewritten from this
 analysis's outputs, carrying two configurations' numbers where they now carry one, each share with
-its interpretation spread, its training spread, and the range across all fifty cells.
+its interpretation spread (as both a standard deviation and a standard error), its training spread,
+the ensemble-size bias, and the range across all fifty member cells — which is a wider envelope than
+the range across the five draw-averaged members and is reported as its own field.
