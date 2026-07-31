@@ -148,9 +148,11 @@ def step3_score(tag, pop, cfg):
                   f"{len(ck['model_state_dict'])} tensors, epoch {ck['epoch']}, "
                   f"stored val_auc {ck['val_auc']:.5f}")
 
-            out = []
+            out, seen_ids = [], []
             for i in range(0, len(keep), BATCH):
                 idx  = keep[i:i + BATCH]
+                seen_ids.extend(x.decode() if isinstance(x, bytes) else x
+                                for x in f["isoform_id"][idx])
                 atg  = f[f"w{ws_atg}/atg_windows"][idx].astype(np.float32)
                 stp  = f[f"w{ws_stop}/stop_windows"][idx].astype(np.float32)
                 feat = (f["orf_features"][idx].astype(np.float32) - mean) / std
@@ -160,8 +162,17 @@ def step3_score(tag, pop, cfg):
                                torch.from_numpy(feat), torch.from_numpy(mask))
                 out.append(lg.squeeze(-1).numpy())
             v = np.concatenate(out)
-            check(f"seed {s} scored every isoform, in order", len(v) == pop["n"],
-                  f"{len(v):,} log-odds, range {v.min():.3f} to {v.max():.3f}")
+            # The label used to say "in order" while the condition tested only length, so a
+            # reordering was undetectable. It now compares the isoform_ids the model was actually
+            # handed, batch by batch, against the population's key.
+            same_order = len(seen_ids) == pop["n"] and all(
+                a == b for a, b in zip(seen_ids, pop["ids"]))
+            first_bad = next((k for k, (a, b) in enumerate(zip(seen_ids, pop["ids"])) if a != b),
+                             None)
+            check(f"seed {s} scored exactly the population's isoforms, in its order", same_order,
+                  f"{len(v):,} log-odds, range {v.min():.3f} to {v.max():.3f}" if same_order
+                  else f"first mismatch at row {first_bad}: saw {seen_ids[first_bad]}, "
+                       f"expected {pop['ids'][first_bad]}")
             L.append(v)
             meta.append(dict(seed=s, epoch=int(ck["epoch"]), stored_val_auc=float(ck["val_auc"])))
 
@@ -182,8 +193,14 @@ def step4_estimates(tag, pop, L):
     step(4, f"ensemble and point estimates — {tag}")
     y = pop["y"]
     ens = L.mean(axis=0)
-    check("ensemble formed on the log-odds scale", True,
-          f"mean log-odds range {ens.min():.3f} to {ens.max():.3f}")
+    # This check used to pass a literal True. A mean must lie within the range of the values it
+    # averages, per isoform -- which fails if the axis is wrong, if members are misaligned, or if
+    # the ensemble was formed on a different scale from the members.
+    lo, hi = L.min(axis=0), L.max(axis=0)
+    inside = bool(((ens >= lo - 1e-9) & (ens <= hi + 1e-9)).all())
+    check("the ensemble lies within its members' range for every isoform", inside,
+          f"{ens.shape[0]:,} isoforms, mean log-odds range {ens.min():.3f} to {ens.max():.3f}"
+          if inside else f"{int(((ens < lo - 1e-9) | (ens > hi + 1e-9)).sum()):,} isoforms outside")
 
     auc_e, ap_e = roc_auc_score(y, ens), average_precision_score(y, ens)
     log(f"      ENSEMBLE  AUC {auc_e:.5f}   AUPRC {ap_e:.5f}")

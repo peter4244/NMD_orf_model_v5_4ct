@@ -386,6 +386,35 @@ stays at five features. The structural share is therefore expected to be lower a
 `atg2000_stop2000` than at `atg1000_stop1000` for a reason that is mechanical rather than
 biological. The comparison is reported as a direction and magnitude, not as a test.
 
+### Memory is the binding constraint, not time
+
+`NMDDataset` materialises a whole split's window arrays as float32 when it is constructed
+(`utils.py:248-249`). Analysis 2 constructs two of them per run — the explained cohort, and the
+train split from which 500 reference isoforms are drawn:
+
+| | train split | explained cohort (`all`) | **per run** |
+|---|---|---|---|
+| `atg1000_stop1000` | 9.0 GB | 14.0 GB | **23 GB** |
+| `atg2000_stop2000` | 17.9 GB | 28.0 GB | **46 GB** |
+
+*Measured here 2026-07-30 from the array shapes; confirmed by two test runs at
+`atg1000_stop1000` that spent minutes at full CPU without emitting a line, which was the load
+rather than the computation.*
+
+The train split is loaded in full to use **500 of its 26,711 rows**. That is the whole of the
+excess, and it explains a note in the record that reads as caution but is not:
+`slurm_kernel_shap_dn.sh` requests 32 GB, and the handoff observes that kernel SHAP's "narrow
+margin is memory, not time". At 46 GB a full-cohort run at the wider configuration would exceed
+that request.
+
+**Before any of the fifty runs, the reference set is read as 500 rows rather than as a split.**
+The normalization and padded-ORF handling must come from the same code path that serves the
+explained cohort, so the change belongs inside `NMDDataset` as an optional restriction to a subset
+of a split's rows, not as a second reader in this script. `NMDDataset` is shared with
+`evaluate.py`, `deepshap.py` and `ensemble_evaluate.py`, so the change is additive with an
+unchanged default, and is verified by scoring one member before and after and asserting identical
+predictions.
+
 ### Cost, and where this runs
 
 Measured 2026-07-30 on this machine's CPU: the coalition evaluation is about 5 ms per isoform, and
