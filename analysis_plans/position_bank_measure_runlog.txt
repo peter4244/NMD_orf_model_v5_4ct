@@ -1,14 +1,15 @@
-$ python measure_position_bank.py --n-iso 500 --n-ctrl 30 --out ../results_interp_all/bank_slot0_n500.npz
-bank: 2 targets + 30 controls from 115 candidates in +/-60
-  controls at codon-convention positions [-60, -57, -54, -51, -48, -45, -42, -39, -36, -33, -30, -27, -24, -21, -18, -15, -12, -9, -6, -2, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33]
+$ python measure_position_bank.py --n-iso 500 --out ../results_interp_all/bank_slot0_n500.npz
+bank: 2 targets at frame offset 0 + 37 controls, all at the same offset, within +/-60
+  upstream controls   (19): [-60, -57, -54, -51, -48, -45, -42, -39, -36, -33, -30, -27, -24, -21, -18, -15, -12, -9, -6]
+  downstream controls (18): [7, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 40, 43, 46, 49, 52, 55, 58]
   all[500 of 41,765]: 500 samples, 138 NMD+ (27.6%)
 
-isoforms 500; eligible at all 32 positions: 470 (94.0%); per-position n 476-500
+isoforms 500; eligible at all 39 positions: 465 (93.0%); per-position n 476-500
 observed-base composition, purine fraction: -3 0.742, +4 0.694, c-60 0.517, c-57 0.509
-  seed 100:  108.3s   no-op |effect| max 4.768e-07
-  seed 200:  142.6s   no-op |effect| max 7.153e-07
-  seed 300:  146.8s   no-op |effect| max 4.768e-07
-  seed 400:  136.1s   no-op |effect| max 4.768e-07
-  seed 500:  170.9s   no-op |effect| max 7.153e-07
+  seed 100:  116.6s   no-op |effect| max 1.431e-06
+  seed 200:  160.7s   no-op |effect| max 9.537e-07
+  seed 300:  170.9s   no-op |effect| max 9.537e-07
+  seed 400:  166.5s   no-op |effect| max 9.537e-07
+  seed 500:  177.6s   no-op |effect| max 9.537e-07
 
 wrote ../results_interp_all/bank_slot0_n500.npz

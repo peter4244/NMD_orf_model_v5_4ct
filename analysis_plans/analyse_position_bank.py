@@ -27,6 +27,7 @@ that independent signs would give, and an agreement rate is only evidence when r
 from __future__ import annotations
 
 import argparse
+import warnings
 
 import numpy as np
 
@@ -40,17 +41,26 @@ OPERATORS = {
 }
 
 
-def contrast(vals, ok, excl, hi_b, lo_b, iso_sel=None):
-    """Per-(member, isoform, position) contrast; NaN where either side is empty."""
-    n_s, n_i, n_p, _ = vals.shape
-    out = np.full((n_s, n_i, n_p), np.nan)
+def contrast(vals, ok, excl, hi_b, lo_b, iso_sel=None, partial_sides=False):
+    """Per-(member, isoform, position) contrast; NaN unless BOTH sides are complete.
+
+    COMPLETE-CASE IS THE DEFAULT, and the reason is that a partially-excluded side is not the
+    operator it claims to be. Averaging {A,G} against {C} because T was excluded gives a
+    contrast whose low side is 100% GC instead of 50%, which is the exact confound `purine` and
+    `A_vs_T` exist to avoid. Exclusion is strongly base-asymmetric -- at -3 the rates are A
+    0.044, C 0.000, G 0.034, T 0.288 -- so the surviving side is systematically GC-enriched and
+    the contrast reads low. Roughly a third of otherwise-usable isoforms are affected at the
+    hypothesis positions. `partial_sides=True` reproduces the earlier behavior for comparison.
+    """
     keep_hi = np.stack([~excl[:, :, b] for b in hi_b], -1)      # (n_i, n_p, |hi|)
     keep_lo = np.stack([~excl[:, :, b] for b in lo_b], -1)
     hi = np.where(keep_hi[None], vals[:, :, :, hi_b], np.nan)
     lo = np.where(keep_lo[None], vals[:, :, :, lo_b], np.nan)
-    with np.errstate(invalid="ignore"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)          # all-NaN slices are expected
         out = np.nanmean(hi, -1) - np.nanmean(lo, -1)
-    good = ok[None] & keep_hi.any(-1)[None] & keep_lo.any(-1)[None]
+    side = (lambda m: m.any(-1)) if partial_sides else (lambda m: m.all(-1))
+    good = ok[None] & side(keep_hi)[None] & side(keep_lo)[None]
     out[~np.broadcast_to(good, out.shape)] = np.nan
     if iso_sel is not None:
         out[:, ~iso_sel, :] = np.nan

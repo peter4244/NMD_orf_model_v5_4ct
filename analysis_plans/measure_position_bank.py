@@ -77,7 +77,9 @@ def recompute_gc(w, lo, hi):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n-iso", type=int, default=300)
-    ap.add_argument("--n-ctrl", type=int, default=30)
+    ap.add_argument("--n-ctrl", type=int, default=0,
+                    help="optional cap on controls, split evenly between the upstream and "
+                         "downstream arms. 0 keeps every frame-matched position.")
     ap.add_argument("--ctrl-halfspan", type=int, default=60)
     ap.add_argument("--slot", type=int, default=0)
     ap.add_argument("--tag", default="atg1000_stop1000")
@@ -93,18 +95,36 @@ def main():
 
     targets = [("-3", -3), ("+4", 4)]
     codon = {W // 2 - 1, W // 2, W // 2 + 1}
+    tgt_off = {(pos_to_index(p, W) - (W // 2 - 1)) % 3 for _, p in targets}
+    assert len(tgt_off) == 1, f"hypothesis positions differ in frame offset: {tgt_off}"
+    off0 = tgt_off.pop()
+
+    # CONTROLS ARE SELECTED BY FRAME OFFSET, NOT BY STRIDE. The created-motif exclusion rate
+    # depends on where a position sits within its in-frame codon, so a mixed-offset control set
+    # is not a matched reference. A uniform stride of 3 does NOT achieve matching: the codon
+    # convention skips zero and the codon, so stepping by 3 from -60 lands on the targets'
+    # offset upstream and a DIFFERENT offset downstream. The earlier bank was built that way and
+    # its 19 frame-matched controls were 100% upstream, leaving the downstream hypothesis
+    # position (+4) with no region-matched reference.
     cand = [p for p in range(-args.ctrl_halfspan, args.ctrl_halfspan + 1)
             if p != 0 and pos_to_index(p, W) not in codon
-            and p not in [q for _, q in targets]]
-    step = max(1, len(cand) // args.n_ctrl)
-    ctrl = [(f"c{p:+d}", p) for p in cand[::step][:args.n_ctrl]]
+            and p not in [q for _, q in targets]
+            and (pos_to_index(p, W) - (W // 2 - 1)) % 3 == off0]
+    up = [p for p in cand if p < 0]
+    dn = [p for p in cand if p > 0]
+    if args.n_ctrl:                       # optional cap, applied evenly to both arms
+        k = max(1, args.n_ctrl // 2)
+        up = up[::max(1, len(up) // k)][:k]
+        dn = dn[::max(1, len(dn) // k)][:k]
+    ctrl = [(f"c{p:+d}", p) for p in up + dn]
     bank = targets + ctrl
     idxs = np.array([pos_to_index(p, W) for _, p in bank])
     names = np.array([n for n, _ in bank])
     codon_pos = np.array([p for _, p in bank])
-    print(f"bank: {len(targets)} targets + {len(ctrl)} controls from {len(cand)} candidates "
-          f"in +/-{args.ctrl_halfspan}")
-    print(f"  controls at codon-convention positions {[p for _, p in ctrl]}")
+    print(f"bank: {len(targets)} targets at frame offset {off0} + {len(ctrl)} controls, "
+          f"all at the same offset, within +/-{args.ctrl_halfspan}")
+    print(f"  upstream controls   ({len(up)}): {up}")
+    print(f"  downstream controls ({len(dn)}): {dn}")
 
     ds = NMDDataset(h5, W, W, split="all", restrict_to=np.arange(args.n_iso))
     n_iso, n_pos, n_orf = len(ds), len(idxs), ds.orf_mask.shape[1]

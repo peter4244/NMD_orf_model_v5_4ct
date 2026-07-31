@@ -1,16 +1,25 @@
 $ python build_mechanism_classes.py
 /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_4ct_dn/nmd_orf_data.h5: 41,765 isoforms, NMD+ 22.3%, stop window w1000
-  slots masked in 207,786; n_downstream_ejc>=1 71,038; PTC by the >50nt rule 65,658 (7.6% of them demoted)
-  demotions rescued by the beyond-window count: 11,796 slots
+  slots masked in 207,786; n_downstream_ejc>=1 71,038; PTC by the >50nt rule 65,663 (7.6% of them demoted)
+  demotions rescued by the beyond-window count: 11,801 slots
+  full ORFik scan: 1,540,674 ORFs over 42,043 isoforms (mean 36.6 per isoform, max 1,124); the model keeps at most 5
+
+UPSTREAM PTC-BEARING ORF: model's 5 slots vs the full ORFik scan
+  isoforms with a clean reference-AUG stop (the population at issue): 21,678
+  found in the 5 model slots : 5,913  NMD+ 12.6%
+  found in the full scan     : 12,010  NMD+ 8.2%
+  TRUE but INVISIBLE to the model: 6,097 isoforms (50.8% of the true set), NMD+ 3.9%
 
 class              definition                                                           n   share    NMD+
-PTC+               the reference-AUG CDS stop has a junction >50 nt downstream      6,863  16.4%  70.0%
+PTC+               the reference-AUG CDS stop has a junction >50 nt downstream      6,864  16.4%  70.0%
 PTC- uORF-PTC      reference-AUG CDS stop is clean; an ORF starting upstream of it is a PTC   5,913  14.2%  12.6%
-PTC- no trigger    reference-AUG CDS stop is clean; no upstream ORF is a PTC       15,766  37.7%   2.2%
-Ref AUG absent     no slot matches the GENCODE-projected reference AUG             13,223  31.7%  25.9%
+PTC- no trigger    reference-AUG CDS stop is clean; no upstream ORF is a PTC       15,765  37.7%   2.2%
+Ref AUG absent     no slot matches the reference isoform's projected AUG           13,223  31.7%  25.9%
 
 share of all NMD+ isoforms: PTC+ 51.5%  PTC- uORF-PTC 8.0%  PTC- no trigger 3.7%  Ref AUG absent 36.7%
-PTC- uORF-PTC composition: proper uORF (stops before the reference AUG) 88.1%, overlapping or N-terminal extension 11.9%
+PTC- uORF-PTC subgroups (labelled by the MOST UPSTREAM qualifying ORF):
+  uORF  terminates in the 5'UTR                                  n= 5,287 (89.4%)  NMD+ 12.6%
+  oORF  reads into the CDS, out of frame -- no reinitiation rescue n=   626 (10.6%)  NMD+ 12.8%
 
 slot-0 anchor, and why the TD2 flag is not neutral:
   ref only (TD2 disagrees)   n= 6,587 (15.8%)  NMD+ 49.5%  slot 0 is a PTC 58.3%
