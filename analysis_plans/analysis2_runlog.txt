@@ -1,10 +1,11 @@
-Analysis 2 — branch decomposition.  2026-07-30T23:08:14
+Analysis 2 — branch decomposition.  2026-07-30T23:25:47
 numpy 2.4.6, pandas 3.0.5
 
 ==============================================================================
 STEP 5 — accept or reject each file, and record the tally
 ==============================================================================
   [OK  ] step 1 population re-read from Dataset A: n=41,765, label==1 9,321
+  [OK  ] test-split sensitivity population: 2,405 of 9,321 summarised isoforms lie in split=='test'
   accepted 50   rejected 0   of 50
         every cell restricted to the 9,321 label==1 isoforms for summarisation
 
@@ -28,6 +29,10 @@ STEP 7 — spreads, ensemble jackknife, ratio, and the licensing diagnostic
                 ensemble centre - member centre = -0.854 pp   [F_member 49.62, F_draw 35.23, crit 3.01 on (4,16)]
     stop/start  1.043   draw x/÷ 1.0337  seed-jackknife x/÷ 1.1155  | members 0.802-1.422  CV 0.1982
     compositional check: arithmetic vs closed geometric differ by at most 0.0058 pp -> report percentages
+    sensitivity (test_clean, n=2,405): structural 76.64%  stop 11.48%  start 11.88%  ratio 0.966
+                structural  primary - sensitivity = -0.40 pp
+                stop        primary - sensitivity = +0.65 pp
+                start       primary - sensitivity = -0.25 pp
   
 --- atg1000_stop1000 ---
     structural   66.31%   draw-sd 0.417  seed-jackknife 1.515  | members 59.72-68.30 (centre 64.54, sd 3.329)
@@ -38,12 +43,16 @@ STEP 7 — spreads, ensemble jackknife, ratio, and the licensing diagnostic
                 ensemble centre - member centre = -1.237 pp   [F_member 1307.12, F_draw 71.39, crit 3.01 on (4,16)]
     stop/start  2.435   draw x/÷ 1.0389  seed-jackknife x/÷ 1.1295  | members 1.482-3.023  CV 0.2342
     compositional check: arithmetic vs closed geometric differ by at most 0.0042 pp -> report percentages
+    sensitivity (test_clean, n=2,405): structural 67.33%  stop 22.66%  start 10.01%  ratio 2.264
+                structural  primary - sensitivity = -1.02 pp
+                stop        primary - sensitivity = +1.22 pp
+                start       primary - sensitivity = -0.20 pp
 
 ==============================================================================
 STEP 8 — write
 ==============================================================================
   wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/branch_shares_per_cell.tsv  (67,951 bytes, 110 rows, 37 columns)
-  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/branch_decomposition_atg2000_stop2000.json  (4,689 bytes)
-  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/branch_decomposition_atg1000_stop1000.json  (4,686 bytes)
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/branch_decomposition_atg2000_stop2000.json  (5,207 bytes)
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/branch_decomposition_atg1000_stop1000.json  (5,202 bytes)
 
-Done. 2026-07-30T23:08:17
+Done. 2026-07-30T23:25:50

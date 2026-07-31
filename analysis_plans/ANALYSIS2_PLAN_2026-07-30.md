@@ -115,9 +115,11 @@ from reference isoforms and the other four ORFs are left alone, and the three at
 | file | one row |
 |---|---|
 | `kernel_shap_branch_{tag}_seed{S}_all_run{R}.tsv` | one isoform: `isoform_id`, `label`, `prediction`, `expected_value`, `shap_atg`, `shap_stop`, `shap_structural`, `shap_sum`, `residual` |
-| `branch_decomposition_{tag}.json` | one configuration: the three shares and the stop-to-start ratio, each with both spreads, plus `n`, the population in words, and the reference-draw seeds |
+| `branch_shares_per_cell.tsv` | one cell at one level: identity, scope, the branch measures, their distribution over isoforms, and the verification anchors. 110 rows — per configuration, 25 member, 5 ensemble, 25 leave-one-out |
+| `branch_decomposition_{tag}.json` | one configuration: the three shares and the stop-to-start ratio, each spread named for its level, the variance components with their F statistics, the compositional check, the test-split sensitivity, `n`, the population in words, and the reference-draw seeds |
 
-Fifty of the first — two configurations × five members × five reference draws — and two of the second.
+Fifty of the first — two configurations × five members × five reference draws — one per-cell table,
+and two summaries.
 
 `shap_atg` is the **start**-branch attribution; the column keeps the legacy name.
 
@@ -293,55 +295,132 @@ output still said 25, and an unreported exclusion is the reporting failure rathe
 Rejection stops the analysis rather than proceeding on the survivors. A residual above tolerance
 means an upstream fault that would also affect the cells that happened to pass.
 
-### Step 6 — reduce each file to three numbers
+### Step 6 — reduce every cell to its branch measures
+
+Three levels are reduced, not one. The member level is the fifty computed cells. The ensemble
+level is what the analysis reports. The leave-one-out level exists because the ensemble's own
+training uncertainty cannot be recovered from member summaries — the absolute value is applied
+after the signed average, so a four-member ensemble has to be formed from the per-isoform
+attributions themselves.
 
 ```
     nmd   = rows where label == 1                      # n emitted, expect 9,321
-    m_b   = mean(|shap_b|) over nmd,  b in {structural, stop, start}
+    m_b   = mean(|phi_b|) over nmd,  b in {structural, stop, start}
     pct_b = 100 * m_b / (m_structural + m_stop + m_start)
+    ratio = m_stop / m_start
+
+    member        (tag, seed, draw)     phi_b = that cell's attributions        25 per configuration
+    ensemble      (tag, draw)           phi_b = mean over the 5 members          5 per configuration
+    ensemble_loo  (tag, seed out, draw) phi_b = mean over the other 4           25 per configuration
 ```
 
-Fifty rows result, one per (configuration, member, reference draw).
+**Signed values are averaged across members first; absolute value and normalization come
+afterwards.** The ensemble's attribution for an isoform is exactly the mean of its members'
+attributions — Shapley values are linear in the value function, and the ensemble's value function
+is the mean of the members' — so this order decomposes the ensemble itself. Reversing it answers a
+different question: averaging absolute values discards sign disagreement between members, and
+averaging percentages is not the percentage of averaged attributions, because normalizing is not
+linear.
 
-### Step 7 — the two spreads, the ensemble, and the ratio
+One consequence carries into step 7. Since `|mean_s phi_s| <= mean_s |phi_s|`, wherever members
+disagree in sign the ensemble carries less attribution mass than the members average, by a
+branch-specific amount. **The ensemble share and the mean of the member shares therefore differ by
+a bias, not only by noise**, and neither is a spread about the other's centre.
 
-The ensemble's attribution for an isoform is the mean of its members' attributions, because members
-are combined by averaging log-odds and attributions are linear on that scale. **Signed values are
-averaged across members first, and absolute values and normalization are applied afterwards.**
-Reversing either order answers a different question: averaging absolute values discards sign
-disagreement between members, and averaging percentages is not the percentage of averaged
-attributions, because normalizing is not linear.
+### Step 7 — each spread at its own level, and the ratio
+
+Every spread is reported against the centre it belongs to. The interpretation spread belongs to the
+ensemble; the training spread describes single members, whose centre differs from the ensemble's by
+the bias named in step 6. They are never combined, and never written as one `value ± a ± b`.
 
 ```
-    # the ensemble's own answer — the headline figure
-    for R in DRAWS:
-        join the 5 members on isoform_id
-        phi_b(i) = mean over members of shap_b(i)      # signed, before absolute value
-        apply step 6 to the averaged table  ->  pct_b(R)
-    point_estimate_b    = mean over DRAWS of pct_b(R)
-    interpretation_sd_b = sd   over DRAWS of pct_b(R)
+    # the headline: the ensemble's answer, and how much the reference draw moves it
+    point_estimate_b  = mean over DRAWS of pct_b^ens(R)
+    sd_draw_ens_b     = sd   over DRAWS of pct_b^ens(R)
+    range_draw_ens_b  = min and max over DRAWS
 
-    # the member distribution — how much the answer depends on the training run
-    for SEED: member_pct_b(SEED) = mean over its 5 draws of pct_b
-    training_sd_b = sd over the 5 member_pct_b
+    # the ensemble's OWN training uncertainty, by delete-one-member jackknife
+    pct_b^(-s)        = mean over DRAWS of pct_b^loo(s out, R)
+    sd_seed_ens_b     = sqrt( (5-1)/5 * sum_s ( pct_b^(-s) - mean_s pct_b^(-s) )^2 )
 
-    # the stop-to-start ratio, formed inside each cell
-    for each of the 25 cells: ratio = m_stop / m_start
-    ratio point estimate, and both spreads, from those 25 values
+    # the member cloud, carrying its own centre so the offset from the ensemble is visible
+    member_pct_b(s)   = mean over DRAWS of pct_b(s, R)
+    member_centre_b   = mean over SEEDS of member_pct_b(s)
+    sd_train_mem_b    = sd   over SEEDS of member_pct_b(s)
+    sd_draw_mem_b     = sd   over DRAWS of ( mean over SEEDS of pct_b(s, R) )
+
+    # the ratio: ensemble level, log scale
+    ratio_point       = exp( mean over DRAWS of log ratio^ens(R) )
+    ratio_sd_draw     = exp( sd   over DRAWS of log ratio^ens(R) )     # a ×/÷ factor
+    ratio_sd_seed     = exp( jackknife sd over SEEDS of log ratio^(-s) )
+    ratio_member(s)   = exp( mean over DRAWS of log ratio(s, R) ), summarized over SEEDS
 
     # sensitivity: the population the published figures used
-    repeat step 6 restricted to rows with split == "test" and label == 1
+    repeat the above restricted to rows with split == "test" and label == 1    # n = 2,405
 ```
 
-The ratio is formed per cell and summarized afterwards. Its numerator and denominator come from the
-same reference draw and are correlated, so a ratio of two separately averaged means is a different
-quantity with no interpretable spread.
+`sd_train_mem_b` and `sd_draw_mem_b` are the two comparable quantities, both member-level;
+`sd_seed_ens_b` and `sd_draw_ens_b` are the other comparable pair, both ensemble-level. Spreads are
+never compared across levels.
+
+Every spread rests on five observations and four degrees of freedom, where the relative standard
+error of a standard deviation is about 35%. Each is therefore given to two significant figures and
+always beside its minimum and maximum, which assume nothing about the distribution.
+
+The ratio is formed inside each cell before being summarized: its numerator and denominator come
+from the same reference draw and are correlated, so a ratio of two separately averaged means is a
+different quantity with no interpretable spread. It is summarized on the log scale because a
+ratio's centre is multiplicative — the geometric mean satisfies `GM(stop/start) = 1 /
+GM(start/stop)`, and which branch is the numerator is arbitrary. It is a ratio of two means of
+`|phi|` over the summarized isoforms, never the mean of per-isoform ratios, which has an unbounded
+tail wherever `|phi_start(i)|` approaches zero.
+
+**Two diagnostics decide how those numbers are described, and both are reported.**
+
+*Variance components.* Member × draw is a fully crossed 5×5, and a cell carries no within-cell
+noise — the coalition enumeration is exact and the reference set fixed — so the interaction is
+identified rather than aliased with a residual. From the 25 member cells, with
+`E[MS_member] = σ²_AB + 5σ²_A`, `E[MS_draw] = σ²_AB + 5σ²_B`, `E[MS_AB] = σ²_AB` on 4, 4 and 16
+degrees of freedom. Where a main effect's F against `MS_AB` is small, its marginal standard
+deviation is described as including the interaction rather than as clean. A negative moment
+estimate is truncated at zero and the truncation stated.
+
+*Compositional scale.* The three shares sum to 100 by construction and so carry two degrees of
+freedom, not three: a rise in one is a fall in another, a joint statement about two of them is one
+fact, and the three spreads are never combined in quadrature. Shares are reported as percentages,
+licensed by comparing the arithmetic mean of the five ensemble compositions against the closed
+geometric mean; agreement within 0.05 percentage points is the condition. The stop-to-start ratio
+is already a log-ratio coordinate of the composition, so the compositionally coherent statistic is
+reported beside them.
 
 ### Step 8 — write
 
-Two files per configuration: the fifty per-isoform tables from step 4, and one summary carrying the
-three shares, the ratio, both spreads for each, the measured `n`, the population in words, and the
-reference-draw seeds.
+Three artifacts. The fifty per-isoform tables from step 4 are retained, being the only route to any
+isoform-level re-analysis. One per-cell table, and one summary per configuration.
+
+**The per-cell table carries every value the summary is computed from**, so any estimator above can
+be recomputed — or replaced with a different one — without rerunning the model. 110 rows: per
+configuration, 25 member, 5 ensemble, 25 leave-one-out.
+
+| group | columns |
+|---|---|
+| identity | `config`, `level`, `member_set`, `member_seed_excluded`, `n_members`, `draw_id` |
+| scope | `n_isoforms_summarised` |
+| estimator inputs | `m_structural`, `m_stop`, `m_start`, `m_total`, `pct_*`, `ratio_stop_start` |
+| distribution | `mean_signed_*`, `sd_abs_*`, `median_abs_*`, `q25_*`, `q75_*`, `frac_pos_*` |
+| verification | `mean_pred_logodds`, `mean_expected_value`, `mean_gap`, efficiency residual |
+
+`m_total` is carried because shares alone cannot show whether total attribution mass moved, and it
+is what makes step 6's bias visible between levels. `sd_abs_*` is carried so that a reader who
+treats the summarized isoforms as a sample rather than a census can form the isoform-level standard
+error without the per-isoform tables.
+
+The summary states, per configuration: the three shares and the ratio, each spread named for its
+level, the variance components with their F statistics, the compositional check, the test-split
+sensitivity, the measured `n`, the population in words, and the reference-draw seeds.
+
+**The summarized isoforms are a census** of the labelled universe at ORF rank 0, not a sample drawn
+from a larger one, so no isoform-level standard error is attached to a reported share.
 
 ## 3d. Statistical models and estimators
 

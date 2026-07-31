@@ -104,6 +104,12 @@ def step5_accept():
     check("step 1 population re-read from Dataset A", len(ids0) == N_ALL and int(y0.sum()) == N_NMD,
           f"n={len(ids0):,}, label==1 {int(y0.sum()):,}")
 
+    with h5py.File(H5, "r") as f:
+        sp = np.array([x.decode() if isinstance(x, bytes) else x for x in f["split"][:]])
+    test_mask = (sp[y0 == 1] == "test")          # over the 9,321, which are in test_clean
+    check("test-split sensitivity population", int(test_mask.sum()) == 2405,
+          f"{int(test_mask.sum()):,} of {len(test_mask):,} summarised isoforms lie in split=='test'")
+
     store, accepted, rejected = {}, 0, []
     for tag in TAGS:
         for s in SEEDS:
@@ -131,7 +137,7 @@ def step5_accept():
     if rejected:
         raise SystemExit("STOPPED: a rejected cell is a defect to diagnose, not a cell to drop")
     log(f"      every cell restricted to the {N_NMD:,} label==1 isoforms for summarisation")
-    return store
+    return store, test_mask
 
 
 # ---------------------------------------------------------------------------------------
@@ -166,32 +172,41 @@ def cell_stats(a):
     return row
 
 
-def step6_reduce(store):
-    """Build the 110-row per-cell table: member, ensemble, and leave-one-out ensemble."""
-    step(6, "reduce every cell — member, ensemble, and leave-one-out ensemble")
+def step6_reduce(store, mask=None, quiet=False):
+    """Build the 110-row per-cell table: member, ensemble, and leave-one-out ensemble.
+
+    `mask` selects a sub-population of the summarised isoforms. None is the primary population
+    (all 9,321 label==1); the test-split sensitivity in step 7 passes the 2,405 that lie in
+    split=="test", which is the population the published figures were computed over.
+    """
+    if not quiet:
+        step(6, "reduce every cell — member, ensemble, and leave-one-out ensemble")
+    sel = (lambda a: a) if mask is None else (lambda a: a[mask])
     rows = []
     for tag in TAGS:
         for s in SEEDS:
             for r in DRAWS:
                 rows.append(dict(config=tag, level="member", member_set=str(s),
                                  member_seed_excluded="NA", n_members=1, draw_id=r,
-                                 **cell_stats(store[(tag, s, r)])))
+                                 **cell_stats(sel(store[(tag, s, r)]))))
         for r in DRAWS:
             # SIGNED average across members FIRST -- this is the ensemble's own decomposition,
             # exact because Shapley is linear in the value function.
-            ens = np.mean([store[(tag, s, r)] for s in SEEDS], axis=0)
+            ens = np.mean([sel(store[(tag, s, r)]) for s in SEEDS], axis=0)
             rows.append(dict(config=tag, level="ensemble",
                              member_set=",".join(map(str, SEEDS)), member_seed_excluded="NA",
                              n_members=5, draw_id=r, **cell_stats(ens)))
         for excl in SEEDS:
             keep = [s for s in SEEDS if s != excl]
             for r in DRAWS:
-                loo = np.mean([store[(tag, s, r)] for s in keep], axis=0)
+                loo = np.mean([sel(store[(tag, s, r)]) for s in keep], axis=0)
                 rows.append(dict(config=tag, level="ensemble_loo",
                                  member_set=",".join(map(str, keep)),
                                  member_seed_excluded=str(excl), n_members=4, draw_id=r,
                                  **cell_stats(loo)))
     df = pd.DataFrame(rows)
+    if quiet:
+        return df
     check("per-cell table has the specified shape",
           len(df) == 110 and len(df[df.level == "member"]) == 50,
           f"{len(df)} rows = 2 configs x (25 member + 5 ensemble + 25 leave-one-out)")
@@ -228,7 +243,7 @@ def anova2(y):
                 f_crit_95=3.01)
 
 
-def step7_summarise(df):
+def step7_summarise(df, sens=None):
     """The two spreads at their own levels, the ensemble jackknife, and the ratio."""
     step(7, "spreads, ensemble jackknife, ratio, and the licensing diagnostic")
     out = {}
@@ -309,6 +324,26 @@ def step7_summarise(df):
         log(f"  compositional check: arithmetic vs closed geometric differ by at most "
             f"{res['compositional_check']['max_abs_difference_pp']:.4f} pp -> "
             f"{res['compositional_check']['decision']}")
+        # SENSITIVITY: the population the published figures used.
+        if sens is not None:
+            sd = sens[(sens.config == tag) & (sens.level == "ensemble")].sort_values("draw_id")
+            res["sensitivity_test_clean"] = {
+                "n_isoforms_summarised": int(sd.n_isoforms_summarised.iloc[0]),
+                "population": "split == 'test' and label == 1",
+                **{NICE[b]: dict(point_estimate=float(sd[f"pct_{NICE[b]}"].mean()),
+                                 sd_draw_ensemble=float(sd[f"pct_{NICE[b]}"].std(ddof=1)))
+                   for b in BRANCH},
+                "ratio_stop_start_geometric_mean":
+                    float(np.exp(np.log(sd["ratio_stop_start"]).mean()))}
+            t = res["sensitivity_test_clean"]
+            log(f"  sensitivity (test_clean, n={t['n_isoforms_summarised']:,}): "
+                f"structural {t['structural']['point_estimate']:.2f}%  "
+                f"stop {t['stop']['point_estimate']:.2f}%  "
+                f"start {t['start']['point_estimate']:.2f}%  "
+                f"ratio {t['ratio_stop_start_geometric_mean']:.3f}")
+            for b in BRANCH:
+                log(f"              {NICE[b]:11s} primary - sensitivity = "
+                    f"{res[NICE[b]]['point_estimate'] - t[NICE[b]]['point_estimate']:+.2f} pp")
         out[tag] = res
     return out
 
@@ -331,9 +366,10 @@ def step8_write(df, summary):
 def main():
     log(f"Analysis 2 — branch decomposition.  {datetime.now().isoformat(timespec='seconds')}")
     log(f"numpy {np.__version__}, pandas {pd.__version__}")
-    store = step5_accept()
+    store, test_mask = step5_accept()
     df = step6_reduce(store)
-    summary = step7_summarise(df)
+    sens = step6_reduce(store, mask=test_mask, quiet=True)
+    summary = step7_summarise(df, sens)
     step8_write(df, summary)
     _ind[0] = ""
     log(f"\nDone. {datetime.now().isoformat(timespec='seconds')}")
