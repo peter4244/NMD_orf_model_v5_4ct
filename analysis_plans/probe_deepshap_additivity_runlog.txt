@@ -1,0 +1,43 @@
+shap 0.51.0   torch 2.5.1+cu121   numpy 2.4.3
+NMDOrfModel: 34,050 trainable parameters
+  Window sizes: ATG=1000, Stop=1000
+  ORF embed dim: 64
+  Conv channels: 32
+model results_4ct_sweep/best_model_atg1000_stop1000_seed100.pt
+
+=== which nonlinearities are nn.Modules, and which are functional? ===
+  module types present: {'NMDOrfModel': 1, 'ORFEncoder': 1, 'SequenceCNN': 2, 'Conv1d': 4, 'BatchNorm1d': 4, 'MaxPool1d': 2, 'Linear': 7, 'Sequential': 2, 'ReLU': 2, 'Dropout': 2, 'AttentionAggregator': 1}
+  NOTE: F.relu, .max(dim=-1), the masked softmax and bmm are NOT in that list by
+        construction -- they are functional calls in model.py, not modules.
+  train[100 of 26,711]: 100 samples, 26 NMD+ (26.0%)
+  all[20 of 41,765]: 20 samples, 11 NMD+ (55.0%)
+
+==========================================================================
+BRANCH: atg
+==========================================================================
+  background (100, 9, 1000)
+  check_additivity=True RAISED: AssertionError
+    The SHAP explanations do not sum up to the model's output! This is either because of a rounding error or because an operator in your computation graph was not fully supported. If the sum difference of %f is significant compared to the scale of your model outputs, please post as a github issue, with a reproducible example so we can debug it. Used framework: pytorch - Max. diff: 0.2571430997798023 -
+  shap warnings about unhandled ops: 0
+
+  COMPLETENESS ERROR, measured independently over 20 isoforms:
+    |sum(phi) - (f(x) - E_bg[f])|   median 0.2685   max 0.8182
+    |f(x) - E_bg[f]|  (the effect)  median 0.2083   max 2.5862
+    median error as a fraction of the median effect: 128.9%
+    VERDICT: ERROR IS LARGE -- positional analysis should not rest on DeepSHAP
+    (pre-registered threshold: 20% of the median effect)
+
+==========================================================================
+BRANCH: stop
+==========================================================================
+  background (100, 9, 1000)
+  check_additivity=True RAISED: AssertionError
+    The SHAP explanations do not sum up to the model's output! This is either because of a rounding error or because an operator in your computation graph was not fully supported. If the sum difference of %f is significant compared to the scale of your model outputs, please post as a github issue, with a reproducible example so we can debug it. Used framework: pytorch - Max. diff: 0.05952733429272827 
+  shap warnings about unhandled ops: 0
+
+  COMPLETENESS ERROR, measured independently over 20 isoforms:
+    |sum(phi) - (f(x) - E_bg[f])|   median 0.5470   max 3.0483
+    |f(x) - E_bg[f]|  (the effect)  median 0.1784   max 1.3271
+    median error as a fraction of the median effect: 306.6%
+    VERDICT: ERROR IS LARGE -- positional analysis should not rest on DeepSHAP
+    (pre-registered threshold: 20% of the median effect)

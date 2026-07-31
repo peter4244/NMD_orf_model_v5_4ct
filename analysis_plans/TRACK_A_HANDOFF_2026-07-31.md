@@ -251,6 +251,44 @@ legend's quantified superlative that is not.
 
 ---
 
+## 12. ⚠ The published nucleotide-level figures rest on a method that fails on this model
+
+**Measured 2026-07-31**, Explorer job 8861228. `shap.DeepExplainer`'s completeness error on this
+architecture, compared against `f(x) − E_bg[f]` evaluated directly:
+
+| branch | median completeness error | median effect | error as % of effect |
+|---|---|---|---|
+| start window | 0.2685 | 0.2083 | **128.9%** |
+| stop window | 0.5470 | 0.1784 | **306.6%** |
+
+`shap_values(..., check_additivity=True)` raises `AssertionError` on both. **The error is larger than
+the quantity being decomposed** — 1.3× on the start window, 3.1× on the stop window.
+
+**Mechanism.** `shap`'s PyTorch backend attaches DeepLIFT rules by walking `nn.Module` instances, and
+this model's dominant nonlinearities are functional calls — `F.relu` after each conv/batch-norm, a
+global `max(dim=-1)`, a masked softmax and `bmm` in the aggregator. The rules never attach.
+`deepshap.py` passes `check_additivity=False` at all three call sites, which is what one does after
+this check has failed.
+
+**Scope of the consequence.** Any figure or claim whose numbers came from `deepshap.py`'s
+per-nucleotide output is affected — the nucleotide-level panels behind claims 5.3.1/5.3.2 and legend
+5.6.7. **Claims 5.2.2, 5.2.3 and 5.2.4 are NOT affected**: those rest on exact enumeration
+(`11_kernel_shap_branches.py` and Analysis 3's producer), where the residual is 1e-15 and the
+decomposition is exact by construction.
+
+Legend 5.6.6 is the one to watch, since it says *"5 DeepSHAP replicates"* — see §11, where the
+magnitude reproduces and the superlative does not. That discrepancy and this measurement are probably
+the same fact.
+
+**Analysis 4 is rewritten around in silico mutagenesis** rather than attribution: perturb the
+sequence, measure the model's actual output change. This follows Saluki (Agarwal & Kelley, *Genome
+Biology* 23:245, 2022), whose input encoding is ours minus the GC channel, which used ISM,
+TF-MoDISco on ISM scores, and insertional analysis, and no gradient attribution.
+
+*Run log: `analysis_plans/probe_deepshap_additivity_runlog.txt`.*
+
+---
+
 ## 9. What is NOT in here
 
 - **No ledger rows have been written, and `build_current_state.py` has not been run.**
