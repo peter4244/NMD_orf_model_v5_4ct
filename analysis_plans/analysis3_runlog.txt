@@ -1,0 +1,70 @@
+Analysis 3 — structural feature decomposition.  2026-07-31T08:48:34
+numpy 2.4.6, pandas 3.0.5
+
+==============================================================================
+STEP 5 — accept or reject each file, and record the tally
+==============================================================================
+  [OK  ] step 1 population re-read from Dataset A: n=41,765, label==1 9,321
+  [OK  ] test-split sensitivity population: 2,405 of 9,321 summarised isoforms in split=='test'
+  [OK  ] independent predictions available from Analysis 2: 10 of 10 (configuration, member) pairs
+  accepted 50   rejected 0   of 50
+        5-player residual: max 3.553e-15   median 1.776e-15
+        4-player residual: max 1.776e-15   median 1.776e-15
+        predictions agree with Analysis 2 on 50 cells: max deviation 1.10e-05 (bar 1e-03)
+  [OK  ] every cell of the grid is present and accepted: 50 of 50 = 2 configs x 5 members x 5 draws
+
+==============================================================================
+STEP 6 — reduce every cell — member, ensemble, and leave-one-out ensemble
+==============================================================================
+  [OK  ] per-cell table has the specified shape: 110 rows = 2 configs x (25 member + 5 ensemble + 25 leave-one-out)
+  [OK  ] five_player: m_total is the normaliser the shares were formed from: max |sum(m) - m_total| = 0.00e+00
+  [OK  ] five_player: efficiency identity holds in every row: max |mean_gap - sum(mean_signed)| = 1.155e-14
+  [OK  ] four_player: m_total is the normaliser the shares were formed from: max |sum(m) - m_total| = 0.00e+00
+  [OK  ] four_player: efficiency identity holds in every row: max |mean_gap - sum(mean_signed)| = 1.243e-14
+
+==============================================================================
+STEP 7 — each spread at its own level, for both games
+==============================================================================
+  
+--- atg2000_stop2000 ---
+    [five_player]
+      frac_start             7.91%   draw-SD 0.123 (SE 0.055)  seed-jk SE 0.321  bias +0.030  | cells 6.78-9.30
+      frac_stop              4.48%   draw-SD 0.103 (SE 0.046)  seed-jk SE 0.207  bias +0.069  | cells 3.70-5.21
+      is_ref_cds            15.10%   draw-SD 0.171 (SE 0.076)  seed-jk SE 0.872  bias +0.023  | cells 12.20-17.60
+      is_sqanti_cds         11.55%   draw-SD 0.622 (SE 0.278)  seed-jk SE 1.028  bias +0.001  | cells 8.54-15.32
+      n_downstream_ejc      60.96%   draw-SD 0.375 (SE 0.168)  seed-jk SE 0.683  bias -0.124  | cells 57.84-62.66
+      compositional: gap 0.0114 pp (threshold 0.05) -> report percentages
+    [four_player]
+      frac_start             8.36%   draw-SD 0.072 (SE 0.032)  seed-jk SE 0.322  bias +0.031  | cells 7.25-9.67
+      frac_stop              4.80%   draw-SD 0.094 (SE 0.042)  seed-jk SE 0.239  bias +0.074  | cells 3.94-5.55
+      annotation            22.51%   draw-SD 0.119 (SE 0.053)  seed-jk SE 0.612  bias +0.038  | cells 21.27-24.58
+      n_downstream_ejc      64.33%   draw-SD 0.145 (SE 0.065)  seed-jk SE 0.557  bias -0.144  | cells 61.61-65.29
+      compositional: gap 0.0007 pp (threshold 0.05) -> report percentages
+    annotation: four-player 22.51%   naive sum of the two five-player shares 26.64%   overstatement +4.13 pp
+    sensitivity (test_clean, n=2,405): frac_start 7.64%  frac_stop 4.49%  is_ref_cds 14.43%  is_sqanti_cds 11.74%  n_downstream_ejc 61.70%
+  
+--- atg1000_stop1000 ---
+    [five_player]
+      frac_start             5.26%   draw-SD 0.096 (SE 0.043)  seed-jk SE 1.064  bias +0.065  | cells 2.74-8.38
+      frac_stop              3.73%   draw-SD 0.098 (SE 0.044)  seed-jk SE 0.310  bias +0.079  | cells 3.34-5.67
+      is_ref_cds            17.86%   draw-SD 0.134 (SE 0.060)  seed-jk SE 0.406  bias +0.012  | cells 16.44-18.83
+      is_sqanti_cds          8.71%   draw-SD 0.494 (SE 0.221)  seed-jk SE 1.060  bias +0.078  | cells 6.19-14.16
+      n_downstream_ejc      64.44%   draw-SD 0.387 (SE 0.173)  seed-jk SE 1.838  bias -0.234  | cells 56.69-69.12
+      compositional: gap 0.0098 pp (threshold 0.05) -> report percentages
+    [four_player]
+      frac_start             5.55%   draw-SD 0.080 (SE 0.036)  seed-jk SE 1.131  bias +0.072  | cells 2.82-8.70
+      frac_stop              3.94%   draw-SD 0.086 (SE 0.038)  seed-jk SE 0.323  bias +0.088  | cells 3.56-5.91
+      annotation            22.95%   draw-SD 0.084 (SE 0.037)  seed-jk SE 0.793  bias +0.053  | cells 21.57-27.04
+      n_downstream_ejc      67.56%   draw-SD 0.133 (SE 0.059)  seed-jk SE 1.688  bias -0.214  | cells 60.88-71.40
+      compositional: gap 0.0009 pp (threshold 0.05) -> report percentages
+    annotation: four-player 22.95%   naive sum of the two five-player shares 26.56%   overstatement +3.62 pp
+    sensitivity (test_clean, n=2,405): frac_start 5.32%  frac_stop 3.64%  is_ref_cds 17.62%  is_sqanti_cds 8.69%  n_downstream_ejc 64.73%
+
+==============================================================================
+STEP 8 — write
+==============================================================================
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/feature_shares_per_cell.tsv  (116,060 bytes, 110 rows, 59 columns)
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/feature_decomposition_atg2000_stop2000.json  (16,162 bytes)
+  wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/feature_decomposition_atg1000_stop1000.json  (16,144 bytes)
+
+Done. 2026-07-31T08:48:43

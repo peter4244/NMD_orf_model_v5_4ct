@@ -200,22 +200,50 @@ time to learn.
 ## 9. What is NOT in here
 
 - **No ledger rows have been written, and `build_current_state.py` has not been run.**
-- **Analysis 3 is in progress and claim 5.14 is NOT yet addressed.** Its plan is committed, its
-  producer runs, and **one** full-cohort cell now exists — `atg1000_stop1000`, member seed 100,
-  reference draw 1, 41,765 rows, max residual 1.776e-15, 9 min 57 s, peak 2.27 GiB. Over the 9,321
-  summarized isoforms it gives `n_downstream_ejc` **57.2%**, `is_ref_cds` 18.1%, `is_sqanti_cds`
-  13.8%, `frac_start` 7.5%, `frac_stop` 3.5%.
-
-  **That is one cell of fifty and must not be quoted.** §1 of this document exists precisely
-  because a single cell landed within 1.4 points of a published figure and turned out to be a
-  coincidence. Claim 5.14 is addressed when the ensemble and both spreads exist.
-
-  Two structural checks the plan predicted both hold on it. `prediction` is the plain model output
-  in both games and agrees with Analysis 2's to 4.29e-06 — float32 reassociation, checked at ~1e-6
-  rather than the 1e-12 used for the within-file algebraic identity, as the plan requires. And the
-  five feature attributions sum to +1.4199 log-odds against Analysis 2's `phi_structural` of
-  +1.5108, so they demonstrably do **not** compose — which is what Shapley non-additivity under
-  regrouping requires, and why the two decompositions are reported side by side and never combined.
+- **Analysis 3 is COMPLETE.** See §10 below. Fifty cells, all accepted.
 - **Nucleotide-level claims (5.16–5.20) are untouched.**
 - The `results_interp_all/` outputs are data, not code, and are gitignored under D38. They are on
   this machine and on Explorer, not in the repository.
+
+---
+
+## 10. Claim 5.14 — SUPPORTED, and more stable than the branch-level claims
+
+Published: *"Of individual ORF structural features, EJC count was by far the most important."*
+
+Fifty cells, two configurations x five members x five reference draws, all accepted (both games'
+residuals at or below 3.55e-15 against a 1e-12 bar). Ensemble shares over the 9,321 summarized
+isoforms:
+
+| feature | `atg2000_stop2000` | `atg1000_stop1000` | range over all 25 cells |
+|---|---|---|---|
+| `n_downstream_ejc` | **60.96%** | **64.44%** | 57.8–62.7 / 56.7–69.1 |
+| `is_ref_cds` | 15.10% | 17.86% | 12.2–17.6 / 16.4–18.8 |
+| `is_sqanti_cds` | 11.55% | 8.71% | 8.5–15.3 / 6.2–14.2 |
+| `frac_start` | 7.91% | 5.26% | 6.8–9.3 / 2.7–8.4 |
+| `frac_stop` | 4.48% | 3.73% | 3.7–5.2 / 3.3–5.7 |
+
+**The claim holds, and it holds better than anything in §2 or §3.** The junction count is the
+largest feature in both configurations, its share agrees between them to within 3.5 points, and no
+cell of the fifty puts it below 56.7%. Contrast claim 5.12, which inverts between configurations,
+and claim 5.11, whose value spans 18 points. Reference-draw spreads are 0.10–0.62 pp and
+ensemble-size biases are under 0.25 pp throughout.
+
+Test-split sensitivity (n = 2,405, the published figures' population) moves nothing: 61.70% and
+64.73%.
+
+**One thing worth the manuscript's attention that the claim does not mention.** The two annotation
+flags together carry **22.5% and 23.0%** — computed as a four-player game in which they move as one
+player, not by adding their separate shares. That is a substantial share of the structural evidence
+resting on *how an ORF was called* rather than on where it sits. It is not a defect, but a sentence
+crediting the model with recovering junction-dependent decay should probably not pass over it in
+silence.
+
+*A note on that number, because the obvious shortcut is wrong.* Adding the two features' individual
+shares gives 26.64% and 26.56% — an overstatement of 4.13 and 3.62 percentage points, because
+`mean|a| + mean|b| >= mean|a+b|` wherever the two attributions differ in sign, and because merging
+players changes the normalizer. The four-player figure is a separate exact Shapley solve over the
+same coalitions. Do not add the five-player shares.
+
+*Source: `results_interp_all/feature_decomposition_*.json` and `feature_shares_per_cell.tsv`,
+produced by `analysis_plans/analysis3.py`; run log at `analysis_plans/analysis3_runlog.txt`.*
