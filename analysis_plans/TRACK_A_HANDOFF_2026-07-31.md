@@ -9,9 +9,12 @@ artifact it came from, so nothing here has to be taken on trust.
 
 **THIS DOCUMENT ACCUMULATES; IT IS NOT SENT PIECEMEAL.** Decided by Pete 2026-07-31. Findings are
 added here as they are made and the document is handed over once, rather than dispatched to the
-other window one at a time. The exception is anything CRITICAL — a result that would change work
-already in progress there, or a defect in something already recorded — which goes immediately and is
-also recorded here. Sections added after the first handover carry the date they were added, so a
+other window one at a time.
+
+**AND THE "CRITICAL EXCEPTION" ESSENTIALLY DOES NOT ARISE.** Pete, 2026-07-31: Track A is standing
+off all model-related work until Track B signs off. So no finding here can invalidate work in
+progress there, and nothing needs dispatching early — including §12, which measures that the method
+behind the published nucleotide-level figures fails on this model. Hold it all for one handover. Sections added after the first handover carry the date they were added, so a
 reader who has seen an earlier revision can find what is new.
 
 **Sections added after the 2026-07-31 handover at `fd5303b`:** §10 (claim 5.2.4, Analysis 3

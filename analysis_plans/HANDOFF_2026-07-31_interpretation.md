@@ -66,6 +66,11 @@ Track A (the ledger window) has the Analyses 1–3 findings: `TRACK_A_HANDOFF_20
 there as D41, W143–W145, C76. Twelve sections; §11 and §12 were added after their commit and they
 have not seen them.
 
+**Nothing needs sending early.** Pete, 2026-07-31: Track A is standing off all model-related work
+until Track B signs off. So findings accumulate in that document and go over in one handover — there
+is no urgency even for §12, which measures that the method behind the published nucleotide-level
+figures fails on this model. Do not interrupt them; add to the document.
+
 ---
 
 ## Analysis 4: two defects, both blocking
