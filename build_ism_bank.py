@@ -376,6 +376,9 @@ def main():
 
     recs, spans_rows, floors, spreads = [], [], [], []
     n_floor_samples = 0
+    chunk_rows = args.chunk_rows
+    if device == "cuda":
+        torch.cuda.reset_peak_memory_stats()
     n_enc_rows = 0
     for n, r in enumerate(take.itertuples()):
         i = row[r.isoform_id]
@@ -386,9 +389,23 @@ def main():
         per_draw = []
         for d in range(R):
             enc = Encoders(model, draw_perms(model, len(os_), gen, device) if is_control else None)
-            v, valid, obs, base, noop, spans = transcript_bank(
-                model, enc, cds, os_, oe_, int(r.tx_length), st,
-                device, args.chunk_rows, args.floor_samples, rng)
+            # An OOM costs the chunk, not the run: the chunk is halved and retried,
+            # the same backoff train_v6.py uses. Chunk size bounds memory and
+            # nothing else, so shrinking it changes wall time and not a number.
+            v = valid = None
+            for attempt in range(5):
+                try:
+                    v, valid, obs, base, noop, spans = transcript_bank(
+                        model, enc, cds, os_, oe_, int(r.tx_length), st,
+                        device, chunk_rows, args.floor_samples, rng)
+                    break
+                except torch.cuda.OutOfMemoryError:
+                    torch.cuda.empty_cache()
+                    chunk_rows = max(64, chunk_rows // 2)
+                    print(f"      OOM on {r.isoform_id}, chunk_rows -> {chunk_rows}",
+                          flush=True)
+            if v is None:
+                raise RuntimeError(f"{r.isoform_id}: OOM at chunk_rows={chunk_rows}")
             per_draw.append(v)
             floors.append(noop[0]); n_floor_samples += noop[1]
         vals = per_draw[0] if R == 1 else np.nanmean(np.stack(per_draw), axis=0)
@@ -457,6 +474,9 @@ def main():
 
     dt = time.time() - t0
     print(f"\nwrote {outp}  ({outp.stat().st_size/1e6:,.0f} MB)")
+    if device == "cuda":
+        print(f"  peak GPU memory {torch.cuda.max_memory_allocated()/1e9:.2f} GB "
+              f"at chunk_rows={chunk_rows}")
     print(f"  n {N:,}   W {W:,}   valid positions {int(valid.sum()):,}")
     print(f"  no-op floor (max |effect| substituting the observed base for itself): "
           f"{floor:.3e} over {n_floor_samples:,} sampled positions "
