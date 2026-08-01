@@ -36,6 +36,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def log1mexp(a):
+    """log(1 - exp(a)) for a <= 0, without losing the small end or the large one.
+
+    Two regimes, split at log(1/2): above it 1-exp(a) is the small quantity and
+    expm1 keeps it; below it exp(a) is small and log1p keeps it. Written out
+    because the one-line form loses every digit on one side or the other, and the
+    mutagenesis bank reads exactly the tails where that happens.
+    """
+    cut = -0.6931471805599453
+    a = torch.clamp(a, max=-1e-300)          # P strictly below 1; a == 0 is log(0)
+    # torch.where evaluates both branches, so each is clamped into its own safe
+    # domain and the unused values are discarded. The clamps are there to keep the
+    # DISCARDED branch finite, not to alter the kept one.
+    return torch.where(a > cut,
+                       torch.log(-torch.expm1(a)),
+                       torch.log1p(-torch.exp(torch.clamp(a, max=cut))))
+
+
 class WindowEncoder(nn.Module):
     """Two convolutions, then a maximum within each of B bins along the length.
 
@@ -120,7 +138,7 @@ class ScanningNMDModel(nn.Module):
         )
         self.decay_head = nn.Linear(decay_hidden, 1)
 
-    def forward(self, atg, stop, structural, mask, return_parts=False):
+    def forward(self, atg, stop, structural, mask, return_parts=False, stable=False):
         """
         atg, stop:  (batch, K, 9, W)   candidates ordered 5'->3'
         structural: (batch, K, n_structural)
@@ -149,9 +167,12 @@ class ScanningNMDModel(nn.Module):
 
         z_p = z_p.view(bsz, K)
         z_d = z_d.view(bsz, K)
-        return self.aggregate(z_p, z_d, mask, return_parts=return_parts)
+        if stable:
+            z_p, z_d = z_p.double(), z_d.double()
+        return self.aggregate(z_p, z_d, mask, return_parts=return_parts,
+                              stable=stable)
 
-    def aggregate(self, z_p, z_d, mask, return_parts=False):
+    def aggregate(self, z_p, z_d, mask, return_parts=False, stable=False):
         """Stick-breaking over the candidates of each transcript, from the two
         per-candidate logits. Separated from forward() because the mutagenesis
         bank recomputes only the encoders of the candidates a substitution
@@ -177,6 +198,27 @@ class ScanningNMDModel(nn.Module):
         log_d = F.logsigmoid(z_d)
         log_terms = log_sel + log_d                    # log[ P(select k) d_k ]
         log_nmd = torch.logsumexp(log_terms, dim=1)    # log P(NMD)
+
+        if stable:
+            # THE MUTAGENESIS PATH. The training path below clamps P(NMD) to
+            # [1e-6, 1-1e-6] and then round-trips through it, and BOTH of those
+            # destroy the response to a perturbation:
+            #
+            #   at the clamp   the logit is pinned at +/-13.8155 and EVERY
+            #                  substitution returns exactly 0.0, which is
+            #                  indistinguishable from a position the model
+            #                  ignores. z_d = -14 with 6 candidates is already
+            #                  inside it -- that is a confident negative, not an
+            #                  extreme one.
+            #   at the top     P = 0.984 is nowhere near the clamp, but float32
+            #                  P has an ulp of ~6e-8 and the perturbation moves
+            #                  it by ~4e-8, so it rounds away. Measured: exactly
+            #                  0.0 at z_d = +16.
+            #
+            # Computed from log_nmd directly, never through P, the log-odds keeps
+            # its resolution at both ends. Identical to the training logit
+            # wherever the clamp is inactive.
+            return log_nmd - log1mexp(log_nmd)
 
         p_nmd = log_nmd.exp().clamp(1e-6, 1 - 1e-6)
         logit = torch.log(p_nmd) - torch.log1p(-p_nmd)

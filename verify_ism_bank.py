@@ -73,8 +73,13 @@ def reference_logit(model, codes, orf_start, orf_end, struct, device):
     stop = decode_windows(codes[:, 1], orf_end - 1, STOP_LEFT, orf_start)
     t = lambda x: torch.as_tensor(x, dtype=torch.float32, device=device)
     with torch.no_grad():
+        # stable=True: the same quantity the bank computes. The training path
+        # clamps P(NMD) and round-trips through it, and both destroy the response
+        # in the tails -- comparing against it would compare two different
+        # quantities and call the disagreement a bug in the cache.
         return float(model(t(atg)[None], t(stop)[None], t(struct)[None],
-                           torch.ones(1, K, dtype=torch.bool, device=device)).item())
+                           torch.ones(1, K, dtype=torch.bool, device=device),
+                           stable=True).item())
 
 
 def perturb_codes(codes, orf_start, orf_end, p, b, spans, one_window_only=None):

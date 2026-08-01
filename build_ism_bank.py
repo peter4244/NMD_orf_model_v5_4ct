@@ -56,6 +56,7 @@ NT = "ACGT"
 STRUCTURAL_COLS = ["n_downstream_ejc", "is_ref_cds", "is_sqanti_cds",
                    "frac_start", "frac_stop"]
 INTERPRETABLE, PREDICTOR = [0], [0, 1, 2, 3, 4]
+CLAMP_LOGIT = 13.815511057963775      # log((1-1e-6)/1e-6), aggregate()'s clamp
 
 
 # ------------------------------------------------------------------ geometry
@@ -162,6 +163,12 @@ def draw_perms(model, K, generator, device):
 def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
                     device, chunk_rows, n_floor, rng):
     """The bank for one transcript. Returns vals, valid, obs, base_logit, floor."""
+    # THE CACHE IS EXACT ONLY IN EVAL MODE. In train mode batch normalization
+    # uses batch statistics, so a candidate's embedding depends on which other
+    # candidates share its batch -- and the cached path recomputes touched
+    # candidates in a DIFFERENT batch composition from the base pass, so every
+    # reused embedding would be subtly wrong and nothing would say so.
+    assert not model.training, "model must be in eval mode; the cache assumes it"
     K = len(orf_start)
     a_lo, a_hi, s_lo, s_hi = window_spans(orf_start, orf_end, tx_len)
     pos, cand, win = covering_index(a_lo, a_hi, s_lo, s_hi)
@@ -183,7 +190,9 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
         z_d0 = model.decay_head(model.decay_body(
             torch.cat([e_atg, e_stop, u_emb], dim=-1))).squeeze(-1)
         mask1 = torch.ones(1, K, dtype=torch.bool, device=device)
-        base_logit = float(model.aggregate(z_p0[None], z_d0[None], mask1).item())
+        base_logit = float(model.aggregate(z_p0[None].double(), z_d0[None].double(),
+                                           mask1, stable=True).item())
+        base_train = float(model.aggregate(z_p0[None], z_d0[None], mask1).item())
 
     # ---- observed base and validity, from the codes themselves -------------
     obs = np.full(P, -1, dtype=np.int8)
@@ -292,7 +301,8 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
                 z_d[pi, ci] = model.decay_head(model.decay_body(
                     torch.cat([e_atg[ci], es, u_emb[ci]], dim=-1))).squeeze(-1)
             mask = torch.ones(n_pert, K, dtype=torch.bool, device=device)
-            out = model.aggregate(z_p, z_d, mask).cpu().numpy()
+            out = model.aggregate(z_p.double(), z_d.double(), mask,
+                                  stable=True).cpu().numpy()
 
         for t, (n, b, _) in enumerate(rp):
             p = int(block[n])
@@ -303,7 +313,7 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
                 vals[p - 1, b] = d
         i = j
 
-    return (vals, valid, obs, base_logit, (noop_max, len(floor_set)),
+    return (vals, valid, obs, (base_logit, base_train), (noop_max, len(floor_set)),
             (a_lo, a_hi, s_lo, s_hi))
 
 
@@ -437,7 +447,7 @@ def main():
                           flush=True)
             if v is None:
                 raise RuntimeError(f"{r.isoform_id}: OOM at chunk_rows={chunk_rows}")
-            per_draw.append(v); base_draws.append(base)
+            per_draw.append(v); base_draws.append(base[0])
         vals = per_draw[0] if R == 1 else np.nanmean(np.stack(per_draw), axis=0)
         spread = np.full(3, np.nan, np.float64)
         if R > 1:
@@ -458,7 +468,8 @@ def main():
         # ".npz.tmp.npz" and the rename that follows it fails on a missing file.
         tmp = shard_dir / f".partial_{r.isoform_id}.npz"
         np.savez(tmp, vals=vals, valid=valid, obs=obs,
-                 base_logit=np.float64(base),
+                 base_logit=np.float64(base[0]),
+                 base_logit_training=np.float64(base[1]),
                  spans=np.stack([a_lo, a_hi, s_lo, s_hi], 1).astype(np.int32),
                  noop=np.float64(noop[0]), n_floor=np.int64(noop[1]),
                  spread=spread)
@@ -486,6 +497,7 @@ def main():
         i = row[r.isoform_id]
         recs.append(dict(isoform_id=r.isoform_id, vals=z["vals"], valid=z["valid"],
                          obs=z["obs"], base_logit=float(z["base_logit"]),
+                         base_train=float(z["base_logit_training"]),
                          label=int(labels[i]), arm=r.arm, split=split_lab[i],
                          gene=gene[i], K=len(z["spans"])))
         for k, (alo, ahi, slo, shi) in enumerate(z["spans"]):
@@ -513,7 +525,18 @@ def main():
         f.create_dataset("valid", data=valid, compression="lzf")
         f.create_dataset("obs", data=obs, compression="lzf")
         f.create_dataset("labels", data=np.array([x["label"] for x in recs], np.int8))
-        f.create_dataset("base_logit", data=np.array([x["base_logit"] for x in recs], np.float32))
+        f.create_dataset("base_logit",
+                         data=np.array([x["base_logit"] for x in recs], np.float64))
+        f.create_dataset("base_logit_training",
+                         data=np.array([x["base_train"] for x in recs], np.float32))
+        # WHICH TRANSCRIPTS THE TRAINING OUTPUT WOULD HAVE PINNED. aggregate()
+        # clamps P(NMD) to [1e-6, 1-1e-6] for training stability, and at the clamp
+        # the logit is constant so EVERY substitution returns exactly 0.0 --
+        # indistinguishable from a position the model ignores. vals are computed
+        # on the unclamped log-odds in float64 and so are unaffected, but a
+        # transcript that far into a tail is a different regime and says so.
+        pinned = np.abs(np.array([x["base_logit"] for x in recs])) >= CLAMP_LOGIT
+        f.create_dataset("pinned_in_training", data=pinned)
         f.create_dataset("transcript_id", data=np.array([x["isoform_id"] for x in recs], dtype="S"))
         f.create_dataset("gene_id", data=np.array([x["gene"] for x in recs], dtype="S"))
         f.create_dataset("arm", data=np.array([x["arm"] for x in recs], dtype="S"))
@@ -547,6 +570,8 @@ def main():
         print(f"  peak GPU memory {torch.cuda.max_memory_allocated()/1e9:.2f} GB "
               f"at chunk_rows={chunk_rows}")
     print(f"  n {N:,}   W {W:,}   valid positions {int(valid.sum()):,}")
+    print(f"  transcripts the TRAINING clamp would pin (vals are unaffected): "
+          f"{int(pinned.sum()):,} of {N:,} ({100*pinned.mean():.1f}%)")
     print(f"  no-op floor (max |effect| substituting the observed base for itself): "
           f"{floor:.3e} over {n_floor_samples:,} sampled positions "
           f"in {len(recs):,} transcripts")
