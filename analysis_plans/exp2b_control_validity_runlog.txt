@@ -1,0 +1,86 @@
+$ python exp2b_control_validity.py
+Captured 2026-08-01T01:55:00Z, repo 710caa9.
+
+====================================================================================================
+EXPERIMENT 2b -- validating the control that killed the stop-codon claim
+====================================================================================================
+
+  population: 24,829 isoforms (reference-CDS slot, >= 320 nt 3'UTR
+  so that every scanned control position is readable in every one)
+  NMD+ 22.5%   PTC+ 27.4%
+  strata: 32
+
+====================================================================================================
+A. THE STOP CODON ITSELF
+====================================================================================================
+
+  n TGA 12,797   n TAG 5,257
+  crude          TGA - TAG = +6.24pp
+  standardised   TGA - TAG = +1.80pp   (32 of 32 strata contribute)
+  common-stratum TGA - TAG = +1.80pp   (32 strata)
+
+====================================================================================================
+B. THE REAL NULL -- 99 control positions instead of 3
+====================================================================================================
+
+  99 control positions with >= 30 in each arm, +4 to +300 nt
+
+  statistic                 median                  IQR           2.5-97.5 pct      mean
+  ---------------------- --------- -------------------- ---------------------- ---------
+  crude                     +8.24p [  +5.71,  +12.19] [   +1.37,   +16.84]     +8.87p
+  standardised             +13.40p [  +9.69,  +17.42] [   +3.04,   +24.79]    +13.42p
+  common-stratum            +0.01p [  -1.58,   +2.28] [   -5.30,    +6.62]     +0.12p
+
+  median n per arm at a control position: TGA 509, TAG 246   (at the stop: 12,797 / 5,257)
+  median strata contributing: 10 of 32 (at the stop: 32)
+
+  ^ THIS is defect 3. The control statistic is averaged over a
+    handful of strata; the stop statistic over all of them.
+
+  where the stop codon sits in the standardised null: +1.80pp = 1th percentile of 99 controls
+
+  where the stop codon sits in the common-stratum null: +1.80pp = 71th percentile of 99 controls
+
+====================================================================================================
+C. POWER-MATCHED -- the stop contrast subsampled to a control's size
+====================================================================================================
+
+  Stop-codon contrast, subsampled to n = 509 TGA / 246 TAG,
+  500 draws, identical estimator:
+    median +14.04pp   2.5-97.5 pct [+5.93, +20.67]   sd 3.69
+  Control positions at their native n:
+    median +13.40pp   2.5-97.5 pct [+3.04, +24.79]   sd 5.47
+
+  If these two spreads are similar, the control positions were never
+  measuring a different thing -- they were measuring the same thing
+  with 25x less data, and the +9 to +11pp I reported is what this
+  estimator does at n = 200-500, not what a null looks like.
+
+====================================================================================================
+D. THE THREE POSITIONS I ORIGINALLY PICKED, IN CONTEXT
+====================================================================================================
+
+  position       n TGA   n TAG     crude   standardised   strata   pctile of null
+  ------------ ------- ------- --------- -------------- -------- ----------------
+  +25              490     193    +6.70p        +11.14p        7              33%
+  +49              493     218    +7.34p        +12.57p        8              42%
+  +100             473     219   +13.31p        +13.22p       10              46%
+  STOP          12,797   5,257    +6.24p         +1.80p       32               1%
+
+====================================================================================================
+E. THE SUBGROUP SPLIT I QUOTED AS SUPPORTING EVIDENCE
+====================================================================================================
+
+  Exp 2 reported TGA-TAG = +4.41pp in PTC+ and +1.04pp in PTC-, and I
+  used that gradient as mechanistic support. Those were computed with
+  the separate-stratum estimator too, so they need re-checking. If all
+  strata are populated in both arms the two estimators must agree.
+
+  subgroup       n TGA   n TAG     crude   separate    common   strata
+  ------------ ------- ------- --------- ---------- --------- --------
+  PTC+           4,017   1,282    +4.32p     +4.50p    +4.50p   16/16 
+  PTC-           8,780   3,975    +0.71p     +0.68p    +0.68p   16/16 
+
+====================================================================================================
+DONE
+====================================================================================================

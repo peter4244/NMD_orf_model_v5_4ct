@@ -13,15 +13,39 @@ and `ebe8582`.
 | | result |
 |---|---|
 | the junction-distance headline | **holds, exactly** — and the gradient printed beside it is a different population |
-| Exp 2, stop codon identity | the published claim **does not survive** a positional control |
+| Exp 2, stop codon identity | **the published claim SURVIVES** at about a quarter its crude size — see the retraction below |
 | Exp 3, 3'UTR motifs | all three are **composition, not motif** |
-| Exp 4, junction phase | reframed as a **calibration null** — and the floor is several points, not zero |
+| Exp 4, junction phase | the null arms are **not significant** once the estimator is fixed |
 | Exp 5, uORF restart gap | **flat**, and the negative is trustworthy |
+| Exp 6, the >200 nt window | there **is** a dose beyond the 50 nt threshold, and it is ~18 points |
 | Exp 1, front vs back | the other window's |
 
-**The single most consequential number of the day is the noise floor**: the machinery everyone has
-been using returns 2–5 percentage points, at p as low as 0.027, on quantities that provably have no
-mechanism. It resolves the +37pp junction effect and does not resolve anything at +2pp.
+> ## RETRACTION, 2026-08-01
+>
+> An earlier version of this document concluded that the §5.3.3 stop-codon claim does not survive a
+> positional control. **That was wrong and the conclusion is withdrawn.** Pete pushed back on it and
+> he was right.
+>
+> The error was in my estimator, not in the biology. `standardised()` selected which strata
+> contribute **separately for each arm** of a contrast. When one arm is small, only a few strata
+> clear the minimum cell size, the two arms end up averaged over *different* strata, and the estimate
+> is biased upward — badly.
+>
+> **The proof is direct.** Subsample the stop-codon contrast — where the answer is known to be
+> +1.80pp — down to a control position's sample size (509 TGA / 246 TAG) and run the identical
+> estimator 500 times. It returns a **median of +14.04pp**. The control positions returned +13.40pp.
+> They were never measuring a different thing; they were measuring the *same* thing with 25× less
+> data through a biased estimator.
+>
+> Fixing the estimator so a stratum contributes only when **both** arms clear the threshold, and
+> running **99** control positions instead of 3, gives a null centred on **+0.01pp** (IQR
+> [−1.58, +2.28]) — which is what a null should look like. The stop codon gives +1.80pp with all
+> 32 of 32 strata contributing in both arms, where the two estimators agree exactly.
+>
+> The same defect inflated Experiment 4's "noise floor". Every null arm loses significance under the
+> corrected estimator (below), so the claim that this design "cannot resolve +2pp" is withdrawn too.
+>
+> Scripts: `exp2b_control_validity.py`, `exp4b_recheck_nulls.py`.
 
 ---
 
@@ -89,13 +113,23 @@ Junction phase relative to a codon boundary has no mechanism for the junction th
 3'UTR is not translated and has no reading frame. So rather than run it as a hypothesis, I ran it as
 a measurement of what our machinery returns when there is provably nothing there.
 
-| arm | result |
-|---|---|
-| null, `count == 1` stratum | −2.07 / −4.18 / −2.12 pp (p 0.44 / 0.075 / 0.28) |
-| null, full cohort | **−4.11 pp, CI [−6.54, −0.59], p = 0.027** |
-| positive control, the >50 nt rule, identical code path | **+37.37 pp, CI [+33.29, +41.57]** |
+| arm | separate-stratum (the broken estimator) | **common-stratum (corrected)** |
+|---|---|---|
+| null, `count == 1`, phase 0−1 | −2.07 pp, p = 0.440 | −2.20 pp, p = 0.383 |
+| null, `count == 1`, phase 0−2 | −4.18 pp, p = 0.087 | −4.18 pp, p = 0.063 |
+| null, full cohort, phase 0−1 | −4.11 pp, **p = 0.012** | −2.55 pp, p = 0.099 |
+| null, full cohort, phase 0−2 | −3.00 pp, p = 0.060 | −2.28 pp, p = 0.112 |
+| withdrawn null 2, all − none | −4.74 pp, **p = 0.001** | −1.70 pp, p = 0.123 |
+| withdrawn null 2, + CDS-junction count matched | −2.29 pp, p = 0.237 | −0.20 pp, p = 0.907 |
+| **positive control**, the >50 nt rule | **+37.37 pp, p = 0.001** | **+37.37 pp, p = 0.001** |
 
-The machinery works. It also fires at p < 0.05 on nothing.
+**Under the corrected estimator not one null arm reaches significance, and the positive control is
+unchanged to two decimals.** The "floor of 2–5 points at p = 0.001" was a property of my estimator,
+not of the design.
+
+The largest surviving null point estimate is −4.18 pp at p = 0.063, on a comparison with n ≈ 800 per
+arm. That is imprecision, not bias — and the 99-position null in `exp2b` puts the centre at
+**+0.01 pp**, which is the right way to read it.
 
 **Withdrawn:** my second null, CDS-internal junction phase, is not a null. Exons of length divisible
 by three are exactly the ones alternative splicing can skip without shifting the frame — that is a
@@ -120,25 +154,62 @@ bootstrap:
 Direction confirmed, and larger where readthrough has something to act on — the pattern a
 termination-efficiency mechanism predicts. I was ready to call it confirmed.
 
-**Then the control that decides it.** The identical TGA-vs-TAG 3-mer contrast, run at 3'UTR
-positions where neither string is a stop codon and no mechanism exists:
+**The control I first ran, and why it was worthless.** I ran the identical contrast at three 3'UTR
+positions, got +11.66 / +9.11 / +11.13 pp, and concluded the stop result did not stand outside its
+own null. Three defects, none of which I checked:
 
-| position | TGA − TAG | 95% CI | p |
-|---|---|---|---|
-| **the stop codon** | **+2.00pp** | [+0.84, +3.18] | 0.001 |
-| 3'UTR +25..+27 | +11.66pp | [+3.67, +23.48] | 0.007 |
-| 3'UTR +50..+52 | +9.11pp | [+2.67, +16.15] | 0.007 |
-| 3'UTR +100..+102 | +11.13pp | [−2.02, +19.64] | 0.104 |
+1. **Three estimates are not a distribution.** Their CIs were [+3.67, +23.48], [+2.67, +16.15] and
+   [−2.02, +19.64].
+2. **The sample sizes are not comparable.** Every transcript carries a stop codon, so TGA n = 14,477
+   and TAG n = 5,818. A specific 3-mer at a fixed 3'UTR offset appears at roughly the 1/64 chance
+   rate: n ≈ 500 and 220.
+3. **The estimands differ.** My estimator chose contributing strata *per arm*. At the stop all 32
+   strata contribute; at a control position the median is **10 of 32**, and the two arms are averaged
+   over different subsets.
 
-The null is larger than the claim. Stated fairly: control n is ~500 against ~14,000 at the stop, so
-those intervals are wide — the reading is not "the control is bigger" but **"the two are not
-separable, and the stop position is not distinguished."**
+**Defect 3 causes an upward bias, and the size of it is measurable.** Subsample the stop-codon
+contrast — true value +1.80 pp — to 509 TGA / 246 TAG and run the same estimator 500 times:
 
-The +4 base fails the same way: spread across A/C/G/T is **1.8pp at +4 against 1.7pp at the +10
-control**, and A−T is −0.92pp (p = 0.180) at +4 against +1.24pp (p = 0.052) at +10.
+    stop contrast at control sample size   median +14.04pp   sd 3.69
+    control positions at native size       median +13.40pp   sd 5.47
 
-Of the "stop identity × +4 context" convergence — 7 of 8 lenses on one side, 9 analyses in total —
-**neither half survives a positional control.**
+The controls were measuring the same thing with 25× less data through a biased estimator.
+
+**The control done properly.** 99 positions from +4 to +300 nt, and a corrected estimator where a
+stratum contributes only if **both** arms clear the cell minimum:
+
+| estimator | null median | IQR | 2.5–97.5 pct | stop codon |
+|---|---|---|---|---|
+| separate-stratum (broken) | +13.40pp | [+9.69, +17.42] | [+3.04, +24.79] | +1.80pp |
+| **common-stratum (correct)** | **+0.01pp** | [−1.58, +2.28] | [−5.30, +6.62] | **+1.80pp** |
+
+The corrected null is centred on zero, which is what a null is. At the stop the two estimators agree
+exactly (+1.80 and +1.80, 32 of 32 strata) because both arms are large — the bias is absent
+precisely where the claim lives.
+
+**So the claim stands.** Direction as published, magnitude about a quarter of the crude contrast
+after matching. The mechanistic gradient also holds under both estimators, with all 16 strata
+populated in each arm:
+
+| | n TGA | n TAG | crude | separate | **common** |
+|---|---|---|---|---|---|
+| PTC+ | 4,017 | 1,282 | +4.32pp | +4.50pp | **+4.50pp** |
+| PTC− | 8,780 | 3,975 | +0.71pp | +0.68pp | **+0.68pp** |
+
+Six-fold larger where a downstream junction exists for termination efficiency to matter at. That is
+the pattern the mechanism predicts and it is not something the matching could manufacture.
+
+*A pre-registration that failed, kept because I wrote it before looking:* I predicted TGA → **less**
+NMD, on the grounds that leaky termination lets ribosomes read through and displace downstream
+junction complexes. The data ran the other way, which is the mainstream slow-termination model. I
+had the mechanism backwards, and my wrong prediction is part of why I was too willing to believe the
+bad control.
+
+**The +4 base is a different matter and it still fails.** Spread across A/C/G/T is 1.8pp at +4
+against **1.7pp at the +10 control**, and A−T is −0.92pp (p = 0.180) at +4 against +1.24pp
+(p = 0.052) at +10. Those two contrasts have comparable sample sizes — every transcript has a base at
++4 and at +10 — so defect 2 does not apply and the comparison is fair. **Stop identity survives; +4
+context does not.**
 
 *A pre-registration that failed, recorded because I wrote it before looking:* I predicted TGA →
 **less** NMD, on the grounds that leaky termination lets ribosomes read through and displace the
@@ -285,17 +356,29 @@ being rebuilt anyway, it should carry graded distance, not a second threshold.
 
 ## What this implies for the plan
 
-**The design resolves +37pp and does not resolve +2pp.**
+**Withdrawn: "the design resolves +37pp and does not resolve +2pp."** That was built on the inflated
+noise floor and does not survive its correction. With a common-stratum estimator the null sits at
++0.01pp and a +2pp effect at n ≈ 18,000 is resolvable, with a gene-clustered interval that excludes
+zero.
 
-The retraining plan's centrepiece is six checks that must all pass before a sequence feature can be
-called important. Five of the six are about *what to compare against*. Today says the harder problem
-is upstream of that: at the effect sizes single sequence elements produce here, stratified comparison
-of observational transcripts cannot separate signal from its own noise floor, however carefully the
-strata are built.
+What replaces it is narrower and more useful:
 
-That is an argument for the perturbation arm of the plan — implanting a motif into sequences that
-lack it and re-encoding — rather than for more careful matching. A perturbation has a within-molecule
-control; a matched comparison never does.
+**The binding constraint is sample size in the smaller arm, not the design.** Every contrast that
+failed today failed for a reason that can be named. The three-motif result failed because the motifs
+were composition — caught by anagram controls, not by matching. The +4 base failed at equal sample
+size against an equal-sized control, which is a fair fight it lost. Only my original stop-codon
+control failed for a reason that was my own error.
 
-It is **not** an argument against the retraining. The one effect that is far above the floor is
-exactly the one the model was never given and never learned, and fixing that is Step 1.
+**Two things to carry into Part 2:**
+
+1. **The six-check standard is sound, but check 3 — "against its own matched controls, not against
+   zero" — needs a fourth clause: the control must have comparable sample size and be computed over
+   the same strata.** Today that single omission produced a confident, wrong retraction of a
+   published claim. The rule belongs in the code, not in a document: any contrast helper should
+   refuse to compare two arms averaged over different strata.
+
+2. **Anagram controls should be standard for any motif claim.** They caught what GC-quintile
+   matching missed, on all three motifs, and they cost nothing.
+
+The perturbation arm is still worth building — a within-molecule control is strictly better than a
+matched one — but today is no longer an argument that matched comparison cannot work.
