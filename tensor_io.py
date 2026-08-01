@@ -109,9 +109,18 @@ def decode_windows(codes, anchor, left, orf_start):
     den = cn[ridx, b] - cn[ridx, a]
     out[:, 5, :] = np.where((den > 0) & filled, num / np.maximum(den, 1), 0.0)
 
-    # channels 6-8, codon position relative to this candidate's own start codon
-    pos = (anchor[:, None] - left) + k
-    frame = np.mod(pos - orf_start[:, None], 3)
+    # channels 6-8, codon position relative to this candidate's own start codon.
+    #
+    # frame[r, c] = (anchor[r] - left + c - orf_start[r]) mod 3
+    #             = (off[r] + c) mod 3        with off[r] = (anchor[r]-left-orf_start[r]) mod 3
+    #
+    # so there are only THREE distinct row patterns, not n. The previous form
+    # built an (n, W) int64 `pos` and an (n, W) `frame` for every chunk and was
+    # half the decode time -- and for the ATG window, where anchor IS orf_start,
+    # every row's pattern is identical.
+    off = np.mod(anchor - left - orf_start, 3)
+    base3 = np.mod(np.arange(3)[:, None] + k, 3)          # (3, W)
+    frame = base3[off]                                     # (n, W), a gather
     rr, cc = np.nonzero(filled)
     out[rr, 6 + frame[rr, cc], cc] = 1.0
     return out

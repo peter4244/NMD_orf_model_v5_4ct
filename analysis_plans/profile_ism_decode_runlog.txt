@@ -1,0 +1,43 @@
+tensor results_tensor_v6   transcript with K=19
+
+=== chunk of 4,096 rows ===
+  build perturbed codes        0.001 s     0.1%
+  decode_windows               0.263 s    12.8%
+  to torch tensor              0.001 s     0.0%
+  2 encoder passes (CPU)       1.793 s    87.1%
+  TOTAL                        2.058 s      1,990 rows/s
+
+=== chunk of 16,384 rows ===
+  build perturbed codes        0.004 s     0.0%
+  decode_windows               1.666 s    15.5%
+  to torch tensor              0.001 s     0.0%
+  2 encoder passes (CPU)       9.098 s    84.5%
+  TOTAL                       10.768 s      1,522 rows/s
+
+=== inside decode_windows, 16,384 rows ===
+  masks from the codes         0.066 s     4.4%
+  allocate (n,9,1000) f32      0.000 s     0.0%
+  channels 0-3 one-hot         0.266 s    17.7%
+  channel 5 rolling GC         0.422 s    28.1%
+  channels 6-8 frame grid      0.747 s    49.8%
+  TOTAL                        1.501 s
+
+  allocation alone is 590 MB per chunk
+
+=== the chunk-assembly loop, which is the shape that would explain flatness ===
+build_ism_bank inner loop does, per position in the block:
+    m = bp == p          # O(len(bp)) scan of the WHOLE block
+    for b in range(4): bc[m], bw[m], m.sum()
+so it is O(positions x pairs), not O(pairs). Doubling the chunk doubles the
+useful work and QUADRUPLES this. That is exactly a flat throughput curve.
+
+ chunk rows  positions    pairs   assembly s     rows/s
+      4,096        341    1,023        0.006    653,118
+     16,384      1,365    4,095        0.039    423,193
+     49,152      4,096   12,288        0.175    280,701
+
+=== the same work with a searchsorted group boundary, which is O(pairs) ===
+ chunk rows   assembly s     rows/s   speedup
+      4,096        0.007    571,263          
+     16,384        0.008  2,036,344          
+     49,152        0.025  1,983,605          
