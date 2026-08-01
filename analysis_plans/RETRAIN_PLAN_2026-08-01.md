@@ -417,24 +417,38 @@ the five seeds' test AUC and AUPRC.
 
 ---
 
-## 8. Model comparisons
+## 8. What training produces
 
 ### 8.1 Question
 
-Which arm licenses which kind of claim?
+What is handed to the interpretation window, and what is each artefact for?
 
 ### 8.2 Approach
 
-Five arms, each 5 seeds, all evaluated on the test split (chr1/3/5/7, 10,719 transcripts).
+Training produces checkpoints, not conclusions. No comparison between model variants establishes
+that a sequence feature matters; that standard is the six checks on a specific feature, and it is
+the interpretation window's.
 
-| arm | differs from the interpretable model by | licenses |
+**Step 1 — hand over the two models of §6.3**, five seeds each, with their test AUC and AUPRC
+reported as the mean and range over seeds. The interpretable variant is the one read. The predictor
+is the reference for what accuracy costs.
+
+**Step 2 — run two arms that can only say "stop", never "yes".**
+
+| arm | differs by | what it can say |
 |---|---|---|
-| interpretable | — | claims about which sequence features matter |
-| predictor | structural block carries 5 numbers (§6.3) | claims about accuracy |
-| sequence-blanked | channels 0–3 set to zero | whether sequence carries usable signal at all |
-| no-junction-feature | structural block empty | whether supplying the junction rule masks anything |
-| label-sensitivity | training set excludes the 2,334 `no_ref_isoform` transcripts | whether behaviour depends on that subgroup |
+| sequence-blanked | channels 0–3 set to zero | if it matches the interpretable model, sequence carries nothing usable at this window size and interpretation will come up empty. Stop early. |
+| no-junction-feature | structural block empty | if it finds something the interpretable model does not, supplying the junction rule is masking it |
 
-Each arm reports test AUC and AUPRC as the mean and range over its 5 seeds, against the current
-model's 0.9310 AUC / 0.8351 AUPRC (measured elsewhere, `SEQUENCE_DISCOVERY_BRIEF.md` §5, at
-`atg1000_stop1000`) and against a tabular-only GBM at 0.8035 AUPRC (same source).
+Neither is evidence for anything. A difference in either direction is an operational signal about
+whether to continue, and is reported as such.
+
+**Step 3 — record, do not arm, the label question.** The 2,334 `no_ref_isoform` transcripts stay in
+training. Whether they are trained on is recorded in the run metadata so the question can be asked
+later against a specific finding, rather than answered in advance against nothing.
+
+### 8.3 Quantities this step reports
+
+Per variant and seed: test AUC, test AUPRC, epochs to stop, wall time. Reported against the current
+model at 0.9310 AUC / 0.8351 AUPRC and a tabular-only GBM at 0.8035 AUPRC (both measured elsewhere,
+`SEQUENCE_DISCOVERY_BRIEF.md` §5).
