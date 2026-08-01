@@ -490,6 +490,23 @@ def main():
     print(f"  no-op floor (max |effect| substituting the observed base for itself): "
           f"{floor:.3e} over {n_floor_samples:,} sampled positions "
           f"in {len(recs):,} transcripts")
+
+    # DOES THIS BANK CARRY ANYTHING? The floor is the size of effect the
+    # arithmetic itself produces. Effects at or below it are not distinguishable
+    # from it, so the share of effects above it is the bank's own statement about
+    # whether it has content -- and a bank whose effects sit at the floor says
+    # nothing however well its geometry checks out.
+    fin = np.isfinite(vals)
+    av = np.abs(vals[fin])
+    print(f"  |effect| vs the floor, over {int(fin.sum()):,} measured substitutions:")
+    print(f"    median {np.median(av):.3e}   p99 {np.percentile(av, 99):.3e}   "
+          f"max {av.max():.3e}")
+    if floor > 0:
+        print(f"    above the floor: {100*(av > floor).mean():.1f}%   "
+              f"above 10x the floor: {100*(av > 10*floor).mean():.1f}%")
+    else:
+        print(f"    floor is exactly zero, so every non-zero effect clears it: "
+              f"{100*(av > 0).mean():.1f}% are non-zero")
     if spreads:
         sd, eff, sdb = (np.mean([x[i] for x in spreads]) for i in range(3))
         print(f"  control arm, {R} paired permutation draws:")

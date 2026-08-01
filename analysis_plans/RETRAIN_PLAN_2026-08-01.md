@@ -917,7 +917,8 @@ Measured over the 41,765 transcripts of step 1, by `build_ism_split.py` /
 
 Reported by the bank build itself: `n`, `W`, bytes per arm, transcripts and genes per arm of step 1,
 the achieved discovery/confirmation balance within each (`is_nmd`, split) cell, the no-op floor of
-step 6 with the number of positions it was sampled at, the measured substitution rate and peak
+step 6 with the number of positions it was sampled at, **the distribution of `|vals|` against that
+floor and the share of substitutions clearing it**, the measured substitution rate and peak
 device memory on the hardware used, and for the control three numbers from the `R` draws of step 9:
 the mean absolute effect, the standard deviation of the effect across paired draws, and the standard
 deviation of the unperturbed logit across draws.
