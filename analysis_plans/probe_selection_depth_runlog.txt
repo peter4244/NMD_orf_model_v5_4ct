@@ -54,10 +54,11 @@ chr21 is a TRAINING chromosome for these checkpoints. In-sample reconnaissance.
     decile 9: kozak   2.151   p_capture 0.4070   n 942
   within slot 0 only (order cannot confound): r +0.2117, n 502
 
-=== IS THE REFERENCE-START PREFERENCE JUST KOZAK? ===
-Kozak deciles computed over ALL candidates; ref vs non-ref compared inside each.
+=== 5. is the reference-start preference just Kozak? ===
+  Kozak deciles over ALL candidates; ref vs non-ref inside each.
    decile    kozak  n ref  p_cap ref  n other  p_cap other     diff
         0   -1.158     59     0.6609      887       0.1822  +0.4787
+        1   -0.871      7  SKIPPED, reference arm under 8
         2   -0.629     28     0.7863      919       0.2167  +0.5696
         3   -0.389     18     0.7020      921       0.1927  +0.5092
         4   -0.132     11     0.7269      933       0.1959  +0.5310
@@ -67,11 +68,6 @@ Kozak deciles computed over ALL candidates; ref vs non-ref compared inside each.
         8    1.260     35     0.7148      911       0.2416  +0.4732
         9    2.151    112     0.6657      830       0.3721  +0.2936
 
-  Kozak-matched mean difference (n-weighted): +0.4026
+  Kozak-matched mean difference (n-weighted): +0.4026  over 323 reference candidates
   Unmatched difference                      : +0.4417
   -> Kozak explains 9% of the raw gap
-
-  So the initiation head is not simply reading the PWM: at matched Kozak the
-  annotated start still gets far more capture than its competitors, which means
-  it uses context the PWM does not encode. THAT is what the mutagenesis bank is
-  for, and it is the first evidence today that there is something there to find.

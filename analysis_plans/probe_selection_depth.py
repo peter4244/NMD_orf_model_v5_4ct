@@ -166,6 +166,46 @@ def main():
         print(f"  within slot 0 only (order cannot confound): r {r0:+.4f}, "
               f"n {int(m0.sum()):,}")
 
+    # ---------------------------------------------------------------- section 5
+    # IS THE REFERENCE-START PREFERENCE JUST KOZAK? Section 3 shows the model
+    # prefers the annotated start; section 4 shows p_capture tracks the PWM. Those
+    # are the same result unless the preference survives at matched Kozak, because
+    # annotated starts have better contexts than their competitors.
+    #
+    # This is the coarse version -- deciles over ALL candidates. It does NOT
+    # correct the admission asymmetry: non-reference candidates are truncated at
+    # the MANE floor and reference starts bypass it, so the lowest decile spans
+    # different ranges in the two arms. probe_capture_ablation.py restricts both
+    # arms to at or above the floor and is the version to read; this one is kept
+    # because it is what produced the numbers in this runlog.
+    print(f"\n=== 5. is the reference-start preference just Kozak? ===")
+    print(f"  Kozak deciles over ALL candidates; ref vs non-ref inside each.")
+    print(f"  {'decile':>7} {'kozak':>8} {'n ref':>6} {'p_cap ref':>10} "
+          f"{'n other':>8} {'p_cap other':>12} {'diff':>8}")
+    d = pd.qcut(kz, 10, labels=False, duplicates="drop")
+    diffs = []
+    for i in sorted(set(d)):
+        m = d == i
+        a_, b_ = m & ref, m & ~ref
+        # A decile whose reference arm holds fewer than 8 candidates is skipped.
+        # On chr21 that drops decile 1 (n_ref = 7), which is the whole of the
+        # 330 - 323 difference between section 3's count and this table's weights.
+        if a_.sum() >= 8:
+            df = cap[a_].mean() - cap[b_].mean()
+            diffs.append((int(a_.sum()), df))
+            print(f"  {i:>7} {kz[m].mean():>8.3f} {int(a_.sum()):>6} "
+                  f"{cap[a_].mean():>10.4f} {int(b_.sum()):>8,} "
+                  f"{cap[b_].mean():>12.4f} {df:>+8.4f}")
+        else:
+            print(f"  {i:>7} {kz[m].mean():>8.3f} {int(a_.sum()):>6}  "
+                  f"SKIPPED, reference arm under 8")
+    w = sum(n * x for n, x in diffs) / sum(n for n, _ in diffs)
+    raw = cap[ref].mean() - cap[~ref].mean()
+    print(f"\n  Kozak-matched mean difference (n-weighted): {w:+.4f}  "
+          f"over {sum(n for n, _ in diffs):,} reference candidates")
+    print(f"  Unmatched difference                      : {raw:+.4f}")
+    print(f"  -> Kozak explains {100*(1-w/raw):.0f}% of the raw gap")
+
 
 if __name__ == "__main__":
     main()
