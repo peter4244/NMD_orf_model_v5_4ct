@@ -215,6 +215,39 @@ def main():
     point = {c: arm_auc(full, c) for c in preds}
     point_pr = {c: arm_auprc(full, c) for c in preds}
 
+    # THE ENSEMBLE, because the number this replaces is one. The published
+    # atg1000_stop1000 figure of 0.9310 is a FIVE-MEMBER ENSEMBLE; its individual
+    # members average 0.9236. Reporting our mean-over-seeds against their
+    # ensemble compares one model with a committee of five. Both aggregations are
+    # printed so the comparison can be made at matched aggregation, and both
+    # averaging rules are shown because AUC is a ranking metric and averaging
+    # probabilities does not give the same order as averaging logits.
+    print(f"\n=== ENSEMBLE over seeds, for comparison at matched aggregation ===")
+    ens = {}
+    for c in preds:
+        per = [np.mean(dr, axis=0) for dr in preds[c].values()]   # mean over draws
+        mean_logit = np.mean(per, axis=0)
+        mean_prob = np.mean([1.0 / (1.0 + np.exp(-x)) for x in per], axis=0)
+        ens[c] = dict(logit_auc=auc_roc(y, mean_logit),
+                      logit_auprc=auprc(y, mean_logit),
+                      prob_auc=auc_roc(y, mean_prob),
+                      prob_auprc=auprc(y, mean_prob),
+                      mean_of_seeds_auc=point[c])
+        print(f"  {c}")
+        print(f"    mean over seeds (one model)  AUC {point[c]:.4f}   "
+              f"AUPRC {point_pr[c]:.4f}")
+        print(f"    ensemble, mean logit         AUC {ens[c]['logit_auc']:.4f}   "
+              f"AUPRC {ens[c]['logit_auprc']:.4f}")
+        print(f"    ensemble, mean probability   AUC {ens[c]['prob_auc']:.4f}   "
+              f"AUPRC {ens[c]['prob_auprc']:.4f}")
+    print(f"  Legacy reference points, from results_4ct/metrics_atg500_stop500.json")
+    print(f"  and analysis_plans/TRACK_A_HANDOFF_2026-07-31.md, on a DIFFERENT")
+    print(f"  universe of 10,131 transcripts -- not comparable, listed so the")
+    print(f"  aggregation mismatch is visible:")
+    print(f"    atg500_stop500   single   AUC 0.9306  AUPRC 0.8330")
+    print(f"    atg1000_stop1000 members  AUC 0.9236 +/- 0.0024")
+    print(f"    atg1000_stop1000 ensemble AUC 0.9310  AUPRC 0.8351")
+
     # BOTH RESAMPLINGS. The ratio of their widths is the design effect ON THE
     # METRIC, which is the quantity that matters and the only one worth quoting.
     # Resampling transcripts assumes independence; resampling genes assumes a
@@ -299,7 +332,7 @@ def main():
         Path(args.out).write_text(json.dumps(
             dict(split=args.split, n=len(idxs), n_genes=len(set(gene)),
                  bootstrap=args.bootstrap, results=rows,
-                 point=point, point_auprc=point_pr), indent=2))
+                 point=point, point_auprc=point_pr, ensemble=ens), indent=2))
         print(f"\nwrote {args.out}")
     print(f"{time.time()-t0:.0f}s")
 
