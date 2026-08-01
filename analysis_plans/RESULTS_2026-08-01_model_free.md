@@ -431,6 +431,58 @@ is unaffected by any of this adjustment argument.
 
 ---
 
+## 8. Step 1 item 3 would delete a quarter of the positive class, and should not
+
+Track A withdrew a claim of their own (W165) after Pete caught it, and flagged that a claim I have
+been carrying may have the same defect. It does.
+
+**The claim:** *"2,240 isoforms are NMD+ by construction (`no_ref_isoform`) — a deterministic label
+with no biological content"* (BRIEF §4), and the action built on it, **Step 1 item 3: remove them
+before training.**
+
+**The code says the dependency runs the other way.** `01_prepare_data_mashr.R:284-286` assigns
+labels from mashr's per-isoform `nmd_responsive` and `adj.P.Val`, SMG1 inhibitor against DMSO,
+unioned and intersected across four cell types — no reference isoform, no comparator, no pairing.
+`05t_ref_cds_features.R:110` then builds the reference pool as `intersect(non_nmd_ids, coding_ids)`
+— **filtering on the already-assigned label** — and `05t:317-320` calls an isoform `no_ref_isoform`
+when its gene has no entry in that pool.
+
+So a gene lacks a reference exactly when it has no non-NMD coding isoform, and a coding isoform of
+such a gene cannot be non-NMD — it would have been eligible to *be* the reference. The 100% rate is
+forced **given** the labels. What is constructed is the *category*, not the *label*. Every one of
+these labels is a measurement.
+
+Measured: **n = 2,334** (the brief says 2,240; different vintage), NMD+ **100.00%**. The mirror holds
+too — **11,343 self-reference isoforms at 0.00% NMD+**, which is Track A's W165 from the other side.
+
+**And the shortcut is not reachable from what the model is given.** The only supplied feature that
+could carry gene-level reference status is `is_ref_cds`. Isoforms with no `is_ref_cds` slot number
+13,320 at 26.4% NMD+, spanning four categories at 8% to 100%, of which `no_ref_isoform` is only
+**17.5%**. The model cannot learn the tautology the plan says it can learn.
+
+**The cost of the deletion:** 2,334 isoforms are **24.8% of all 9,425 positives**, across 1,266 genes
+and 23 chromosomes.
+
+### The residual concern is real but different, and it is about purity, not construction
+
+If these were transcriptional knock-ons rather than decay substrates they should be depleted of the
+canonical trigger. They are intermediate:
+
+| group | n | slot-0 stop has a junction ≥ 50 nt downstream |
+|---|---|---|
+| `no_ref_isoform` positives | 2,334 | **44.5%** |
+| all other positives | 7,091 | 74.2% |
+| negatives | 32,618 | 9.6% |
+
+Enriched 4.6× over negatives, so a large share are genuine substrates — but markedly less pure than
+the rest of the positive class, and 57% come from single-isoform genes.
+
+**Recommendation: do not delete them. Report a sensitivity arm trained without them.** That answers
+the real question — does the model's behaviour depend on this subgroup — without throwing away a
+quarter of the measured positives on a premise that is backwards.
+
+---
+
 ## What this implies for the plan
 
 **Withdrawn: "the design resolves +37pp and does not resolve +2pp."** That was built on the inflated

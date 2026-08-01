@@ -1,0 +1,130 @@
+$ python exp8_label_construction.py
+Captured 2026-08-01T02:20:45Z, repo 7762e46.
+
+================================================================================================
+EXPERIMENT 8 -- is "NMD+ by construction" true, and does it matter?
+================================================================================================
+
+  42,043 isoforms with a category and a label; overall NMD+ 22.4%
+
+================================================================================================
+1. CATEGORY DISTRIBUTION AND NMD RATE
+================================================================================================
+
+  category                      n    share     NMD+
+  ---------------------- -------- -------- --------
+  no_downstream_ejc        16,592    39.5%     5.3%
+  ref_atg_lost              9,696    23.1%    10.7%
+  effectively_ptc           7,960    18.9%    61.4%
+  truncated_no_ejc          4,223    10.0%     3.6%
+  no_ref_isoform            2,334     5.6%   100.0%
+  not_atg_in_target           685     1.6%    13.1%
+  no_stop_in_target           553     1.3%     8.0%
+
+  no_ref_isoform: n = 2,334, NMD+ 100.00%
+  the brief says 2,240 at 100%. Measured here: 2,334 at 100.00%.
+
+================================================================================================
+2. IS THE TAUTOLOGY EXACT, AND WHY
+================================================================================================
+
+  The reference pool is intersect(non_nmd_ids, coding_ids), one per gene by top
+  DMSO CPM. So a gene lacks a reference exactly when it has NO non-NMD CODING
+  isoform. An isoform of such a gene that is itself coding therefore cannot be
+  non-NMD -- if it were, it would have been eligible to BE the reference.
+
+  So the 100% rate is forced GIVEN the labels. It is not that the labels were
+  assigned to make it true; it is that the category was drawn around isoforms
+  whose labels already were what they are.
+
+  self-reference isoforms: n = 11,343, NMD+ 0.00%
+  (Track A's W165: this is the same tautology from the other side --
+   a reference isoform is non-NMD because references are CHOSEN from
+   the non-NMD pool. Withdrawn by them, and it is the same shape.)
+
+================================================================================================
+3. THE QUESTION THAT DECIDES STEP 1 -- can the model reach it?
+================================================================================================
+
+  A label that is deterministic given information the model DOES NOT HAVE is
+  not learnable and is not a leak. The five supplied tabular features are
+  frac_start, frac_stop, is_ref_cds, is_sqanti_cds, n_downstream_ejc. The only
+  one that could carry gene-level reference status is is_ref_cds -- a gene with
+  no reference can have no slot flagged is_ref_cds.
+
+  So: how well does "no slot is flagged is_ref_cds" identify the category, and
+  how NMD+ is that population?
+
+  population                                          n     NMD+
+  -------------------------------------------- -------- --------
+  has a slot flagged is_ref_cds                  28,723    20.6%
+  has NO slot flagged is_ref_cds                 13,320    26.4%
+
+  within 'no is_ref_cds slot' (13,320 isoforms), by category:
+    ref_atg_lost               9,696    10.7%
+    no_ref_isoform             2,334   100.0%
+    not_atg_in_target            685    13.1%
+    no_stop_in_target            553     8.0%
+
+  fraction of no_ref_isoform with no is_ref_cds slot: 100.0%
+  fraction of the no-is_ref_cds population that is no_ref_isoform: 17.5%
+
+  >> The model-visible proxy is NOT deterministic. "No is_ref_cds slot" spans
+     several categories at very different NMD rates, so the tautology is not
+     reachable from the supplied features. The model cannot learn the shortcut
+     the plan says it can learn.
+
+================================================================================================
+4. WHAT REMOVING THEM WOULD COST
+================================================================================================
+
+  total NMD+ isoforms:             9,425
+  NMD+ inside no_ref_isoform:      2,334 (24.8% of all positives)
+  chromosomes they span:           23 of 25
+  genes they span:                 1,266
+
+  These are real mashr treatment responses -- an isoform that rises when SMG1 is
+  inhibited. Deleting them removes measured positives and shifts the class
+  balance, for no gain, since section 3 shows the pattern is not learnable from
+  what the model is given.
+
+================================================================================================
+VERDICT ON STEP 1, ITEM 3
+================================================================================================
+
+  DO NOT REMOVE THEM. The wording "labelled degraded automatically, because of
+  how the label was defined rather than because of anything measured" inverts
+  the dependency. Every one of these labels is a measurement; what is
+  constructed is the CATEGORY, which is drawn by filtering on the label.
+
+  The residual concern worth keeping is different and is about label QUALITY,
+  not construction: a gene in which EVERY isoform responds to SMG1 inhibition
+  may be responding transcriptionally rather than through transcript-specific
+  decay. That is a reason to look at those genes, not a reason to delete them,
+  and it applies to no_ref_isoform only incidentally.
+
+================================================================================================
+5. THE RESIDUAL CONCERN, TESTED RATHER THAN LEFT HANGING
+================================================================================================
+
+  If these 2,334 are real NMD substrates they should carry the canonical
+  trigger at roughly the rate other NMD+ isoforms do. If they carry it much
+  LESS often, their response to SMG1 inhibition is more likely transcriptional
+  -- a gene-level knock-on rather than transcript-specific decay -- and that
+  WOULD be a reason to treat them differently, on quality grounds rather than
+  the construction grounds the plan gives.
+
+  among NMD+ isoforms, how often does the slot-0 stop have a
+  junction >= 50 nt downstream?
+
+    group                                           n     PTC+
+    ---------------------------------------- -------- --------
+    no_ref_isoform positives                    2,334    44.5%
+    all other positives                         7,091    74.2%
+    negatives (reference point)                32,618     9.6%
+
+  isoforms per gene among no_ref_isoform genes: 1 median, 57% are single-isoform genes here
+
+================================================================================================
+DONE
+================================================================================================
