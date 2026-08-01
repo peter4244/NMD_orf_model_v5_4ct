@@ -43,6 +43,8 @@ REPO = Path(__file__).resolve().parent
 POOL = REPO / "results_pool_v6" / "orf_pool.tsv"
 FLAGS = REPO / "results_ism_v6" / "gencode_candidate_flags.tsv"
 SPLIT = REPO / "results_ism_v6" / "discovery_confirmation_split.tsv"
+SQANTI = (Path.home() / "claude_projects" / "nmd_deposit_2026" / "source_data"
+          / "sqanti" / "nmd_lungcells_classification.txt")
 SEED = 20260801
 
 
@@ -73,6 +75,20 @@ def main():
             return f"{lab} / no annotation"
         return f"{lab} / {'main-ORF stop' if r.main_orf_stop else 'NO main-ORF stop'}"
     sp["cell"] = sp.apply(cell, axis=1)
+
+    # STRUCTURAL CATEGORY, so a bank-based replication can match the population
+    # it is replicating. The interpretability window's Analysis 1 counts 381 in
+    # the scarce cell over full splice matches; this subset counts 437 over the
+    # tensor's full set. Neither is wrong and they are not interchangeable, and
+    # without the field on the transcript nobody downstream can tell which they
+    # are looking at.
+    sq = pd.read_csv(SQANTI, sep="\t", usecols=["isoform", "structural_category"])
+    sq = sq.drop_duplicates("isoform").set_index("isoform")["structural_category"]
+    sp["structural_category"] = sp.isoform_id.map(sq).fillna("unknown")
+    sp["is_fsm"] = (sp.structural_category == "full-splice_match").astype(int)
+    print(f"  structural category: "
+          + ", ".join(f"{k} {v:,}" for k, v in
+                      sp.structural_category.value_counts().head(4).items()))
 
     counts = sp.cell.value_counts().sort_index()
     print(f"population {len(sp):,} transcripts (the tensor's own set)")
@@ -110,10 +126,16 @@ def main():
     # tx_length travels with the subset: the bank needs it and a consumer that
     # has to go back to tx_summary for one column will eventually join it wrong.
     sub = sub.merge(sp[["isoform_id", "gene_id", "chr", "tx_length", "is_nmd",
-                        "arm", "has_annotation", "main_orf_stop"]], on="isoform_id")
+                        "arm", "has_annotation", "main_orf_stop",
+                        "structural_category", "is_fsm"]], on="isoform_id")
     sub = sub.sort_values("isoform_id", kind="stable").reset_index(drop=True)
 
     print(f"\n  total {len(sub):,} transcripts, {sub.gene_id.nunique():,} genes")
+    print(f"  full splice matches {int(sub.is_fsm.sum()):,} "
+          f"({100*sub.is_fsm.mean():.1f}%) -- the population Analysis 1 uses")
+    _sc = sub[(sub.cell == "NMD / NO main-ORF stop")]
+    print(f"  scarce cell: {len(_sc):,} total, {int(_sc.is_fsm.sum()):,} of them FSM "
+          f"(their Analysis 1 counts 381 over FSM only)")
     print(f"  discovery {int((sub.arm=='discovery').sum()):,} / "
           f"confirmation {int((sub.arm=='confirmation').sum()):,}")
     print(f"  genes in discovery {sub.loc[sub.arm=='discovery','gene_id'].nunique():,} / "

@@ -1,8 +1,8 @@
 {
-  "built_at": "2026-08-01T21:08:16Z",
+  "built_at": "2026-08-01T21:20:55Z",
   "script": "build_ism_subset.py",
   "seed": 20260801,
-  "sha256": "7056a80d05bdb424d3bd6522950bc919aeea4446faa2040c79174e2718faffdb",
+  "sha256": "9b4afb5b6e9767a25d1a90267e8d4b2ff78f0c53c495fce25b4d88eea7e4ffd7",
   "n": 4999,
   "n_genes": 3830,
   "cells": {

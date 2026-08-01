@@ -210,6 +210,8 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
         # move the output at all and the first is what a start-codon check reads.
         _, parts = model.aggregate(z_p0[None], z_d0[None], mask1, return_parts=True)
         base_sel = parts["p_select"][0].double()
+        _st = torch.as_tensor(orf_start, dtype=torch.float64, device=device)
+        base_wmean = (base_sel * _st).sum() / base_sel.sum().clamp_min(1e-30)
         p_cap = parts["p"][0].cpu().numpy().astype(np.float32)
         p_sel = parts["p_select"][0].cpu().numpy().astype(np.float32)
         p_dec = parts["d"][0].cpu().numpy().astype(np.float32)
@@ -236,6 +238,8 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
 
     vals = np.full((P, 4), np.nan, dtype=np.float32)
     dsel_out = np.full((P, 4), np.nan, dtype=np.float32)
+    dstart_out = np.full((P, 4), np.nan, dtype=np.float32)
+    dgc_out = np.zeros((P, 4), dtype=np.int8)
 
     # ---- the substitutions --------------------------------------------------
     keep = valid[pos - 1]
@@ -338,7 +342,20 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
             lq = torch.nn.functional.logsigmoid(-z_p.double())
             lsel = (torch.cumsum(lq, 1) - lq
                     + torch.nn.functional.logsigmoid(z_p.double()))
-            dsel = (0.5 * (lsel.exp() - base_sel[None]).abs().sum(1)).cpu().numpy()
+            psel_p = lsel.exp()
+            dsel = (0.5 * (psel_p - base_sel[None]).abs().sum(1)).cpu().numpy()
+            # SIGNED companion to dsel. Total variation says a substitution moved
+            # the selection distribution; it cannot say WHICH WAY, and a frame
+            # switch and a diffuse reshuffle of equal magnitude are the same
+            # number. The mass-weighted mean start position is signed, defined for
+            # every transcript regardless of annotation -- unlike "mass upstream
+            # of the annotated start", which is undefined for the 62.8% with no
+            # GENCODE transcript -- and reads directly: positive means the
+            # substitution pushed initiation 3', negative 5'.
+            st_t = torch.as_tensor(orf_start, dtype=torch.float64, device=device)
+            wmean_p = ((psel_p * st_t[None]).sum(1)
+                       / psel_p.sum(1).clamp_min(1e-30))
+            dstart = (wmean_p - base_wmean).cpu().numpy()
 
         # THE DIFFERENCE IS TAKEN AGAINST THE NO-OP FROM THIS SAME CHUNK, never
         # against the batch-K base pass. row_of maps (position index, base) to the
@@ -356,6 +373,14 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
                 if b != o:
                     vals[p - 1, b] = float(out[row_of[(n, b)]]) - ref
                     dsel_out[p - 1, b] = float(dsel[row_of[(n, b)]])
+                    dstart_out[p - 1, b] = float(dstart[row_of[(n, b)]])
+                    # channel 5 is a rolling GC fraction derived from the bases,
+                    # so it moves on any substitution that changes GC status --
+                    # 68.2% of them. Base identity and local GC shift are
+                    # therefore confounded in the DISCOVERY pass, not only at
+                    # confirmation, and a candidate cannot be screened for
+                    # GC-drivenness without this recorded.
+                    dgc_out[p - 1, b] = (int(b in (1, 2)) - int(o in (1, 2)))
         i = j
 
     # ---- two per-position quantities today's findings made necessary ----------
@@ -383,7 +408,7 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
 
     return (vals, valid, obs, (base_logit, base_train), (noop_max, int(valid.sum())),
             (a_lo, a_hi, s_lo, s_hi), (p_cap, p_sel, p_dec), (fill_count, mass),
-            dsel_out)
+            (dsel_out, dstart_out, dgc_out))
 
 
 def main():
@@ -432,6 +457,9 @@ def main():
     gc_flags = None
     if GENCODE_FLAGS.exists():
         _g = pd.read_csv(GENCODE_FLAGS, sep="\t")
+        for _c in ("overlaps_gencode_start", "has_gencode_cds"):
+            if _c not in _g.columns:
+                _g[_c] = np.nan
         gc_flags = {}
         for iso_id, g in _g.groupby("isoform_id", sort=False):
             g = g.sort_values("slot", kind="stable")
@@ -441,7 +469,9 @@ def main():
             # garbage, which would reintroduce exactly the confusion the empty
             # nulls were protecting against.
             gc_flags[iso_id] = (g.is_gencode_start.fillna(-1).to_numpy(np.int8),
-                                g.upstream_of_gencode_start.fillna(-1).to_numpy(np.int8))
+                                g.upstream_of_gencode_start.fillna(-1).to_numpy(np.int8),
+                                g.overlaps_gencode_start.fillna(-1).to_numpy(np.int8),
+                                g.has_gencode_cds.fillna(0).to_numpy(np.int8))
         print(f"\nGENCODE-projected start flags: {GENCODE_FLAGS.name}, "
               f"{len(gc_flags):,} transcripts")
     else:
@@ -453,7 +483,8 @@ def main():
 
     # per-candidate mechanism flags, read from the pool table
     _pool = pd.read_csv(REPO_POOL, sep="\t",
-                        usecols=["isoform_id", "slot", "orf_start", "is_ref_cds"])
+                        usecols=["isoform_id", "slot", "orf_start", "is_ref_cds",
+                                 "n_downstream_ejc", "kozak_score"])
     pool_ref = {}
     for iso_id, g in _pool.groupby("isoform_id", sort=False):
         g = g.sort_values("slot", kind="stable")
@@ -461,7 +492,9 @@ def main():
         ref_start = int(r_.iloc[0]) if len(r_) else -1
         pool_ref[iso_id] = (g.is_ref_cds.to_numpy(np.int8),
                             ((g.orf_start.to_numpy() < ref_start) & (ref_start > 0)
-                             ).astype(np.int8))
+                             ).astype(np.int8),
+                            g.n_downstream_ejc.to_numpy(np.int32),
+                            g.kozak_score.to_numpy(np.float32))
 
     # THE SUBSET IS STRATIFIED, NOT A PREFIX. The mechanism cell the section is
     # about is under 1% of the pool, so a random prefix of 5,000 draws about
@@ -592,7 +625,8 @@ def main():
                  base_logit_training=np.float64(base[1]),
                  spans=np.stack([a_lo, a_hi, s_lo, s_hi], 1).astype(np.int32),
                  p_capture=per_cand[0], p_select=per_cand[1], p_decay=per_cand[2],
-                 fill_count=per_pos[0], mass=per_pos[1], dsel=dsel_arr,
+                 fill_count=per_pos[0], mass=per_pos[1],
+                 dsel=dsel_arr[0], dstart=dsel_arr[1], dgc=dsel_arr[2],
                  noop=np.float64(noop[0]), n_floor=np.int64(noop[1]),
                  spread=spread)
         os.replace(tmp, shard)            # a shard is never half-written
@@ -615,14 +649,17 @@ def main():
     recs, spans_rows, floors, spreads = [], [], [], []
     pcap, psel, pdec = [], [], []
     is_ref, upstream = [], []
-    gc_is, gc_up = [], []
+    ejc, koz = [], []
+    gc_is, gc_up, gc_ov, gc_hs = [], [], [], []
     fills, masses, dsels = [], [], []
+    dstarts, dgcs = [], []
     n_floor_samples = 0
     for n, r in enumerate(take.itertuples()):
         z = np.load(shard_dir / f"{r.isoform_id}.npz")
         pcap.append(z["p_capture"]); psel.append(z["p_select"]); pdec.append(z["p_decay"])
         pr = pool_ref.get(r.isoform_id)
         is_ref.append(pr[0]); upstream.append(pr[1])
+        ejc.append(pr[2]); koz.append(pr[3])
         if gc_flags is not None:
             # -1 where the isoform has no GENCODE transcript at all: 36.5% of the
             # pool. A stratification keyed on this field silently drops the novel
@@ -632,9 +669,12 @@ def main():
             n_k = len(pr[0])
             g_is = gf[0] if gf is not None else np.full(n_k, -1, np.int8)
             g_up = gf[1] if gf is not None else np.full(n_k, -1, np.int8)
+            g_ov = gf[2] if gf is not None else np.full(n_k, -1, np.int8)
+            g_hs = gf[3] if gf is not None else np.zeros(n_k, np.int8)
             gc_is.append(g_is); gc_up.append(g_up)
+            gc_ov.append(g_ov); gc_hs.append(g_hs)
         fills.append(z["fill_count"]); masses.append(z["mass"])
-        dsels.append(z["dsel"])
+        dsels.append(z["dsel"]); dstarts.append(z["dstart"]); dgcs.append(z["dgc"])
         i = row[r.isoform_id]
         recs.append(dict(isoform_id=r.isoform_id, vals=z["vals"], valid=z["valid"],
                          obs=z["obs"], base_logit=float(z["base_logit"]),
@@ -655,12 +695,16 @@ def main():
     fill_count = np.zeros((N, W), np.int16)
     mass = np.zeros((N, W), np.float32)
     dsel = np.full((N, W, 4), np.nan, np.float32)
+    dstart = np.full((N, W, 4), np.nan, np.float32)
+    dgc = np.zeros((N, W, 4), np.int8)
     for i, x in enumerate(recs):
         p = len(x["valid"])
         vals[i, :p] = x["vals"]; valid[i, :p] = x["valid"]; obs[i, :p] = x["obs"]
         fill_count[i, :len(fills[i])] = fills[i]
         mass[i, :len(masses[i])] = masses[i]
         dsel[i, :len(dsels[i])] = dsels[i]
+        dstart[i, :len(dstarts[i])] = dstarts[i]
+        dgc[i, :len(dgcs[i])] = dgcs[i]
 
     cand_count = np.array([x["K"] for x in recs], np.int32)
     cand_offset = np.concatenate([[0], np.cumsum(cand_count)])[:-1].astype(np.int32)
@@ -727,6 +771,8 @@ def main():
         f.create_dataset("fill_count", data=fill_count, compression="lzf")
         f.create_dataset("mass", data=mass, compression="lzf")
         f.create_dataset("dsel", data=dsel, compression="lzf")
+        f.create_dataset("dstart", data=dstart, compression="lzf")
+        f.create_dataset("dgc", data=dgc, compression="lzf")
         # THE MECHANISM STRATIFIER. Pete measured that 70.8% of candidates
         # meeting the uORF definition carry a downstream junction, against 24.1%
         # of reference-traced main ORFs, and the driver is length -- 69.4% of
@@ -739,10 +785,27 @@ def main():
         # to everything this project distrusts about the TD2 CDS calls.
         f.create_dataset("cand_is_ref_cds", data=np.concatenate(is_ref))
         f.create_dataset("cand_upstream_of_ref", data=np.concatenate(upstream))
+        # the STRUCTURAL facts, beside the model's outputs. p_decay is what the
+        # model thinks; n_downstream_ejc is what the junctions do, and it is what
+        # "decay-capable upstream ORF" means. kozak_score is initiation strength
+        # as a CONTINUOUS covariate, which is also what stops anyone
+        # reconstructing the categorical uORF definition that mislabels 71.7%.
+        f.create_dataset("cand_n_downstream_ejc", data=np.concatenate(ejc))
+        f.create_dataset("cand_kozak_score", data=np.concatenate(koz))
         if gc_is:
             f.create_dataset("cand_is_gencode_start", data=np.concatenate(gc_is))
             f.create_dataset("cand_upstream_of_gencode",
                              data=np.concatenate(gc_up))
+            # starts before the annotated AUG and ends at or past it: it blocks
+            # reinitiation, and it is the ATF4 configuration.
+            f.create_dataset("cand_overlaps_gencode_start",
+                             data=np.concatenate(gc_ov))
+            # the EXPLICIT mask. An empty-means-null convention is only as strong
+            # as the consumer's cast -- pandas turns NaN into 0 on an int8 cast
+            # with a warning any log filter eats -- so the sentinel AND the mask
+            # both ship and the state is unmissable.
+            f.create_dataset("cand_has_gencode_cds",
+                             data=np.concatenate(gc_hs))
         f.attrs["upstream_definitions"] = (
             "cand_upstream_of_ref: orf_start < the orf_start of the candidate "
             "with is_ref_cds==1, where the reference isoform is the "

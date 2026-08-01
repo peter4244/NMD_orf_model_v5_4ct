@@ -1,3 +1,4 @@
+  structural category: full-splice_match 16,109, incomplete-splice_match 10,568, novel_in_catalog 9,634, novel_not_in_catalog 4,598
 population 41,765 transcripts (the tensor's own set)
   with an admitted GENCODE start: 15,526 (37.2%)
 
@@ -20,9 +21,11 @@ population 41,765 transcripts (the tensor's own set)
   control / no annotation              18,456    1,025    18.006
 
   total 4,999 transcripts, 3,830 genes
+  full splice matches 2,648 (53.0%) -- the population Analysis 1 uses
+  scarce cell: 437 total, 381 of them FSM (their Analysis 1 counts 381 over FSM only)
   discovery 2,494 / confirmation 2,505
   genes in discovery 1,913 / confirmation 1,917
   weighted total reconstructs the pool: 41,765 against 41,765
 
-wrote results_ism_v6/ism_subset.tsv  sha256 7056a80d05bdb424d3bd6522950bc919
-3s
+wrote results_ism_v6/ism_subset.tsv  sha256 9b4afb5b6e9767a25d1a90267e8d4b2f
+13s
