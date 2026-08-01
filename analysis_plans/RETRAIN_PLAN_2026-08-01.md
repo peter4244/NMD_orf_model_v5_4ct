@@ -79,8 +79,13 @@ transcript position `ref_utr5_length + 1`. `ref_atg_available` is 1 where that p
 
 ### 2.5 `HOLDOUT` — paralog gene lists
 
-`paralog_genes.tsv` (56 genes) and `val_paralog_genes.tsv` (19 genes) in the same directory. Genes
-withheld from training so that a paralog of a training gene cannot appear in evaluation.
+`paralog_genes.tsv` (56 genes) and `val_paralog_genes.tsv` (19 genes) in the same directory.
+
+Each file lists genes with a close paralog on the **other side** of a split boundary. Leakage into
+the test set and leakage into the validation set are computed against different boundaries, so the
+two lists are disjoint sets on disjoint chromosomes: all 56 test-side genes lie on chr1/3/5/7 and
+all 19 validation-side genes on chr2/chr4 (measured here). Neither list contains a training-split
+gene, so these are genes screened out of **evaluation**, not genes withheld from training.
 
 ### 2.6 Datasets this plan replaces
 
@@ -232,8 +237,9 @@ One row per admitted candidate, replacing `selected_orfs.tsv`:
 | ...reaching it only by the always-admit rule | same | 3,823 (13.3%) |
 | coverage of upstream ORFs whose own stop has a junction >50 bases downstream | 133,765 such ORFs | 89,073 (66.6%) |
 
-All predicted values are measured in `design5_final_pool_runlog.txt` on the same sequences with
-the same enumeration.
+Sources: rows 1 and 2 from `design1_orf_pool_size_runlog.txt` and `design2_mane_floor_runlog.txt`;
+the 1,530,321 denominator in row 5 from `design2`; every other value from
+`design5_final_pool_runlog.txt`. All on the same sequences with the same enumeration.
 
 ### 3.5 Cost
 
@@ -244,9 +250,8 @@ roughly 22 GB. This does not fit in the 8 GiB on this machine; the tensor is bui
 ### 3.6 The tail
 
 No cap applies. Every transcript keeps all of its admitted candidates, and batches are bucketed by
-candidate count so that a batch holds transcripts of similar width. Candidates per transcript at
-`FLOOR` with the annotated CDS forced in: median 32, p90 65, p99 107, maximum 1,191 (measured,
-`design3_check_track_a_runlog.txt`).
+candidate count so that a batch holds transcripts of similar width. Candidates per transcript after all four admission
+rules: median 17, p90 35, p99 59, maximum 565 (measured, `design5_final_pool_runlog.txt`).
 
 If a cap is ever imposed, the pool table carries a per-transcript column recording whether it was
 hit and how many candidates were dropped.
@@ -287,8 +292,8 @@ moving; the reading-frame channels then mean the same thing for an ORF of any le
 
 The ATG window is **asymmetric**: initiation depends on what a scanning ribosome has already
 traversed, so the window reaches 900 bases upstream and 100 into the ORF. That covers the whole
-region 5′ of the candidate for 62.0% of upstream candidates and the whole annotated 5′UTR for 85.8%
-of transcripts (measured, `design3_check_track_a_runlog.txt`).
+region 5′ of the candidate for **67.0%** of admitted upstream candidates and the whole annotated
+5′UTR for **85.8%** of transcripts (measured, `design6_upstream_reach_runlog.txt`).
 
 Filling is bounded at the ORF's midpoint so the two windows never read the same base: the ATG window
 fills no further than `mid`, the stop window no earlier. The bound applies to the fill, not to the
@@ -324,8 +329,8 @@ back at inference rather than recomputed.
 
 **Step 4 — assemble ragged, not padded.**
 
-Candidates per transcript run from 1 to 1,191 with a median of 32, so padding every transcript to
-the maximum would store mostly zeros. Candidates are stored as one flat array in transcript order
+Candidates per transcript run from 1 to 565 with a median of 17 (§3.4), so padding every transcript
+to the maximum would store mostly zeros. Candidates are stored as one flat array in transcript order
 with a per-transcript start offset and count.
 
 ```
@@ -333,10 +338,28 @@ candidates[i]  = (atg_window[9,500], stop_window[9,500], structural[1 or 5])
 offset[t], count[t]   such that transcript t owns candidates[offset[t] : offset[t]+count[t]]
 ```
 
-**Step 5 — assign splits.**
+**Step 5 — assign splits, screening each evaluation side against its own paralog list.**
 
-Split comes from `chr` in `TX`: test chr1/3/5/7, validation chr2/4, training the rest. Transcripts
-of genes listed in `HOLDOUT` are removed from the training split.
+Split comes from `chr` in `TX`: test chr1/3/5/7, validation chr2/4, training the rest. A transcript
+on a test chromosome whose gene is in `paralog_genes.tsv` is labelled `test_paralog` rather than
+`test`; a transcript on a validation chromosome whose gene is in `val_paralog_genes.tsv` is labelled
+`val_paralog` rather than `val`. Each branch consults its own side's list: the two lists are disjoint
+and sit on disjoint chromosomes, so a single shared test can never fire for one of the sides.
+
+```
+for each transcript t:
+    if chr[t] in {chr1, chr3, chr5, chr7}:
+        split[t] = "test_paralog" if gene[t] in paralog_genes      else "test"
+    elif chr[t] in {chr2, chr4}:
+        split[t] = "val_paralog"  if gene[t] in val_paralog_genes  else "val"
+    else:
+        split[t] = "train"
+```
+
+`test_clean` is `split == "test"`, 10,597 transcripts; `val_clean` is `split == "val"`, 4,381
+(measured here: 122 of 10,719 test and 56 of 4,437 validation transcripts are screened out). An
+absent `val_paralog` label is an error rather than an empty category — it means the screen did not
+run.
 
 ### 5.4 Quantities this step reports
 
@@ -444,8 +467,9 @@ The tensor from §5.
 **Step 1 — loss and optimizer.** Binary cross-entropy on the transcript logit against `is_nmd`.
 Adam. Batches are bucketed by candidate count (§3.6).
 
-**Step 2 — stopping.** Training stops when validation AUC has not improved for 5 epochs; the
-checkpoint with the best validation AUC is kept.
+**Step 2 — stopping.** Training stops when AUC on `val_clean` has not improved for 5 epochs; the
+checkpoint with the best `val_clean` AUC is kept. Early stopping selects a checkpoint, so it runs on
+the screened set.
 
 **Step 3 — seeds.** Each configuration is trained from 5 random initialisations.
 

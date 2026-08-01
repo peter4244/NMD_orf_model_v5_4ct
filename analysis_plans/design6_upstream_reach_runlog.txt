@@ -1,0 +1,59 @@
+$ python design6_upstream_reach.py
+Captured 2026-08-01T03:57:08Z, repo b8d93c2.
+
+========================================================================================
+DESIGN 6 -- upstream reach required by the ATG window
+========================================================================================
+
+  admission floor -1.2508 (MANE q05), position rule: start in the first half
+
+========================================================================================
+1. ANNOTATED 5'UTR LENGTH
+========================================================================================
+
+  transcripts with a projected reference start codon: 28,775
+  percentile        bases
+  p25                 129
+  p50                 267
+  p75                 566
+  p90                1189
+  p95                1895
+  p99                3470
+
+  upstream reach     5UTR fully covered
+  ---------------- --------------------
+  400                             64.5%
+  500                             71.5%
+  900                             85.8%
+  1900                            95.0%
+
+========================================================================================
+2. DISTANCE FROM THE TRANSCRIPT 5' END TO AN ADMITTED UPSTREAM CANDIDATE
+========================================================================================
+
+  admitted candidates starting upstream of the reference start codon: 106,284
+  percentile        bases
+  p25                 216
+  p50                 545
+  p75                1137
+  p90                1855
+  p99                3616
+
+  upstream reach     candidate fully covered
+  ---------------- -------------------------
+  400                                  40.6%
+  500                                  47.3%
+  900                                  67.0%
+  1900                                 90.6%
+
+========================================================================================
+THE TWO FIGURES THE PLAN CITES
+========================================================================================
+
+  at 900 bases of upstream reach:
+    whole annotated 5'UTR covered, transcripts        85.8%
+    whole 5' region covered, upstream candidates      67.0%
+
+========================================================================================
+DONE
+========================================================================================
