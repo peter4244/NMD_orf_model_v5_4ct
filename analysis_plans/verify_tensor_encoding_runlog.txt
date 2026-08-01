@@ -1,0 +1,14 @@
+$ python verify_tensor_encoding.py --tensor results_tensor_chr21
+Captured 2026-08-01T05:08:38Z.
+
+400 candidates from 502 transcripts, results_tensor_chr21/nmd_tensor.h5
+
+  pass  atg_anchor_base      0
+  pass  stop_anchor_base     0
+  pass  onehot_sum           0
+  pass  frame_at_anchor      0
+  pass  junction_channel     0
+  pass  windows_overlap      0
+  pass  gc_range             0
+
+exit 0
