@@ -683,6 +683,7 @@ def main():
     pcap, psel, pdec = [], [], []
     is_ref, upstream = [], []
     ejc, koz = [], []
+    o_st, o_en = [], []
     gc_is, gc_up, gc_ov, gc_hs = [], [], [], []
     fills, masses, dsels = [], [], []
     dstarts, dgcs = [], []
@@ -690,10 +691,13 @@ def main():
     n_floor_samples = 0
     for n, r in enumerate(take.itertuples()):
         z = np.load(shard_dir / f"{r.isoform_id}.npz")
+        _i = row[r.isoform_id]
+        sl2 = slice(int(offset[_i]), int(offset[_i]) + int(count[_i]))
         pcap.append(z["p_capture"]); psel.append(z["p_select"]); pdec.append(z["p_decay"])
         pr = pool_ref.get(r.isoform_id)
         is_ref.append(pr[0]); upstream.append(pr[1])
         ejc.append(pr[2]); koz.append(pr[3])
+        o_st.append(o_start_all[sl2]); o_en.append(o_end_all[sl2])
         if gc_flags is not None:
             # -1 where the isoform has no GENCODE transcript at all: 36.5% of the
             # pool. A stratification keyed on this field silently drops the novel
@@ -844,6 +848,24 @@ def main():
         # reconstructing the categorical uORF definition that mislabels 71.7%.
         f.create_dataset("cand_n_downstream_ejc", data=np.concatenate(ejc))
         f.create_dataset("cand_kozak_score", data=np.concatenate(koz))
+        # ORF COORDINATES PER CANDIDATE. Without these the array index a
+        # transcript position occupies inside a window is not exactly
+        # computable from the bank, and that index is what decides whether a
+        # positional peak sits in the last pooling bin against the convolution
+        # padding. The interpretability window found their top 15 offsets all at
+        # +58 to +97 -- array indices 958-997 of 1000, inside the final bin and
+        # within 42 of the edge -- and the same profile in control candidates,
+        # which is the signature of the encoder rather than of initiation.
+        #   ATG  window: array index = position - orf_start + 900
+        #   stop window: array index = position - (orf_end - 1) + 500
+        f.create_dataset("cand_orf_start", data=np.concatenate(o_st))
+        f.create_dataset("cand_orf_end", data=np.concatenate(o_en))
+        f.attrs["window_geometry"] = (
+            "ATG window: 1000 wide, anchor orf_start at array index 900, so "
+            "index = position - orf_start + 900. Stop window: anchor orf_end-1 "
+            "at index 500. The last pooling bin of 8 spans indices 875-999 and "
+            "abuts the padded edge; a positional peak there should be reported "
+            "with that flagged, or an edge artifact reads as a motif.")
         if gc_is:
             f.create_dataset("cand_is_gencode_start", data=np.concatenate(gc_is))
             f.create_dataset("cand_upstream_of_gencode",
