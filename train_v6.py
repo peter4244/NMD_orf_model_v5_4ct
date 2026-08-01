@@ -100,7 +100,7 @@ class TensorSource:
     """Reads padded batches out of the ragged HDF5."""
 
     def __init__(self, path, struct_cols, blank_sequence=False,
-                 blank_junctions=False):
+                 blank_junctions=False, in_memory=True):
         self.path = str(path)
         self.struct_cols = struct_cols
         self.blank_sequence = blank_sequence
@@ -123,6 +123,18 @@ class TensorSource:
             self.norm_std = f["normalization/std"][:]
             self.pool_complete = (f["pool_complete"][:]
                                   if "pool_complete" in f else None)
+            self.structural = f["structural"][:]
+            # THE CODES LIVE IN RAM. Profiled on the real split, the HDF5 read
+            # was 67% of the batch against 29% for the decode: a batch is bucketed
+            # by candidate count, so its rows are scattered across the file and
+            # every lzf chunk they touch is decompressed again. Uncompressed the
+            # whole array is 1.6 GB, so it simply fits -- which is only true
+            # because a position is one byte rather than nine float16 channels.
+            # Prefetching would not have fixed this; overlapping a 1.2 s load with
+            # a 0.02 s compute saves the 0.02 s.
+            self.codes = f["codes"][:] if in_memory else None
+        if self.codes is not None:
+            print(f"  codes resident in RAM: {self.codes.nbytes/1e9:.2f} GB")
 
     @property
     def f(self):
@@ -140,9 +152,13 @@ class TensorSource:
                                for i in idxs])
         srt = np.argsort(rows, kind="stable")    # h5py needs increasing indices
         inv = np.argsort(srt, kind="stable")
-        r = rows[srt]
-        codes = self.f["codes"][r][inv]
-        st = self.f["structural"][r][inv][:, self.struct_cols]
+        if self.codes is not None:
+            codes = self.codes[rows]
+            st = self.structural[rows][:, self.struct_cols]
+        else:
+            r = rows[srt]
+            codes = self.f["codes"][r][inv]
+            st = self.structural[rows][:, self.struct_cols]
 
         # The nine channels are rebuilt here rather than stored. tensor_io holds
         # the only definition of the mapping, and it is checked against the
@@ -229,10 +245,25 @@ def main():
     ap.add_argument("--blank-junctions", action="store_true")
     ap.add_argument("--seed", type=int, default=100)
     ap.add_argument("--lr", type=float, default=1e-3)
-    ap.add_argument("--max-padded", type=int, default=2048)
+    ap.add_argument("--max-padded", type=int, default=0,
+                    help="0 = size it from conv_channels and --mem-budget-gb")
+    ap.add_argument("--mem-budget-gb", type=float, default=10.0)
     ap.add_argument("--max-epochs", type=int, default=60)
     ap.add_argument("--patience", type=int, default=5)
     args = ap.parse_args()
+
+    # Peak activation memory is very close to linear in BOTH the padded batch
+    # and the channel count: measured on a V100, 0.8 / 3.1 GB at 512 / 2048
+    # candidates with 32 channels, and 2.9 / 11.4 at 128. A fixed batch therefore
+    # OOMs at 128 channels while wasting the card at 16, and 8192 x 128 already
+    # did OOM. Above ~1024 the epoch barely improves, so the cap is 2048.
+    GB_PER_UNIT = 4.35e-5                       # GB per (padded candidate x channel)
+    if args.max_padded <= 0:
+        args.max_padded = int(np.clip(
+            args.mem_budget_gb / (args.conv_channels * GB_PER_UNIT), 256, 2048))
+        print(f"max_padded auto-sized to {args.max_padded} for "
+              f"conv_channels={args.conv_channels} at a "
+              f"{args.mem_budget_gb:.0f} GB budget")
 
     outdir = Path(args.out); outdir.mkdir(parents=True, exist_ok=True)
     ckpt = outdir / "checkpoint.pt"
@@ -291,11 +322,27 @@ def main():
         model.train()
         tot, nb = 0.0, 0
         for b in make_batches(src.count[tr], args.max_padded, rng["numpy"]):
-            A, S, U, M, y = src.batch(tr[b], device)
-            opt.zero_grad(set_to_none=True)
-            loss = F.binary_cross_entropy_with_logits(model(A, S, U, M), y)
-            loss.backward(); opt.step()
-            tot += loss.item(); nb += 1
+            # An OOM on one batch of a 40-run array should cost that batch, not
+            # the run. The offending batch is split and retried; if the halves
+            # still do not fit, that is a real failure and it propagates.
+            for attempt, chunks in enumerate(([b], np.array_split(b, 2),
+                                              np.array_split(b, 4))):
+                try:
+                    for ch in chunks:
+                        if not len(ch):
+                            continue
+                        A, S, U, M, y = src.batch(tr[ch], device)
+                        opt.zero_grad(set_to_none=True)
+                        loss = F.binary_cross_entropy_with_logits(
+                            model(A, S, U, M), y)
+                        loss.backward(); opt.step()
+                        tot += loss.item(); nb += 1
+                    break
+                except torch.cuda.OutOfMemoryError:
+                    torch.cuda.empty_cache()
+                    if attempt == 2:
+                        raise
+                    print(f"  OOM at {len(b)} transcripts, splitting", flush=True)
         vauc, vpr, n = evaluate(model, src, va, device, args.max_padded)
         history.append(dict(epoch=epoch, train_loss=tot / max(nb, 1),
                             val_auc=float(vauc), val_auprc=float(vpr),

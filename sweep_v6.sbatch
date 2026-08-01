@@ -25,7 +25,7 @@ echo "  variant=$VARIANT conv_channels=$C n_bins=$B permute=$PERM blank_seq=$BSE
 [ -f "$OUT/checkpoint.pt" ] && echo "  checkpoint present — resuming"
 
 ARGS=(--tensor results_tensor_v6 --out "$OUT" --variant "$VARIANT"
-      --conv-channels "$C" --n-bins "$B" --seed "$SEED")
+      --conv-channels "$C" --n-bins "$B" --seed "$SEED" --mem-budget-gb 10)
 [ "$PERM"  = "1" ] && ARGS+=(--permute-bins)
 [ "$BSEQ"  = "1" ] && ARGS+=(--blank-sequence)
 [ "$BJUNC" = "1" ] && ARGS+=(--blank-junctions)
