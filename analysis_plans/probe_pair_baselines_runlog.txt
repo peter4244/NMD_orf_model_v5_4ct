@@ -1,0 +1,41 @@
+  b8_s100.pt: done
+  b8_s200.pt: done
+  b8_s300.pt: done
+  b8_s400.pt: done
+  b8_s500.pt: done
+
+chr2 (VALIDATION -- held out from gradients, chosen on for early stopping)
+  1,154 position-matched pairs, both arms at or above the Kozak floor
+
+=== 1. what wins these pairs? ===
+  score                                win rate        n
+  p_capture (the model)                   86.1%    1,154
+  kozak_score (PWM)                       53.0%    1,154
+  orf_length                              97.9%    1,154
+  n_downstream_ejc                        18.0%    1,154
+  5'-proximity (-orf_start)               67.0%    1,154
+  right-hand window fill                  84.3%    1,154
+  50% is chance. The pairs are matched on start position, so a score
+  that is a function of start position alone must sit near 50%.
+
+=== 2. THE ORF-LENGTH LEAK, and whether it explains the result ===
+  The ATG window fills 100 bases past the start codon BUT IS CLIPPED AT
+  THE ORF MIDPOINT, so an ORF under ~200 bases has a right-truncated
+  window and the truncation reports its length. Reference CDSs are long.
+  candidates with the full 100 bases of right fill: 28.2%
+    among reference starts     : 96.0%
+    among non-reference        : 25.8%
+  pairs where BOTH windows are untruncated: 354 of 1,154
+  both untruncated (no length leak)    capture  58.8%   orf_length  94.4%   n 354
+  at least one truncated               capture  98.2%   orf_length  99.5%   n 800
+
+=== 3. direction split, on the untruncated pairs only ===
+  The interpretability window's control, restricted to pairs carrying
+  neither the 5'-padding leak nor the ORF-length leak.
+  reference UPSTREAM                   capture  55.9%   n 320
+  reference DOWNSTREAM                 capture  85.3%   n 34
+  A monotone positional preference must put one of these BELOW 50%.
+all matched pairs                 86.1%  n 1,154  z 24.53  95% CI [ 83.2,  89.0]
+both windows untruncated          58.8%  n   354  z  3.31  95% CI [ 53.6,  64.0]
+  ...of those, ref upstream       55.9%  n   320  z  2.11  95% CI [ 50.4,  61.4]
+  ...of those, ref downstream     85.3%  n    34  z  4.12  95% CI [ 68.5, 102.1]
