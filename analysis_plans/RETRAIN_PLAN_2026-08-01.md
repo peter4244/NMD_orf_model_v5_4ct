@@ -288,9 +288,9 @@ Source: `build_orf_pool_runlog.txt`, which is this step's own output.
 
 ### 3.5 Cost
 
-Training-tensor size scales linearly in candidates per transcript and in window width. The current
-5-slot tensor at 500-wide windows is 2.9 GB, so 19.1 candidates at 1000-wide windows projects to
-roughly 22 GB. This does not fit in the 8 GiB on this machine; the tensor is built on the cluster.
+Training-tensor size scales linearly in candidates per transcript and in window width. 802,035 candidates, each with two
+1000-base 9-channel windows stored as float16, is **28.9 GB** — measured by building chr21 and
+scaling by candidate count, not by scaling the old file. This does not fit in the 8 GiB on this machine; the tensor is built on the cluster.
 
 ### 3.6 The tail
 
@@ -445,8 +445,9 @@ Transcripts on the 233 read-through composite loci — `gene_id` of the form `EN
 genes transcribed as one unit, so the split, the paralog screen and the gene clustering are all
 ill-defined on it, and the paralog screen cannot see inside one.
 
-`test_clean` is `split == "test"`, 10,597 transcripts; `val_clean` is `split == "val"`, 4,381
-(measured here: 122 of 10,719 test and 56 of 4,437 validation transcripts are screened out). An
+`test_clean` is `split == "test"`, **10,520** transcripts; `val_clean` is `split == "val"`, **4,356**
+(measured: of 10,719 test transcripts 122 are paralog-screened and 77 sit on composite loci; of 4,437
+validation transcripts, 56 and 25). The five split labels total 41,765. An
 absent `val_paralog` label is an error rather than an empty category — it means the screen did not
 run.
 
@@ -638,7 +639,7 @@ Per variant and seed: `test_clean` AUC and AUPRC, epochs to stop, wall time.
 
 Each metric carries a **bootstrap interval resampled over genes**, computed within each seed. Seeds
 vary initialisation only — the split is fixed — so the range over seeds contains no sampling variance
-at all, and the sampling variance it omits is inflated by clustering: `test_clean` holds 10,597
+at all, and the sampling variance it omits is inflated by clustering: `test_clean` holds 10,520
 transcripts in 3,234 genes, 90.0% of them in a multi-transcript gene, and this project measured the
 inflation from ignoring that at 5.47. A comparison between arms in §8.2 is read as an overlap of
 gene-clustered intervals, not as a difference of point estimates.
