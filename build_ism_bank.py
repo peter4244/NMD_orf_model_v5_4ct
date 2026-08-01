@@ -37,6 +37,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -321,6 +322,9 @@ def main():
     ap.add_argument("--seed", type=int, default=20260801)
     ap.add_argument("--device", default="")
     ap.add_argument("--limit-transcripts", type=int, default=0)
+    ap.add_argument("--from-index", type=int, default=0, dest="from_index",
+                    help="build only take[from:to); shards let tasks share a directory")
+    ap.add_argument("--to-index", type=int, default=0, dest="to_index")
     args = ap.parse_args()
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -374,17 +378,34 @@ def main():
     rng = np.random.default_rng(args.seed)
     gen = torch.Generator(device=device); gen.manual_seed(args.seed)
 
-    recs, spans_rows, floors, spreads = [], [], [], []
-    n_floor_samples = 0
     chunk_rows = args.chunk_rows
     if device == "cuda":
         torch.cuda.reset_peak_memory_stats()
-    n_enc_rows = 0
-    for n, r in enumerate(take.itertuples()):
+
+    # ONE SHARD PER TRANSCRIPT, and a restart skips what is already on disk.
+    # The gpu partition kills at 8 hours and this run is longer than one
+    # transcript, so a build with no resume is a build that starts from zero
+    # every time the queue preempts it. The shard is written to a temporary name
+    # and renamed, so a shard is never half-written. Splitting the subset across
+    # array tasks with --from/--to writes into the same directory and needs no
+    # coordination, because a shard is named by its transcript.
+    shard_dir = Path(str(args.out) + ".shards")
+    shard_dir.mkdir(parents=True, exist_ok=True)
+    lo_i = args.from_index
+    hi_i = args.to_index if args.to_index > 0 else len(take)
+    todo = list(take.itertuples())[lo_i:hi_i]
+    print(f"\nbuilding transcripts [{lo_i}, {hi_i}) of {len(take):,}")
+    print(f"  shards in {shard_dir}")
+    n_skipped = 0
+    for n, r in enumerate(todo, start=lo_i):
+        shard = shard_dir / f"{r.isoform_id}.npz"
+        if shard.exists():
+            n_skipped += 1
+            continue
         i = row[r.isoform_id]
         sl = slice(int(offset[i]), int(offset[i]) + int(count[i]))
         cds, os_, oe_ = codes_all[sl], o_start_all[sl].astype(np.int64), o_end_all[sl].astype(np.int64)
-        st = struct_all[sl][:, cols]
+        struct_k = struct_all[sl][:, cols]
 
         per_draw, base_draws = [], []
         for d in range(R):
@@ -396,7 +417,7 @@ def main():
             for attempt in range(5):
                 try:
                     v, valid, obs, base, noop, spans = transcript_bank(
-                        model, enc, cds, os_, oe_, int(r.tx_length), st,
+                        model, enc, cds, os_, oe_, int(r.tx_length), struct_k,
                         device, chunk_rows, args.floor_samples, rng)
                     break
                 except torch.cuda.OutOfMemoryError:
@@ -407,33 +428,62 @@ def main():
             if v is None:
                 raise RuntimeError(f"{r.isoform_id}: OOM at chunk_rows={chunk_rows}")
             per_draw.append(v); base_draws.append(base)
-            floors.append(noop[0]); n_floor_samples += noop[1]
         vals = per_draw[0] if R == 1 else np.nanmean(np.stack(per_draw), axis=0)
+        spread = np.full(3, np.nan, np.float64)
         if R > 1:
             # Spread over the paired draws, on entries finite in EVERY draw.
             # nan-functions here return NaN for the all-NaN slices that invalid
             # positions and the observed base leave behind, and one NaN poisons
             # the mean -- which is how this reported "nan" the first time it ran.
-            st = np.stack(per_draw)
-            ok = np.isfinite(st).all(axis=0)
+            stk = np.stack(per_draw)
+            ok = np.isfinite(stk).all(axis=0)
             if ok.any():
-                spreads.append((float(st[:, ok].std(axis=0).mean()),
-                                float(np.abs(st[:, ok].mean(axis=0)).mean()),
-                                float(np.std(base_draws))))
+                spread = np.array([float(stk[:, ok].std(axis=0).mean()),
+                                   float(np.abs(stk[:, ok].mean(axis=0)).mean()),
+                                   float(np.std(base_draws))])
 
-        recs.append(dict(isoform_id=r.isoform_id, vals=vals, valid=valid, obs=obs,
-                         base_logit=base, label=int(labels[i]), arm=r.arm,
-                         split=split_lab[i], gene=gene[i], K=len(os_)))
         a_lo, a_hi, s_lo, s_hi = spans
-        for k in range(len(os_)):
-            spans_rows.append((n, k, a_lo[k], a_hi[k], s_lo[k], s_hi[k]))
-        n_enc_rows += int(valid.sum())
-        if n % 25 == 0 or n == len(take) - 1:
+        # The temporary name must itself end in .npz: np.savez APPENDS ".npz" to
+        # any path that does not, so a ".npz.tmp" target is written to
+        # ".npz.tmp.npz" and the rename that follows it fails on a missing file.
+        tmp = shard_dir / f".partial_{r.isoform_id}.npz"
+        np.savez(tmp, vals=vals, valid=valid, obs=obs,
+                 base_logit=np.float64(base),
+                 spans=np.stack([a_lo, a_hi, s_lo, s_hi], 1).astype(np.int32),
+                 noop=np.float64(noop[0]), n_floor=np.int64(noop[1]),
+                 spread=spread)
+        os.replace(tmp, shard)            # a shard is never half-written
+        if (n - lo_i) % 25 == 0 or n == hi_i - 1:
             print(f"  [{n+1:>5,}/{len(take):,}] {r.isoform_id:<32} K={len(os_):>3} "
                   f"P={len(valid):>6,} valid={int(valid.sum()):>6,} "
-                  f"floor={max(floors):.2e}  ({time.time()-t0:.0f}s)", flush=True)
+                  f"floor={noop[0]:.2e}  ({time.time()-t0:.0f}s)", flush=True)
+    if n_skipped:
+        print(f"  {n_skipped:,} transcripts already had a shard and were not recomputed")
 
-    # ------------------------------------------------------------------ write
+    # ------------------------------------------------------------------ assemble
+    missing = [r.isoform_id for r in take.itertuples()
+               if not (shard_dir / f"{r.isoform_id}.npz").exists()]
+    if missing:
+        print(f"\n{len(missing):,} of {len(take):,} shards are missing — "
+              f"not assembling. Rerun to fill them, or pass --from/--to for the gap.")
+        print(f"  first missing: {missing[:3]}")
+        return
+
+    recs, spans_rows, floors, spreads = [], [], [], []
+    n_floor_samples = 0
+    for n, r in enumerate(take.itertuples()):
+        z = np.load(shard_dir / f"{r.isoform_id}.npz")
+        i = row[r.isoform_id]
+        recs.append(dict(isoform_id=r.isoform_id, vals=z["vals"], valid=z["valid"],
+                         obs=z["obs"], base_logit=float(z["base_logit"]),
+                         label=int(labels[i]), arm=r.arm, split=split_lab[i],
+                         gene=gene[i], K=len(z["spans"])))
+        for k, (alo, ahi, slo, shi) in enumerate(z["spans"]):
+            spans_rows.append((n, k, alo, ahi, slo, shi))
+        floors.append(float(z["noop"])); n_floor_samples += int(z["n_floor"])
+        if np.isfinite(z["spread"]).all():
+            spreads.append(tuple(z["spread"].tolist()))
+
     W = max(len(x["valid"]) for x in recs)
     N = len(recs)
     vals = np.full((N, W, 4), np.nan, np.float32)
