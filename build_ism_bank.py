@@ -818,6 +818,14 @@ def main():
         f.create_dataset("dgc", data=dgc, compression="lzf")
         f.create_dataset("vals_capture", data=vals_cap, compression="lzf")
         f.create_dataset("vals_decay", data=vals_dec, compression="lzf")
+        f.attrs["branch_resolution"] = (
+            "vals_capture is roughly a thousandfold smaller than vals_decay, so "
+            "it is the column where resolution could be mistaken for signal. It "
+            "is not: all three aggregations run in float64 via aggregate(stable="
+            "True), and a substitution moves z_p by ~2e5 float32 ulps at typical "
+            "capture magnitudes. But the two columns have DIFFERENT noise floors "
+            "and a single liveness threshold across them would be wrong in one -- "
+            "capture carries no clamp, the transcript log-odds does.")
         f.attrs["branch_attribution"] = (
             "vals is the total change in the transcript logit. vals_capture is "
             "what the substitution did through the INITIATION branch alone -- "
@@ -983,6 +991,18 @@ def main():
     # says nothing however well its geometry checks out.
     fin = np.isfinite(vals)
     av = np.abs(vals[fin])
+    # THE BRANCH SPLIT AGAINST THE SAME FLOOR. vals_capture is a much smaller
+    # quantity than vals, so it is the column where a reader is most likely to
+    # mistake resolution for signal. The aggregation runs in float64 and z_p
+    # resolves a substitution by ~2e5 float32 ulps, so these are measurements --
+    # but the share clearing the offset is printed so that is visible rather
+    # than argued.
+    for nm, arr in (("vals_capture", vals_cap), ("vals_decay", vals_dec)):
+        av2 = np.abs(arr[np.isfinite(arr)])
+        if len(av2):
+            print(f"  {nm}: median {np.median(av2):.3e}   "
+                  f"above the offset {100*(av2 > floor).mean():.1f}%   "
+                  f"above 10x it {100*(av2 > 10*floor).mean():.1f}%")
     print(f"  |effect| vs that offset, over {int(fin.sum()):,} substitutions:")
     print(f"    median {np.median(av):.3e}   p99 {np.percentile(av, 99):.3e}   "
           f"max {av.max():.3e}")
