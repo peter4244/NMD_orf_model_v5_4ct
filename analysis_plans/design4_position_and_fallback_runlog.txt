@@ -1,0 +1,57 @@
+$ python design4_position_and_fallback.py
+Captured 2026-08-01T03:26:50Z, repo fd59d23.
+
+================================================================================================
+DESIGN 4 -- position discount and the empty-pool fallback
+================================================================================================
+
+  MANE q05 floor -1.2508
+
+  enumerating ...
+    12,000
+    24,000
+    36,000
+
+================================================================================================
+1. RULE 1 -- discount ORFs starting past the transcript midpoint
+================================================================================================
+
+                                       mean/tx   median     p99     max         total
+  ---------------------------------- --------- -------- ------- ------- -------------
+  above the floor                         36.4       32     107   1,190     1,530,321
+  ...and starting in the first half       19.0       17      58     564       798,384
+
+  discounted: 731,937 candidates (47.8% of the above-floor pool)
+
+  coverage of triggering upstream ORFs (133,765 of them):
+    above the floor                    70.6%
+    ...and in the first half           66.6%
+    cost of rule 1 to coverage          4.0 points
+
+================================================================================================
+2. RULE 2 -- transcripts where nothing clears the floor
+================================================================================================
+
+  transcripts with zero candidates above the floor: 7 (0.02%)
+    of those, a GENCODE CDS start is enumerable: 0
+    so they get CDS + top 4; the other 7 get top 5
+
+================================================================================================
+3. INTERACTION -- does rule 1 remove a CDS start rule 2 needs?
+================================================================================================
+
+  transcripts with an enumerable GENCODE CDS start: 28,775
+    its start lies past the transcript midpoint: 1,617 (5.6%)
+    it falls below the floor:                    2,423 (8.4%)
+
+================================================================================================
+4. THE POOL AFTER BOTH RULES
+================================================================================================
+
+  mean 19.0   median 17   p90 35   p99 58   max 564   total 798,399
+  transcripts with zero candidates after both rules: 61
+  projected HDF5 at 1000-wide windows: 22 GB
+
+================================================================================================
+DONE
+================================================================================================

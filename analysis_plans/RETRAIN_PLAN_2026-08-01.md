@@ -154,13 +154,17 @@ propagates. The scale matches: the calibration scores with `Isopair::scoreKozakP
 FLOOR = readRDS(kozak_mane_calibration.rds)$threshold_q05      # -1.2508
 ```
 
-**Step 4 — admit and order.**
+**Step 4 — admit, discount by position, and order.**
 
-A candidate is admitted when its score is at or above `FLOOR`. The candidate matching the annotated
-CDS start is admitted regardless of score, where the transcript has one: at `FLOOR` it otherwise
-drops out for 8.4% of transcripts (measured, §3.4), leaving those transcripts with no candidate at
-their annotated coding sequence. Unconditional admission places the ORF in the pool; nothing marks
-which one it is.
+A candidate is admitted when its score is at or above `FLOOR` **and** its start lies in the first
+half of the transcript. The position rule discounts ORFs a scanning ribosome is unlikely to reach:
+it removes 47.8% of the above-floor pool for 4.0 points of coverage of triggering upstream ORFs
+(measured, §3.4).
+
+Where the admitted set is then empty, a fallback admits five candidates: the GENCODE CDS start plus
+the four highest-scoring AUGs from the scan where the transcript has an enumerable CDS start, or the
+five highest-scoring AUGs where it does not. The fallback triggers on the pool being empty **after**
+both the floor and the position rule, not on the floor alone.
 
 Admitted candidates are ordered by `start` ascending, which is the order a scanning ribosome
 encounters them, and the slot index is that position in the order. Slot index carries no priority:
@@ -168,13 +172,22 @@ slot 0 is the 5′-most admitted candidate, not the annotated one.
 
 ```
 for each transcript t:
+    L        = tx_length[t]
     admitted = [ orf for orf in ORFs(t)
-                 if score(orf) >= FLOOR
-                 or orf.start == ref_utr5_length[t] ]
+                 if score(orf) >= FLOOR and orf.start <= L/2 ]
+
+    if admitted is empty:
+        ranked = sort(ORFs(t), key = score, descending)
+        cds    = the orf with orf.start == ref_utr5_length[t] + 1, if any
+        admitted = ([cds] + ranked[:4]) if cds exists else ranked[:5]
+
     admitted = sort(admitted, key = orf.start, ascending)
     for k, orf in enumerate(admitted):
         orf.slot = k
 ```
+
+Each transcript records how many candidates the position rule discounted and whether the fallback
+fired, so neither is a silent exclusion.
 
 **Step 5 — attach the per-candidate quantities the model is given.**
 
@@ -207,27 +220,26 @@ One row per admitted candidate, replacing `selected_orfs.tsv`:
 
 ### 3.4 Quantities this step reports
 
-Each is a count or proportion over the pool, and each is compared against the value predicted from
-the measurement in `design1_orf_pool_size_runlog.txt`, which used the same enumeration on the same
-sequences.
-
 | quantity | population | predicted |
 |---|---|---|
-| candidates per transcript before the floor | 42,043 transcripts | mean 54.6 |
-| candidates per transcript after the floor | 42,043 transcripts | mean 36.4 |
-| candidates in the largest transcript | 42,043 transcripts | 1,190 |
-| share of upstream ORFs whose own stop has a junction >50 bases downstream that are admitted | 133,765 such ORFs over 17,944 transcripts | 70.6% |
-| share of transcripts whose annotated start codon clears `FLOOR` on its own | 28,775 transcripts with `ref_atg_available == 1` | 91.6% |
-| the same share after unconditional admission | same | 100% |
+| candidates per transcript, no floor | 42,043 transcripts | mean 54.6 |
+| ...above `FLOOR` | same | mean 36.4 |
+| ...and in the first half of the transcript | same | **mean 19.0**, median 17, p99 58, max 564 |
+| candidates discounted by position | above-floor pool of 1,530,321 | 731,937 (47.8%) |
+| coverage of upstream ORFs whose own stop has a junction >50 bases downstream | 133,765 such ORFs | 70.6% above `FLOOR`, **66.6%** after the position rule |
+| transcripts where the fallback fires | 42,043 transcripts | 68 |
+| transcripts with an empty pool after all rules | 42,043 transcripts | 0 |
+| GENCODE CDS start below `FLOOR` | 28,775 with an enumerable CDS start | 2,423 (8.4%) |
+| GENCODE CDS start past the transcript midpoint | same | 1,617 (5.6%) |
 
-All predicted values are measured in `design2_mane_floor_runlog.txt` on the same sequences with the
-same enumeration.
+All predicted values are measured in `design4_position_and_fallback_runlog.txt` on the same
+sequences with the same enumeration.
 
 ### 3.5 Cost
 
-Training-tensor size scales linearly in candidates per transcript. The current 5-slot tensor is
-2.9 GB, so 36.4 candidates projects to roughly 21 GB. This does not fit in the 8 GiB on this
-machine; the tensor is built on the cluster.
+Training-tensor size scales linearly in candidates per transcript and in window width. The current
+5-slot tensor at 500-wide windows is 2.9 GB, so 19.0 candidates at 1000-wide windows projects to
+roughly 22 GB. This does not fit in the 8 GiB on this machine; the tensor is built on the cluster.
 
 ### 3.6 The tail
 
@@ -265,15 +277,15 @@ The pool table from §3, `SEQ`, `JUNC`, `TX`, `HOLDOUT`.
 **Step 1 — give each candidate two sequence windows.**
 
 A candidate carries an ATG window centred on the middle base of its start codon and a stop window
-centred on the middle base of its stop codon, each 500 bases wide. A window running off either end
+centred on the middle base of its stop codon, each 1000 bases wide. A window running off either end
 of the transcript is zero-padded on that side. Where the two windows would overlap, each is clipped
 at the midpoint of the ORF so that together they partition it and neither reads the other's half;
 the clipped side is padded.
 
 ```
 mid   = (orf_start + orf_end) / 2
-atg  = SEQ[t][ orf_start+1 - 250 : orf_start+1 + 250 ]   clipped to [1, mid], zero-padded
-stop = SEQ[t][ orf_end-1  - 250 : orf_end-1  + 250 ]     clipped to [mid, tx_length], zero-padded
+atg  = SEQ[t][ orf_start+1 - 500 : orf_start+1 + 500 ]   fill bounded above by mid
+stop = SEQ[t][ orf_end-1  - 500 : orf_end-1  + 500 ]     fill bounded below by mid
 ```
 
 **Step 2 — encode nine channels at each window position.**
