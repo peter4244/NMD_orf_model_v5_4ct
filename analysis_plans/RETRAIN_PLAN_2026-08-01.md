@@ -942,11 +942,11 @@ Measured over all 42,043 transcripts of the pool, by
 | fraction of the transcript covered | same | mean 0.778, median 0.755 |
 | transcripts covered completely | same | 7,156 (17.0%) |
 | share of uncovered mass lying 3′ of the last window | same | 95.3% |
-| encoder passes per transcript, caching unaffected candidates | same | mean 119,956 |
-| ...re-encoding every candidate instead | same | mean 502,235 |
+| encoder passes per transcript, caching unaffected candidates | same | mean 159,942 |
+| ...re-encoding every candidate instead | same | mean 669,647 |
 | saving from the cache, on the totals | same | 4.2× |
-| float32 input if one transcript's substitutions are batched at once | same | mean 2.79 GB, p90 5.39 GB, max 89.97 GB |
-| ...transcripts above 8 GB on that basis | same | 898 |
+| float32 input if one transcript's substitutions are batched at once | same | mean 3.72 GB, p90 7.19 GB, max 119.96 GB |
+| ...transcripts above 8 GB on that basis | same | 3,584 |
 | genes | 42,043 transcripts | 12,613, mean 3.3 transcripts each |
 | genes carrying both labels | 12,613 genes | 3,546 |
 | `is_nmd` prevalence | 42,043 transcripts | 0.2242 |
@@ -981,6 +981,6 @@ spread 1.18e-02 (373×). The structure — that the unpaired term is orders of m
 paired one — is a property of the architecture. The ratio is not, and is re-measured on the trained
 control checkpoint before `R` is chosen.
 
-Whole-transcript batching is not used: at a mean of 2.79 GB of model input per transcript before any
-activation, 898 transcripts exceed 8 GB on input alone. The bank is chunked by perturbation, and the
+Whole-transcript batching is not used: at a mean of 3.72 GB of model input per transcript before any
+activation, 3,584 transcripts exceed 8 GB on input alone. The bank is chunked by perturbation, and the
 chunk size is set from a measured per-row cost on the hardware the run uses.

@@ -21,26 +21,26 @@ transcripts in the pool    : 42,043
   share of the uncovered mass that is that tail  : 95.3%
 
 === encoder passes per transcript (one pass = one window through one encoder) ===
-  cached  (recompute only affected windows)      mean      119,956  median      100,944  p90      234,821  max    4,086,204 
-  naive   (recompute every candidate)            mean      502,235  median      333,279  p90    1,069,819  max  244,624,095 
+  cached  (recompute only affected windows)      mean      159,942  median      134,592  p90      313,094  max    5,448,272 
+  naive   (recompute every candidate)            mean      669,647  median      444,372  p90    1,426,426  max  326,165,460 
   saving factor, on the totals                   : 4.2x
   saving factor, per transcript                  mean          3.5  median          3.3  p90          4.8  max         59.9 
 
 === a 1,000-transcript bank, label-stratified at the pool's own prevalence ===
   prevalence in the pool 0.224 -> 224 positive, 776 negative
-  cached  total encoder passes            : 120,646,290
-      at  20,000/s :    100.5 min per arm,    301.6 min for 3 window arms
-      at  85,000/s :     23.7 min per arm,     71.0 min for 3 window arms
-      at 200,000/s :     10.1 min per arm,     30.2 min for 3 window arms
-  naive   total encoder passes            : 500,820,804
-      at  20,000/s :    417.4 min per arm,   1252.1 min for 3 window arms
-      at  85,000/s :     98.2 min per arm,    294.6 min for 3 window arms
-      at 200,000/s :     41.7 min per arm,    125.2 min for 3 window arms
+  cached  total encoder passes            : 160,861,720
+      at  20,000/s :    134.1 min per arm,    402.2 min for 3 window arms
+      at  85,000/s :     31.5 min per arm,     94.6 min for 3 window arms
+      at 200,000/s :     13.4 min per arm,     40.2 min for 3 window arms
+  naive   total encoder passes            : 667,761,072
+      at  20,000/s :    556.5 min per arm,   1669.4 min for 3 window arms
+      at  85,000/s :    130.9 min per arm,    392.8 min for 3 window arms
+      at 200,000/s :     55.6 min per arm,    166.9 min for 3 window arms
 
 === input-tensor bytes if ONE transcript's substitutions are batched at once ===
-  float32 input, whole transcript at once (GB)   mean         2.79  median         2.37  p90         5.39  max        89.97 
-  transcripts over 8 GB of input alone           : 898
-  transcripts over 32 GB of input alone          : 2
+  float32 input, whole transcript at once (GB)   mean         3.72  median         3.16  p90         7.19  max       119.97 
+  transcripts over 8 GB of input alone           : 2,897
+  transcripts over 32 GB of input alone          : 7
   -> the bank chunks by perturbation, not by transcript; the chunk size is
      what bounds memory and it is set from a measured per-row cost, not this.
 

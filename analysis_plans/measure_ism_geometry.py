@@ -14,12 +14,14 @@ over K numbers, not an encoder pass.
 
 So the cost is not "positions x candidates". It is
 
-    encoder passes = 3 x sum over candidates of (2 x filled ATG positions
+    encoder passes = 4 x sum over candidates of (2 x filled ATG positions
                                                  + 1 x filled stop positions)
 
 ATG counts twice because two encoders read that window — enc_init and enc_atg — and one
-counts because only enc_stop reads the stop window. The 3 is the three substitutions per
-position; the observed base is a no-op and is sampled separately.
+counts because only enc_stop reads the stop window. The 4 is three substitutions per position
+PLUS the observed base: that fourth row is the baseline the other three are differenced
+against, and it has to sit in the same chunk as they do because the encoder's output depends
+on how many rows share its batch (three regimes, 3.278e-07 apart, at batch 1 / 2-7 / 8+).
 
 GEOMETRY, read from build_tensor.py rather than from the plan's prose:
 
@@ -170,9 +172,9 @@ def main():
 
     # ------------------------------------------------------------- the cost
     # encoder passes, cached: only the windows containing p are recomputed
-    enc_cached = 3 * (2 * per_tx["atg_sum"] + per_tx["stop_sum"])
+    enc_cached = 4 * (2 * per_tx["atg_sum"] + per_tx["stop_sum"])
     # encoder passes, naive: every candidate re-encoded for every substitution
-    enc_naive = 3 * per_tx["covered"] * (2 * per_tx["K"] + per_tx["K"])
+    enc_naive = 4 * per_tx["covered"] * (2 * per_tx["K"] + per_tx["K"])
     per_tx["enc_cached"] = enc_cached
     per_tx["enc_naive"] = enc_naive
 
@@ -211,7 +213,7 @@ def main():
     # that transcript is batched at once. This is the quantity probe_ism_cost.py
     # caught at 35.3 GiB on the old architecture.
     print(f"\n=== input-tensor bytes if ONE transcript's substitutions are batched at once ===")
-    rows = 3 * (per_tx["atg_sum"] + per_tx["stop_sum"])      # window-encodes, not passes
+    rows = 4 * (per_tx["atg_sum"] + per_tx["stop_sum"])      # window-encodes, not passes
     gb = rows * 9 * WINDOW * 4 / 1e9                          # float32, 9 channels
     describe("float32 input, whole transcript at once (GB)", gb, "", ".2f")
     print(f"  transcripts over 8 GB of input alone           : {int((gb > 8).sum()):,}")
