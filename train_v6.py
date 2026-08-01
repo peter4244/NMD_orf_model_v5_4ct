@@ -100,11 +100,12 @@ class TensorSource:
     """Reads padded batches out of the ragged HDF5."""
 
     def __init__(self, path, struct_cols, blank_sequence=False,
-                 blank_junctions=False, in_memory=True):
+                 blank_junctions=False, zero_structural=False, in_memory=True):
         self.path = str(path)
         self.struct_cols = struct_cols
         self.blank_sequence = blank_sequence
         self.blank_junctions = blank_junctions
+        self.zero_structural = zero_structural
         self._f = None
         with h5py.File(self.path, "r") as f:
             self.offset = f["offset"][:]
@@ -191,6 +192,14 @@ class TensorSource:
         if self.blank_junctions:
             A[:, :, 4] = 0.0
             S[:, :, 4] = 0.0
+        if self.zero_structural:
+            # The block is kept at its declared width and set to zero, rather
+            # than removed: the model requires n_structural >= 1, and `cols = []`
+            # does NOT drop it -- `cols if cols else [0]` resolves to [0] and
+            # feeds n_downstream_ejc straight back in. That silently made the
+            # no-junction arm a junction-derived arm while its own checkpoint
+            # recorded structural_columns=[].
+            U[:] = 0.0
 
         t = lambda x, d=torch.float32: torch.as_tensor(x, dtype=d, device=device)
         return (t(A), t(S), t(U), torch.as_tensor(M, device=device),
@@ -274,16 +283,18 @@ def main():
     rng = dict(numpy=np.random.default_rng(args.seed))
 
     cols = INTERPRETABLE if args.variant == "interpretable" else PREDICTOR
-    if args.blank_junctions:
-        cols = []                       # the arm drops the structural block too
+    # n_downstream_ejc is junction-derived, so the no-junction arm must lose it
+    # as well as channel 4, or it is not a junction ablation at all.
+    zero_struct = bool(args.blank_junctions)
     src = TensorSource(Path(args.tensor) / "nmd_tensor.h5",
-                       cols if cols else [0],
+                       cols,
                        blank_sequence=args.blank_sequence,
-                       blank_junctions=args.blank_junctions)
+                       blank_junctions=args.blank_junctions,
+                       zero_structural=zero_struct)
 
     model = ScanningNMDModel(conv_channels=args.conv_channels,
                              n_bins=args.n_bins,
-                             n_structural=max(len(cols), 1),
+                             n_structural=len(cols),
                              permute_bins=args.permute_bins).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -298,7 +309,10 @@ def main():
         permute_bins=bool(args.permute_bins), variant=args.variant,
         blank_sequence=bool(args.blank_sequence),
         blank_junctions=bool(args.blank_junctions), seed=args.seed,
-        structural_columns=[STRUCTURAL_COLS[c] for c in cols],
+        structural_columns=([] if zero_struct
+                            else [STRUCTURAL_COLS[c] for c in cols]),
+        structural_width=len(cols),
+        structural_zeroed=zero_struct,
         normalization=dict(columns=STRUCTURAL_COLS,
                            mean=src.norm_mean.tolist(),
                            std=src.norm_std.tolist()),
@@ -307,7 +321,8 @@ def main():
                                "test", "test_paralog"]})
     print(f"device {device}   parameters {count_parameters(model):,}")
     print(f"variant {args.variant}   structural columns "
-          f"{[STRUCTURAL_COLS[c] for c in cols] if cols else '(none)'}")
+          f"{'(all zeroed)' if zero_struct else [STRUCTURAL_COLS[c] for c in cols]}"
+          f"   block width {len(cols)}")
     print(f"train {len(tr):,}   val_clean {len(va):,}   "
           f"positives train {src.labels[tr].mean()*100:.1f}%", flush=True)
 
