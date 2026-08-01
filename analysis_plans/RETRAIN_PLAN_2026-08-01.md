@@ -866,6 +866,9 @@ stored column is invalid for every transcript.
 | `transcript_id` | (n_iso,) | string | keys to `TX` |
 | `spans` | (n_cand, 6) | int32 | one row per candidate: transcript row index, slot, and the four bounds of `ATG_k` and `STOP_k` |
 | `cand_offset`, `cand_count` | (n_iso,) | int32 | the rows of `spans` belonging to each transcript |
+| `p_capture` | (n_cand,) | float32 | `p_k` of §6.2 step 2, the initiation head's output, unperturbed |
+| `p_select` | (n_cand,) | float32 | `P_select[k]` of §6.2 step 4, unperturbed |
+| `p_decay` | (n_cand,) | float32 | `d_k` of §6.2 step 3, unperturbed |
 | `arm` | (n_iso,) | string | `discovery` or `confirmation`, from step 1 |
 | `split` | (n_iso,) | string | `train`, `val`, `val_paralog`, `test`, `test_paralog`, from §5 step 5 |
 | `gene_id` | (n_iso,) | string | for clustering |
@@ -874,6 +877,25 @@ stored column is invalid for every transcript.
 | `pinned_in_training` | (n_iso,) | bool | `|base_logit| >= 13.8155`, where that clamp is active |
 
 Provenance travels as file attributes beside these: the checkpoint path, the model configuration, the pool `sha256`, the split file, the number of paired draws, the number of positions the floor was sampled at, and a one-paragraph statement of what one `vals` entry means.
+
+`p_capture`, `p_select` and `p_decay` share `spans`' row order but are separate datasets: `spans` is
+geometry and survives a change of checkpoint, these are model outputs and do not.
+
+`p_capture` ships alongside `p_select` rather than only the product. `P_select[k]` is `p_k` times the
+probability that every earlier candidate was passed over, so it confounds "this candidate is a strong
+initiation context" with "everything upstream of it was weak"; a check on initiation context reads
+the first, and only `p_select` decides whether a substitution can move the output at all.
+
+**A candidate carrying no selection mass cannot move the transcript logit however its sequence
+changes.** A zero there is "not expressible", which is the same distinction as `valid` against a
+measured zero, one level up. Stick-breaking halves the mass at every slot when `p_k` is near 0.5, so
+this is not a rare corner: at `p_k` = 0.5 exactly, 99.8% of the mass falls in slots 0 to 9, while
+73.3% of transcripts hold more than 10 candidates and 37.6% hold more than 20 (measured, §9.4).
+
+The depth the mass reaches is a **function of the fitted `p_k`**, so the same number is a readout of
+whether the initiation head learned anything: selectivity and depth are one axis, and mass dying
+early says `p_k` is close to uniform. It is measured on the selected checkpoint before any bank is
+built, and reported as a result rather than only as a restriction.
 
 `spans` is emitted because the interpretation window excludes positions within 25 bases of a window
 boundary, where a substitution perturbs the truncated denominator of the 50-base rolling mean of
@@ -950,6 +972,11 @@ Measured over all 42,043 transcripts of the pool, by
 | genes | 42,043 transcripts | 12,613, mean 3.3 transcripts each |
 | genes carrying both labels | 12,613 genes | 3,546 |
 | `is_nmd` prevalence | 42,043 transcripts | 0.2242 |
+| transcripts with more than 10 candidates | same | 30,799 (73.3%) |
+| ...more than 20 | same | 15,788 (37.6%) |
+| slot of the reference start codon in 5′→3′ order | 28,775 with one in the pool | median 1, mean 3.7, p90 11, max 564 |
+| ...within slots 0 to 9 | same | 25,559 (88.8%) |
+| selection mass in slots 0 to 9, at `p_k` = 0.5 | 60 chr21 transcripts | 99.8% |
 
 Measured over the 41,765 transcripts of step 1, by `build_ism_split.py` /
 `build_ism_split_runlog.txt`:

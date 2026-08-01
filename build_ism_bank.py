@@ -193,6 +193,16 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
         base_logit = float(model.aggregate(z_p0[None].double(), z_d0[None].double(),
                                            mask1, stable=True).item())
         base_train = float(model.aggregate(z_p0[None], z_d0[None], mask1).item())
+        # THE PER-CANDIDATE QUANTITIES, from the unperturbed pass. p_capture is
+        # what the initiation head emits and is the interpretable one; p_select
+        # is p_capture times the probability every earlier candidate was passed,
+        # so it confounds "this is a strong start" with "everything upstream was
+        # weak". Both ship, because the second decides whether a substitution can
+        # move the output at all and the first is what a start-codon check reads.
+        _, parts = model.aggregate(z_p0[None], z_d0[None], mask1, return_parts=True)
+        p_cap = parts["p"][0].cpu().numpy().astype(np.float32)
+        p_sel = parts["p_select"][0].cpu().numpy().astype(np.float32)
+        p_dec = parts["d"][0].cpu().numpy().astype(np.float32)
 
     # ---- observed base and validity, from the codes themselves -------------
     obs = np.full(P, -1, dtype=np.int8)
@@ -327,7 +337,7 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
         i = j
 
     return (vals, valid, obs, (base_logit, base_train), (noop_max, int(valid.sum())),
-            (a_lo, a_hi, s_lo, s_hi))
+            (a_lo, a_hi, s_lo, s_hi), (p_cap, p_sel, p_dec))
 
 
 def main():
@@ -448,7 +458,7 @@ def main():
             v = valid = None
             for attempt in range(5):
                 try:
-                    v, valid, obs, base, noop, spans = transcript_bank(
+                    v, valid, obs, base, noop, spans, per_cand = transcript_bank(
                         model, enc, cds, os_, oe_, int(r.tx_length), struct_k,
                         device, chunk_rows, rng)
                     break
@@ -483,6 +493,7 @@ def main():
                  base_logit=np.float64(base[0]),
                  base_logit_training=np.float64(base[1]),
                  spans=np.stack([a_lo, a_hi, s_lo, s_hi], 1).astype(np.int32),
+                 p_capture=per_cand[0], p_select=per_cand[1], p_decay=per_cand[2],
                  noop=np.float64(noop[0]), n_floor=np.int64(noop[1]),
                  spread=spread)
         os.replace(tmp, shard)            # a shard is never half-written
@@ -503,9 +514,11 @@ def main():
         return
 
     recs, spans_rows, floors, spreads = [], [], [], []
+    pcap, psel, pdec = [], [], []
     n_floor_samples = 0
     for n, r in enumerate(take.itertuples()):
         z = np.load(shard_dir / f"{r.isoform_id}.npz")
+        pcap.append(z["p_capture"]); psel.append(z["p_select"]); pdec.append(z["p_decay"])
         i = row[r.isoform_id]
         recs.append(dict(isoform_id=r.isoform_id, vals=z["vals"], valid=z["valid"],
                          obs=z["obs"], base_logit=float(z["base_logit"]),
@@ -568,6 +581,13 @@ def main():
         f.create_dataset("arm", data=np.array([x["arm"] for x in recs], dtype="S"))
         f.create_dataset("split", data=np.array([x["split"] for x in recs], dtype="S"))
         f.create_dataset("spans", data=np.array(spans_rows, np.int32))
+        # MODEL OUTPUTS, NOT GEOMETRY. Same row order as spans so the join is
+        # positional, but their own datasets: spans are a property of the pool and
+        # survive a change of checkpoint, these do not, and one table holding both
+        # invites exactly the reuse that pool_sha256 exists to prevent.
+        f.create_dataset("p_capture", data=np.concatenate(pcap))
+        f.create_dataset("p_select", data=np.concatenate(psel))
+        f.create_dataset("p_decay", data=np.concatenate(pdec))
         f.create_dataset("cand_offset", data=cand_offset)
         f.create_dataset("cand_count", data=cand_count)
         f.attrs["batch_shape_offset"] = floor
@@ -622,6 +642,28 @@ def main():
     print(f"  n {N:,}   W {W:,}   valid positions {int(valid.sum()):,}")
     print(f"  transcripts the TRAINING clamp would pin (vals are unaffected): "
           f"{int(pinned.sum()):,} of {N:,} ({100*pinned.mean():.1f}%)")
+
+    # HOW DEEP DOES SELECTION MASS REACH? Stick-breaking halves the mass every
+    # slot at p_capture ~ 0.5, and a candidate carrying no mass cannot move the
+    # output however its sequence changes -- so a zero there is "not expressible"
+    # and not "the model did not notice". It is also a readout of the initiation
+    # head itself: depth and selectivity are the same axis, so mass dying early
+    # says p_capture is close to uniform, which is a finding about the model.
+    ps = np.concatenate(psel)
+    slot = np.concatenate([np.arange(c) for c in cand_count])
+    print(f"  selection mass by slot, over {N:,} transcripts:")
+    tot = ps.sum()
+    for lo, hi in ((0, 9), (10, 19), (20, 49), (50, 10**9)):
+        m = (slot >= lo) & (slot <= hi)
+        if m.any():
+            lab = f"slots {lo}-{hi}" if hi < 10**9 else f"slots {lo}+"
+            print(f"    {lab:<14} {100*ps[m].sum()/tot:>6.2f}%   "
+                  f"{int(m.sum()):>8,} candidates")
+    print(f"  p_capture over all candidates: median {np.median(np.concatenate(pcap)):.4f} "
+          f"(0.5 = uniform, no initiation preference learned)")
+    frac = float((ps < 1e-4).mean())
+    print(f"  candidates carrying < 1e-4 of the mass: {100*frac:.1f}% "
+          f"-- a substitution there cannot move the output")
     print(f"  batch-shape offset REMOVED by the same-chunk baseline: max {floor:.3e} "
           f"over {n_floor_samples:,} positions in {len(recs):,} transcripts")
     print(f"    (this is how far a chunk's no-op sits from the batch-K base pass. "
