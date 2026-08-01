@@ -150,7 +150,10 @@ def main():
     ap.add_argument("--pool", default="results_pool_v6")
     ap.add_argument("--out", default="results_tensor_v6")
     ap.add_argument("--chrom", default="",
-                    help="build only this chromosome, for a local check")
+                    help="build only these chromosomes, comma-separated, for a "
+                         "local check. Several are allowed so a local substrate "
+                         "can hold train AND val rows, which anything that fits "
+                         "on train and tunes on val needs.")
     ap.add_argument("--tables", default=str(TABLES))
     ap.add_argument("--fasta", default=str(FASTA))
     args = ap.parse_args()
@@ -196,8 +199,9 @@ def main():
         print(f"  {s:<14} {int(tx['split'].eq(s).sum()):>7,}")
 
     if args.chrom:
-        tx = tx[tx["chr"].eq(args.chrom)].copy()
-        print(f"\n  RESTRICTED to {args.chrom}: {len(tx):,} transcripts")
+        want = [c.strip() for c in args.chrom.split(",") if c.strip()]
+        tx = tx[tx["chr"].isin(want)].copy()
+        print(f"\n  RESTRICTED to {', '.join(want)}: {len(tx):,} transcripts")
 
     # -------------------------------------------------------------- the pool
     provenance = json.loads((pooldir / "orf_pool_provenance.json").read_text())
