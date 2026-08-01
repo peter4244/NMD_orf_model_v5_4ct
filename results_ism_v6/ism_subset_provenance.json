@@ -1,0 +1,41 @@
+{
+  "built_at": "2026-08-01T21:08:16Z",
+  "script": "build_ism_subset.py",
+  "seed": 20260801,
+  "sha256": "7056a80d05bdb424d3bd6522950bc919aeea4446faa2040c79174e2718faffdb",
+  "n": 4999,
+  "n_genes": 3830,
+  "cells": {
+    "NMD / NO main-ORF stop": {
+      "population": 437,
+      "taken": 437,
+      "weight": 1.0
+    },
+    "NMD / main-ORF stop": {
+      "population": 1101,
+      "taken": 1025,
+      "weight": 1.0741463414634147
+    },
+    "NMD / no annotation": {
+      "population": 7783,
+      "taken": 1025,
+      "weight": 7.593170731707317
+    },
+    "control / NO main-ORF stop": {
+      "population": 13526,
+      "taken": 1025,
+      "weight": 13.196097560975609
+    },
+    "control / main-ORF stop": {
+      "population": 462,
+      "taken": 462,
+      "weight": 1.0
+    },
+    "control / no annotation": {
+      "population": 18456,
+      "taken": 1025,
+      "weight": 18.005853658536584
+    }
+  },
+  "note": "Scarce cells taken whole, abundant cells sampled, sampling_weight recorded per transcript. Any population-level estimate must be reweighted or it describes this subset rather than the pool. Main ORF is the GENCODE-projected start, not the expression-derived reference; transcripts with no annotation are their own cells rather than dropped."
+}

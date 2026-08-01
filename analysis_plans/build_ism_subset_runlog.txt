@@ -1,0 +1,28 @@
+population 41,765 transcripts (the tensor's own set)
+  with an admitted GENCODE start: 15,526 (37.2%)
+
+  cell                                      N   % of pool
+  NMD / NO main-ORF stop                  437       1.05%
+  NMD / main-ORF stop                   1,101       2.64%
+  NMD / no annotation                   7,783      18.64%
+  control / NO main-ORF stop           13,526      32.39%
+  control / main-ORF stop                 462       1.11%
+  control / no annotation              18,456      44.19%
+
+  cells at or below 833 taken WHOLE; the rest share 4,101 at 1,025 each
+
+  cell                                      N    taken    weight
+  NMD / NO main-ORF stop                  437      437     1.000   WHOLE
+  NMD / main-ORF stop                   1,101    1,025     1.074
+  NMD / no annotation                   7,783    1,025     7.593
+  control / NO main-ORF stop           13,526    1,025    13.196
+  control / main-ORF stop                 462      462     1.000   WHOLE
+  control / no annotation              18,456    1,025    18.006
+
+  total 4,999 transcripts, 3,830 genes
+  discovery 2,494 / confirmation 2,505
+  genes in discovery 1,913 / confirmation 1,917
+  weighted total reconstructs the pool: 41,765 against 41,765
+
+wrote results_ism_v6/ism_subset.tsv  sha256 7056a80d05bdb424d3bd6522950bc919
+3s

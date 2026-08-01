@@ -435,8 +435,13 @@ def main():
         gc_flags = {}
         for iso_id, g in _g.groupby("isoform_id", sort=False):
             g = g.sort_values("slot", kind="stable")
-            gc_flags[iso_id] = (g.is_gencode_start.to_numpy(np.int8),
-                                g.upstream_of_gencode_start.to_numpy(np.int8))
+            # fillna(-1) BEFORE the cast. The flags file writes nulls EMPTY on
+            # purpose, so "no annotation" cannot be read as "not upstream" -- but
+            # casting NaN straight to int8 is undefined and silently produces
+            # garbage, which would reintroduce exactly the confusion the empty
+            # nulls were protecting against.
+            gc_flags[iso_id] = (g.is_gencode_start.fillna(-1).to_numpy(np.int8),
+                                g.upstream_of_gencode_start.fillna(-1).to_numpy(np.int8))
         print(f"\nGENCODE-projected start flags: {GENCODE_FLAGS.name}, "
               f"{len(gc_flags):,} transcripts")
     else:
@@ -458,8 +463,21 @@ def main():
                             ((g.orf_start.to_numpy() < ref_start) & (ref_start > 0)
                              ).astype(np.int8))
 
+    # THE SUBSET IS STRATIFIED, NOT A PREFIX. The mechanism cell the section is
+    # about is under 1% of the pool, so a random prefix of 5,000 draws about
+    # fifty of it. build_ism_subset.py takes the scarce cells whole and records a
+    # sampling weight per transcript; --split still accepts the ranked order for
+    # the old behaviour, but the subset file is what §9 now specifies.
     sp_all = pd.read_csv(args.split, sep="\t")
-    sp = sp_all.sort_values("rank", kind="stable")
+    if "sampling_weight" in sp_all.columns:
+        sp = sp_all.sort_values("isoform_id", kind="stable")
+        print(f"\nsubset file: {args.split}")
+        print(f"  {len(sp):,} transcripts, {sp.gene_id.nunique():,} genes, "
+              f"stratified with sampling weights")
+        for c, g in sp.groupby("cell"):
+            print(f"    {c:<34} {len(g):>6,}  weight {g.sampling_weight.iloc[0]:>7.3f}")
+    else:
+        sp = sp_all.sort_values("rank", kind="stable")
     with h5py.File(str(Path(args.tensor) / "nmd_tensor.h5"), "r") as f:
         iso = np.array([s.decode() for s in f["isoform_id"][:]])
         row = {s: i for i, s in enumerate(iso)}
@@ -485,8 +503,11 @@ def main():
         take = sp.head(args.n if args.n > 0 else len(sp))
         if args.limit_transcripts:
             take = take.head(args.limit_transcripts)
-    print(f"\nsubset     {len(take):,} transcripts "
-          f"(rank < {int(take['rank'].max())+1:,} of the fixed order)")
+    if "rank" in take.columns:
+        print(f"\nsubset     {len(take):,} transcripts "
+              f"(rank < {int(take['rank'].max())+1:,} of the fixed order)")
+    else:
+        print(f"\nsubset     {len(take):,} transcripts (stratified; see cells above)")
     print(f"  in the tensor {len(sp):,} of {len(sp_all):,} split rows; "
           f"prevalence {take['is_nmd'].mean():.4f}")
     for a in ("discovery", "confirmation"):
@@ -680,6 +701,20 @@ def main():
         f.create_dataset("transcript_id", data=np.array([x["isoform_id"] for x in recs], dtype="S"))
         f.create_dataset("gene_id", data=np.array([x["gene"] for x in recs], dtype="S"))
         f.create_dataset("arm", data=np.array([x["arm"] for x in recs], dtype="S"))
+        if "sampling_weight" in sp_all.columns:
+            wmap = dict(zip(sp_all.isoform_id, sp_all.sampling_weight))
+            cmap = dict(zip(sp_all.isoform_id, sp_all.cell))
+            f.create_dataset("sampling_weight", data=np.array(
+                [wmap[x["isoform_id"]] for x in recs], np.float32))
+            f.create_dataset("cell", data=np.array(
+                [cmap[x["isoform_id"]] for x in recs], dtype="S"))
+            f.attrs["sampling"] = (
+                "STRATIFIED, not a random sample. Scarce mechanism cells were "
+                "taken whole and abundant ones sampled, so the bank's composition "
+                "is not the pool's. Any population-level estimate must be "
+                "reweighted by sampling_weight or it describes this subset "
+                "rather than the pool. The weights reconstruct the pool exactly: "
+                "they sum to 41,765.")
         f.create_dataset("split", data=np.array([x["split"] for x in recs], dtype="S"))
         f.create_dataset("spans", data=np.array(spans_rows, np.int32))
         # MODEL OUTPUTS, NOT GEOMETRY. Same row order as spans so the join is
