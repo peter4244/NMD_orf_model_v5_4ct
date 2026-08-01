@@ -1,0 +1,74 @@
+$ python exp7_does_graded_help.py
+Captured 2026-08-01T02:15:56Z, repo 7e9f907.
+
+====================================================================================================
+EXPERIMENT 7 -- does grading the junction feature help find OTHER
+                sequence elements, or is the binary indicator enough?
+====================================================================================================
+
+  population: 26,459 isoforms, reference-CDS anchor, >= 200 nt of 3'UTR
+  NMD+ 21.7%   binary rule fires in 26.0%
+
+  what the two adjustments look like:
+    distance bin       n     NMD+   binary says
+    none          18,623     4.7%         0.00
+    d0_50          2,378    52.1%         0.59
+    d51_100        2,062    77.4%         1.00
+    d101_200       1,919    79.6%         1.00
+    d201_500         774    52.7%         1.00
+    d500p            703    13.8%         1.00
+
+  Note the binary column: it is NOT a coarsening of the distance
+  bins. A transcript whose NEAREST junction is within 50 nt can still
+  have a LATER one beyond 50, so 'd0_50' is a mix. That is the honest
+  version of the comparison and it is what the model would see.
+
+====================================================================================================
+THE COMPARISON -- each candidate, adjusted two ways
+====================================================================================================
+
+  A = binary junction rule x 3'UTR quartile x GC quartile
+  B = graded distance bin  x 3'UTR quartile x GC quartile
+  Both gene-clustered. If A and B agree, grading buys nothing here.
+
+  candidate                                       A: binary              B: graded     shift
+  ---------------------------------- ---------------------- ---------------------- ---------
+  stop codon TGA vs TAG                 +1.89 [+0.80,+3.17]    +1.36 [+0.11,+2.63]    -0.53p
+  AATAAA in first 200 nt                +0.89 [-1.26,+2.49]    +0.53 [-1.45,+1.98]    -0.36p
+  TTATTTATT (ARE)                       +1.41 [-4.23,+7.59]    +1.40 [-4.30,+7.28]    -0.00p
+  pyrimidine run >= 10                  -4.50 [-5.76,-3.35]    -3.18 [-4.39,-2.03]    +1.32p
+  3'UTR GC, top vs bottom quartile       +nan [ +nan, +nan]     +nan [ +nan, +nan]     +nanp
+  5'UTR length, long vs short          +9.51 [+8.18,+10.90]   +9.64 [+8.26,+11.07]    +0.13p
+  upstream AUG count, >=4 vs <=1        +7.23 [+5.97,+8.55]    +7.80 [+6.67,+9.16]    +0.57p
+
+  On the odds scale, where the pp scale can mislead:
+  candidate                            A: binary OR   B: graded OR    ratio
+  ---------------------------------- -------------- -------------- --------
+  stop codon TGA vs TAG                       1.222          1.169    0.956
+  AATAAA in first 200 nt                      1.083          0.993    0.917
+  TTATTTATT (ARE)                             0.857          0.864    1.009
+  pyrimidine run >= 10                        0.651          0.727    1.117
+  3'UTR GC, top vs bottom quartile              nan            nan      nan
+  5'UTR length, long vs short                 2.819          3.059    1.085
+  upstream AUG count, >=4 vs <=1              2.422          2.656    1.097
+
+====================================================================================================
+READING
+====================================================================================================
+
+  largest absolute shift in any candidate: 1.32pp
+  median absolute shift:                    0.45pp
+  largest change in odds ratio:             11.7%
+
+  If those are small, the answer to Pete's question is: grading the junction
+  feature does NOT help find other sequence elements. The binary rule already
+  absorbs the part of junction geometry that could contaminate a sequence
+  claim, and the 18pp gradient beyond it -- real as it is -- lives in a
+  direction that no candidate sequence feature is aligned with.
+
+  That would make the graded feature a BIOLOGY finding to report, not a design
+  change to make. The two are separable and I had conflated them.
+
+====================================================================================================
+DONE
+====================================================================================================

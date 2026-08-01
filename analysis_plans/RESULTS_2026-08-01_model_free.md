@@ -397,10 +397,37 @@ nt rule is a threshold, so there is no dose to respond to, and the question is e
 perfect model.* The 51–100 versus 101–200 contrast is a dose, it is 18 points, and it is on the
 cleanest data in the set.
 
-**Consequence for Part 2 Step 1.** The fix to `n_downstream_ejc` is currently specified as applying
-the 50 nt rule — i.e. replacing a thresholdless count with a thresholded one. That would still
-discard the 18-point difference between a junction at 80 nt and one at 150 nt. If the feature is
-being rebuilt anyway, it should carry graded distance, not a second threshold.
+**Consequence for Part 2 Step 1 — and I got this wrong.** I argued that because the effect is
+graded, the rebuilt feature should carry graded distance rather than a second threshold. Pete asked
+how that would help identify *other* sequence features, as opposed to a binary indicator. It
+doesn't, and `exp7_does_graded_help.py` measures it.
+
+A supplied feature is inadequate for discovery only if what it leaves behind can be **mistaken for a
+sequence element**. So each candidate sequence feature was measured twice — adjusted for the binary
+rule, and adjusted for six distance bins:
+
+| candidate | A: binary | B: graded | shift | OR change |
+|---|---|---|---|---|
+| stop codon TGA vs TAG | +1.89 | +1.36 | −0.53pp | 4.4% |
+| AATAAA in first 200 nt | +0.89 | +0.53 | −0.36pp | 8.3% |
+| TTATTTATT (ARE) | +1.41 | +1.40 | −0.00pp | 0.9% |
+| pyrimidine run ≥ 10 | −4.50 | −3.18 | +1.32pp | 11.7% |
+| 5'UTR length, long vs short | +9.51 | +9.64 | +0.13pp | 8.5% |
+| upstream AUG count, ≥4 vs ≤1 | +7.23 | +7.80 | +0.57pp | 9.7% |
+
+Median absolute shift **0.45pp**, largest **1.32pp**, largest odds-ratio change **11.7%**. No
+conclusion moves. **The binary rule already absorbs the part of junction geometry that could
+contaminate a sequence claim**, and the graded residual sits in a direction no candidate sequence
+feature is aligned with. I had assumed the residual would leak into sequence claims. It does not.
+
+So the 18-point gradient is a **biology finding to report, not a design change to make.** Those are
+separable and I conflated them. The Step 1 fix that matters is still the one already agreed —
+thresholdless count → the 50 nt rule — and it should stop there.
+
+**What the same table says about where the signal actually is**, unprompted and worth more than the
+argument it settles: on the odds scale, 5'UTR length gives **2.82** and upstream AUG count **2.42**,
+against 1.22 for the stop codon and ~1.0 for every 3'UTR motif. The 5' end dwarfs the 3' end, and it
+is unaffected by any of this adjustment argument.
 
 ---
 
