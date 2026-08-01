@@ -1,0 +1,60 @@
+tensor results_tensor_chr2
+  2,826 transcripts, 57,921 candidates
+  splits: val=2,787, val_paralog=39
+  admitted_by: floor=57,638, reference=272, fallback=11
+  b8_s100.pt: done
+  b8_s200.pt: done
+  b8_s300.pt: done
+  b8_s400.pt: done
+  b8_s500.pt: done
+
+=== the admission-rule confound, sized ===
+  reference start codons below the Kozak floor : 178 of 1,909 (9.3%)
+  non-reference candidates below the floor     : 7
+  -> below the floor the non-reference arm is nearly empty, so a decile
+     spanning it is not matched. Restricting both arms to >= the floor
+     removes the truncation instead of bounding it.
+
+=== p_capture: reference start vs everything else ===
+  condition                                gap   n ref   n other
+  all candidates                       +0.4686   1,909    56,012
+  both arms at or above the floor      +0.4770   1,731    56,005
+  ...and slot 0 only                   +0.5510     682     2,106
+  ...and slot 1-4                      +0.4600     668    10,285
+  ...and slot 5+                       +0.4728     381    43,614
+
+  Kozak-decile matched, restricted to at or above the floor:
+   decile    kozak  n ref  n other       gap
+        0   -1.114     85    5,690   +0.4987
+        1   -0.864     74    5,725   +0.4850
+        2   -0.630     81    5,668   +0.4742
+        3   -0.405    113    5,659   +0.4487
+        4   -0.167     86    5,688   +0.4954
+        5    0.095    108    5,671   +0.4380
+        6    0.382    206    5,566   +0.4725
+        7    0.710    203    5,566   +0.4003
+        8    1.146    286    5,490   +0.4489
+        9    1.984    489    5,282   +0.4452
+  n-weighted mean gap, floor-restricted and Kozak-matched: +0.4518
+
+=== what the capture head is reading (Track A's ablation) ===
+  Capture sees the start-codon window alone. Zeroing a channel of that
+  window at inference asks what the preference survives on.
+  channels zeroed                          gap   vs base   median p
+  none (baseline)                      +0.4770      100%     0.0329
+  4  junction mark                     +0.4473       94%     0.0255
+  5  rolling GC                        +0.4553       95%     0.0125
+  4 and 5  bases only                  +0.4177       88%     0.0098
+
+  A gap that survives with 4 and 5 zeroed is carried by base identity
+  in the start-codon window -- initiation context. One that collapses when
+  channel 4 goes was junction geometry.
+
+=== selection depth, out of sample ===
+  slots 0-4       75.98% of mass   13,841 candidates
+  slots 5-9       14.92% of mass   12,068 candidates
+  slots 10-19      7.24% of mass   17,202 candidates
+  slots 20-49      1.79% of mass   13,628 candidates
+  slots 50+        0.06% of mass    1,182 candidates
+  candidates with P_select < 1e-4: 38.8%
+  p_capture median 0.0329  mean 0.2317  sd 0.3289  within 0.05 of 0.5: 2.4%

@@ -1,0 +1,35 @@
+============================================================================================
+build_tensor.py — section 5 of RETRAIN_PLAN_2026-08-01.md
+============================================================================================
+
+STEP 5 — splits
+  composite read-through loci removed: 278 transcripts on 233 loci
+  train           26,711
+  val              4,356
+  val_paralog         56
+  test            10,520
+  test_paralog       122
+
+  RESTRICTED to chr2: 2,826 transcripts
+
+  2,826 transcripts, 57,921 candidates
+
+STEP 3 — structural block normalised on the training split only
+  0 of 57,921 candidates are training rows
+    n_downstream_ejc   mean     3.6504   sd     5.3760
+    is_ref_cds         mean     0.0330   sd     0.1785
+    is_sqanti_cds      mean     0.0410   sd     0.1982
+    frac_start         mean     0.2628   sd     0.1395
+    frac_stop          mean     0.3478   sd     0.1935
+
+STEPS 1, 2, 4 — encode 57,921 candidates
+  window 1000 wide, ATG anchored at index 900, stop at index 500
+  projected 0.12 GB of codes before compression
+  20,000 / 57,921   (6s)
+  40,000 / 57,921   (7s)
+
+  candidates whose ATG window is clipped by the midpoint : 41,610 (71.8%)
+  candidates whose stop window is clipped by the midpoint: 52,218 (90.2%)
+
+wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_tensor_chr2/nmd_tensor.h5  (0.03 GB)
+total 8s
