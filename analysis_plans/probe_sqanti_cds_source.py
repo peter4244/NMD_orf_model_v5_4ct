@@ -39,6 +39,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+REPO = Path(__file__).resolve().parent.parent
 NMD = Path.home() / "claude_projects" / "nmd"
 TRACK_A = Path.home() / "claude_projects" / "nmd_lung_longread_2026"
 sys.path.insert(0, str(TRACK_A / "tools"))
@@ -136,6 +137,46 @@ def main():
     print(f"\nnovel isoforms with a CDS call: {len(novel):,}, "
           f"of which {int(novel.enst.isna().sum()):,} have no GENCODE transcript "
           f"to inherit from")
+
+    # ---- restricted to the model's own universe ----------------------------
+    # The 645k SQANTI isoforms are not the model's population. What matters for
+    # what the model was SHOWN is the pooled set.
+    pool_iso = set(pd.read_csv(REPO / "results_pool_v6" / "orf_pool.tsv", sep="\t",
+                               usecols=["isoform_id"]).isoform_id.unique())
+    p = m[m.isoform.isin(pool_iso)].copy()
+    print(f"\n=== restricted to the {len(pool_iso):,} transcripts in the model pool ===")
+    print(f"  of these, {len(p):,} carry a SQANTI CDS call")
+    print(f"\n{'structural_category':<26}{'n':>8}{'has ENST':>10}{'start==GENCODE':>16}"
+          f"{'start DIFFERS':>15}")
+    for cat, sub in p.groupby("structural_category"):
+        nref = int(sub.enst.notna().sum())
+        if nref:
+            ok = int(sub.start_matches.sum())
+            print(f"{cat:<26}{len(sub):>8,}{nref:>10,}{100*ok/nref:>15.1f}%"
+                  f"{nref-ok:>15,}")
+        else:
+            print(f"{cat:<26}{len(sub):>8,}{nref:>10,}{'—':>16}{'—':>15}")
+
+    annot = p[p.enst.notna()]
+    n_diff = int((~annot.start_matches).sum())
+    emit("5.90.5", "pooled transcripts with a GENCODE associated transcript",
+         int(len(annot)), n=int(len(pool_iso)),
+         population="transcripts in the v6 candidate pool carrying a SQANTI CDS "
+                    "call and a GENCODE associated_transcript (FSM and ISM)")
+    emit("5.90.5", "pooled annotated transcripts whose SQANTI CDS start differs "
+         "from the GENCODE start", n_diff, n=int(len(annot)),
+         population="pooled transcripts with a GENCODE associated_transcript; "
+                    "strand-aware start codon coordinate compared")
+    emit("5.90.5", "pooled transcripts with no GENCODE transcript to inherit a "
+         "CDS from", int(len(p) - len(annot)), n=int(len(p)),
+         population="pooled transcripts carrying a SQANTI CDS call; novel, "
+                    "fusion and genic categories have no associated_transcript")
+    print(f"\n  annotated pooled transcripts: {len(annot):,}")
+    print(f"    SQANTI start differs from GENCODE: {n_diff:,} "
+          f"({100*n_diff/max(len(annot),1):.1f}% of annotated, "
+          f"{100*n_diff/len(pool_iso):.1f}% of the pool)")
+    print(f"  pooled transcripts with no GENCODE transcript at all: "
+          f"{len(p)-len(annot):,}")
 
 
 if __name__ == "__main__":

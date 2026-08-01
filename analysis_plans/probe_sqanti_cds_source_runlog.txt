@@ -11,3 +11,18 @@ novel_in_catalog           152,534         0             —               —
 novel_not_in_catalog       195,105         0             —               —
 
 novel isoforms with a CDS call: 347,639, of which 347,639 have no GENCODE transcript to inherit from
+
+=== restricted to the 42,043 transcripts in the model pool ===
+  of these, 42,043 carry a SQANTI CDS call
+
+structural_category              n  has ENST  start==GENCODE  start DIFFERS
+full-splice_match           16,109    16,109           75.1%          4,006
+fusion                         937         0               —              —
+genic                          136         0               —              —
+incomplete-splice_match     10,570    10,570           24.3%          8,001
+novel_in_catalog             9,679         0               —              —
+novel_not_in_catalog         4,612         0               —              —
+
+  annotated pooled transcripts: 26,679
+    SQANTI start differs from GENCODE: 12,007 (45.0% of annotated, 28.6% of the pool)
+  pooled transcripts with no GENCODE transcript at all: 15,364

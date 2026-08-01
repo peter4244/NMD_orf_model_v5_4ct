@@ -223,11 +223,13 @@ def main():
     # averaging rules are shown because AUC is a ranking metric and averaging
     # probabilities does not give the same order as averaging logits.
     print(f"\n=== ENSEMBLE over seeds, for comparison at matched aggregation ===")
-    ens = {}
+    ens, ens_pred, ens_pred_logit = {}, {}, {}
     for c in preds:
         per = [np.mean(dr, axis=0) for dr in preds[c].values()]   # mean over draws
         mean_logit = np.mean(per, axis=0)
         mean_prob = np.mean([1.0 / (1.0 + np.exp(-x)) for x in per], axis=0)
+        ens_pred[c] = mean_prob
+        ens_pred_logit[c] = mean_logit
         ens[c] = dict(logit_auc=auc_roc(y, mean_logit),
                       logit_auprc=auprc(y, mean_logit),
                       prob_auc=auc_roc(y, mean_prob),
@@ -240,6 +242,11 @@ def main():
               f"AUPRC {ens[c]['logit_auprc']:.4f}")
         print(f"    ensemble, mean probability   AUC {ens[c]['prob_auc']:.4f}   "
               f"AUPRC {ens[c]['prob_auprc']:.4f}")
+    print(f"  ENSEMBLE RULE: mean PROBABILITY is the reported one -- it is the")
+    print(f"  arithmetic mixture of the members and does not depend on the link")
+    print(f"  function. Mean logit is printed beside it; the two differ by ~0.0005")
+    print(f"  and choosing whichever is higher after seeing both would be a")
+    print(f"  selection effect, however small.")
     print(f"  Legacy reference points, from results_4ct/metrics_atg500_stop500.json")
     print(f"  and analysis_plans/TRACK_A_HANDOFF_2026-07-31.md, on a DIFFERENT")
     print(f"  universe of 10,131 transcripts -- not comparable, listed so the")
@@ -258,6 +265,13 @@ def main():
           f"over {n_t:,} transcripts", flush=True)
     boot = {c: np.empty(args.bootstrap) for c in preds}
     boot_tx = {c: np.empty(args.bootstrap) for c in preds}
+    # THE ENSEMBLE NEEDS ITS OWN INTERVAL. The statistic above is the mean over
+    # seeds of per-seed AUC; the ensemble is the AUC of the averaged prediction.
+    # They are different estimators and an interval for one does not cover the
+    # other, so reporting the ensemble as the headline while quoting the
+    # seed-mean's interval beside it would be a mismatch nobody could see.
+    boot_e = {c: np.empty(args.bootstrap) for c in preds}
+    boot_e_tx = {c: np.empty(args.bootstrap) for c in preds}
     for b in range(args.bootstrap):
         pick = rng.integers(0, n_g, n_g)
         idx = np.concatenate([groups[i] for i in pick])
@@ -265,6 +279,8 @@ def main():
         for c in preds:
             boot[c][b] = arm_auc(idx, c)
             boot_tx[c][b] = arm_auc(idx_t, c)
+            boot_e[c][b] = auc_roc(y[idx], ens_pred[c][idx])
+            boot_e_tx[c][b] = auc_roc(y[idx_t], ens_pred[c][idx_t])
         if (b + 1) % max(1, args.bootstrap // 5) == 0:
             print(f"  {b+1:,}/{args.bootstrap:,}  ({time.time()-t0:.0f}s)", flush=True)
 
@@ -327,6 +343,17 @@ def main():
             print(f"  gene-clustered half-width {half:.5f}  -> permutation noise is "
                   f"{se/half:.2f}x the sampling half-width")
             print(f"  {'R is sufficient' if se < 0.2*half else 'RAISE R: permutation noise is not negligible against sampling'}")
+
+    print(f"\n=== ENSEMBLE with intervals (the reported headline) ===")
+    print(f"  {'configuration':<26} {'AUC':>8} {'95% (transcript)':>22} "
+          f"{'95% (gene) [check]':>22}")
+    for c in preds:
+        lo, hi = np.percentile(boot_e_tx[c], [2.5, 97.5])
+        glo, ghi = np.percentile(boot_e[c], [2.5, 97.5])
+        ens[c]["tx_ci"] = [float(lo), float(hi)]
+        ens[c]["gene_ci"] = [float(glo), float(ghi)]
+        print(f"  {c:<26} {ens[c]['prob_auc']:>8.4f} "
+              f"{f'[{lo:.4f}, {hi:.4f}]':>22} {f'[{glo:.4f}, {ghi:.4f}]':>22}")
 
     if args.out:
         Path(args.out).write_text(json.dumps(

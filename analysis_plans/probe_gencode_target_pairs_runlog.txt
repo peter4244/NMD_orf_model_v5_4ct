@@ -1,0 +1,19 @@
+chr2: 2,826 transcripts, 57,921 candidates
+  full splice matches with a GENCODE CDS : 881
+  annotated AUG present in the isoform   : 881
+  annotated AUG admitted as a candidate  : 839
+
+=== independence of the two targets ===
+  annotated candidate that is ALSO the reference-AUG candidate: 709 of 839 (84.5%)
+
+=== GENCODE-annotated start ===
+  169 pairs over 155 targets, 103 genes
+  win rate 60.9%   gene-clustered 95% CI [50.0, 71.1]   p(<=0.5) 0.0278
+    target upstream       59.0%  n   161  95% CI [51.3, 66.3]
+    target downstream    100.0%  n     8  95% CI [67.6, 100.0]
+
+=== reference-AUG start (comparison) ===
+  354 pairs over 318 targets, 146 genes
+  win rate 58.8%   gene-clustered 95% CI [49.3, 67.9]   p(<=0.5) 0.0345
+    target upstream       55.9%  n   320  95% CI [50.5, 61.3]
+    target downstream     85.3%  n    34  95% CI [69.9, 93.6]

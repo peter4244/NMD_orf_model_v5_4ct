@@ -658,6 +658,17 @@ later against a specific finding, rather than answered in advance against nothin
 
 Per variant and seed: `test_clean` AUC and AUPRC, epochs to stop, wall time.
 
+**The headline metric is the five-seed ENSEMBLE**, and the ensembling rule is the mean predicted
+**probability** — the arithmetic mixture of the members, which does not depend on the link function.
+The mean-logit ensemble is reported beside it; the two differ by about 0.0005 on `test_clean` and
+selecting whichever is higher after seeing both would be a selection effect, however small. The
+seed-mean is also reported, because it is the single-model quantity and the two are not
+interchangeable.
+
+**The ensemble carries its own bootstrap interval.** The seed-mean statistic is the mean over seeds
+of per-seed AUC; the ensemble is the AUC of the averaged prediction. They are different estimators
+and an interval computed for one does not cover the other, so each is resampled separately.
+
 **The interval reported with a headline metric is the ordinary bootstrap over transcripts.** The
 gene-resampled interval is computed and reported beside it as a **check**, together with their
 variance ratio, which is the design effect on that metric. Applying a clustering correction by

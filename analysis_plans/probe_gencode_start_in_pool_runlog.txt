@@ -1,0 +1,11 @@
+pool: 42,043 transcripts, 802,035 candidates
+pooled transcripts with a GENCODE CDS for their own associated transcript: 22,370
+
+structural_category              n   AUG present   AND in the pool
+full-splice_match           13,500        100.0%             95.0%
+incomplete-splice_match      8,747         36.1%             30.8%
+ALL ANNOTATED               22,247         74.9%             69.8%
+  (123 skipped: no exon structure on file)
+
+present but NOT admitted: 1,129
+not present in the isoform at all: 5,592
