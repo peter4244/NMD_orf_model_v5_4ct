@@ -189,7 +189,12 @@ reference-AUG anchor 13,223 (25.9%).
    codon offset and 8.7% at another.
 4. **Cross-isoform averaging at a fixed anchor-relative index destroys per-isoform signal** —
    roughly 9× here. Gate per isoform first, aggregate second.
-5. **Bootstrap must be clustered by gene** (variance inflation 5.47).
+5. **Bootstrap must be clustered by gene** (measured design effect **1.71** (`is_nmd` ICC 0.300 within gene, effective cluster size 3.36 — intervals 1.31× wider)). *Corrected 2026-08-01:* this read
+   "variance inflation 5.47", which was `sd 5.47` — a percentage-point standard
+   deviation lifted out of the power-matching section of
+   `exp2b_control_validity_runlog.txt`, where it has nothing to do with genes or
+   clustering. The instruction is unchanged; the magnitude was wrong, and it was wrong
+   in the direction of overstating what clustering costs.
 6. **Conditioning on the annotated ORF is circular** when ORF identification is half of what the
    model is supposed to do.
 7. **A confident negative in this area has twice been a confounder rather than the model.**

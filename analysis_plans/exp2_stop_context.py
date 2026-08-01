@@ -95,8 +95,12 @@ def boot_diff(d, col, a, b, strata, gene_col="gene_id", n=2000, label="is_nmd",
               min_cell=10):
     """Gene-clustered bootstrap of the standardised a-minus-b difference.
 
-    Clustered by gene because transcripts of one gene are not independent --
-    the brief puts the variance inflation from ignoring this at 5.47.
+    Clustered by gene because transcripts of one gene are not independent.
+    Magnitude, measured 2026-08-01: is_nmd ICC within gene 0.300 at an effective
+    cluster size of 3.36, so the design effect is 1.71 and an interval widens by
+    1.31x. The 5.47 this docstring used to cite (from the brief) was never a
+    variance inflation -- it is `sd 5.47`, a percentage-point standard deviation
+    from the power-matching section of exp2b's runlog.
 
     Implemented on integer-coded arrays with bincount rather than pandas
     groupby: a resample has to be taken thousands of times and rebuilding a
