@@ -31,7 +31,13 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--tensor", default="results_tensor_chr21")
 ap.add_argument("--pool", default="results_pool_v6")
 ap.add_argument("--n", type=int, default=400)
+# Same overrides as build_tensor.py. They were added there and not here, so the
+# first cluster run built 28.8 GB correctly and then failed trying to open a
+# laptop path.
+ap.add_argument("--tables", default=T)
+ap.add_argument("--fasta", default=FASTA)
 a = ap.parse_args()
+T, FASTA = a.tables, a.fasta
 H = os.path.join(a.tensor, "nmd_tensor.h5")
 
 with h5py.File(H) as f:
