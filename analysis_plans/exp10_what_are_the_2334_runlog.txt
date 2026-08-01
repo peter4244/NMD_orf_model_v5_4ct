@@ -1,0 +1,88 @@
+$ python exp10_what_are_the_2334.py
+Captured 2026-08-01T02:27:25Z, repo 635c7f3.
+
+================================================================================================
+EXPERIMENT 10 -- what are the 2,334?
+================================================================================================
+
+  group                       n
+  the 2,334               2,334
+  other positives         7,091
+  negatives              32,618
+
+================================================================================================
+1. DID THE GENE HAVE NO NON-DECAYED ISOFORM, OR DID WE DROP IT?
+================================================================================================
+
+  reading the count matrix for isoform counts BEFORE the universe restriction ...
+
+                                        the 2,334    other pos    negatives
+  ---------------------------------- ------------ ------------ ------------
+  median isoforms in the universe             2.0          6.0          5.0
+  median isoforms expressed at all           46.0         55.0         43.0
+  median dropped by the label filter         43.0         49.0         37.0
+
+  of the 2,334, 723 (31%) are the ONLY isoform of their gene in the universe
+  2,283 (98%) belong to a gene that HAS other expressed isoforms which the label filter dropped
+  median dropped, among those: 44
+
+  >> This is the (a)-versus-(b) answer. Where the gene has other expressed
+     isoforms that simply failed the adj.P > 0.30 test in some cell type, the
+     absent reference is a property of our threshold, not of the gene.
+
+================================================================================================
+2. WHICH DECAY ROUTE DO THEY CARRY?
+================================================================================================
+
+  route                         the 2,334    other positives          negatives
+  -------------------- ------------------ ------------------ ------------------
+  EJC junction                      44.5%              74.2%               9.6%
+  upstream ORF                      49.9%              23.6%              55.3%
+  long 3'UTR only                    2.7%               1.1%              17.1%
+  no route                           2.9%               1.1%              17.9%
+
+================================================================================================
+3. WHAT KIND OF TRANSCRIPT ARE THEY?
+================================================================================================
+
+                                        the 2,334      other pos      negatives
+  -------------------------------- -------------- -------------- --------------
+  median transcript length                  2,512          2,980          2,998
+  median exon count                             9             10              7
+  median junction count                         8              9              6
+  median slot-0 ORF length                    706            579            876
+  median 3'UTR                              1,034          1,691          1,210
+
+  structural category                   the 2,334      other pos      negatives
+  full-splice_match                         30.6%          18.7%          43.1%
+  incomplete-splice_match                    4.7%           5.7%          30.8%
+  novel_in_catalog                          40.0%          51.8%          15.5%
+  novel_not_in_catalog                      16.8%          20.9%           8.4%
+  fusion                                     7.6%           2.7%           1.7%
+
+  SQANTI calls it coding                   100.0%         100.0%         100.0%
+
+================================================================================================
+4. HOW ROBUST IS THE LABEL? -- response in how many cell types
+================================================================================================
+
+  The NMD label is a UNION across four cell types, so a transcript called
+  responsive in ONE cell type is admitted on the same footing as one called in
+  four. mashr's own per-cell-type calls are not on this machine, so this is a
+  direct proxy computed from the counts: in how many cell types does the
+  transcript's mean CPM rise under SMG1 inhibition?
+
+  cell types with >20% rise             the 2,334      other pos      negatives
+  -------------------------------- -------------- -------------- --------------
+  0                                          0.0%           0.0%          16.8%
+  1                                          1.1%           1.1%          35.3%
+  2                                          3.6%           5.2%          30.9%
+  3                                          6.1%           8.8%          14.2%
+  4                                         89.2%          84.8%           2.8%
+  median                                        4              4              1
+
+  median baseline log2(CPM+1), DMSO           0.29           0.16           0.69
+
+================================================================================================
+DONE
+================================================================================================
