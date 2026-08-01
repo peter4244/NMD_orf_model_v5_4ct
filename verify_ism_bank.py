@@ -144,6 +144,7 @@ def main():
     worst_val, worst_base, n_cmp = 0.0, 0.0, 0
     prop_tested = prop_differed = 0
     prop_delta, prop_rel, prop_cover = [], [], []
+    by_k = {}
     noop_max = 0.0
 
     for n in pick:
@@ -199,7 +200,10 @@ def main():
                 if bb == o:
                     noop_max = max(noop_max, abs(ref))
                     continue
-                worst_val = max(worst_val, abs(ref - float(vals[p0, bb])))
+                d = abs(ref - float(vals[p0, bb]))
+                worst_val = max(worst_val, d)
+                by_k.setdefault(K, ([], [], []))[0].append(d)
+                by_k[K][2].append(iso_id)
                 n_cmp += 1
 
             # ---- 3. propagation --------------------------------------------
@@ -253,9 +257,18 @@ def main():
     print(f"  comparisons                                  : {n_cmp:,}")
     print(f"  max |bank - reference|                       : {worst_val:.3e}")
     print(f"  max |base logit difference|                  : {worst_base:.3e}")
-    print(f"\n=== 5. no-op on the reference path ===")
+    print(f"\n=== 5. no-op on the reference path, and the batch-shape offset ===")
     print(f"  max |effect| substituting the observed base  : {noop_max:.3e}")
-    print(f"  bank's own floor                             : {float(b.attrs['floor']):.3e}")
+    print(f"  batch-shape offset the bank removed          : "
+          f"{float(b.attrs['batch_shape_offset']):.3e}")
+    print(f"\n=== 6. bank-vs-reference disagreement, BY CANDIDATE COUNT ===")
+    print(f"  The encoder has three batch-shape regimes (1, 2-7, 8+). The bank now")
+    print(f"  differences against a same-chunk baseline and the reference against a")
+    print(f"  batch-K pass, so any residual should NOT track K.")
+    print(f"  {'K':>6} {'transcripts':>12} {'comparisons':>12} {'max |bank-ref|':>16}")
+    for k in sorted(by_k):
+        v = by_k[k]
+        print(f"  {k:>6} {len(set(v[2])):>12} {len(v[0]):>12} {max(v[0]):>16.3e}")
     print(f"\n{time.time()-t0:.0f}s")
 
 

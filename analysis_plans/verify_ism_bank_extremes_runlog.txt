@@ -1,31 +1,18 @@
-  [1/4] ENSG00000159140.23.novel32         K= 15 L= 6,814 valid= 1,989  (5s)
-  [2/4] ENSG00000157538.15.novel2          K=  1 L= 1,724 valid= 1,390  (5s)
-  [3/4] ENST00000903443.1                  K=  2 L=   564 valid=   564  (5s)
-  [4/4] ENST00000342449.8                  K=146 L=17,728 valid= 9,350  (16s)
-
-=== 1. observed base vs the FASTA ===
-  mismatches                                   : 0  -> PASS
-
-=== 2. window spans ===
-  valid positions outside every shipped span   : 0  -> PASS
-  ACGT positions inside a span but not valid   : 0  -> PASS
-
-=== 3. propagation to every covering window ===
-  multiply-covered positions tested            : 69
-  windows covering them, mean                  : 11.62
-  where the ONE-WINDOW shortcut differs        : 36 (52.2%)
-  |shortcut - propagated|, median / max        : 3.494e-05 / 7.484e-04
-  as a fraction of the propagated effect       : median 0.65, p90 1.88, max 9.86
-  -> the bank is the propagated quantity; check 4 is what verifies it.
-     A shortcut that differs on 52% of multiply-covered positions is not a rounding difference.
-
-=== 4. vals vs the uncached reference ===
-  comparisons                                  : 300
-  max |bank - reference|                       : 3.502e-08
+  max |bank - reference|                       : 4.029e-08
   max |base logit difference|                  : 0.000e+00
 
-=== 5. no-op on the reference path ===
+=== 5. no-op on the reference path, and the batch-shape offset ===
   max |effect| substituting the observed base  : 0.000e+00
-  bank's own floor                             : 1.491e-08
+  batch-shape offset the bank removed          : 1.529e-08
 
-16s
+=== 6. bank-vs-reference disagreement, BY CANDIDATE COUNT ===
+  The encoder has three batch-shape regimes (1, 2-7, 8+). The bank now
+  differences against a same-chunk baseline and the reference against a
+  batch-K pass, so any residual should NOT track K.
+       K  transcripts  comparisons   max |bank-ref|
+       1            1           75        4.029e-08
+       2            1           75        2.258e-08
+      15            1           75        7.191e-12
+     146            1           75        1.646e-12
+
+17s

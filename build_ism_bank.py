@@ -161,7 +161,7 @@ def draw_perms(model, K, generator, device):
 
 # ------------------------------------------------------------------ one arm
 def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
-                    device, chunk_rows, n_floor, rng):
+                    device, chunk_rows, rng):
     """The bank for one transcript. Returns vals, valid, obs, base_logit, floor."""
     # THE CACHE IS EXACT ONLY IN EVAL MODE. In train mode batch normalization
     # uses batch statistics, so a candidate's embedding depends on which other
@@ -222,27 +222,33 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
     order = np.argsort(pos_v, kind="stable")
     pos_v, cand_v, win_v = pos_v[order], cand_v[order], win_v[order]
 
-    # The floor is sampled from the positions that HAVE an observed base to
-    # substitute for itself, not from 1..tx_length: a sample drawn before validity
-    # is known lands mostly on unprobeable positions and the floor ends up
-    # measured over far fewer samples than it claims.
+    # EVERY POSITION CARRIES ITS OWN NO-OP, AND THE EFFECT IS MEASURED AGAINST IT.
+    # The encoder's output for a fixed input row depends on how many rows share
+    # its batch -- measured on this model, three regimes at batch 1, 2-7 and 8+,
+    # 3.28e-07 apart. The unperturbed pass runs at batch K and a chunk runs at
+    # batch len(chunk), so a difference taken between them carries that offset
+    # whenever K and the chunk fall in different regimes. With K under 8 for
+    # 15.5% of transcripts, that is a systematic error CORRELATED WITH CANDIDATE
+    # COUNT, not noise.
+    #
+    # Substituting the observed base for itself in the SAME chunk gives a
+    # baseline computed at the same batch shape, and the offset cancels exactly.
+    # Row position within a batch does not matter -- verified -- so same-chunk is
+    # enough and the rows need no particular order. This is why all four bases
+    # are computed rather than three: the fourth is the baseline, not a check.
     noop_max = 0.0
-    vp = np.flatnonzero(valid) + 1
-    floor_set = set(rng.choice(vp, size=min(n_floor, len(vp)),
-                               replace=False).tolist()) if len(vp) else set()
     starts = np.searchsorted(pos_v, np.unique(pos_v))
     upos = np.unique(pos_v)
 
     i = 0
     while i < len(upos):
-        # take as many positions as fit the row budget; each contributes up to
-        # 3 substitutions (4 where the position is a floor sample) per covering pair
+        # each position contributes 4 rows per covering pair: 3 substitutions and
+        # the no-op that is their baseline
         j, rows = i, 0
         while j < len(upos):
             lo = starts[j]
             hi = starts[j + 1] if j + 1 < len(starts) else len(pos_v)
-            nb = 4 if int(upos[j]) in floor_set else 3
-            r = (hi - lo) * nb
+            r = (hi - lo) * 4
             if rows and rows + r > chunk_rows:
                 break
             rows += r; j += 1
@@ -255,8 +261,7 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
         for n, p in enumerate(block):
             m = bp == p
             o = int(obs[p - 1])
-            bases = range(4) if int(p) in floor_set else [b for b in range(4) if b != o]
-            for b in bases:
+            for b in range(4):          # the observed base included, as the baseline
                 c = int(m.sum())
                 rc.append(bc[m]); rw.append(bw[m]); rb.append(np.full(c, b))
                 rp.append((n, b, c))
@@ -304,16 +309,24 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
             out = model.aggregate(z_p.double(), z_d.double(), mask,
                                   stable=True).cpu().numpy()
 
-        for t, (n, b, _) in enumerate(rp):
-            p = int(block[n])
-            d = float(out[t] - base_logit)
-            if b == int(obs[p - 1]):
-                noop_max = max(noop_max, abs(d))       # the floor, not an effect
-            else:
-                vals[p - 1, b] = d
+        # THE DIFFERENCE IS TAKEN AGAINST THE NO-OP FROM THIS SAME CHUNK, never
+        # against the batch-K base pass. row_of maps (position index, base) to the
+        # row of `out` so the pairing is explicit rather than positional.
+        row_of = {(n, b): t for t, (n, b, _) in enumerate(rp)}
+        for n, p0 in enumerate(block):
+            p = int(p0)
+            o = int(obs[p - 1])
+            ref = float(out[row_of[(n, o)]])
+            # how far this chunk's baseline sits from the batch-K base pass. It is
+            # the offset the same-chunk baseline removes, and it is reported so
+            # its size is visible rather than assumed small.
+            noop_max = max(noop_max, abs(ref - base_logit))
+            for b in range(4):
+                if b != o:
+                    vals[p - 1, b] = float(out[row_of[(n, b)]]) - ref
         i = j
 
-    return (vals, valid, obs, (base_logit, base_train), (noop_max, len(floor_set)),
+    return (vals, valid, obs, (base_logit, base_train), (noop_max, int(valid.sum())),
             (a_lo, a_hi, s_lo, s_hi))
 
 
@@ -326,7 +339,6 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--n", type=int, default=1000)
     ap.add_argument("--chunk-rows", type=int, default=4096)
-    ap.add_argument("--floor-samples", type=int, default=200)
     ap.add_argument("--perm-draws", type=int, default=1,
                     help="control arm only: paired permutation draws to average over")
     ap.add_argument("--seed", type=int, default=20260801)
@@ -438,7 +450,7 @@ def main():
                 try:
                     v, valid, obs, base, noop, spans = transcript_bank(
                         model, enc, cds, os_, oe_, int(r.tx_length), struct_k,
-                        device, chunk_rows, args.floor_samples, rng)
+                        device, chunk_rows, rng)
                     break
                 except torch.cuda.OutOfMemoryError:
                     torch.cuda.empty_cache()
@@ -544,9 +556,8 @@ def main():
         f.create_dataset("spans", data=np.array(spans_rows, np.int32))
         f.create_dataset("cand_offset", data=cand_offset)
         f.create_dataset("cand_count", data=cand_count)
-        f.attrs["floor"] = floor
-        f.attrs["floor_samples"] = int(n_floor_samples)
-        f.attrs["floor_samples_requested_per_transcript"] = int(args.floor_samples)
+        f.attrs["batch_shape_offset"] = floor
+        f.attrs["batch_shape_offset_positions"] = int(n_floor_samples)
         f.attrs["checkpoint"] = str(args.checkpoint)
         f.attrs["pool_sha256"] = pool_sha
         f.attrs["perm_draws"] = R
@@ -591,26 +602,30 @@ def main():
     print(f"  n {N:,}   W {W:,}   valid positions {int(valid.sum()):,}")
     print(f"  transcripts the TRAINING clamp would pin (vals are unaffected): "
           f"{int(pinned.sum()):,} of {N:,} ({100*pinned.mean():.1f}%)")
-    print(f"  no-op floor (max |effect| substituting the observed base for itself): "
-          f"{floor:.3e} over {n_floor_samples:,} sampled positions "
-          f"in {len(recs):,} transcripts")
+    print(f"  batch-shape offset REMOVED by the same-chunk baseline: max {floor:.3e} "
+          f"over {n_floor_samples:,} positions in {len(recs):,} transcripts")
+    print(f"    (this is how far a chunk's no-op sits from the batch-K base pass. "
+          f"It is\n     the systematic, K-correlated error the baseline cancels; "
+          f"vals do not carry it.)")
 
-    # DOES THIS BANK CARRY ANYTHING? The floor is the size of effect the
-    # arithmetic itself produces. Effects at or below it are not distinguishable
-    # from it, so the share of effects above it is the bank's own statement about
-    # whether it has content -- and a bank whose effects sit at the floor says
-    # nothing however well its geometry checks out.
+    # DOES THIS BANK CARRY ANYTHING? vals are now differences taken inside one
+    # batch shape, so the no-op is zero by construction and is no longer a
+    # measurement. The batch-shape offset is still the right SCALE to read
+    # against: it is the size of difference this pipeline's float32 encoders
+    # produce from a change that is not a substitution at all. An effect below it
+    # is not distinguishable from arithmetic, and a bank whose effects sit there
+    # says nothing however well its geometry checks out.
     fin = np.isfinite(vals)
     av = np.abs(vals[fin])
-    print(f"  |effect| vs the floor, over {int(fin.sum()):,} measured substitutions:")
+    print(f"  |effect| vs that offset, over {int(fin.sum()):,} substitutions:")
     print(f"    median {np.median(av):.3e}   p99 {np.percentile(av, 99):.3e}   "
           f"max {av.max():.3e}")
     if floor > 0:
-        print(f"    above the floor: {100*(av > floor).mean():.1f}%   "
-              f"above 10x the floor: {100*(av > 10*floor).mean():.1f}%")
+        print(f"    above it: {100*(av > floor).mean():.1f}%   "
+              f"above 10x it: {100*(av > 10*floor).mean():.1f}%")
     else:
-        print(f"    floor is exactly zero, so every non-zero effect clears it: "
-              f"{100*(av > 0).mean():.1f}% are non-zero")
+        print(f"    the offset is exactly zero on this run: "
+              f"{100*(av > 0).mean():.1f}% of effects are non-zero")
     if spreads:
         sd, eff, sdb = (np.mean([x[i] for x in spreads]) for i in range(3))
         print(f"  control arm, {R} paired permutation draws:")
