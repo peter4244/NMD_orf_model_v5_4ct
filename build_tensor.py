@@ -29,6 +29,8 @@ import h5py
 import numpy as np
 import pandas as pd
 
+from tensor_io import encode_window_codes
+
 REPO = Path(__file__).resolve().parent
 # Defaults are the local layout; --tables and --fasta override them so the same
 # script runs on the cluster, where the tables sit beside the repo and the FASTA
@@ -234,43 +236,52 @@ def main():
 
     h5path = outdir / "nmd_tensor.h5"
     with h5py.File(h5path, "w") as f:
-        atg_ds = f.create_dataset("atg_windows", (n, N_CHANNELS, WINDOW),
-                                  dtype="float16", chunks=(1, N_CHANNELS, WINDOW))
-        stop_ds = f.create_dataset("stop_windows", (n, N_CHANNELS, WINDOW),
-                                   dtype="float16", chunks=(1, N_CHANNELS, WINDOW))
+        # ONE uint8 PER POSITION PER WINDOW, not nine float16 channels. Eight of
+        # the nine channels are binary and the ninth is derivable, so the channels
+        # are reconstructed in the loader from this byte plus the candidate's own
+        # coordinates. 1.6 GB instead of 28.8, verified to decode identically.
+        codes_ds = f.create_dataset("codes", (n, 2, WINDOW), dtype="uint8",
+                                    chunks=(256, 2, WINDOW), compression="lzf")
         iso_a = pool["isoform_id"].to_numpy()
         st_a = pool["orf_start"].to_numpy(np.int64)
         en_a = pool["orf_end"].to_numpy(np.int64)
         len_by_iso = dict(zip(tx["isoform_id"], tx["tx_length"]))
-        codes_cache, gc_cache = {}, {}
+        raw_cache = {}
         n_atg_clipped = n_stop_clipped = 0
+        buf = np.zeros((4096, 2, WINDOW), dtype=np.uint8)
+        buf_at = 0
 
         for i in range(n):
             if i and i % 20000 == 0:
                 print(f"  {i:,} / {n:,}   ({time.time()-t0:.0f}s)", flush=True)
             iso = iso_a[i]
-            if iso not in codes_cache:
-                codes_cache.clear(); gc_cache.clear()
-                raw = np.frombuffer(seqs[iso].encode("ascii"), dtype=np.uint8)
-                codes_cache[iso] = NUC_INDEX[raw]
-                gc_cache[iso] = IS_GC[raw]
-            codes, gcf = codes_cache[iso], gc_cache[iso]
+            if iso not in raw_cache:
+                raw_cache.clear()
+                raw_cache[iso] = np.frombuffer(seqs[iso].encode("ascii"),
+                                               dtype=np.uint8)
+            raw = raw_cache[iso]
             L = int(len_by_iso[iso])
             s, e = int(st_a[i]), int(en_a[i])
             mid = (s + e) // 2                       # mid belongs to the ATG window
             jp = junc.get(iso, np.empty(0, dtype=np.int64))
 
-            atg_ds[i] = encode_window(codes, gcf, jp, L, anchor=s,
-                                      left=ATG_LEFT, right=ATG_RIGHT,
-                                      orf_start=s, fill_lo=1, fill_hi=mid)
-            stop_ds[i] = encode_window(codes, gcf, jp, L, anchor=e - 1,
-                                       left=STOP_LEFT, right=STOP_RIGHT,
-                                       orf_start=s, fill_lo=mid + 1, fill_hi=L)
+            buf[buf_at, 0] = encode_window_codes(raw, jp, L, s, ATG_LEFT,
+                                                 ATG_RIGHT, 1, mid)
+            buf[buf_at, 1] = encode_window_codes(raw, jp, L, e - 1, STOP_LEFT,
+                                                 STOP_RIGHT, mid + 1, L)
+            buf_at += 1
+            if buf_at == len(buf):                   # flush in slabs, not row by row
+                codes_ds[i - buf_at + 1:i + 1] = buf
+                buf_at = 0
             if s + ATG_RIGHT - 1 > mid:
                 n_atg_clipped += 1
             if e - 1 - STOP_LEFT < mid:
                 n_stop_clipped += 1
+        if buf_at:
+            codes_ds[n - buf_at:n] = buf[:buf_at]
 
+        f.create_dataset("orf_start", data=st_a.astype(np.int32))
+        f.create_dataset("orf_end", data=en_a.astype(np.int32))
         f.create_dataset("structural", data=struct_norm.astype(np.float32))
         f.create_dataset("structural_raw", data=struct.astype(np.float32))
         f.create_dataset("isoform_id", data=np.array(tx["isoform_id"], dtype="S"))

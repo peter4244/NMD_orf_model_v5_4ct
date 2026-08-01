@@ -21,6 +21,7 @@ Usage:
 """
 import argparse, os
 import h5py, numpy as np, pandas as pd
+from tensor_io import decode_windows
 
 T = os.path.expanduser("~/claude_projects/nmd_w69_tables_2026-07-30")
 FASTA = os.path.expanduser(
@@ -68,12 +69,15 @@ bad = dict.fromkeys(["atg_anchor_base", "stop_anchor_base", "onehot_sum",
                      "frame_at_anchor", "junction_channel", "windows_overlap",
                      "gc_range"], 0)
 with h5py.File(H) as f:
-    A, S = f["atg_windows"], f["stop_windows"]
+    codes = f["codes"]
+    o_start, o_end = f["orf_start"][:], f["orf_end"][:]
     for i in pick:
         r = pool.iloc[i]; iso = r.isoform_id
         s, e = int(r.orf_start), int(r.orf_end)
         seq = seqs[iso]; L = len(seq); mid = (s + e) // 2
-        aw = np.asarray(A[i], np.float32); sw = np.asarray(S[i], np.float32)
+        c = codes[i]
+        aw = decode_windows(c[0][None, :], np.array([s]), AL, np.array([s]))[0]
+        sw = decode_windows(c[1][None, :], np.array([e - 1]), SL, np.array([s]))[0]
         if not (aw[:4, AL].sum() == 1 and NUC[int(np.argmax(aw[:4, AL]))] == seq[s - 1]):
             bad["atg_anchor_base"] += 1
         if not (sw[:4, SL].sum() == 1 and NUC[int(np.argmax(sw[:4, SL]))] == seq[e - 2]):

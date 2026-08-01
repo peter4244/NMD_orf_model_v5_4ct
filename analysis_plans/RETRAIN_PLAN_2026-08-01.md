@@ -288,9 +288,10 @@ Source: `build_orf_pool_runlog.txt`, which is this step's own output.
 
 ### 3.5 Cost
 
-Training-tensor size scales linearly in candidates per transcript and in window width. 802,035 candidates, each with two
-1000-base 9-channel windows stored as float16, is **28.9 GB** — measured by building chr21 and
-scaling by candidate count, not by scaling the old file. This does not fit in the 8 GiB on this machine; the tensor is built on the cluster.
+Training-tensor size scales linearly in candidates per transcript and in window width. 802,035 candidates at two 1000-base windows,
+one byte per position, is **1.6 GB** before compression — measured by building chr21 and scaling by
+candidate count. Storing the nine channels as float16 instead costs 28.8 GB, which exceeded the
+cluster's per-user quota. This does not fit in the 8 GiB on this machine; the tensor is built on the cluster.
 
 ### 3.6 The tail
 
@@ -411,16 +412,32 @@ transcripts whose split label is exactly `train` — computed after step 5 assig
 screened-out transcript contributes. Those constants are written into the tensor file and are read
 back at inference rather than recomputed.
 
-**Step 4 — assemble ragged, not padded.**
+**Step 4 — assemble ragged, and store one byte per position rather than nine channels.**
 
 Candidates per transcript run from 1 to 565 with a median of 17 (§3.4), so padding every transcript
 to the maximum would store mostly zeros. Candidates are stored as one flat array in transcript order
 with a per-transcript start offset and count.
 
+Eight of the nine channels are binary and the ninth is derivable from them, so the windows are stored
+as **one `uint8` per position per window** and the channels are reconstructed in the data loader:
+
+| bits | meaning |
+|---|---|
+| 0–2 | fill state: 0 unfilled, 1–4 for A, C, G, T, 5 filled but not one of those |
+| 3 | a junction lies at this transcript position |
+
+"Filled but not ACGT" is a distinct state from "unfilled": an N inside the window counts toward the
+GC denominator and carries a reading frame, while a position outside the window or past the midpoint
+clip carries neither.
+
 ```
-candidates[i]  = (atg_window[9,1000], stop_window[9,1000], structural[1 or 5])
+codes[i]       = uint8[2, 1000]                # ATG window, stop window
+orf_start[i], orf_end[i]                       # for the reading-frame channels
+structural[i]  = float32[5]
 offset[t], count[t]   such that transcript t owns candidates[offset[t] : offset[t]+count[t]]
 ```
+
+Encoding and decoding are one definition, in `tensor_io.py`.
 
 **Step 5 — assign splits, screening each evaluation side against its own paralog list.**
 

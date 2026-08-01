@@ -36,6 +36,7 @@ import torch
 import torch.nn.functional as F
 
 from model_v6 import ScanningNMDModel, count_parameters
+from tensor_io import decode_windows
 
 STRUCTURAL_COLS = ["n_downstream_ejc", "is_ref_cds", "is_sqanti_cds",
                    "frac_start", "frac_stop"]
@@ -112,6 +113,10 @@ class TensorSource:
             self.split = np.array([s.decode() for s in f["split"][:]])
             self.gene = np.array([s.decode() for s in f["gene_id"][:]])
             self.window = int(f.attrs["window"])
+            self.atg_left = int(f.attrs["atg_left"])
+            self.stop_left = int(f.attrs["stop_left"])
+            self.orf_start = f["orf_start"][:]
+            self.orf_end = f["orf_end"][:]
 
     @property
     def f(self):
@@ -130,9 +135,16 @@ class TensorSource:
         srt = np.argsort(rows, kind="stable")    # h5py needs increasing indices
         inv = np.argsort(srt, kind="stable")
         r = rows[srt]
-        atg = self.f["atg_windows"][r][inv]
-        stop = self.f["stop_windows"][r][inv]
+        codes = self.f["codes"][r][inv]
         st = self.f["structural"][r][inv][:, self.struct_cols]
+
+        # The nine channels are rebuilt here rather than stored. tensor_io holds
+        # the only definition of the mapping, and it is checked against the
+        # nine-channel encoder rather than against a description of it.
+        s0 = self.orf_start[rows]
+        e0 = self.orf_end[rows]
+        atg = decode_windows(codes[:, 0], s0, self.atg_left, s0)
+        stop = decode_windows(codes[:, 1], e0 - 1, self.stop_left, s0)
 
         n = len(idxs)
         A = np.zeros((n, K, atg.shape[1], self.window), dtype=np.float32)
