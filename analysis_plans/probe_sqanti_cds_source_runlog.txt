@@ -1,0 +1,13 @@
+GENCODE: 2,283,168 CDS lines over 234,024 transcripts
+SQANTI: 645,272 isoforms
+  with a CDS call: 531,333
+
+structural_category              n  has ENST  CDS==GENCODE  start==GENCODE
+full-splice_match          103,490   103,490          0.4%           76.0%
+fusion                      11,386         0             —               —
+genic                        2,903         0             —               —
+incomplete-splice_match     65,915    65,915          0.0%           37.4%
+novel_in_catalog           152,534         0             —               —
+novel_not_in_catalog       195,105         0             —               —
+
+novel isoforms with a CDS call: 347,639, of which 347,639 have no GENCODE transcript to inherit from

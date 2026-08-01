@@ -161,10 +161,29 @@ def main():
             meta[cfg] = dict(is_perm=is_perm, R=R)
             sd_draw = (float(np.std([auc_roc(y, d) for d in draws]))
                        if R > 1 else 0.0)
-            print(f"  {cfg} seed {sd}: {R} draw(s)"
-                  + (f", across-draw AUC sd {sd_draw:.5f}" if R > 1 else ""), flush=True)
+            # POINT ESTIMATES PRINTED HERE, not after the bootstrap. The headline
+            # AUC and AUPRC need one forward pass per seed; the bootstrap and the
+            # control's permutation draws take two orders of magnitude longer, and
+            # holding the number back until they finish is a reporting choice, not
+            # a computational one.
+            a_ = float(np.mean([auc_roc(y, d) for d in draws]))
+            p_ = float(np.mean([auprc(y, d) for d in draws]))
+            print(f"  {cfg} seed {sd}: {R} draw(s)   AUC {a_:.4f}  AUPRC {p_:.4f}"
+                  + (f"   across-draw AUC sd {sd_draw:.5f}" if R > 1 else ""),
+                  flush=True)
             if R > 1:
                 meta[cfg]["draw_sd"] = sd_draw
+        if cfg in preds:
+            pts = [float(np.mean([auc_roc(y, d) for d in dr]))
+                   for dr in preds[cfg].values()]
+            pps = [float(np.mean([auprc(y, d) for d in dr]))
+                   for dr in preds[cfg].values()]
+            print(f"  >>> {cfg} over {len(pts)} seeds: "
+                  f"AUC {np.mean(pts):.4f} [{min(pts):.4f}, {max(pts):.4f}]   "
+                  f"AUPRC {np.mean(pps):.4f} [{min(pps):.4f}, {max(pps):.4f}]",
+                  flush=True)
+            print(f"  >>> (seed range, NOT a confidence interval; the "
+                  f"gene-clustered interval follows the bootstrap)", flush=True)
 
     def arm_auc(idx, cfg):
         """Mean over seeds of (mean over permutation draws of AUC).
@@ -216,16 +235,26 @@ def main():
         if (b + 1) % max(1, args.bootstrap // 5) == 0:
             print(f"  {b+1:,}/{args.bootstrap:,}  ({time.time()-t0:.0f}s)", flush=True)
 
+    # THE ORDINARY INTERVAL IS THE ONE REPORTED. The gene-clustered one is
+    # printed beside it as a CHECK, not as a correction to apply by default: the
+    # design effect is a property of the statistic and must be measured each
+    # time. On test_clean for AUC it came out at 1.00, so the two coincide; for
+    # the matched-pair statistic of §8.5 it was 3.15, where it matters greatly.
     print(f"\n{'configuration':<26} {'seeds':>5} {'mean AUC':>9} "
-          f"{'gene-clustered 95%':>22} {'mean AUPRC':>11}")
-    print("-" * 80)
+          f"{'95% (transcript)':>22} {'95% (gene) [check]':>22} {'mean AUPRC':>11}")
+    print("-" * 104)
     rows = {}
     for c in preds:
         lo, hi = np.percentile(boot[c], [2.5, 97.5])
-        rows[c] = dict(auc=point[c], auprc=point_pr[c], lo=float(lo), hi=float(hi),
+        tlo, thi = np.percentile(boot_tx[c], [2.5, 97.5])
+        rows[c] = dict(auc=point[c], auprc=point_pr[c],
+                       gene_lo=float(lo), gene_hi=float(hi),
+                       tx_lo=float(tlo), tx_hi=float(thi),
+                       seed_lo=float(min(x for x in [point[c]])),
                        seeds=len(preds[c]), **meta[c])
         print(f"{c:<26} {len(preds[c]):>5} {point[c]:>9.4f} "
-              f"{f'[{lo:.4f}, {hi:.4f}]':>22} {point_pr[c]:>11.4f}")
+              f"{f'[{tlo:.4f}, {thi:.4f}]':>22} {f'[{lo:.4f}, {hi:.4f}]':>22} "
+              f"{point_pr[c]:>11.4f}")
 
     print(f"\nDESIGN EFFECT, measured on the metric rather than assumed:")
     print(f"  {'configuration':<26} {'sd(gene)':>10} {'sd(transcript)':>15} "

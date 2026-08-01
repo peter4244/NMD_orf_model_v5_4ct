@@ -658,9 +658,14 @@ later against a specific finding, rather than answered in advance against nothin
 
 Per variant and seed: `test_clean` AUC and AUPRC, epochs to stop, wall time.
 
-Each metric carries a bootstrap interval resampled **both over transcripts and over genes**, with
-both reported and their ratio printed. That ratio is the design effect on the metric, and it is
-measured rather than assumed.
+**The interval reported with a headline metric is the ordinary bootstrap over transcripts.** The
+gene-resampled interval is computed and reported beside it as a **check**, together with their
+variance ratio, which is the design effect on that metric. Applying a clustering correction by
+default would assume the thing this project has twice got wrong: the design effect is a property of
+the statistic, not of the dataset. Measured on `test_clean`, AUC for the selected configuration gives
+**1.00** — gene and transcript resampling are indistinguishable, sd 0.00343 against 0.00344 — while
+the matched-pair statistic of §8.5 gives 3.15 on the same transcripts. Both are measured, neither is
+carried.
 
 Transcripts of one gene are not independent, but they are far less dependent than this project has
 been assuming. Measured over the test chromosomes: 41.0% of multi-transcript genes carry **both**
@@ -681,6 +686,11 @@ inferred from the labels.
 
 Seeds vary initialisation only — the split is fixed — so the range over seeds contains no sampling
 variance at all. It is reported beside the interval and labelled differently.
+
+**No interval here covers the split.** Test is four fixed chromosomes, so resampling within them
+cannot express what a different chromosome partition would give, and that variation is plausibly
+larger than either interval. A reported metric states the estimand it is conditional on: this model,
+these four chromosomes.
 
 **A comparison between arms is a paired difference, bootstrapped on the same gene resamples.** Both
 arms are scored on the same transcripts, so most of the sampling uncertainty is shared and cancels;

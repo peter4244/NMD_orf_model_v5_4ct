@@ -1,0 +1,11 @@
+400 single-base substitutions on real chr2 windows
+
+  fill mask (ch 6-8) bitwise identical      : True
+  upstream fill unchanged                   : True
+  right-hand fill unchanged                 : True
+  junction channel (ch 4) unchanged         : True
+  sequence channels (ch 0-3) DID change     : True
+
+  total |delta| by channel: c0=197.0  c1=204.0  c2=191.0  c3=208.0  c4=0.0  c5=272.2  c6=0.0  c7=0.0  c8=0.0
+  positions changed per row, ch0-3: mean 2.00 (2 = one base swapped)
+  GC channel moves on 68.2% of rows (expected: it is derived from sequence)
