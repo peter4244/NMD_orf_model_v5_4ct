@@ -239,6 +239,8 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
     vals = np.full((P, 4), np.nan, dtype=np.float32)
     dsel_out = np.full((P, 4), np.nan, dtype=np.float32)
     dstart_out = np.full((P, 4), np.nan, dtype=np.float32)
+    vcap_out = np.full((P, 4), np.nan, dtype=np.float32)
+    vdec_out = np.full((P, 4), np.nan, dtype=np.float32)
     dgc_out = np.zeros((P, 4), dtype=np.int8)
 
     # ---- the substitutions --------------------------------------------------
@@ -340,8 +342,25 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
                 z_d[pi, ci] = model.decay_head(model.decay_body(
                     torch.cat([e_atg[ci], es, u_emb[ci]], dim=-1))).squeeze(-1)
             mask = torch.ones(n_pert, K, dtype=torch.bool, device=device)
-            out = model.aggregate(z_p.double(), z_d.double(), mask,
-                                  stable=True).cpu().numpy()
+            zp_d, zd_d = z_p.double(), z_d.double()
+            out = model.aggregate(zp_d, zd_d, mask, stable=True).cpu().numpy()
+            # EXACT ATTRIBUTION INTO THE TWO BRANCHES. The transcript logit is a
+            # function of (p_k, d_k) only, and a substitution moves both. Holding
+            # one at its unperturbed value and re-aggregating gives what the
+            # other did on its own.
+            #
+            #   capture-only  the base changed WHERE the ribosome initiates
+            #   decay-only    the base changed WHETHER that frame triggers decay
+            #
+            # These are different biological events and in `vals` they are the
+            # same number. With selection worth 0.063 of test AUC against
+            # sequence's 0.005, and the mechanism result being the model
+            # diverting away from the main start, the split is close to the whole
+            # question. Costs two aggregations over K numbers per chunk.
+            zp0 = z_p0.double()[None].expand(n_pert, -1)
+            zd0 = z_d0.double()[None].expand(n_pert, -1)
+            out_cap = model.aggregate(zp_d, zd0, mask, stable=True).cpu().numpy()
+            out_dec = model.aggregate(zp0, zd_d, mask, stable=True).cpu().numpy()
             # HOW FAR THE SELECTION DISTRIBUTION MOVED. With selection worth
             # 0.063 of AUC on test and sequence 0.005, a substitution that
             # changes WHICH ORF the model commits to is the mechanism rather
@@ -374,6 +393,8 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
             p = int(p0)
             o = int(obs[p - 1])
             ref = float(out[row_of[(n, o)]])
+            ref_c = float(out_cap[row_of[(n, o)]])
+            ref_d = float(out_dec[row_of[(n, o)]])
             # how far this chunk's baseline sits from the batch-K base pass. It is
             # the offset the same-chunk baseline removes, and it is reported so
             # its size is visible rather than assumed small.
@@ -383,6 +404,8 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
                     vals[p - 1, b] = float(out[row_of[(n, b)]]) - ref
                     dsel_out[p - 1, b] = float(dsel[row_of[(n, b)]])
                     dstart_out[p - 1, b] = float(dstart[row_of[(n, b)]])
+                    vcap_out[p - 1, b] = float(out_cap[row_of[(n, b)]]) - ref_c
+                    vdec_out[p - 1, b] = float(out_dec[row_of[(n, b)]]) - ref_d
                     # channel 5 is a rolling GC fraction derived from the bases,
                     # so it moves on any substitution that changes GC status --
                     # 68.2% of them. Base identity and local GC shift are
@@ -417,7 +440,7 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
 
     return (vals, valid, obs, (base_logit, base_train), (noop_max, int(valid.sum())),
             (a_lo, a_hi, s_lo, s_hi), (p_cap, p_sel, p_dec), (fill_count, mass),
-            (dsel_out, dstart_out, dgc_out))
+            (dsel_out, dstart_out, dgc_out, vcap_out, vdec_out))
 
 
 def main():
@@ -636,6 +659,7 @@ def main():
                  p_capture=per_cand[0], p_select=per_cand[1], p_decay=per_cand[2],
                  fill_count=per_pos[0], mass=per_pos[1],
                  dsel=dsel_arr[0], dstart=dsel_arr[1], dgc=dsel_arr[2],
+                 vals_capture=dsel_arr[3], vals_decay=dsel_arr[4],
                  noop=np.float64(noop[0]), n_floor=np.int64(noop[1]),
                  spread=spread)
         os.replace(tmp, shard)            # a shard is never half-written
@@ -662,6 +686,7 @@ def main():
     gc_is, gc_up, gc_ov, gc_hs = [], [], [], []
     fills, masses, dsels = [], [], []
     dstarts, dgcs = [], []
+    vcaps, vdecs = [], []
     n_floor_samples = 0
     for n, r in enumerate(take.itertuples()):
         z = np.load(shard_dir / f"{r.isoform_id}.npz")
@@ -684,6 +709,7 @@ def main():
             gc_ov.append(g_ov); gc_hs.append(g_hs)
         fills.append(z["fill_count"]); masses.append(z["mass"])
         dsels.append(z["dsel"]); dstarts.append(z["dstart"]); dgcs.append(z["dgc"])
+        vcaps.append(z["vals_capture"]); vdecs.append(z["vals_decay"])
         i = row[r.isoform_id]
         recs.append(dict(isoform_id=r.isoform_id, vals=z["vals"], valid=z["valid"],
                          obs=z["obs"], base_logit=float(z["base_logit"]),
@@ -706,6 +732,8 @@ def main():
     dsel = np.full((N, W, 4), np.nan, np.float32)
     dstart = np.full((N, W, 4), np.nan, np.float32)
     dgc = np.zeros((N, W, 4), np.int8)
+    vals_cap = np.full((N, W, 4), np.nan, np.float32)
+    vals_dec = np.full((N, W, 4), np.nan, np.float32)
     for i, x in enumerate(recs):
         p = len(x["valid"])
         vals[i, :p] = x["vals"]; valid[i, :p] = x["valid"]; obs[i, :p] = x["obs"]
@@ -714,6 +742,8 @@ def main():
         dsel[i, :len(dsels[i])] = dsels[i]
         dstart[i, :len(dstarts[i])] = dstarts[i]
         dgc[i, :len(dgcs[i])] = dgcs[i]
+        vals_cap[i, :len(vcaps[i])] = vcaps[i]
+        vals_dec[i, :len(vdecs[i])] = vdecs[i]
 
     cand_count = np.array([x["K"] for x in recs], np.int32)
     cand_offset = np.concatenate([[0], np.cumsum(cand_count)])[:-1].astype(np.int32)
@@ -782,6 +812,19 @@ def main():
         f.create_dataset("dsel", data=dsel, compression="lzf")
         f.create_dataset("dstart", data=dstart, compression="lzf")
         f.create_dataset("dgc", data=dgc, compression="lzf")
+        f.create_dataset("vals_capture", data=vals_cap, compression="lzf")
+        f.create_dataset("vals_decay", data=vals_dec, compression="lzf")
+        f.attrs["branch_attribution"] = (
+            "vals is the total change in the transcript logit. vals_capture is "
+            "what the substitution did through the INITIATION branch alone -- "
+            "enc_init -> init_head -> p_k -- holding every decay probability at "
+            "its unperturbed value. vals_decay is the mirror, holding every "
+            "capture probability fixed. The three do not sum exactly: the "
+            "stick-breaking aggregation is not additive in (p, d), so "
+            "vals - (vals_capture + vals_decay) is the interaction, and it is "
+            "recoverable by subtraction. A base that moves initiation and a base "
+            "that moves decay are different biological events and vals alone "
+            "cannot tell them apart.")
         # THE MECHANISM STRATIFIER. Pete measured that 70.8% of candidates
         # meeting the uORF definition carry a downstream junction, against 24.1%
         # of reference-traced main ORFs, and the driver is length -- 69.4% of
