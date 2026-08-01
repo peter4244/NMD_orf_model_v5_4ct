@@ -1,0 +1,53 @@
+transcripts in TX          : 42,043
+candidates in the pool     : 802,035
+transcripts in the pool    : 42,043
+
+=== per candidate, filled window positions (of 1000 each) ===
+  ATG window filled positions                    mean          742  median          906  p90        1,000  max        1,000 
+  stop window filled positions                   mean          613  median          537  p90          944  max        1,000 
+  candidates with an empty ATG window            : 0
+  candidates with an empty stop window           : 0
+  candidates whose ATG window is full (1000)    : 112,148 (14.0%)
+  candidates whose stop window is full (1000)   : 67,959 (8.5%)
+
+=== per transcript ===
+  transcript length                              mean        3,273  median        2,966  p90        5,524  max       91,667 bases
+  candidates K                                   mean           19  median           17  p90           35  max          565 
+  transcript positions covered by >=1 window     mean        2,353  median        2,237  p90        3,583  max       48,107 bases
+  fraction of the transcript covered             mean        0.778  median        0.755  p90        1.000  max        1.000 
+  transcripts fully covered                      : 7,156 (17.0%)
+  mean uncovered bases per transcript            : 920
+  mean bases 3' of the last window               : 877
+  share of the uncovered mass that is that tail  : 95.3%
+
+=== encoder passes per transcript (one pass = one window through one encoder) ===
+  cached  (recompute only affected windows)      mean      119,956  median      100,944  p90      234,821  max    4,086,204 
+  naive   (recompute every candidate)            mean      502,235  median      333,279  p90    1,069,819  max  244,624,095 
+  saving factor, on the totals                   : 4.2x
+  saving factor, per transcript                  mean          3.5  median          3.3  p90          4.8  max         59.9 
+
+=== a 1,000-transcript bank, label-stratified at the pool's own prevalence ===
+  prevalence in the pool 0.224 -> 224 positive, 776 negative
+  cached  total encoder passes            : 120,646,290
+      at  20,000/s :    100.5 min per arm,    301.6 min for 3 window arms
+      at  85,000/s :     23.7 min per arm,     71.0 min for 3 window arms
+      at 200,000/s :     10.1 min per arm,     30.2 min for 3 window arms
+  naive   total encoder passes            : 500,820,804
+      at  20,000/s :    417.4 min per arm,   1252.1 min for 3 window arms
+      at  85,000/s :     98.2 min per arm,    294.6 min for 3 window arms
+      at 200,000/s :     41.7 min per arm,    125.2 min for 3 window arms
+
+=== input-tensor bytes if ONE transcript's substitutions are batched at once ===
+  float32 input, whole transcript at once (GB)   mean         2.79  median         2.37  p90         5.39  max        89.97 
+  transcripts over 8 GB of input alone           : 898
+  transcripts over 32 GB of input alone          : 2
+  -> the bank chunks by perturbation, not by transcript; the chunk size is
+     what bounds memory and it is set from a measured per-row cost, not this.
+
+=== gene structure, for the discovery / confirmation split ===
+  genes over the 42,043 pooled transcripts : 12,613
+  transcripts with no gene_id                    : 0
+  transcripts per gene                           mean          3.3  median          2.0  p90          7.0  max         27.0 
+  genes carrying both labels                     : 3,546 of 12,613
+
+wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/analysis_plans/ism_geometry_per_transcript.tsv  (42,043 rows)

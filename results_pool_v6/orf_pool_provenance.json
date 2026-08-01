@@ -1,15 +1,22 @@
 {
-  "built_at": "2026-08-01T05:04:56Z",
-  "floor": -1.2507921188400943,
-  "calibration": {
-    "n_scored": 19226,
-    "n_input": 19276,
-    "gencode": "GENCODE_v49",
-    "computed_at": "2026-04-19T03:20:52Z",
-    "quantile": "threshold_q05",
-    "path": "/Users/petecastaldi/claude_projects/Isopair/inst/extdata/kozak_mane_calibration.rds"
+  "built_at": "2026-08-01T10:26:26Z",
+  "pool_sha256": "19347421efb56f4aeb950938ad96d85ac151824a9d8fe34c8b63a56636725404",
+  "admission": {
+    "kozak_floor": -1.2507921188400943,
+    "calibration": {
+      "n_scored": 19226,
+      "n_input": 19276,
+      "gencode": "GENCODE_v49",
+      "computed_at": "2026-04-19T03:20:52Z",
+      "quantile": "threshold_q05",
+      "path": "/Users/petecastaldi/claude_projects/Isopair/inst/extdata/kozak_mane_calibration.rds"
+    },
+    "position_rule": "orf_start <= tx_length // 2",
+    "reference_start_always_admitted": true,
+    "fallback": "top 5 by score when the pool is empty",
+    "min_orf_length": 0,
+    "ejc_rule_nt": 50
   },
-  "ejc_rule_nt": 50,
   "n_transcripts": 42043,
   "n_candidates": 802035,
   "script": "build_orf_pool.py"

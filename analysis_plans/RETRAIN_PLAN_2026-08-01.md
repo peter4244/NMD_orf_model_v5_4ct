@@ -669,3 +669,227 @@ The reference points are re-derived rather than quoted. The published 0.9310 AUC
 computed on 10,131 transcripts of a different universe with a different pool and feature set, and
 AUPRC is prevalence-dependent, so it does not transport. The existing checkpoint is re-evaluated on
 `test_clean` and that number is the comparison; the tabular-only GBM is refitted on the same split.
+
+---
+
+## 9. The in-silico mutagenesis bank
+
+### 9.1 Question
+
+What does the trained model's transcript-level prediction do when each base of a transcript is
+substituted, over what population is that measured, and which transcript positions can be measured
+at all?
+
+### 9.2 Starting data
+
+The tensor from §5, the pool table from §3, `TX` (§2.2) for `is_nmd`, `tx_length` and `chr`,
+`REFCDS` (§2.4) for `gene_id`, and the checkpoints from §7 step 5 and §8 step 2.
+
+The bank is consumed by the interpretation window, which computes every metric from it. This section
+produces the bank and the population statement that travels with it, and stops there.
+
+### 9.3 Approach
+
+**Step 1 — partition the genes into a discovery half and a confirmation half.**
+
+Each of the 12,613 `gene_id` values in `REFCDS` (measured, §9.4) is assigned to `discovery` or
+`confirmation` by an independent fair draw from a generator seeded at 20260801. A gene is assigned
+once, over the whole universe rather than over any subset, so the assignment does not change when the
+subset of §9.3 step 2 grows.
+
+Every transcript inherits its gene's arm. A gene lies entirely on one chromosome, so the arm never
+crosses the `train` / `val` / `test` boundary of §5 step 5, and a transcript's arm and its split are
+separate facts that both travel with the bank.
+
+```
+for each gene g in REFCDS:
+    arm[g] = "discovery" if rng.random() < 0.5 else "confirmation"
+for each transcript t:
+    arm[t] = arm[gene_id[t]]
+```
+
+Paralogy is **not** screened across this boundary. The two lists of `HOLDOUT` (§2.5) are computed
+against the test and validation boundaries and say nothing about this one, so a close paralog pair
+can be split across the two arms. The count of transcripts whose gene has a paralog anywhere is
+reported (§9.4) rather than removed.
+
+**Step 2 — fix the order in which transcripts enter the bank.**
+
+The 42,043 transcripts of the pool are put in one fixed random order by the same generator, drawn
+independently within each `is_nmd` stratum and interleaved so that any prefix of the order holds the
+pool's own prevalence. The bank of size *n* is the first *n* transcripts of that order.
+
+A larger bank is therefore the same bank with rows appended: the subset at *n* = 1,000 is a prefix of
+the subset at *n* = 2,000, and step 1's arm assignment is unchanged by the growth. The order is
+written out in full so *n* is a parameter of the run rather than a property of the file.
+
+```
+order = interleave( shuffle(transcripts with is_nmd == 1),
+                    shuffle(transcripts with is_nmd == 0),
+                    at the pool prevalence 0.2242 )
+subset(n) = order[:n]
+```
+
+**Step 3 — establish which transcript positions are measurable.**
+
+A candidate's two windows each cover a contiguous run of transcript positions, fixed by §5 step 1:
+
+```
+mid_k    = (orf_start_k + orf_end_k) // 2
+ATG_k    = [ max(1, orf_start_k - 900),      min(tx_length, mid_k, orf_start_k + 99) ]
+STOP_k   = [ max(mid_k + 1, orf_end_k - 501), min(tx_length, orf_end_k + 498) ]
+
+covering(p) = { (k, ATG)  : p in ATG_k }  union  { (k, STOP) : p in STOP_k }
+valid(p)    = covering(p) is not empty
+```
+
+A position outside every window is read by no part of the model and carries no effect to measure.
+Over the 42,043 transcripts, 77.8% of positions are covered and 17.0% of transcripts are covered
+completely; 95.3% of the uncovered mass lies 3′ of the last window, because §3 step 4 admits only
+candidates starting in the first half of the transcript and the 3′-most stop window reaches 498 bases
+past the 3′-most stop codon (measured, §9.4). `valid` is emitted so that an uncovered position is
+distinguishable from a measured zero.
+
+**Step 4 — define one substitution.**
+
+`sub(t, p, b)` replaces the base at transcript position *p* of transcript *t* with base *b*, in
+**every** window in `covering(p)`, and recomputes channel 5 of each of those windows from that
+window's own bases.
+
+Everything else is held fixed: the junction channel, the reading-frame channels, the structural
+block, the candidate coordinates, and the candidate set itself. A substitution can create or destroy
+an ATG or a stop codon, and the pool is **not** re-derived when it does; the bank measures the
+model's response to its input, not to a re-scanned transcript.
+
+Applying the substitution to one window and not the others would present the same transcript
+coordinate as two different bases within one forward pass, which is a state no transcript can occupy.
+
+```
+sub(t, p, b):
+    for (k, w) in covering(p):
+        i = index of p in window w of candidate k        # p - anchor(k,w) + left(w)
+        fill_state[k, w, i] = b
+        channel5[k, w] = rolling_GC(window w of candidate k, span 50)
+```
+
+The observed base `obs(p)` is read back from any covering window. All covering windows encode the
+same transcript position, so they agree; disagreement is an error in the geometry rather than a
+property of the data.
+
+**Step 5 — recompute only what the substitution changed.**
+
+The model runs in evaluation mode, so batch normalization uses its running statistics and dropout is
+off. Each candidate's two embeddings then depend only on that candidate's own windows, and a
+candidate no window of which contains *p* has exactly the values it had in the unperturbed pass.
+
+```
+base pass:  for every candidate k, compute and keep
+            e_init_k = enc_init(atg_k),  e_atg_k = enc_atg(atg_k),  e_stop_k = enc_stop(stop_k)
+
+for a substitution at p:
+    for (k, ATG)  in covering(p):  recompute e_init_k and e_atg_k
+    for (k, STOP) in covering(p):  recompute e_stop_k
+    p_k, d_k  from the current embeddings, for every k
+    logit     from the stick-breaking aggregation of §6.2 step 4, over all K candidates
+```
+
+The aggregation is recomputed over the whole transcript every time, because the stick-breaking
+product couples the candidates: an earlier candidate's capture changes every later candidate's
+selection mass. Only the encoders are cached. That cache is 4.2× fewer encoder passes than
+re-encoding every candidate for every substitution (measured, §9.4).
+
+**Step 6 — measure the no-op floor.**
+
+`sub(t, p, obs(p))` substitutes the observed base for itself and must return an effect of zero. It is
+evaluated at positions sampled uniformly without replacement from the valid positions of each
+transcript, rather than at all of them, and the largest absolute value over the sample is the bank's
+floor. An effect below the floor is not distinguishable from the arithmetic.
+
+**Step 7 — emit the bank.**
+
+One file per arm. `W` is the largest `last_covered` over the transcripts in the subset, so no stored
+column is invalid for every transcript.
+
+| name | shape | type | content |
+|---|---|---|---|
+| `vals` | (n_iso, W, 4) | float32 | logit under `sub(t, p, b)` minus the unperturbed logit; NaN where `valid` is false, and at the observed base |
+| `valid` | (n_iso, W) | bool | `valid(p)` of step 3 |
+| `obs` | (n_iso, W) | int8 | observed base, ACGT = 0123; −1 where `valid` is false or the base is not one of ACGT |
+| `labels` | (n_iso,) | int8 | `is_nmd` |
+| `floor` | scalar | float32 | step 6 |
+| `transcript_id` | (n_iso,) | string | keys to `TX` |
+| `spans` | (n_cand, 6) | int32 | one row per candidate: transcript row index, slot, and the four bounds of `ATG_k` and `STOP_k` |
+| `cand_offset`, `cand_count` | (n_iso,) | int32 | the rows of `spans` belonging to each transcript |
+| `arm` | (n_iso,) | string | `discovery` or `confirmation`, from step 1 |
+| `split` | (n_iso,) | string | `train`, `val`, `val_paralog`, `test`, `test_paralog`, from §5 step 5 |
+| `gene_id` | (n_iso,) | string | for clustering |
+| `base_logit` | (n_iso,) | float32 | the unperturbed logit |
+
+`spans` is emitted because the interpretation window excludes positions within 25 bases of a window
+boundary, where a substitution perturbs the truncated denominator of the 50-base rolling mean of
+channel 5. The bounds are stated rather than left to be reconstructed from the pool table.
+
+**Step 8 — the arms.**
+
+| arm | model | bank |
+|---|---|---|
+| interpretable | the configuration selected in §7 step 5 | full |
+| permuted-bin control | `interp_c32_b8_perm` at the same seeds | full, by step 9 |
+| sequence-blanked | §8.2 | **none** — see below |
+| predictor, no-junction | §8.2, §6.3 | none; §8.3 metrics only |
+
+The sequence-blanked arm is trained and evaluated with channels 0–3 and 5 set to zero, and a
+substitution changes channels 0–3 and 5 and nothing else. Every entry of its `vals` is therefore
+exactly zero by construction, whatever the model learned, so the arm has no mutagenesis bank. Its
+evidence is the §8.3 accuracy comparison.
+
+**Step 9 — the permuted-bin control is stochastic, and is measured with common random numbers.**
+
+The control redraws its bin permutation at every forward pass (§6.2 step 1), so a single forward pass
+of it is a draw rather than a prediction. Its effect at a position is the expectation over
+permutations, estimated by pairing: one permutation is drawn per candidate window and held fixed
+across the unperturbed pass and every substitution of that transcript, the whole bank is computed
+under it, and the result is averaged over `R` such draws.
+
+```
+for r in 1..R:
+    P_r = one permutation per (candidate, window), drawn once
+    vals_r = the bank of steps 4-7 computed with every forward pass using P_r
+vals = mean over r of vals_r
+```
+
+Pairing is what makes this measurable: an unpaired difference of two passes is dominated by the
+permutation, not by the substitution. `R` is set from the spread across draws, which is reported
+(§9.4). The training path is unchanged — a permutation supplied to the encoder replaces the draw, and
+supplying none redraws exactly as §6.2 step 1 specifies.
+
+### 9.4 Quantities this step reports
+
+Measured over all 42,043 transcripts of the pool, by
+`measure_ism_geometry.py` / `measure_ism_geometry_runlog.txt`:
+
+| quantity | population | measured |
+|---|---|---|
+| filled ATG-window positions per candidate | 802,035 candidates | mean 742 of 1000, median 906 |
+| filled stop-window positions per candidate | same | mean 613 of 1000, median 537 |
+| transcript positions covered by ≥1 window | 42,043 transcripts | mean 2,353 of 3,273 |
+| fraction of the transcript covered | same | mean 0.778, median 0.755 |
+| transcripts covered completely | same | 7,156 (17.0%) |
+| share of uncovered mass lying 3′ of the last window | same | 95.3% |
+| encoder passes per transcript, caching unaffected candidates | same | mean 119,956 |
+| ...re-encoding every candidate instead | same | mean 502,235 |
+| saving from the cache, on the totals | same | 4.2× |
+| float32 input if one transcript's substitutions are batched at once | same | mean 2.79 GB, p90 5.39 GB, max 89.97 GB |
+| ...transcripts above 8 GB on that basis | same | 898 |
+| genes | 42,043 transcripts | 12,613, mean 3.3 transcripts each |
+| genes carrying both labels | 12,613 genes | 3,546 |
+| `is_nmd` prevalence | 42,043 transcripts | 0.2242 |
+
+Reported by the bank build itself: `n`, `W`, bytes per arm, transcripts and genes per arm of step 1,
+the achieved discovery/confirmation balance within each (`is_nmd`, split) cell, the no-op floor of
+step 6 with the number of positions it was sampled at, the measured rate in encoder passes per
+second on the hardware used, and for the control the spread of `vals` across the `R` draws of step 9.
+
+Whole-transcript batching is not used: at a mean of 2.79 GB of model input per transcript before any
+activation, 898 transcripts exceed 8 GB on input alone. The bank is chunked by perturbation, and the
+chunk size is set from a measured per-row cost on the hardware the run uses.

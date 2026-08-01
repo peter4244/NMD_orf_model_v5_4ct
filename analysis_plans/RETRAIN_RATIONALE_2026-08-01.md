@@ -242,3 +242,75 @@ they respond in all four cell types more consistently than the rest of the posit
 are enriched roughly 2× for the upstream-ORF mechanism. **Deleting them would preferentially delete
 the mechanism this entire rebuild is aimed at.** Keep them; run one sensitivity arm without them,
 which now has a clean meaning.
+
+---
+
+## 8. The mutagenesis bank — why §9 of the plan is shaped the way it is
+
+Written 2026-08-01, after measuring the pool's geometry rather than estimating it.
+
+### 8.1 The sequence-blanked bank cannot exist
+
+The interpretation window asked for three banks and offered to give up the sequence-blanked one
+first if the cost was high. Cost is not what removes it. That arm is trained *and evaluated* with
+channels 0–3 and 5 set to zero, and a base substitution changes channels 0–3 and 5 and nothing else.
+Every entry of its bank is therefore exactly zero whatever the model learned — not approximately,
+not usually, but by construction of the two definitions together. A table of zeros is not a null to
+compare against; it is the arithmetic restating itself. The arm keeps its meaning in §8.2, where it
+is an accuracy comparison, and loses it here.
+
+### 8.2 The permuted-bin control is a random variable, and the naive difference measures the wrong thing
+
+The control redraws its bin permutation at every forward pass, deliberately: a permutation fixed at
+initialisation would be undone by the projection that follows it. That property, which is what makes
+the arm a control during training, makes a single forward pass of the trained model a draw rather
+than a prediction. Subtracting one draw from another gives the difference between two permutations
+with a substitution somewhere inside it, and the permutation is by far the larger term.
+
+Pairing fixes it. Hold one permutation fixed across the unperturbed pass and every substitution of a
+transcript, and the difference is exact conditional on that permutation; average over draws and it
+estimates the expectation, which is the quantity the arm is supposed to supply. This is the one arm
+the interpretation window said it could not build itself, so getting the estimator right here is the
+part of the handover that carries the most weight.
+
+### 8.3 22% of transcript positions cannot be probed at all
+
+The interpretation window's working assumption was that with 19 candidates spread 5′→3′ the union of
+window spans is probably the whole transcript. Measured, it is 77.8% of positions, and only 17.0% of
+transcripts are covered completely. The missing region is not scattered — 95.3% of it is one run at
+the 3′ end, because candidates must start in the first half of the transcript and the 3′-most stop
+window reaches only 498 bases past the 3′-most stop codon.
+
+This matters beyond bookkeeping. A 3′UTR motif search over this bank is a search over the proximal
+3′UTR only, and a null computed over "all positions" would be computed over a population that stops
+part-way down the transcript. `valid` is in the contract so that an unprobeable position is
+distinguishable from a measured zero, and the coverage figure travels with the bank rather than
+sitting in a plan.
+
+### 8.4 The cache is exact, and it is worth 4.2×
+
+A substitution changes only the windows containing that coordinate. In evaluation mode — batch
+normalization on running statistics, dropout off — a candidate's embeddings depend on nothing but its
+own windows, so every other candidate's capture and decay are the values already computed. This is
+an identity, not an approximation, and it is the reason the bank is minutes of GPU rather than the
+150 CPU-hours the laptop measurement suggested.
+
+What it does not buy is the aggregation: stick-breaking couples the candidates, so an earlier
+candidate's capture shifts every later candidate's selection mass and the product is recomputed over
+the whole transcript every time. That is arithmetic over K numbers and is not the expensive part.
+Measured over the pool, caching the encoders is 4.2× fewer encoder passes than re-encoding
+everything.
+
+### 8.5 The gene partition is drawn over the universe, not over the subset
+
+The interpretation window cannot say what *n* the bank needs; their pilot at 120 transcripts gave a
+top strength of 2.5 against a null edge of 1.0 and they do not know where the curve turns. So the
+bank is built to grow by appending rather than by rebuilding: the transcript order is fixed once at
+the pool's prevalence, and the discovery/confirmation arm is assigned per gene over all 12,613 genes
+before any subset is taken. Growing *n* from 1,000 to 2,000 then leaves every earlier row and every
+arm assignment unchanged, and a result computed at 1,000 stays comparable with one computed at 2,000.
+
+Paralogy is not screened across that boundary and the plan says so. The two paralog lists this
+project holds are computed against the test and the validation boundaries and carry no information
+about this one. Screening it properly means computing a third list; asserting it is screened when it
+is not would be worse than recording that it is not.
