@@ -242,6 +242,7 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
     vcap_out = np.full((P, 4), np.nan, dtype=np.float32)
     vdec_out = np.full((P, 4), np.nan, dtype=np.float32)
     dgc_out = np.zeros((P, 4), dtype=np.int8)
+    offset_out = np.zeros(P, dtype=np.float32)
 
     # ---- the substitutions --------------------------------------------------
     keep = valid[pos - 1]
@@ -398,7 +399,14 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
             # how far this chunk's baseline sits from the batch-K base pass. It is
             # the offset the same-chunk baseline removes, and it is reported so
             # its size is visible rather than assumed small.
-            noop_max = max(noop_max, abs(ref - base_logit))
+            # PER POSITION, not just the maximum. This is the measured floor:
+            # the same input scored in a chunk of one against a chunk of
+            # thousands differs by float32 accumulation order alone, and a reader
+            # who assumes zero will read that difference as signal. Shipping it
+            # per position lets every downstream gate use the floor that actually
+            # applies where it is looking.
+            offset_out[p - 1] = abs(ref - base_logit)
+            noop_max = max(noop_max, offset_out[p - 1])
             for b in range(4):
                 if b != o:
                     vals[p - 1, b] = float(out[row_of[(n, b)]]) - ref
@@ -440,7 +448,7 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
 
     return (vals, valid, obs, (base_logit, base_train), (noop_max, int(valid.sum())),
             (a_lo, a_hi, s_lo, s_hi), (p_cap, p_sel, p_dec), (fill_count, mass),
-            (dsel_out, dstart_out, dgc_out, vcap_out, vdec_out))
+            (dsel_out, dstart_out, dgc_out, vcap_out, vdec_out, offset_out))
 
 
 def main():
@@ -660,6 +668,7 @@ def main():
                  fill_count=per_pos[0], mass=per_pos[1],
                  dsel=dsel_arr[0], dstart=dsel_arr[1], dgc=dsel_arr[2],
                  vals_capture=dsel_arr[3], vals_decay=dsel_arr[4],
+                 chunk_offset=dsel_arr[5],
                  noop=np.float64(noop[0]), n_floor=np.int64(noop[1]),
                  spread=spread)
         os.replace(tmp, shard)            # a shard is never half-written
@@ -687,7 +696,7 @@ def main():
     gc_is, gc_up, gc_ov, gc_hs = [], [], [], []
     fills, masses, dsels = [], [], []
     dstarts, dgcs = [], []
-    vcaps, vdecs = [], []
+    vcaps, vdecs, coffs = [], [], []
     n_floor_samples = 0
     for n, r in enumerate(take.itertuples()):
         z = np.load(shard_dir / f"{r.isoform_id}.npz")
@@ -714,6 +723,7 @@ def main():
         fills.append(z["fill_count"]); masses.append(z["mass"])
         dsels.append(z["dsel"]); dstarts.append(z["dstart"]); dgcs.append(z["dgc"])
         vcaps.append(z["vals_capture"]); vdecs.append(z["vals_decay"])
+        coffs.append(z["chunk_offset"])
         i = row[r.isoform_id]
         recs.append(dict(isoform_id=r.isoform_id, vals=z["vals"], valid=z["valid"],
                          obs=z["obs"], base_logit=float(z["base_logit"]),
@@ -738,6 +748,7 @@ def main():
     dgc = np.zeros((N, W, 4), np.int8)
     vals_cap = np.full((N, W, 4), np.nan, np.float32)
     vals_dec = np.full((N, W, 4), np.nan, np.float32)
+    chunk_offset = np.zeros((N, W), np.float32)
     for i, x in enumerate(recs):
         p = len(x["valid"])
         vals[i, :p] = x["vals"]; valid[i, :p] = x["valid"]; obs[i, :p] = x["obs"]
@@ -748,6 +759,7 @@ def main():
         dgc[i, :len(dgcs[i])] = dgcs[i]
         vals_cap[i, :len(vcaps[i])] = vcaps[i]
         vals_dec[i, :len(vdecs[i])] = vdecs[i]
+        chunk_offset[i, :len(coffs[i])] = coffs[i]
 
     cand_count = np.array([x["K"] for x in recs], np.int32)
     cand_offset = np.concatenate([[0], np.cumsum(cand_count)])[:-1].astype(np.int32)
@@ -818,6 +830,7 @@ def main():
         f.create_dataset("dgc", data=dgc, compression="lzf")
         f.create_dataset("vals_capture", data=vals_cap, compression="lzf")
         f.create_dataset("vals_decay", data=vals_dec, compression="lzf")
+        f.create_dataset("chunk_offset", data=chunk_offset, compression="lzf")
         f.attrs["branch_resolution"] = (
             "vals_capture is roughly a thousandfold smaller than vals_decay, so "
             "it is the column where resolution could be mistaken for signal. It "
