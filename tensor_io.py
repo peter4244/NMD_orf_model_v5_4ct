@@ -64,6 +64,40 @@ def encode_window_codes(seq_bytes, junc_pos, tx_len, anchor, left, right,
     return out
 
 
+def gc_terms(fill):
+    """Channel 5's numerator, denominator and validity, before the division.
+
+    `fill` is (n, W) integer fill state, 0-5. Returns (num, den, ok), each (n, W).
+
+    Both sums count 0/1 over at most W = 1000 positions, so every entry of `num`
+    and `den` is an exact integer in float32 -- well inside the 2^24 where
+    float32 holds integers exactly. That is what lets a caller that knows how a
+    substitution moved the GC count patch `num` by +/-1 and divide, and get the
+    SAME float32 result as recomputing the cumulative sums from scratch: both
+    forms divide one exact integer by another, so both round identically.
+
+    The bounds are clipped to each row's own filled run, so an edge is not
+    diluted by positions the encoder never averaged over.
+    """
+    filled = fill > 0
+    n, W = fill.shape
+    is_gc = ((fill == 2) | (fill == 3)).astype(np.float32)   # C or G
+    fmask = filled.astype(np.float32)
+    cg = np.concatenate([np.zeros((n, 1), np.float32), np.cumsum(is_gc, axis=1)], 1)
+    cn = np.concatenate([np.zeros((n, 1), np.float32), np.cumsum(fmask, axis=1)], 1)
+    half = GC_SPAN // 2
+    first = np.argmax(filled, axis=1)
+    cnt = filled.sum(axis=1)
+    last = first + cnt                                        # exclusive
+    k = np.arange(W)[None, :]
+    a = np.clip(k - half, first[:, None], last[:, None])
+    b = np.clip(k + half + 1, first[:, None], last[:, None])
+    ridx = np.arange(n)[:, None]
+    num = cg[ridx, b] - cg[ridx, a]
+    den = cn[ridx, b] - cn[ridx, a]
+    return num, den, (den > 0) & filled
+
+
 def decode_windows(codes, anchor, left, orf_start):
     """Reconstruct the nine channels from stored codes.
 
@@ -91,23 +125,9 @@ def decode_windows(codes, anchor, left, orf_start):
     # channel 5: rolling GC across the FILLED range only, with padding counted as
     # absent rather than as GC-free. The filled region is one contiguous run, so
     # the running sums are taken over it and written back in place.
-    is_gc = ((fill == 2) | (fill == 3)).astype(np.float32)   # C or G
-    fmask = filled.astype(np.float32)
-    cg = np.concatenate([np.zeros((n, 1), np.float32), np.cumsum(is_gc, axis=1)], 1)
-    cn = np.concatenate([np.zeros((n, 1), np.float32), np.cumsum(fmask, axis=1)], 1)
-    half = GC_SPAN // 2
-    # bounds clipped to each row's own filled run, so an edge is not diluted by
-    # positions the encoder never averaged over
-    first = np.argmax(filled, axis=1)
-    cnt = filled.sum(axis=1)
-    last = first + cnt                                        # exclusive
+    num, den, ok = gc_terms(fill)
+    out[:, 5, :] = np.where(ok, num / np.maximum(den, 1), 0.0)
     k = np.arange(W)[None, :]
-    a = np.clip(k - half, first[:, None], last[:, None])
-    b = np.clip(k + half + 1, first[:, None], last[:, None])
-    ridx = np.arange(n)[:, None]
-    num = cg[ridx, b] - cg[ridx, a]
-    den = cn[ridx, b] - cn[ridx, a]
-    out[:, 5, :] = np.where((den > 0) & filled, num / np.maximum(den, 1), 0.0)
 
     # channels 6-8, codon position relative to this candidate's own start codon.
     #

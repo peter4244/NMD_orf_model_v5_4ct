@@ -40,6 +40,7 @@ sys.path.insert(0, str(REPO))
 
 from model_v6 import ScanningNMDModel          # noqa: E402
 from tensor_io import decode_windows           # noqa: E402
+from window_cache import WindowCache           # noqa: E402
 
 ATG_LEFT = 900
 
@@ -108,12 +109,33 @@ def main():
                                                        msk, stable=True)
                                            for _ in range(3)])
 
-        tot = sum(v[0] for k, v in t.items() if k != "aggregate x1")
+        # THE CACHED PATH, timed in the same process on the same rows. The three
+        # lines it replaces are `build codes`, `decode_windows` and `host->device`;
+        # it produces the (n, 9, 1000) input directly on the device. Comparing two
+        # separate runs would compare their spread as much as their code -- on this
+        # work a single before/after pair once read 2.9x where the truth was 10%.
+        cache = WindowCache(codes[:, 0], s0, ATG_LEFT, s0, dev)
+        ci = torch.as_tensor(rc, dtype=torch.long, device=dev)
+        wi = torch.as_tensor(idx, dtype=torch.long, device=dev)
+        bi = torch.full((n_rows,), 2, dtype=torch.long, device=dev)   # substitute C
+        clock("cache.windows", lambda: cache.windows(ci, wi, bi))
+
+        old_input = t["build codes"][0] + t["decode_windows"][0] + t["host->device"][0]
+        new_input = t["cache.windows"][0]
+        tot = sum(v[0] for k, v in t.items()
+                  if k not in ("aggregate x1", "cache.windows"))
+        tot_new = tot - old_input + new_input
         print(f"=== chunk {n_rows:,} rows ===")
         for k, (v, sd) in t.items():
-            flag = "   (x3 replaces x1 in the total)" if k == "aggregate x3" else ""
+            flag = ""
+            if k == "aggregate x3":
+                flag = "   (x3 replaces x1 in the total)"
+            elif k == "cache.windows":
+                flag = "   (replaces the three lines above it)"
             print(f"  {k:<16} {v:>8.4f} s  +/-{sd:>7.4f}  {100*v/tot:>5.1f}%{flag}")
-        print(f"  {'TOTAL':<16} {tot:>8.4f} s   {n_rows/tot:>9,.0f} rows/s\n")
+        print(f"  {'TOTAL old':<16} {tot:>8.4f} s   {n_rows/tot:>9,.0f} rows/s")
+        print(f"  {'TOTAL cached':<16} {tot_new:>8.4f} s   {n_rows/tot_new:>9,.0f} rows/s"
+              f"   {tot/tot_new:>5.1f}x\n")
 
     # kernel-launch overhead, the only cost that would be flat in chunk size
     if dev == "cuda":

@@ -48,7 +48,7 @@ import pandas as pd
 import torch
 
 from model_v6 import ScanningNMDModel
-from tensor_io import decode_windows
+from window_cache import WindowCache
 
 ATG_LEFT, STOP_LEFT = 900, 500
 WINDOW = 1000
@@ -184,10 +184,14 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
     P = int(max(a_hi.max(), s_hi.max()))          # last covered position
 
     # ---- the unperturbed pass, and the embeddings the cache keeps -----------
-    atg9 = torch.as_tensor(decode_windows(codes[:, 0], orf_start, ATG_LEFT, orf_start),
-                           device=device)
-    stop9 = torch.as_tensor(decode_windows(codes[:, 1], orf_end - 1, STOP_LEFT, orf_start),
-                            device=device)
+    # Each candidate's two windows are decoded ONCE here and kept on the device.
+    # A substitution then copies the decoded window and patches the ~51 positions
+    # it can reach, rather than rebuilding all 1000 -- see window_cache.py for why
+    # that is bitwise equal and not merely close. `.base` is exactly what
+    # decode_windows returned, so the unperturbed pass reads it directly.
+    atg_cache = WindowCache(codes[:, 0], orf_start, ATG_LEFT, orf_start, device)
+    stop_cache = WindowCache(codes[:, 1], orf_end - 1, STOP_LEFT, orf_start, device)
+    atg9, stop9 = atg_cache.base, stop_cache.base
     kidx = torch.arange(K, device=device)
     u = torch.as_tensor(struct, dtype=torch.float32, device=device)
     with torch.no_grad():
@@ -308,13 +312,13 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
         rpos = np.concatenate([np.full(c, block[n]) for (n, _, c) in rp])
         n_pert = len(rp)
 
-        # build the perturbed codes: bits 0-2 take the new base, bit 3 (junction)
-        # is a property of the annotation and is preserved
+        # where in its window each row's substitution lands. The perturbed codes
+        # are no longer materialised: the cache takes the index and the new base
+        # and patches the decoded window, so the junction bit is preserved by not
+        # being touched rather than by being masked through.
         anchor = np.where(rw == 0, orf_start[rc], orf_end[rc] - 1)
         left = np.where(rw == 0, ATG_LEFT, STOP_LEFT)
         widx = rpos - anchor + left
-        pc = codes[rc, rw].copy()
-        pc[np.arange(len(pc)), widx] = (pc[np.arange(len(pc)), widx] & 8) | (rb + 1)
 
         is_atg = rw == 0
         z_p = z_p0[None].repeat(n_pert, 1).clone()
@@ -322,11 +326,11 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
         with torch.no_grad():
             if is_atg.any():
                 sel = np.flatnonzero(is_atg)
-                x = torch.as_tensor(decode_windows(pc[sel], orf_start[rc[sel]],
-                                                   ATG_LEFT, orf_start[rc[sel]]),
-                                    device=device)
                 ci = torch.as_tensor(rc[sel], device=device, dtype=torch.long)
                 pi = torch.as_tensor(pid[sel], device=device, dtype=torch.long)
+                x = atg_cache.windows(
+                    ci, torch.as_tensor(widx[sel], device=device, dtype=torch.long),
+                    torch.as_tensor(rb[sel] + 1, device=device, dtype=torch.long))
                 ei = enc.init(x, ci)
                 ea = enc.atg(x, ci)
                 z_p[pi, ci] = model.init_head(ei).squeeze(-1)
@@ -334,11 +338,11 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
                     torch.cat([ea, e_stop[ci], u_emb[ci]], dim=-1))).squeeze(-1)
             if (~is_atg).any():
                 sel = np.flatnonzero(~is_atg)
-                x = torch.as_tensor(decode_windows(pc[sel], orf_end[rc[sel]] - 1,
-                                                   STOP_LEFT, orf_start[rc[sel]]),
-                                    device=device)
                 ci = torch.as_tensor(rc[sel], device=device, dtype=torch.long)
                 pi = torch.as_tensor(pid[sel], device=device, dtype=torch.long)
+                x = stop_cache.windows(
+                    ci, torch.as_tensor(widx[sel], device=device, dtype=torch.long),
+                    torch.as_tensor(rb[sel] + 1, device=device, dtype=torch.long))
                 es = enc.stop(x, ci)
                 z_d[pi, ci] = model.decay_head(model.decay_body(
                     torch.cat([e_atg[ci], es, u_emb[ci]], dim=-1))).squeeze(-1)

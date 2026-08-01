@@ -951,8 +951,36 @@ for a substitution at p:
 
 The aggregation is recomputed over the whole transcript every time, because the stick-breaking
 product couples the candidates: an earlier candidate's capture changes every later candidate's
-selection mass. Only the encoders are cached. That cache is 4.2× fewer encoder passes than
-re-encoding every candidate for every substitution (measured, §9.4).
+selection mass. Only the encoders are cached among the model's own computations. That cache is
+4.2× fewer encoder passes than re-encoding every candidate for every substitution (measured, §9.4).
+
+**Step 5c — the decoded window is cached too, and a substitution patches it.**
+
+The nine channels of §5 are reconstructed from the stored codes for every window the model reads.
+Rebuilding all 1,000 positions per substitution was 88.2% of the run on a V100, against 4.4% for
+all three encoders (measured, `analysis_plans/profile_ism_cluster.py`; the same profile on a
+laptop says the opposite, because there the encoders are on the CPU).
+
+A substitution changes about 51 of the 1,000 positions: the substituted base in channels 0–3, and
+the ±25 span over which channel 5 averages local GC. Channel 4 does not change, because a junction
+is annotation. Channels 6–8 do not change, because the frame grid is anchored on the candidate's
+own start codon, which the substitution does not move, and because a base is replaced by a base so
+the fill mask is unchanged. Each candidate's two windows are therefore decoded once and kept on
+the device, and a substitution copies the decoded window and patches that span
+(`window_cache.py`).
+
+The patch is **bitwise equal** to a full decode, not close to one. Channel 5 is `num / den` where
+both are counts over at most 1,000 positions and so are exact integers in float32; a substitution
+moves the count over the span by exactly −1, 0 or +1 and leaves the denominator alone, so
+`(num ± 1) / den` is the same division of the same two exact integers a full recompute performs.
+The three possible numerators are precomputed per candidate, so the substitution path performs no
+channel-5 arithmetic at all.
+
+Equality is checked rather than argued, by `verify_window_cache.py`, which compares the patched
+window against `decode_windows` on real windows of both kinds and requires zero differing entries.
+The check reports how many substitutions took the channel-5 branch and how many skipped it, and
+fails if either is zero: half of all substitutions leave GC status unchanged, and a check drawn
+only from those would pass without testing the span at all.
 
 **Step 5b — the response variable is the unclamped log-odds.**
 
