@@ -1,0 +1,16 @@
+{
+  "built_at": "2026-08-01T04:27:25Z",
+  "floor": -1.2507921188400943,
+  "calibration": {
+    "n_scored": 19226,
+    "n_input": 19276,
+    "gencode": "GENCODE_v49",
+    "computed_at": "2026-04-19T03:20:52Z",
+    "quantile": "threshold_q05",
+    "path": "/Users/petecastaldi/claude_projects/Isopair/inst/extdata/kozak_mane_calibration.rds"
+  },
+  "ejc_rule_nt": 50,
+  "n_transcripts": 42043,
+  "n_candidates": 802035,
+  "script": "build_orf_pool.py"
+}

@@ -270,12 +270,12 @@ One row per admitted candidate, replacing `selected_orfs.tsv`:
 | candidates per transcript, no floor | 42,043 transcripts | mean 54.6 |
 | ...above `FLOOR` | same | mean 36.4 |
 | **...after all four admission rules** | same | **mean 19.1**, median 17, p90 35, p99 59, max 565 |
-| candidates total | same | 802,430 |
+| candidates total | same | 802,035 |
 | transcripts with an empty pool | same | 0 |
-| candidates discounted by position | above-floor pool of 1,530,321 | 731,937 (47.8%) |
+| candidates discounted by position | 42,043 transcripts | 732,509 |
 | transcripts where the fallback fires | 42,043 transcripts | 58 |
 | GENCODE CDS start in the pool | 28,775 with an enumerable CDS start | 28,775 (100%) |
-| ...reaching it only by the always-admit rule | same | 3,823 (13.3%) |
+| ...reaching it only by the always-admit rule | same | 3,825 (13.3%) |
 | coverage of upstream ORFs whose own stop has a junction >50 bases downstream | 133,765 such ORFs | 89,073 (66.6%) |
 | transcripts all of whose triggering upstream ORFs are admitted | 17,944 carrying at least one | not yet measured |
 
@@ -284,9 +284,10 @@ One row per admitted candidate, replacing `selected_orfs.tsv`:
 row is the one the aggregation of §6.2 Step 4 depends on: a transcript missing one of its triggering
 ORFs has the wrong leak product, which the ORF-level percentage does not show.
 
-Sources: rows 1 and 2 from `design1_orf_pool_size_runlog.txt` and `design2_mane_floor_runlog.txt`;
-the 1,530,321 denominator in row 5 from `design2`; every other value from
-`design5_final_pool_runlog.txt`. All on the same sequences with the same enumeration.
+Source: `build_orf_pool_runlog.txt`, which is this step's own output. The coverage rows are the
+exception — `build_orf_pool.py` does not yet classify non-admitted ORFs as upstream or triggering, so
+those two rows are carried from `design5_final_pool_runlog.txt` and are not yet produced by the code
+that implements this section.
 
 ### 3.5 Cost
 
@@ -305,9 +306,9 @@ hit and how many candidates were dropped.
 
 ### 3.7 What the always-admit rule puts in the pool
 
-2,423 admitted candidates — 0.3% of the pool — score below `FLOOR`, and every one of them is the
-reference start codon, because the always-admit rule is the only way a below-floor candidate enters
-(measured here). Within the pool, therefore, a below-floor score identifies the reference start codon
+2,493 admitted candidates — 0.3% of the pool — score below `FLOOR`: 2,423 are the reference start
+codon and 70 arrive by the fallback, which by definition fires only where nothing clears the floor
+(measured, `build_orf_pool_runlog.txt`). Within the pool, therefore, a below-floor score identifies the reference start codon
 exactly. It identifies 8.4% of reference start codons, not all of them, and it does not recover the
 transcript-level properties that carry the label — a transcript with no reference isoform is 100%
 NMD-positive and a self-reference transcript 0%, and neither is inferable from which candidate is
