@@ -550,6 +550,10 @@ def main():
         f.attrs["checkpoint"] = str(args.checkpoint)
         f.attrs["pool_sha256"] = pool_sha
         f.attrs["perm_draws"] = R
+        if spreads:
+            f.attrs["perm_spread_effect_sd"] = float(np.mean([x[0] for x in spreads]))
+            f.attrs["perm_mean_abs_effect"] = float(np.mean([x[1] for x in spreads]))
+            f.attrs["perm_unperturbed_logit_sd"] = float(np.mean([x[2] for x in spreads]))
         f.attrs["split_file"] = str(args.split)
         f.attrs["plan"] = "analysis_plans/RETRAIN_PLAN_2026-08-01.md §9"
         f.attrs["config"] = json.dumps({k: ckargs[k] for k in
@@ -557,12 +561,27 @@ def main():
                                          "permute_bins", "blank_sequence",
                                          "blank_junctions", "seed")})
         f.attrs["vals_meaning"] = (
-            "vals[i,p,b] = logit(transcript i with base at 1-based position p+1 "
-            "replaced by ACGT[b], in every candidate window containing that "
-            "coordinate) - base_logit[i]. NaN where valid is False and at the "
-            "observed base. spans gives each candidate's window extents in "
-            "transcript coordinates: (transcript row, slot, atg_lo, atg_hi, "
-            "stop_lo, stop_hi), 1-based inclusive.")
+            "vals[i,p,b] = logit(transcript i with the base at 1-based transcript "
+            "position p+1 replaced by ACGT[b], in every candidate window "
+            "containing that coordinate) - base_logit[i]. NaN where valid is "
+            "False and at the observed base.")
+        # TWO CONVENTIONS IN ONE FILE, AND THEY DIFFER BY ONE. The array axis of
+        # vals/valid/obs is 0-based; spans are 1-based inclusive transcript
+        # coordinates, which is what the plan and every other table in this
+        # project use. Stated rather than left to be inferred: this project has
+        # already lost an hour to a coordinate convention it reconstructed.
+        f.attrs["coordinates"] = (
+            "vals/valid/obs axis 1 is 0-BASED: index p is 1-based transcript "
+            "position p+1. spans are 1-BASED INCLUSIVE: a span [lo, hi] covers "
+            "array indices [lo-1, hi-1] inclusive, i.e. vals[i, lo-1:hi]. "
+            "spans columns: (transcript row, slot, atg_lo, atg_hi, stop_lo, "
+            "stop_hi).")
+        f.attrs["logit_definition"] = (
+            "log-odds of P(NMD) computed from log P(NMD) directly in float64, "
+            "WITHOUT the [1e-6, 1-1e-6] clamp the training path applies. At the "
+            "clamp the training logit is constant and every substitution returns "
+            "exactly 0.0; base_logit_training and pinned_in_training record which "
+            "transcripts the training output would have pinned.")
 
     dt = time.time() - t0
     print(f"\nwrote {outp}  ({outp.stat().st_size/1e6:,.0f} MB)")
