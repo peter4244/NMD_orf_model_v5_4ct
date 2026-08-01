@@ -55,8 +55,12 @@ chr4 — 4,437. Training is everything else — 26,887 (measured here). No gene 
 
 ### 2.3 `JUNC` — exon junction positions
 
-`~/claude_projects/nmd_w69_tables_2026-07-30/junctions.tsv`, 95,623 rows, one per transcript in the
-structure set, of which all 42,043 model transcripts are present.
+`~/claude_projects/nmd_w69_tables_2026-07-30/junctions.tsv`, 95,623 rows, one per transcript in
+`structures.rds` — the parsed exon-structure set built from the combined GTF, which holds both the
+GENCODE reference transcripts and the SQANTI-called novel isoforms. It is a **wider set than the
+model universe**: 40,486 reference and 55,137 novel entries, against 16,068 and 25,975 in `TX`
+(measured here). `TX` is a strict subset of it, so every transcript this plan looks up is present.
+The 53,580 extra transcripts carry no label and are not used by this plan.
 
 `junctions` is a comma-separated ascending list of transcript coordinates. Each value is the
 position of the last base before an exon–exon junction, so a junction listed at 393 means the
