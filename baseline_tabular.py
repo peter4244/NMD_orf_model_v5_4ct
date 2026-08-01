@@ -93,6 +93,11 @@ def main():
     ap.add_argument("--split", default="val", choices=["val", "test"])
     ap.add_argument("--bootstrap", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=20260801)
+    ap.add_argument("--drop-cols", default="",
+                    help="comma-separated column names to withhold. The baseline "
+                         "exists to be a STRONG comparator, so weakening it "
+                         "quietly would flatter the model for the wrong reason -- "
+                         "it is run both ways and both are reported.")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
     t0 = time.time()
@@ -100,6 +105,14 @@ def main():
     from sklearn.ensemble import HistGradientBoostingClassifier
 
     X, y, split, gene, iso, names = build_features(args.tensor)
+    if args.drop_cols:
+        drop = {c.strip() for c in args.drop_cols.split(",") if c.strip()}
+        keep = [i for i, n in enumerate(names)
+                if not any(n.endswith(d) for d in drop)]
+        dropped = [n for i, n in enumerate(names) if i not in set(keep)]
+        print(f"WITHHELD: {', '.join(sorted(drop))} -> dropped {len(dropped)} "
+              f"of {len(names)} features")
+        X, names = X[:, keep], [names[i] for i in keep]
     tr = split == "train"
     va = split == "val"
     ev = split == args.split

@@ -41,7 +41,14 @@ from tensor_io import decode_windows
 STRUCTURAL_COLS = ["n_downstream_ejc", "is_ref_cds", "is_sqanti_cds",
                    "frac_start", "frac_stop"]
 INTERPRETABLE = [0]                 # n_downstream_ejc only
-PREDICTOR = [0, 1, 2, 3, 4]
+# is_sqanti_cds (index 2) is WITHHELD. It is TD2 calling the TARGET isoform's own
+# CDS, and TD2 avoids ORFs that terminate at a premature stop -- which is exactly
+# the ORF an NMD-susceptible isoform has. Every other TD2 exposure in v6 is absent
+# or indirect; this one is direct and points the wrong way on the class we care
+# about. is_ref_cds (index 1) stays: its anchor is by construction the dominant
+# NON-NMD isoform, whose CDS does not terminate prematurely, so the bias mechanism
+# is weakest exactly there -- and the interpretable variant never receives it.
+PREDICTOR = [0, 1, 3, 4]            # n_downstream_ejc, is_ref_cds, frac_start, frac_stop
 
 
 # ------------------------------------------------------------------ metrics

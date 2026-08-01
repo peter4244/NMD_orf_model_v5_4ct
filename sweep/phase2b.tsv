@@ -1,0 +1,6 @@
+name	variant	conv_channels	n_bins	permute_bins	blank_sequence	blank_junctions	seed
+predictor_nosqanti_c32_b8	predictor	32	8	0	0	0	100
+predictor_nosqanti_c32_b8	predictor	32	8	0	0	0	200
+predictor_nosqanti_c32_b8	predictor	32	8	0	0	0	300
+predictor_nosqanti_c32_b8	predictor	32	8	0	0	0	400
+predictor_nosqanti_c32_b8	predictor	32	8	0	0	0	500
