@@ -54,13 +54,19 @@ def auc_roc(y, s):
 
 
 def auprc(y, s):
+    """Average precision, with TIES GROUPED.
+
+    The step-wise form breaks ties by array order, which is wrong: no threshold
+    separates two identical scores, so they must be pooled. It matters here and
+    not elsewhere -- a boosted tree's probabilities tie far more often than a
+    network's logits do. sklearn's implementation groups correctly and is
+    already a dependency of this script.
+    """
+    from sklearn.metrics import average_precision_score
     y = np.asarray(y); s = np.asarray(s)
     if y.sum() == 0:
         return float("nan")
-    o = np.argsort(-s, kind="stable")
-    y = y[o]
-    tp = np.cumsum(y)
-    return float(((tp / np.arange(1, len(y) + 1)) * y).sum() / y.sum())
+    return float(average_precision_score(y, s))
 
 
 def build_features(tensor):
@@ -93,6 +99,11 @@ def main():
     ap.add_argument("--split", default="val", choices=["val", "test"])
     ap.add_argument("--bootstrap", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=20260801)
+    ap.add_argument("--seeds", default="100,200,300,400,500",
+                    help="the model is a five-seed ensemble and the baseline was "
+                         "a single fit; that asymmetry is not defensible, so the "
+                         "baseline is fitted at the SAME five seeds and reported "
+                         "as a mean with its range")
     ap.add_argument("--drop-cols", default="",
                     help="comma-separated column names to withhold. The baseline "
                          "exists to be a STRONG comparator, so weakening it "
@@ -129,25 +140,38 @@ def main():
                 + ", ".join(f"{s}={int((split == s).sum()):,}"
                             for s in sorted(set(split.tolist()))))
 
-    # Tuned on val_clean only, exactly as the sequence model's configuration is.
-    best, best_auc = None, -np.inf
-    for lr in (0.03, 0.06, 0.1):
-        for leaves in (15, 31, 63):
-            m = HistGradientBoostingClassifier(
-                learning_rate=lr, max_leaf_nodes=leaves, max_iter=500,
-                early_stopping=True, validation_fraction=0.15,
-                random_state=args.seed)
-            m.fit(X[tr], y[tr])
-            a = auc_roc(y[va], m.predict_proba(X[va])[:, 1])
-            print(f"  lr {lr}  leaves {leaves:>3}  val AUC {a:.4f}")
-            if a > best_auc:
-                best, best_auc = m, a
-    print(f"\n  selected on val_clean: val AUC {best_auc:.4f}")
+    # Tuned on val_clean only, exactly as the sequence model's configuration is,
+    # and fitted at the same five seeds the model uses.
+    seeds = [int(x) for x in args.seeds.split(",")]
+    per_seed, preds = [], []
+    for sd in seeds:
+        best, best_auc = None, -np.inf
+        for lr in (0.03, 0.06, 0.1):
+            for leaves in (15, 31, 63):
+                m = HistGradientBoostingClassifier(
+                    learning_rate=lr, max_leaf_nodes=leaves, max_iter=500,
+                    early_stopping=True, validation_fraction=0.15,
+                    random_state=sd)
+                m.fit(X[tr], y[tr])
+                a = auc_roc(y[va], m.predict_proba(X[va])[:, 1])
+                if a > best_auc:
+                    best, best_auc = m, a
+        pp = best.predict_proba(X[ev])[:, 1]
+        preds.append(pp)
+        per_seed.append((auc_roc(y[ev], pp), auprc(y[ev], pp), best_auc))
+        print(f"  seed {sd}: val AUC {best_auc:.4f}   "
+              f"{args.split} AUC {per_seed[-1][0]:.4f}  AUPRC {per_seed[-1][1]:.4f}")
 
-    p = best.predict_proba(X[ev])[:, 1]
-    a, pr = auc_roc(y[ev], p), auprc(y[ev], p)
+    aucs = [x[0] for x in per_seed]; prs = [x[1] for x in per_seed]
+    a, pr = float(np.mean(aucs)), float(np.mean(prs))
+    p = np.mean(preds, axis=0)                     # the ensemble, matched to the model
+    ea, epr = auc_roc(y[ev], p), auprc(y[ev], p)
     print(f"\n=== tabular baseline on {args.split}_clean ===")
-    print(f"  AUC {a:.4f}   AUPRC {pr:.4f}   n {int(ev.sum()):,}   "
+    print(f"  seed mean  AUC {a:.4f} [{min(aucs):.4f}, {max(aucs):.4f}]   "
+          f"AUPRC {pr:.4f} [{min(prs):.4f}, {max(prs):.4f}]")
+    print(f"  ensemble   AUC {ea:.4f}   AUPRC {epr:.4f}   "
+          f"<- the aggregation the model's headline uses")
+    print(f"  n {int(ev.sum()):,}   n_nmd {int(y[ev].sum()):,}   "
           f"prevalence {y[ev].mean():.4f}")
 
     # gene- and transcript-resampled intervals, the same pair evaluate_v6 reports
