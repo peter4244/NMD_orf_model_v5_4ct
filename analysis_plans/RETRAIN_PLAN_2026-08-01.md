@@ -869,9 +869,14 @@ vals = mean over r of vals_r
 ```
 
 Pairing is what makes this measurable: an unpaired difference of two passes is dominated by the
-permutation, not by the substitution. `R` is set from the spread across draws, which is reported
-(§9.4). The training path is unchanged — a permutation supplied to the encoder replaces the draw, and
-supplying none redraws exactly as §6.2 step 1 specifies.
+permutation, not by the substitution. The size of that domination is measured rather than assumed —
+the standard deviation of the **unperturbed** logit across permutation draws is what an unpaired
+difference would carry as noise, and it is reported beside the effect it would swamp (§9.4).
+
+`R` is set from the spread across paired draws, on the trained control checkpoint, and is not set in
+advance: the ratio of that spread to the effect is a property of the fitted weights, and a value read
+off an untrained model does not transfer. The training path is unchanged — a permutation supplied to
+the encoder replaces the draw, and supplying none redraws exactly as §6.2 step 1 specifies.
 
 ### 9.4 Quantities this step reports
 
@@ -912,8 +917,17 @@ Measured over the 41,765 transcripts of step 1, by `build_ism_split.py` /
 
 Reported by the bank build itself: `n`, `W`, bytes per arm, transcripts and genes per arm of step 1,
 the achieved discovery/confirmation balance within each (`is_nmd`, split) cell, the no-op floor of
-step 6 with the number of positions it was sampled at, the measured rate in encoder passes per
-second on the hardware used, and for the control the spread of `vals` across the `R` draws of step 9.
+step 6 with the number of positions it was sampled at, the measured substitution rate and peak
+device memory on the hardware used, and for the control three numbers from the `R` draws of step 9:
+the mean absolute effect, the standard deviation of the effect across paired draws, and the standard
+deviation of the unperturbed logit across draws.
+
+The third of those is what an unpaired estimator would carry as noise. Measured on chr21 with
+**untrained** weights, where the effect itself is near zero and the ratio therefore says nothing about
+the fitted model: mean absolute effect 3.15e-05, paired spread 4.50e-05 (1.43×), unperturbed-logit
+spread 1.18e-02 (373×). The structure — that the unpaired term is orders of magnitude larger than the
+paired one — is a property of the architecture. The ratio is not, and is re-measured on the trained
+control checkpoint before `R` is chosen.
 
 Whole-transcript batching is not used: at a mean of 2.79 GB of model input per transcript before any
 activation, 898 transcripts exceed 8 GB on input alone. The bank is chunked by perturbation, and the

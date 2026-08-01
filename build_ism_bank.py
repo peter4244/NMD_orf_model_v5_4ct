@@ -386,7 +386,7 @@ def main():
         cds, os_, oe_ = codes_all[sl], o_start_all[sl].astype(np.int64), o_end_all[sl].astype(np.int64)
         st = struct_all[sl][:, cols]
 
-        per_draw = []
+        per_draw, base_draws = [], []
         for d in range(R):
             enc = Encoders(model, draw_perms(model, len(os_), gen, device) if is_control else None)
             # An OOM costs the chunk, not the run: the chunk is halved and retried,
@@ -406,11 +406,20 @@ def main():
                           flush=True)
             if v is None:
                 raise RuntimeError(f"{r.isoform_id}: OOM at chunk_rows={chunk_rows}")
-            per_draw.append(v)
+            per_draw.append(v); base_draws.append(base)
             floors.append(noop[0]); n_floor_samples += noop[1]
         vals = per_draw[0] if R == 1 else np.nanmean(np.stack(per_draw), axis=0)
         if R > 1:
-            spreads.append(float(np.nanstd(np.stack(per_draw), axis=0).mean()))
+            # Spread over the paired draws, on entries finite in EVERY draw.
+            # nan-functions here return NaN for the all-NaN slices that invalid
+            # positions and the observed base leave behind, and one NaN poisons
+            # the mean -- which is how this reported "nan" the first time it ran.
+            st = np.stack(per_draw)
+            ok = np.isfinite(st).all(axis=0)
+            if ok.any():
+                spreads.append((float(st[:, ok].std(axis=0).mean()),
+                                float(np.abs(st[:, ok].mean(axis=0)).mean()),
+                                float(np.std(base_draws))))
 
         recs.append(dict(isoform_id=r.isoform_id, vals=vals, valid=valid, obs=obs,
                          base_logit=base, label=int(labels[i]), arm=r.arm,
@@ -482,7 +491,15 @@ def main():
           f"{floor:.3e} over {n_floor_samples:,} sampled positions "
           f"in {len(recs):,} transcripts")
     if spreads:
-        print(f"  control: mean sd across {R} paired draws = {np.mean(spreads):.3e}")
+        sd, eff, sdb = (np.mean([x[i] for x in spreads]) for i in range(3))
+        print(f"  control arm, {R} paired permutation draws:")
+        print(f"    mean |effect|                              {eff:.4e}")
+        print(f"    sd of the effect across paired draws       {sd:.4e}  "
+              f"({sd/max(eff,1e-30):.2f} x the effect)")
+        print(f"    sd of the UNPERTURBED logit across draws   {sdb:.4e}  "
+              f"({sdb/max(eff,1e-30):.2f} x the effect)")
+        print(f"    -> the last line is what an UNPAIRED difference would carry as "
+              f"noise.\n       Pairing is what removes it; R averages what is left.")
     print(f"  {dt:.0f}s, {3*int(valid.sum())/max(dt,1e-9):,.0f} substitutions/s")
 
 

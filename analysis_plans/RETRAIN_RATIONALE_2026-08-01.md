@@ -273,6 +273,15 @@ estimates the expectation, which is the quantity the arm is supposed to supply. 
 the interpretation window said it could not build itself, so getting the estimator right here is the
 part of the handover that carries the most weight.
 
+How much it matters is measurable without waiting for the trained checkpoint: run the unperturbed
+pass under several permutation draws and look at how far its logit moves. On chr21 with untrained
+weights that spread was 373x the mean absolute substitution effect, against 1.43x for the spread of
+the paired difference. Untrained weights make the effect itself near zero, so the ratio is not the
+number to quote about the fitted model — but the ordering is architectural, and it says an unpaired
+control bank would have been noise with a signal somewhere inside it, indistinguishable from a real
+null by inspection. That is the failure this arm exists to rule out, so it would have ruled in
+whatever it was pointed at.
+
 ### 8.3 22% of transcript positions cannot be probed at all
 
 The interpretation window's working assumption was that with 19 candidates spread 5′→3′ the union of
