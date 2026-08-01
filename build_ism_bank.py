@@ -336,8 +336,31 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
                     vals[p - 1, b] = float(out[row_of[(n, b)]]) - ref
         i = j
 
+    # ---- two per-position quantities today's findings made necessary ----------
+    # FILL COUNT: how many candidate windows hold this transcript position. ISM
+    # holds geometry fixed per substitution, but AGGREGATING across isoforms at a
+    # fixed anchor-relative offset does not: isoforms differ in where their
+    # windows are filled, so an apparent importance peak at an offset can reflect
+    # WHICH ISOFORMS HAVE FILL THERE rather than anything about sequence.
+    # Reference starts run 0.38 upstream fill against 0.79 for competitors, so
+    # this is live at exactly the offsets of interest. Shipped per position so any
+    # positional profile can be reported raw AND conditioned on it.
+    #
+    # SELECTION MASS: the total P_select of the candidates covering this position.
+    # A position whose covering candidates carry no mass cannot move the output
+    # however its base changes, so a zero there is "not expressible" rather than
+    # "the model ignores it". Shipped rather than gated on, so the threshold is
+    # the reader's choice and is stated with its exclusion count.
+    fill_count = np.zeros(P, dtype=np.int16)
+    mass = np.zeros(P, dtype=np.float32)
+    for k in range(K):
+        for lo, hi in ((a_lo[k], a_hi[k]), (s_lo[k], s_hi[k])):
+            if hi >= lo:
+                fill_count[lo - 1:hi] += 1
+                mass[lo - 1:hi] += p_sel[k]
+
     return (vals, valid, obs, (base_logit, base_train), (noop_max, int(valid.sum())),
-            (a_lo, a_hi, s_lo, s_hi), (p_cap, p_sel, p_dec))
+            (a_lo, a_hi, s_lo, s_hi), (p_cap, p_sel, p_dec), (fill_count, mass))
 
 
 def main():
@@ -458,7 +481,7 @@ def main():
             v = valid = None
             for attempt in range(5):
                 try:
-                    v, valid, obs, base, noop, spans, per_cand = transcript_bank(
+                    v, valid, obs, base, noop, spans, per_cand, per_pos = transcript_bank(
                         model, enc, cds, os_, oe_, int(r.tx_length), struct_k,
                         device, chunk_rows, rng)
                     break
@@ -494,6 +517,7 @@ def main():
                  base_logit_training=np.float64(base[1]),
                  spans=np.stack([a_lo, a_hi, s_lo, s_hi], 1).astype(np.int32),
                  p_capture=per_cand[0], p_select=per_cand[1], p_decay=per_cand[2],
+                 fill_count=per_pos[0], mass=per_pos[1],
                  noop=np.float64(noop[0]), n_floor=np.int64(noop[1]),
                  spread=spread)
         os.replace(tmp, shard)            # a shard is never half-written
@@ -515,10 +539,12 @@ def main():
 
     recs, spans_rows, floors, spreads = [], [], [], []
     pcap, psel, pdec = [], [], []
+    fills, masses = [], []
     n_floor_samples = 0
     for n, r in enumerate(take.itertuples()):
         z = np.load(shard_dir / f"{r.isoform_id}.npz")
         pcap.append(z["p_capture"]); psel.append(z["p_select"]); pdec.append(z["p_decay"])
+        fills.append(z["fill_count"]); masses.append(z["mass"])
         i = row[r.isoform_id]
         recs.append(dict(isoform_id=r.isoform_id, vals=z["vals"], valid=z["valid"],
                          obs=z["obs"], base_logit=float(z["base_logit"]),
@@ -536,9 +562,13 @@ def main():
     vals = np.full((N, W, 4), np.nan, np.float32)
     valid = np.zeros((N, W), bool)
     obs = np.full((N, W), -1, np.int8)
+    fill_count = np.zeros((N, W), np.int16)
+    mass = np.zeros((N, W), np.float32)
     for i, x in enumerate(recs):
         p = len(x["valid"])
         vals[i, :p] = x["vals"]; valid[i, :p] = x["valid"]; obs[i, :p] = x["obs"]
+        fill_count[i, :len(fills[i])] = fills[i]
+        mass[i, :len(masses[i])] = masses[i]
 
     cand_count = np.array([x["K"] for x in recs], np.int32)
     cand_offset = np.concatenate([[0], np.cumsum(cand_count)])[:-1].astype(np.int32)
@@ -588,6 +618,8 @@ def main():
         f.create_dataset("p_capture", data=np.concatenate(pcap))
         f.create_dataset("p_select", data=np.concatenate(psel))
         f.create_dataset("p_decay", data=np.concatenate(pdec))
+        f.create_dataset("fill_count", data=fill_count, compression="lzf")
+        f.create_dataset("mass", data=mass, compression="lzf")
         f.create_dataset("cand_offset", data=cand_offset)
         f.create_dataset("cand_count", data=cand_count)
         f.attrs["batch_shape_offset"] = floor
