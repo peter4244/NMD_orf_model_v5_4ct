@@ -29,3 +29,4 @@ seq_store.npz
 results_pool_v6/orf_pool.tsv
 results_pool_v6/orf_pool_record.tsv
 results_tensor_*/
+transfer/

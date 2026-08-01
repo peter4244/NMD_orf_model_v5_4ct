@@ -30,6 +30,9 @@ import numpy as np
 import pandas as pd
 
 REPO = Path(__file__).resolve().parent
+# Defaults are the local layout; --tables and --fasta override them so the same
+# script runs on the cluster, where the tables sit beside the repo and the FASTA
+# is the transcript-filtered copy rather than the 1.6 GB original.
 TABLES = Path(os.path.expanduser("~/claude_projects/nmd_w69_tables_2026-07-30"))
 DEPOSIT = Path(os.path.expanduser("~/claude_projects/nmd_deposit_2026/source_data"))
 FASTA = DEPOSIT / "sqanti" / "nmd_lungcells_corrected.fasta"
@@ -140,12 +143,16 @@ def encode_window(codes, gc_flag, junc_pos, tx_len, anchor, left, right,
 
 
 def main():
+    global TABLES, FASTA        # must precede any use of the names in this scope
     ap = argparse.ArgumentParser()
     ap.add_argument("--pool", default="results_pool_v6")
     ap.add_argument("--out", default="results_tensor_v6")
     ap.add_argument("--chrom", default="",
                     help="build only this chromosome, for a local check")
+    ap.add_argument("--tables", default=str(TABLES))
+    ap.add_argument("--fasta", default=str(FASTA))
     args = ap.parse_args()
+    TABLES, FASTA = Path(args.tables), Path(args.fasta)
     pooldir, outdir = REPO / args.pool, REPO / args.out
     outdir.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
