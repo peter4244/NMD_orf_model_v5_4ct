@@ -1,0 +1,92 @@
+$ python test_contrast_lib.py
+Captured 2026-08-01T02:05:54Z, repo bb168b2.
+
+============================================================================================
+0. THE POPULATION DEFINITION, STATED CORRECTLY THIS TIME
+============================================================================================
+
+  orf_rank is ZERO-BASED: {0: 42043, 1: 41997, 2: 41873, 3: 41724, 4: 41537}
+  is_ref_cds lives entirely at rank 0: {0: 28723, 1: 0, 2: 0, 3: 0, 4: 0}
+  My earlier prose called the headline population 'slot 0
+  (orf_rank == 1)'. The CODE used .min(), which is 0, so the numbers
+  are right and the sentence was wrong. Caught by Track A.
+
+============================================================================================
+1. WHERE BOTH ARMS ARE LARGE, THE WEIGHTING CHOICE DOES NOT MATTER
+============================================================================================
+    
+  Exp 2 -- TGA minus TAG at the stop codon
+      n 14,477 vs 5,818  (ratio 2.5x)   strata 32/31 alone, 31 shared of 32
+      per-arm   +2.02pp    common-stratum   +1.92pp  <- weightings agree
+      95% CI [+0.71, +3.20]  p = 0.001  (1500 gene-clustered draws)
+  [PASS] stop: the two weightings agree                     got   +0.10  expected   +0.00  (tol 0.3)
+  [PASS] stop: effect is present and positive               got   +1.92  expected   +2.60  (tol 1.0)
+
+  That agreement is the substantive point. The estimator that
+  inflates at small n is not inflating here, because it has no thin
+  arm to inflate on -- which is why the stop-codon claim stands.
+    
+  PTC+ subgroup
+      n 4,065 vs 1,300  (ratio 3.1x)   strata 16/15 alone, 15 shared of 16
+      per-arm   +4.43pp    common-stratum   +4.36pp  <- weightings agree
+      95% CI [+0.79, +7.69]  p = 0.007  (800 gene-clustered draws)
+    
+  PTC- subgroup
+      n 10,412 vs 4,518  (ratio 2.3x)   strata 16/16 alone, 16 shared of 16
+      per-arm   +1.05pp    common-stratum   +1.05pp  <- weightings agree
+      95% CI [-0.03, +2.03]  p = 0.055  (800 gene-clustered draws)
+
+  The mechanistic gradient -- larger where a downstream junction
+  exists for termination efficiency to act on -- does not depend on
+  the weighting choice either.
+
+============================================================================================
+2. WHERE ONE ARM IS THIN, THEY DIVERGE -- WHICH IS THE WHOLE STORY
+============================================================================================
+
+  99 mechanism-free 3'UTR positions, TGA vs TAG
+    weighting             median                  IQR   median strata
+    ------------------ --------- -------------------- ---------------
+    per-arm              +13.40p [  +9.69,  +17.42]              10
+    common-stratum        +0.01p [  -1.58,   +2.28]              10
+  [PASS] per-arm null is displaced from zero                got  +13.40  expected  +13.00  (tol 6.0)
+  [PASS] common-stratum null is centred near zero           got   +0.01  expected   +0.00  (tol 2.5)
+
+  median arm sizes at a control position: 509 vs 246   (at the stop: 14,477 vs 5,818)
+  A guard keyed on 'no shared stratum' would NOT have fired here --
+  the median position still shares 10 strata. The tell was the arm
+  sizes and the 25x ratio, which is a thing to notice, not to assert.
+
+============================================================================================
+3. THE CHECK THAT ACTUALLY DECIDED IT -- power-matching
+============================================================================================
+
+  Stop-codon contrast subsampled to 509 TGA / 246 TAG, per-arm
+  weighting, 500 draws -- the answer here is KNOWN to be about +2pp:
+    median +14.04pp   2.5-97.5 pct [+5.93, +20.67]   sd 3.69
+  [PASS] per-arm estimator inflates at control sample size  got  +14.04  expected  +13.00  (tol 6.0)
+
+  It returns ~+13pp on a contrast whose true value is ~+2pp. The
+  control positions returned ~+13pp. They were measuring the same
+  thing with 25x less data through an estimator that inflates.
+
+============================================================================================
+4. THE OTHER HEADLINES STILL COME OUT
+============================================================================================
+    
+  Exp 4 -- the >50 nt rule (positive control)
+      n 1,415 vs 1,022  (ratio 1.4x)   strata 16/16 alone, 16 shared of 16
+      per-arm  +37.64pp    common-stratum  +37.64pp  <- weightings agree
+      95% CI [+33.45, +41.76]  p = 0.001  (1500 gene-clustered draws)
+  [PASS] Exp4 positive control                              got  +37.64  expected  +37.40  (tol 2.0)
+    
+  Exp 6 -- 101-200 minus 51-100, the dose beyond the threshold
+      n 414 vs 387  (ratio 1.1x)   strata 16/16 alone, 16 shared of 16
+      per-arm  +14.06pp    common-stratum  +14.06pp  <- weightings agree
+      95% CI [+5.76, +21.49]  p = 0.001  (1500 gene-clustered draws)
+  [PASS] Exp6 rise beyond the threshold                     got  +14.06  expected  +13.00  (tol 6.0)
+         Track A independently got +13.0pp, CI [+6.4, +19.7].
+
+============================================================================================
+ALL CHECKS PASSED
+============================================================================================

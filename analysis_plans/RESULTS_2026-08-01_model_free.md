@@ -55,7 +55,8 @@ No committed script in either repository produced 10.8% / 46.8%, and no worklog 
 Recomputed with independent code, it reproduces **to the digit** — but under exactly one definition,
 which none of the four documents citing it states:
 
-> slot 0 (`orf_rank == 1`), `n_downstream_ejc == 1`, restricted to the **41,765 isoforms in the
+> slot 0 (`orf_rank == 0` — the column is ZERO-based; earlier prose of mine said `== 1`, though the
+> code used `.min()` and was right), `n_downstream_ejc == 1`, restricted to the **41,765 isoforms in the
 > HDF5**, not the 42,043 in the tables.
 
 On the full tables it is 1,397 / 2,107 at 10.7% / 46.8%. Under the **reference-CDS** anchor instead
@@ -107,7 +108,7 @@ sequence elements. Flagged, not opened.
 
 ---
 
-## 4. The calibration null — read this before the others
+## 4. The calibration null, and what it was worth once the estimator was fixed
 
 Junction phase relative to a codon boundary has no mechanism for the junction that decides NMD: the
 3'UTR is not translated and has no reading frame. So rather than run it as a hypothesis, I ran it as
@@ -138,7 +139,7 @@ p = 0.001 and I am reporting it as inconclusive rather than banking it.
 
 ---
 
-## 2. Stop codon identity — the published claim does not survive
+## 2. Stop codon identity — the published claim survives, at a quarter its crude size
 
 §5.3.3 says UGA turns up more often in degraded transcripts. Crude, it does: TGA is 59.1% of
 degraded against 50.2% of stable, **+8.9pp**.
@@ -273,12 +274,23 @@ strongest unexplored thing I turned up.
 ## A landmine for Part 2, Step 1
 
 `orf_scan_metadata.json` for these very tables records `"min_orf_length": 9`. The data it describes
-has a hard floor of **33**, with not one ORF below it. **The parameter was set and did not take
-effect.**
+has a hard floor of **33**, with not one ORF below it.
 
-Step 1 of the retraining plan turns on lowering that floor so ATF4's textbook uORF becomes
-admissible. Whoever does it must verify the **output**, not the parameter. (BRIEF §4's 33 nt claim is
-right; the metadata is wrong.)
+**My diagnosis of this was wrong and Track A corrected it.** I wrote "the parameter was set and did
+not take effect." It took effect exactly as documented. `05s_orfik_scan.R:112` calls
+`ORFik::findORFs(..., minimumLength = 9)`, and ORFik's `minimumLength` is measured in **codons
+excluding the start and stop**: 3 + 9x3 + 3 = **33 nt**, precisely the observed floor, with 59,425
+ORFs sitting exactly on it. It is a unit confusion, not a silent failure — the metadata field is
+named `min_orf_length`, which reads as nucleotides.
+
+This changes the Step 1 fix rather than just flagging it. Pete's ruling is admission by start-codon
+score alone; under the true semantics that is **`minimumLength = 0`**, which ORFik documents as
+START + STOP = 6 bp — a start-stop element, which is what he described. Someone who believes the
+parameter is ignored goes hunting for a bug that is not there; someone who reads the field as
+nucleotides sets 9 again and gets 33 again. ATF4's uORF1 is 3 codons and is inadmissible above
+`minimumLength = 1`.
+
+The advice survives its own wrong reasoning: **verify the output floor, not the parameter.**
 
 ---
 
@@ -372,13 +384,29 @@ control failed for a reason that was my own error.
 **Two things to carry into Part 2:**
 
 1. **The six-check standard is sound, but check 3 — "against its own matched controls, not against
-   zero" — needs a fourth clause: the control must have comparable sample size and be computed over
-   the same strata.** Today that single omission produced a confident, wrong retraction of a
-   published claim. The rule belongs in the code, not in a document: any contrast helper should
-   refuse to compare two arms averaged over different strata.
+   zero" — needs a fourth clause: compare the control's sample size to the target's before reading
+   anything into the difference.** Today that single omission produced a confident, wrong retraction
+   of a published claim.
+
+   *My first response to this was to write the rule into the code — a helper that raised when two
+   arms could not be averaged over the same strata. Pete's objection was that this substitutes a rule
+   for contextual judgement, and checking settles it: **the guard would not have fired on the case
+   that motivated it.** The offending control positions still shared 10 of 32 strata, so it would
+   have returned a number and raised nothing, while firing on legitimate small-n contrasts where
+   whoever hit it would just loosen the threshold. What caught the error was noticing that n = 214
+   against n = 5,818 is not like-for-like, and power-matching to check. No assertion produces that.*
+
+   So `contrast_lib.py` reports rather than enforces: it returns **both** weightings side by side
+   with the per-arm sample sizes and shared-strata counts, so a divergence is visible instead of
+   latent. At the stop the two agree (+2.02 and +1.92); across 99 control positions they are +13.40
+   and +0.01. That contrast is the finding, and it is information, not a verdict.
 
 2. **Anagram controls should be standard for any motif claim.** They caught what GC-quintile
    matching missed, on all three motifs, and they cost nothing.
+
+3. **`power_match` and `sweep_null` are the two things worth having as tools** — not because they
+   enforce anything, but because they make the right check cheap. Sweeping 99 positions instead of 3
+   is one call.
 
 The perturbation arm is still worth building — a within-molecule control is strictly better than a
 matched one — but today is no longer an argument that matched comparison cannot work.

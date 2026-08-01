@@ -114,7 +114,7 @@ def main():
     cands = {}
     cands["slot flagged is_ref_cds"] = sel[sel["is_ref_cds"].astype(bool)]
     cands["slot flagged is_sqanti_cds"] = sel[sel["is_sqanti_cds"].astype(bool)]
-    cands["slot 0 (orf_rank == 1)"] = sel[sel["orf_rank"].eq(sel["orf_rank"].min())]
+    cands["slot 0 (orf_rank == 0, the minimum; column is ZERO-based)"] = sel[sel["orf_rank"].eq(sel["orf_rank"].min())]
     cands["longest ORF in the 5 slots"] = sel.sort_values(
         "orf_length", ascending=False).drop_duplicates("isoform_id")
     cands["longest ORF in the full scan"] = allorf.sort_values(
