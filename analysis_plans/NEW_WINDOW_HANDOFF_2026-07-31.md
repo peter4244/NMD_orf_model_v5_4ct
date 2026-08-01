@@ -96,7 +96,7 @@ positions; treating agreement between the five trained copies as evidence on its
 whether junction distance matters *beyond* the 50-nucleotide threshold — that rule is a threshold,
 so there is no dose to respond to, and the question is empty even for a perfect model.
 
-## Four traps that cost this project real time
+## Five traps that cost this project real time
 
 1. **Agents invent runs and numbers.** Two of four summary agents cited experiments that never
    happened, formatted identically to real ones. **Never repeat a number you have not personally

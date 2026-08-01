@@ -193,7 +193,12 @@ reference-AUG anchor 13,223 (25.9%).
 6. **Conditioning on the annotated ORF is circular** when ORF identification is half of what the
    model is supposed to do.
 7. **A confident negative in this area has twice been a confounder rather than the model.**
-8. **The only ground truth for "which ORF is translated" is GENCODE traced through the isoform.**
+8. **A comparison statistic can have a null that is not 50%.** `|slope fitted on a short window| >
+   |slope fitted on a long window|` held for 83.2% of isoforms in the junction-distance probe and
+   means nothing: a fit over a shorter x-range has higher variance under the same noise, so the
+   inequality holds almost mechanically whatever the truth. Establish a statistic's null before
+   reading it as evidence — the same shape as trap 2, where control positions were 100% same-signed.
+9. **The only ground truth for "which ORF is translated" is GENCODE traced through the isoform.**
    Absent ribosome profiling, any discovered initiation feature is capped at "predicts the
    annotated start", not "predicts ribosome selection".
 
