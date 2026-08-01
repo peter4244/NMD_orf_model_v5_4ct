@@ -843,10 +843,17 @@ channel 5. The bounds are stated rather than left to be reconstructed from the p
 
 | arm | model | bank |
 |---|---|---|
-| interpretable | the configuration selected in §7 step 5 | full |
-| permuted-bin control | `interp_c32_b8_perm` at the same seeds | full, by step 9 |
+| interpretable | the configuration selected in §7 step 5 | full, **one per seed** |
+| permuted-bin control | `interp_c32_b8_perm` | full, one per seed, by step 9 |
 | sequence-blanked | §8.2 | **none** — see below |
 | predictor, no-junction | §8.2, §6.3 | none; §8.3 metrics only |
+
+A bank is built for **each of the five seeds** of an arm, over the same subset and the same
+discovery/confirmation split, and shipped as five files. Seeds differ in initialisation only, so a
+sequence feature present in one and absent in the other four is a property of that initialisation
+rather than of the model, and nothing in the gene-level split of step 1 can detect that — it holds
+the seed fixed and varies the transcripts. Requiring a finding to survive across seeds is the check
+that varies the other axis.
 
 The sequence-blanked arm is trained and evaluated with channels 0–3 and 5 set to zero, and a
 substitution changes channels 0–3 and 5 and nothing else. Every entry of its `vals` is therefore
