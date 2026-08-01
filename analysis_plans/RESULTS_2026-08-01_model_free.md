@@ -13,7 +13,7 @@ and `ebe8582`.
 | | result |
 |---|---|
 | the junction-distance headline | **holds, exactly** — and the gradient printed beside it is a different population |
-| Exp 2, stop codon identity | **the published claim SURVIVES** at about a quarter its crude size — see the retraction below |
+| Exp 2, stop codon identity | the claim **SURVIVES** at ~¼ its crude size; the *mechanism* I attached to it does **not** — two retractions, both below |
 | Exp 3, 3'UTR motifs | all three are **composition, not motif** |
 | Exp 4, junction phase | the null arms are **not significant** once the estimator is fixed |
 | Exp 5, uORF restart gap | **flat**, and the negative is trustworthy |
@@ -188,17 +188,55 @@ The corrected null is centred on zero, which is what a null is. At the stop the 
 exactly (+1.80 and +1.80, 32 of 32 strata) because both arms are large — the bias is absent
 precisely where the claim lives.
 
-**So the claim stands.** Direction as published, magnitude about a quarter of the crude contrast
-after matching. The mechanistic gradient also holds under both estimators, with all 16 strata
-populated in each arm:
+**So the association stands.** Direction as published, magnitude about a quarter of the crude
+contrast after matching.
 
-| | n TGA | n TAG | crude | separate | **common** |
-|---|---|---|---|---|---|
-| PTC+ | 4,017 | 1,282 | +4.32pp | +4.50pp | **+4.50pp** |
-| PTC− | 8,780 | 3,975 | +0.71pp | +0.68pp | **+0.68pp** |
+### SECOND WITHDRAWAL — the mechanistic gradient was the scale, not a mechanism
 
-Six-fold larger where a downstream junction exists for termination efficiency to matter at. That is
-the pattern the mechanism predicts and it is not something the matching could manufacture.
+I then wrote that the effect is *"six-fold larger where a downstream junction exists for termination
+efficiency to act on — matching cannot manufacture it."* Track A objected that matching didn't
+manufacture it, **the scale did**. Checked on my own population (`exp2c_scale_check.py`), and they
+are right.
+
+Percentage-point differences compress as a base rate approaches 0 or 1. My PTC+ arm sits at 70% NMD
+and my PTC− arm at 5%. Before touching the data, ask what pp difference a **fixed** odds ratio
+produces at those two base rates:
+
+| odds ratio | at 66.5% (PTC+) | at 4.4% (PTC−) | pp ratio |
+|---|---|---|---|
+| 1.20 | +3.93pp | +0.83pp | 4.7× |
+| 1.25 | +4.78pp | +1.04pp | 4.6× |
+| 1.30 | +5.57pp | +1.25pp | 4.5× |
+
+**A single constant odds ratio, with no difference between the groups at all, generates a 4–5×
+gradient in percentage points.** My "six-fold" sits inside that range.
+
+Measured, gene-clustered, on the matched strata:
+
+| | PTC+ | PTC− | ratio |
+|---|---|---|---|
+| percentage points | **+4.36pp** [+1.08, +8.00] | **+1.05pp** [+0.00, +2.03] | 4.1× |
+| **Mantel–Haenszel odds ratio** | **1.24** [1.06, 1.47] | **1.25** [0.99, 1.58] | **0.99×** |
+| base rate | 69.9% | 5.1% | |
+
+The odds ratios are identical. Give PTC− the PTC+ odds ratio and it would show +0.98pp; it shows
++1.05pp. The log-odds-ratio difference is −0.006, 95% CI [−0.294, +0.259], p = 0.97.
+
+**And the consequence is not bookkeeping.** On the odds scale the effect is present *equally in both
+strata*. A termination-efficiency mechanism acting through EJC-dependent decay predicts the opposite
+— concentration where an EJC exists, ideally absence without one. An effect of the same
+multiplicative size in transcripts with **no** downstream junction points at something common to
+both: EJC-independent decay, or a compositional property of TGA-ending transcripts that PTC status
+does not capture.
+
+So: **the association survives and the mechanism I attached to it does not.** Track A's framing is
+better than mine was — an effect present on the odds scale in both strata is a cleaner result than a
+pp gradient confined to one, it just is not the mechanism argument.
+
+That is the second time in one day I reached for a mechanism ahead of the evidence. The first was
+the readthrough prediction, which came out backwards. **Any pp difference compared across groups
+with different base rates now travels with its odds ratio and base rate** — `contrast_lib.describe`
+prints all three, so the comparison cannot be made silently.
 
 *A pre-registration that failed, kept because I wrote it before looking:* I predicted TGA → **less**
 NMD, on the grounds that leaky termination lets ribosomes read through and displace downstream

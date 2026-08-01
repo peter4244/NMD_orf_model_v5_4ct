@@ -1,0 +1,98 @@
+$ python exp2c_scale_check.py
+Captured 2026-08-01T02:11:19Z, repo de833ae.
+
+==================================================================================================
+EXPERIMENT 2c -- mechanism or scale?
+==================================================================================================
+
+==================================================================================================
+A. THE ARITHMETIC, BEFORE ANY DATA
+==================================================================================================
+
+  What percentage-point difference does a FIXED odds ratio produce,
+  at the base rates of my two subgroups?
+
+  odds ratio     at TAG rate 66.5% (PTC+)    at TAG rate 4.4% (PTC-)   pp ratio
+  ------------ -------------------------- -------------------------- ----------
+  1.15                              3.04p                      0.63p        4.8x
+  1.20                              3.93p                      0.83p        4.7x
+  1.25                              4.78p                      1.04p        4.6x
+  1.30                              5.57p                      1.25p        4.5x
+  1.40                              7.04p                      1.65p        4.3x
+
+  A single constant odds ratio, applied to both subgroups with NO
+  difference between them, generates a 4-5x gradient in percentage
+  points. My 'six-fold' claim is inside that range. Track A is right
+  that the pp gradient on its own carries no mechanistic information.
+
+==================================================================================================
+B. THE MEASUREMENT ON MY MATCHED STRATA -- both scales, side by side
+==================================================================================================
+    
+  PTC+  (n = 6,882)
+      n 4,065 vs 1,300  (ratio 3.1x)   strata 16/15 alone, 15 shared of 16
+      per-arm   +4.43pp    common-stratum   +4.36pp  <- weightings agree
+      rates 71.0% vs 66.6%   base rate 69.9%   MH odds ratio 1.24
+      95% CI [+1.08, +8.00]  p = 0.007  (1500 gene-clustered draws)
+      odds ratio 95% CI [1.06, 1.47]
+    
+  PTC-  (n = 20,920)
+      n 10,412 vs 4,518  (ratio 2.3x)   strata 16/16 alone, 16 shared of 16
+      per-arm   +1.05pp    common-stratum   +1.05pp  <- weightings agree
+      rates 5.4% vs 4.4%   base rate 5.1%   MH odds ratio 1.25
+      95% CI [+0.00, +2.03]  p = 0.051  (1500 gene-clustered draws)
+      odds ratio 95% CI [0.99, 1.58]
+
+                               PTC+       PTC-      ratio
+  ---------------------- ---------- ---------- ----------
+  percentage points          +4.36p     +1.05p       4.1x
+  odds ratio                   1.24       1.25      0.99x
+  base rate                   69.9%       5.1%
+
+  Predicted pp difference if BOTH subgroups had PTC+'s odds ratio:
+    PTC- would show +0.98pp; it shows +1.05pp.
+
+==================================================================================================
+C. THE TEST THE MECHANISM CLAIM ACTUALLY NEEDS
+   Is the ODDS RATIO different between PTC+ and PTC-?
+==================================================================================================
+
+  log odds-ratio difference (PTC+ minus PTC-):
+    -0.006   95% CI [-0.294, +0.259]   p = 0.973
+    ratio of odds ratios 0.99 [0.75, 1.30]
+
+  The two bootstrap series are independent draws over different
+  gene sets, so this interval is approximate. It is here to show
+  the order of magnitude, not as a formal interaction test.
+
+  >> The interval spans 1. There is NO evidence the effect
+     differs between PTC+ and PTC- on the odds scale.
+
+==================================================================================================
+D. WHAT THIS DOES TO THE CLAIM
+==================================================================================================
+
+  WITHDRAWN: "six-fold larger where a downstream junction exists for
+  termination efficiency to act on -- matching cannot manufacture it."
+  Matching didn't. The scale did, and section A shows a constant odds ratio
+  reproduces a 4-5x pp gradient with no group difference at all.
+
+  WHAT SURVIVES: the direction and the overall effect. TGA carries more decay
+  than TAG at matched composition, PTC status, and 3'UTR length.
+
+  WHAT CHANGES MECHANISTICALLY, and it is not a small change: on the odds
+  scale the effect is present in BOTH strata. A termination-efficiency
+  mechanism acting through EJC-dependent decay predicts concentration where an
+  EJC exists. An effect of similar multiplicative size in transcripts WITHOUT a
+  downstream junction is not that -- it points at something common to both,
+  which could be EJC-independent decay, or a compositional property of TGA-
+  ending transcripts that PTC status does not capture.
+
+  So the association stands and the mechanism story I attached to it does not.
+  That is the second time today I have reached for a mechanism ahead of the
+  evidence for it -- the first was the readthrough prediction, which came out
+  backwards.
+
+==================================================================================================
+DONE
+==================================================================================================

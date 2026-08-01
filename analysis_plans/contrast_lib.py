@@ -87,7 +87,30 @@ def std_diff(kcode, arm, y, n_strata, min_cell=10):
     n1, n0 = int((arm == 1).sum()), int((arm == 0).sum())
     per_arm = (avg(rate1, g1) - avg(rate0, g0)) * 100
     common = (avg(rate1, both) - avg(rate0, both)) * 100
+
+    # Mantel-Haenszel odds ratio over the shared strata, reported ALONGSIDE the
+    # percentage-point difference rather than instead of it. Track A's point,
+    # 2026-08-01: pp differences compress as the base rate approaches 0 or 1, so
+    # a constant multiplicative effect produces a large pp gradient across
+    # strata with different base rates. Two groups at 72% and 6% baseline with
+    # the SAME odds ratio give +4.5pp and +1.3pp. Quoting the pp ratio as
+    # evidence of a mechanism, without naming the scale, is therefore unsafe --
+    # which is exactly what I did with PTC+ vs PTC-.
+    a = np.bincount(kcode[arm == 1], weights=y[arm == 1], minlength=n_strata)
+    b = c1 - a
+    c = np.bincount(kcode[arm == 0], weights=y[arm == 0], minlength=n_strata)
+    dd = c0 - c
+    tot = c1 + c0
+    ok = both & (tot > 0)
+    num = float((a[ok] * dd[ok] / tot[ok]).sum())
+    den = float((b[ok] * c[ok] / tot[ok]).sum())
+    mh_or = num / den if den > 0 else np.nan
+
     return dict(diff_per_arm=per_arm, diff_common=common,
+                rate1=avg(rate1, both) * 100, rate0=avg(rate0, both) * 100,
+                base_rate=float(y[np.isin(kcode, np.flatnonzero(both))].mean() * 100)
+                if both.any() else np.nan,
+                mh_or=mh_or,
                 n1=n1, n0=n0, arm_ratio=max(n1, n0) / max(min(n1, n0), 1),
                 strata_arm1=int(g1.sum()), strata_arm0=int(g0.sum()),
                 strata_shared=int(both.sum()), n_strata=n_strata)
@@ -108,9 +131,15 @@ def describe(res, label="", indent="    "):
         note = ("  <- weightings agree" if gap < 0.25
                 else f"  <- weightings differ by {gap:.2f}pp; look at why")
     print(f"{indent}  per-arm {d1:+7.2f}pp    common-stratum {d0:+7.2f}pp{note}")
+    # base rate and odds ratio always travel with the pp difference, because a
+    # pp difference cannot be compared ACROSS groups whose base rates differ
+    print(f"{indent}  rates {res['rate1']:.1f}% vs {res['rate0']:.1f}%   "
+          f"base rate {res['base_rate']:.1f}%   MH odds ratio {res['mh_or']:.2f}")
     if "lo" in res and not np.isnan(res.get("lo", np.nan)):
         print(f"{indent}  95% CI [{res['lo']:+.2f}, {res['hi']:+.2f}]  "
               f"p = {res['p']:.3f}  ({res['n_draws']} gene-clustered draws)")
+    if "or_lo" in res and not np.isnan(res.get("or_lo", np.nan)):
+        print(f"{indent}  odds ratio 95% CI [{res['or_lo']:.2f}, {res['or_hi']:.2f}]")
 
 
 def boot_diff(df, arm_col, a, b, strata_cols, label, gene_col,
@@ -135,10 +164,13 @@ def boot_diff(df, arm_col, a, b, strata_cols, label, gene_col,
 
     res = std_diff(kcode, arm, y, nk, min_cell=min_cell)
     draws = np.empty(n)
+    ors = np.empty(n)
     ng = len(guniq)
     for t in range(n):
         r = np.concatenate([rows_by_gene[g] for g in rng.integers(0, ng, ng)])
-        draws[t] = std_diff(kcode[r], arm[r], y[r], nk, min_cell=min_cell)[key]
+        s = std_diff(kcode[r], arm[r], y[r], nk, min_cell=min_cell)
+        draws[t], ors[t] = s[key], s["mh_or"]
+    ok_or = ors[np.isfinite(ors) & (ors > 0)]
     draws = draws[~np.isnan(draws)]
     if len(draws) < 20:
         res.update(lo=np.nan, hi=np.nan, p=np.nan, n_draws=len(draws))
@@ -146,7 +178,9 @@ def boot_diff(df, arm_col, a, b, strata_cols, label, gene_col,
     lo, hi = np.percentile(draws, [2.5, 97.5])
     p = 2 * min((draws <= 0).mean(), (draws >= 0).mean())
     res.update(lo=lo, hi=hi, p=max(p, 1.0 / len(draws)),
-               n_draws=len(draws), interval_on=use)
+               n_draws=len(draws), interval_on=use, or_draws=ok_or)
+    if len(ok_or) >= 20:
+        res["or_lo"], res["or_hi"] = np.percentile(ok_or, [2.5, 97.5])
     return res
 
 
