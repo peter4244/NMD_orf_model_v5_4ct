@@ -21,7 +21,7 @@ wrong until the other window has failed to break them.
 
 | what | where |
 |---|---|
-| **The plan** — four cheap experiments, then a retraining plan | `nmd_lung_longread_2026/docs/EXPERIMENT_AND_RETRAIN_PLAN_2026-07-31.md` |
+| **The plan** — five cheap experiments, then a retraining plan | `nmd_lung_longread_2026/docs/EXPERIMENT_AND_RETRAIN_PLAN_2026-07-31.md` |
 | **The ranked hypotheses** — 143 proposals in four tiers | `nmd_lung_longread_2026/docs/MERGED_HYPOTHESIS_RANKING_2026-07-31.md` |
 
 Supporting, in this repo, all committed:
@@ -34,6 +34,8 @@ Supporting, in this repo, all committed:
 - `analysis_plans/ANALYSIS5_PLAN_2026-07-31.md` — the start-codon-context analysis
 - `analysis_plans/TRACK_A_HANDOFF_2026-07-31.md` — findings for the other window, section 13
   is the current one
+- The other window wrote its own handoff at `nmd_lung_longread_2026/docs/TRACK_A_HANDOFF_2026-08-01.md`.
+  Read both; they were written to agree and any place they do not is a thing to resolve.
 
 ## What is settled, in plain terms
 
@@ -58,10 +60,22 @@ junction sits more than 50 nucleotides past the stop are NMD-positive **46.8%** 
 sits closer, **10.8%**. A four-fold difference the model's inputs cannot express. This is the
 strongest result anyone produced, and it needs no model at all — two spreadsheets.
 
-**The pattern generalises.** Every sequence computation the model failed to learn corresponds to one
-of those five numbers that made learning unnecessary: the junction-distance rule, the start-codon
-context, which reading frame is the real one, and the geometry relating frames to each other. This
-is why the retraining plan withholds them.
+**The pattern generalises, but read the conclusion carefully.** Every sequence computation the model
+failed to learn corresponds to one of those five numbers that made learning unnecessary: the
+junction-distance rule, the start-codon context, which reading frame is the real one, and the
+geometry relating frames to each other.
+
+That is a description. The prescription both windows drew from it — withhold all five — was **wrong
+for the junction count, and Pete corrected it.** The 50-nucleotide rule is textbook biology, so
+under his scoping (supply what is solved, discover what is not) it belongs on the supplied side
+alongside splice-site locations and start-codon identity. Keeping it also *helps*: with that chunk
+of variance accounted for, what is left over for stop context, upstream-ORF strength and 3'UTR
+motifs is cleaner, and the model does not spend limited capacity re-deriving something known.
+
+**What was broken was the feature, not the decision to have one.** Fixing it — so it implements the
+distance rule instead of counting any junction at any distance — is the change that matters. One
+cheap arm runs without it as a check that it is not masking something unexpected. The other three
+numbers are still withheld.
 
 **Start-codon context has a weak but real effect**, and it is strongest in transcripts where the
 model is unsure which reading frame is genuine — which is what you would expect if the context is
@@ -96,6 +110,11 @@ so there is no dose to respond to, and the question is empty even for a perfect 
    slope fitted over a short range beats one fitted over a long range almost automatically; and a
    comparison that holds something fixed "by construction" is not thereby free of the thing it was
    meant to control.
+5. **Do not pre-excuse a result.** This happened twice in one day and both times it stopped the
+   looking. The model's flat response to junction distance was explained away as "it was handed the
+   answer anyway" — which turned out to be false, and the true reason was more interesting. A weak
+   start-codon signal was explained away as an artefact of dead measurements — also false. If you
+   catch yourself writing the excuse before the check, do the check.
 
 ## Practical facts
 
