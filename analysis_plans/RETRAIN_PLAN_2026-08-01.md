@@ -830,12 +830,26 @@ The model's own output layer is unchanged — the clamp is correct for training.
 and `pinned_in_training` record which transcripts that output would have pinned, so that regime can
 be conditioned on rather than inferred.
 
-**Step 6 — measure the no-op floor.**
+**Step 6 — every position carries its own baseline, computed at the same batch shape.**
 
-`sub(t, p, obs(p))` substitutes the observed base for itself and must return an effect of zero. It is
-evaluated at positions sampled uniformly without replacement from the valid positions of each
-transcript, rather than at all of them, and the largest absolute value over the sample is the bank's
-floor. An effect below the floor is not distinguishable from the arithmetic.
+`sub(t, p, obs(p))` substitutes the observed base for itself, and **the other three substitutions at
+that position are differenced against it** rather than against the unperturbed pass of step 5.
+
+The reason is that the encoder's output for a fixed input row depends on how many rows share its
+batch. Measured on this model in evaluation mode, there are three regimes — batch 1, batch 2 to 7,
+and batch 8 upward — that differ by 3.278e-07; row position within a batch does not matter. The
+unperturbed pass runs at batch *K* and a chunk of substitutions runs at the chunk's own size, so a
+difference taken between them carries that offset whenever the two fall in different regimes. *K* is
+below 8 for 6,537 of 42,043 transcripts, so the offset is present for 15.5% of the cohort and absent
+for the rest: an error **correlated with candidate count**, not noise.
+
+Differencing within one chunk cancels it exactly. All four bases are therefore evaluated at every
+position, and the fourth is the baseline rather than a check.
+
+The distance between each chunk's baseline and the unperturbed pass is recorded as
+`batch_shape_offset` — the quantity removed. It is measured at every valid position, and it is the
+scale an effect is read against: a difference this pipeline produces from a change that is not a
+substitution at all.
 
 **Step 7 — emit the bank.**
 
@@ -848,7 +862,7 @@ stored column is invalid for every transcript.
 | `valid` | (n_iso, W) | bool | `valid(p)` of step 3 |
 | `obs` | (n_iso, W) | int8 | observed base, ACGT = 0123; −1 where `valid` is false or the base is not one of ACGT |
 | `labels` | (n_iso,) | int8 | `is_nmd` |
-| `floor` | scalar attribute | float | step 6, the maximum over every sampled position and draw |
+| `batch_shape_offset` | scalar attribute | float | step 6, the maximum over every valid position and draw |
 | `transcript_id` | (n_iso,) | string | keys to `TX` |
 | `spans` | (n_cand, 6) | int32 | one row per candidate: transcript row index, slot, and the four bounds of `ATG_k` and `STOP_k` |
 | `cand_offset`, `cand_count` | (n_iso,) | int32 | the rows of `spans` belonging to each transcript |
@@ -953,9 +967,9 @@ Measured over the 41,765 transcripts of step 1, by `build_ism_split.py` /
 | ...positives among them | same | 105 / 118 |
 
 Reported by the bank build itself: `n`, `W`, bytes per arm, transcripts and genes per arm of step 1,
-the achieved discovery/confirmation balance within each (`is_nmd`, split) cell, the no-op floor of
-step 6 with the number of positions it was sampled at, **the distribution of `|vals|` against that
-floor and the share of substitutions clearing it**, the measured substitution rate and peak
+the achieved discovery/confirmation balance within each (`is_nmd`, split) cell, the
+`batch_shape_offset` of step 6 with the number of positions it was measured at, **the distribution of
+`|vals|` against it and the share of substitutions clearing it**, the measured substitution rate and peak
 device memory on the hardware used, and for the control three numbers from the `R` draws of step 9:
 the mean absolute effect, the standard deviation of the effect across paired draws, and the standard
 deviation of the unperturbed logit across draws.
