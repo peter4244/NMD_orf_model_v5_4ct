@@ -1,0 +1,25 @@
+{
+  "built_at": "2026-08-01T11:17:34Z",
+  "script": "build_ism_split.py",
+  "seed": 20260801,
+  "sha256": "fe89053110bec64f5417e16518bf3c4841b6985731e368e33565d5cd6a6fe2ed",
+  "n_transcripts": 41765,
+  "n_genes": 12380,
+  "prevalence": 0.22317730156829882,
+  "composite_loci_excluded": 278,
+  "arm_counts": {
+    "discovery": 20897,
+    "confirmation": 20868
+  },
+  "gene_counts": {
+    "discovery": 6224,
+    "confirmation": 6156
+  },
+  "paralog_screened_across_arms": false,
+  "note": "Arms are assigned per gene over the whole universe before any subset is taken, so a bank of n is a prefix of a bank of n' > n. Paralogy is NOT screened across the arm boundary: the two paralog lists this project holds are computed against the test and validation boundaries and carry no information about this one.",
+  "inputs": {
+    "tx_summary": "/Users/petecastaldi/claude_projects/nmd_w69_tables_2026-07-30/tx_summary.tsv",
+    "ref_cds_features": "/Users/petecastaldi/claude_projects/nmd_w69_tables_2026-07-30/ref_cds_features.tsv",
+    "pool": "/Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_pool_v6/orf_pool.tsv"
+  }
+}

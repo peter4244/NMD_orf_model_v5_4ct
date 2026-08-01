@@ -57,13 +57,23 @@ class WindowEncoder(nn.Module):
         self.mid_pool = nn.MaxPool1d(mid_pool) if mid_pool > 1 else nn.Identity()
         self.fc = nn.Linear(conv_channels * n_bins, out_dim)
 
-    def forward(self, x):
+    def forward(self, x, bin_perm=None):
+        """bin_perm: (N, B) long, or (B,) broadcast over N. Supplied only by the
+        mutagenesis bank, which needs ONE permutation held fixed across the
+        unperturbed pass and every substitution of a transcript — an unpaired
+        difference of two passes of this arm is dominated by the permutation
+        rather than by the substitution. Supplying none redraws, which is what
+        training does and what makes the arm a control.
+        """
         h = F.relu(self.bn1(self.conv1(x)))
         h = self.mid_pool(h)
         h = F.relu(self.bn2(self.conv2(h)))
         parts = torch.tensor_split(h, self.n_bins, dim=-1)
         pooled = torch.stack([p.amax(dim=-1) for p in parts], dim=1)  # (N, B, C)
-        if self.permute_bins and self.n_bins > 1:
+        if bin_perm is not None and self.n_bins > 1:
+            idx = bin_perm if bin_perm.dim() == 2 else bin_perm.expand(pooled.shape[0], -1)
+            pooled = torch.gather(pooled, 1, idx.unsqueeze(-1).expand_as(pooled))
+        elif self.permute_bins and self.n_bins > 1:
             # THE CONTROL ARM, and the permutation must be drawn PER EXAMPLE at
             # every forward pass. A permutation fixed at initialisation is not a
             # control: self.fc is fully connected over the flattened bins, so it
@@ -139,7 +149,18 @@ class ScanningNMDModel(nn.Module):
 
         z_p = z_p.view(bsz, K)
         z_d = z_d.view(bsz, K)
+        return self.aggregate(z_p, z_d, mask, return_parts=return_parts)
 
+    def aggregate(self, z_p, z_d, mask, return_parts=False):
+        """Stick-breaking over the candidates of each transcript, from the two
+        per-candidate logits. Separated from forward() because the mutagenesis
+        bank recomputes only the encoders of the candidates a substitution
+        touches and then re-aggregates over the whole transcript — the product
+        couples the candidates, so the aggregation cannot be cached even though
+        the encoders can. One definition, called from both places.
+
+        z_p, z_d: (batch, K)   mask: (batch, K) bool
+        """
         # ---- stick-breaking, in log space --------------------------------
         # logsigmoid rather than log(sigmoid(.)): p_k saturates toward 0 and 1
         # and the naive form loses the log of a small number entirely.

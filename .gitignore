@@ -29,3 +29,5 @@ results_tensor_*/
 runs/
 seq_store.npz
 transfer/
+results_ism_v6/*.tsv
+results_tensor_v6_full.h5

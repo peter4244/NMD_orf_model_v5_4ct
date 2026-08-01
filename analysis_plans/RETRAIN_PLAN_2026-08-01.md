@@ -692,10 +692,16 @@ produces the bank and the population statement that travels with it, and stops t
 
 **Step 1 — partition the genes into a discovery half and a confirmation half.**
 
-Each of the 12,613 `gene_id` values in `REFCDS` (measured, §9.4) is assigned to `discovery` or
-`confirmation` by an independent fair draw from a generator seeded at 20260801. A gene is assigned
-once, over the whole universe rather than over any subset, so the assignment does not change when the
-subset of §9.3 step 2 grows.
+The population is the 41,765 transcripts the tensor holds: the pool's 42,043 less the 278 on the 233
+read-through composite loci, which §5 step 5 removes from every split and which therefore cannot
+appear in a bank built from the tensor. A composite is two genes transcribed as one unit, so an arm
+assignment on it is ill-defined for the same reason a split is.
+
+Each of the 12,380 `gene_id` values remaining (measured, §9.4) is assigned to `discovery` or
+`confirmation` by an independent fair draw from a generator seeded at 20260801, over genes taken in
+sorted order so the assignment depends on the gene set and the seed and not on row order in any input
+file. A gene is assigned once, over the whole universe rather than over any subset, so the assignment
+does not change when the subset of §9.3 step 2 grows.
 
 Every transcript inherits its gene's arm. A gene lies entirely on one chromosome, so the arm never
 crosses the `train` / `val` / `test` boundary of §5 step 5, and a transcript's arm and its split are
@@ -715,9 +721,9 @@ reported (§9.4) rather than removed.
 
 **Step 2 — fix the order in which transcripts enter the bank.**
 
-The 42,043 transcripts of the pool are put in one fixed random order by the same generator, drawn
-independently within each `is_nmd` stratum and interleaved so that any prefix of the order holds the
-pool's own prevalence. The bank of size *n* is the first *n* transcripts of that order.
+The 41,765 transcripts of step 1 are put in one fixed random order by the same generator, drawn
+independently within each `is_nmd` stratum and interleaved so that any prefix of the order holds
+their prevalence, 0.2232. The bank of size *n* is the first *n* transcripts of that order.
 
 A larger bank is therefore the same bank with rows appended: the subset at *n* = 1,000 is a prefix of
 the subset at *n* = 2,000, and step 1's arm assignment is unchanged by the growth. The order is
@@ -726,9 +732,13 @@ written out in full so *n* is a parameter of the run rather than a property of t
 ```
 order = interleave( shuffle(transcripts with is_nmd == 1),
                     shuffle(transcripts with is_nmd == 0),
-                    at the pool prevalence 0.2242 )
+                    at the prevalence 0.2232 )
 subset(n) = order[:n]
 ```
+
+Position *i* of the order takes a positive when `floor((i+1) * 0.2232)` exceeds `floor(i * 0.2232)`,
+so the positive count of any prefix is within one of `i × 0.2232` rather than only correct in
+expectation.
 
 **Step 3 — establish which transcript positions are measurable.**
 
@@ -884,6 +894,21 @@ Measured over all 42,043 transcripts of the pool, by
 | genes | 42,043 transcripts | 12,613, mean 3.3 transcripts each |
 | genes carrying both labels | 12,613 genes | 3,546 |
 | `is_nmd` prevalence | 42,043 transcripts | 0.2242 |
+
+Measured over the 41,765 transcripts of step 1, by `build_ism_split.py` /
+`build_ism_split_runlog.txt`:
+
+| quantity | population | measured |
+|---|---|---|
+| transcripts on a composite locus, excluded | 42,043 transcripts | 278 on 233 loci |
+| genes | 41,765 transcripts | 12,380 |
+| `is_nmd` prevalence | same | 0.2232 |
+| transcripts assigned `discovery` | same | 20,897 (50.0%), prevalence 0.2254 |
+| transcripts assigned `confirmation` | same | 20,868 (50.0%), prevalence 0.2210 |
+| genes spanning both arms | 12,380 genes | 0 |
+| genes spanning more than one chromosome | same | 0 |
+| at *n* = 1,000: discovery / confirmation | first 1,000 of the order | 463 / 537, over 936 genes |
+| ...positives among them | same | 105 / 118 |
 
 Reported by the bank build itself: `n`, `W`, bytes per arm, transcripts and genes per arm of step 1,
 the achieved discovery/confirmation balance within each (`is_nmd`, split) cell, the no-op floor of

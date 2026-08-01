@@ -1,0 +1,470 @@
+#!/usr/bin/env python
+"""
+build_ism_bank.py — the in-silico mutagenesis bank.
+
+Implements section 9 of analysis_plans/RETRAIN_PLAN_2026-08-01.md. One invocation
+builds one arm. The interpretation window computes every metric from the output;
+nothing here interprets anything.
+
+WHAT ONE ENTRY MEANS. vals[i, p, b] is the change in transcript i's logit when the
+base at 1-based transcript position p+1 is replaced by ACGT[b], IN EVERY CANDIDATE
+WINDOW THAT CONTAINS THAT COORDINATE. Perturbing one window and not the others
+would present the same coordinate as two different bases inside one forward pass,
+which is a state no transcript can occupy, and it is the off-manifold condition
+this method exists to avoid.
+
+WHAT IS HELD FIXED. The junction channel, the reading-frame channels, the
+structural block, the candidate coordinates and the candidate set itself. A
+substitution can create or destroy an ATG or a stop codon; the pool is not
+re-derived when it does. The bank measures the model's response to its input, not
+to a re-scanned transcript.
+
+THE CACHE, AND WHY THE NO-OP FLOOR CHECKS IT. In eval mode a candidate's
+embeddings depend on nothing but its own windows, so a candidate no window of
+which contains p keeps the values from the unperturbed pass. That is an identity,
+not an approximation — but the cached path runs the encoder at a different batch
+size from the base pass, and a different batch size can pick a different reduction
+order. Substituting the observed base for itself exercises exactly that path and
+must return zero, so the floor measures the error the cache introduces rather than
+merely checking an index.
+
+Usage:
+    python build_ism_bank.py --tensor results_tensor_chr21 \\
+        --checkpoint runs/interp_c32_b8_s100/best.pt \\
+        --split results_ism_v6/discovery_confirmation_split.tsv \\
+        --n 1000 --out results_ism_v6/bank_interpretable.h5
+"""
+
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+
+import h5py
+import numpy as np
+import pandas as pd
+import torch
+
+from model_v6 import ScanningNMDModel
+from tensor_io import decode_windows
+
+ATG_LEFT, STOP_LEFT = 900, 500
+WINDOW = 1000
+NT = "ACGT"
+STRUCTURAL_COLS = ["n_downstream_ejc", "is_ref_cds", "is_sqanti_cds",
+                   "frac_start", "frac_stop"]
+INTERPRETABLE, PREDICTOR = [0], [0, 1, 2, 3, 4]
+
+
+# ------------------------------------------------------------------ geometry
+def window_spans(orf_start, orf_end, tx_len):
+    """The transcript positions each window actually holds a base for.
+
+    Read off build_tensor.py's two encode_window_codes calls: the ATG window is
+    anchored at orf_start with 900 to its left and filled no further than the ORF
+    midpoint; the stop window is anchored at orf_end-1 with 500 to its left and
+    filled no earlier than one past the midpoint. `mid` belongs to the ATG window,
+    so the two never hold the same coordinate.
+    """
+    mid = (orf_start + orf_end) // 2
+    a_lo = np.maximum(1, orf_start - ATG_LEFT)
+    a_hi = np.minimum(np.minimum(tx_len, mid), orf_start + (WINDOW - ATG_LEFT) - 1)
+    s_lo = np.maximum(mid + 1, (orf_end - 1) - STOP_LEFT)
+    s_hi = np.minimum(tx_len, (orf_end - 1) + (WINDOW - STOP_LEFT) - 1)
+    return a_lo, a_hi, s_lo, s_hi
+
+
+def covering_index(a_lo, a_hi, s_lo, s_hi):
+    """For every transcript position, which (candidate, window) pairs hold it.
+
+    Returned as a sorted flat list plus per-position offsets, so the pairs for a
+    block of positions are one contiguous slice.
+    """
+    pos, cand, win = [], [], []
+    for k in range(len(a_lo)):
+        if a_hi[k] >= a_lo[k]:
+            r = np.arange(a_lo[k], a_hi[k] + 1)
+            pos.append(r); cand.append(np.full(len(r), k)); win.append(np.zeros(len(r), np.int8))
+        if s_hi[k] >= s_lo[k]:
+            r = np.arange(s_lo[k], s_hi[k] + 1)
+            pos.append(r); cand.append(np.full(len(r), k)); win.append(np.ones(len(r), np.int8))
+    if not pos:
+        return (np.zeros(0, np.int64),) * 3
+    pos = np.concatenate(pos); cand = np.concatenate(cand); win = np.concatenate(win)
+    o = np.lexsort((cand, pos))
+    pos, cand, win = pos[o], cand[o], win[o]
+    # A (position, candidate) pair must occur at most once. The midpoint rule
+    # makes a candidate's two windows disjoint, so it holds by construction — but
+    # the assembly of z_d writes z_d[perturbation, candidate] by index, and a
+    # repeat would silently keep whichever was written last rather than fail.
+    dup = (pos[1:] == pos[:-1]) & (cand[1:] == cand[:-1])
+    assert not dup.any(), (
+        f"{int(dup.sum())} (position, candidate) pairs are covered twice: a "
+        f"candidate's ATG and stop windows overlap, which the midpoint clip of "
+        f"plan §5.3 step 1 forbids")
+    return pos, cand, win
+
+
+# ------------------------------------------------------------------ the model
+def load_model(ckpt_path, device):
+    ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    a = ck["args"]
+    cols = INTERPRETABLE if a["variant"] == "interpretable" else PREDICTOR
+    if a.get("blank_junctions"):
+        cols = []
+    m = ScanningNMDModel(conv_channels=a["conv_channels"], n_bins=a["n_bins"],
+                         n_structural=max(len(cols), 1),
+                         permute_bins=bool(a.get("permute_bins", False)))
+    m.load_state_dict(ck["model"]); m.to(device).eval()
+    return m, ck, (cols if cols else [0]), a
+
+
+class Encoders:
+    """The three encoder calls, with an optional fixed bin permutation.
+
+    The permuted-bin arm redraws its permutation at every forward pass, so one
+    pass of it is a draw and not a prediction. The bank holds one draw fixed
+    across the unperturbed pass and every substitution of a transcript and
+    averages over draws; that pairing is what leaves the substitution as the only
+    term that moves.
+    """
+
+    def __init__(self, model, perms=None):
+        self.m = model
+        self.perms = perms or {}
+
+    def _p(self, name, idx):
+        q = self.perms.get(name)
+        return None if q is None else q[idx]
+
+    def init(self, x, idx):
+        return self.m.enc_init(x, bin_perm=self._p("init", idx))
+
+    def atg(self, x, idx):
+        return self.m.enc_atg(x, bin_perm=self._p("atg", idx))
+
+    def stop(self, x, idx):
+        return self.m.enc_stop(x, bin_perm=self._p("stop", idx))
+
+
+def draw_perms(model, K, generator, device):
+    """One permutation per candidate per encoder, for the control arm."""
+    if not model.enc_init.permute_bins or model.enc_init.n_bins <= 1:
+        return None
+    B = model.enc_init.n_bins
+    return {n: torch.argsort(torch.rand(K, B, generator=generator, device=device), dim=1)
+            for n in ("init", "atg", "stop")}
+
+
+# ------------------------------------------------------------------ one arm
+def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
+                    device, chunk_rows, n_floor, rng):
+    """The bank for one transcript. Returns vals, valid, obs, base_logit, floor."""
+    K = len(orf_start)
+    a_lo, a_hi, s_lo, s_hi = window_spans(orf_start, orf_end, tx_len)
+    pos, cand, win = covering_index(a_lo, a_hi, s_lo, s_hi)
+    P = int(max(a_hi.max(), s_hi.max()))          # last covered position
+
+    # ---- the unperturbed pass, and the embeddings the cache keeps -----------
+    atg9 = torch.as_tensor(decode_windows(codes[:, 0], orf_start, ATG_LEFT, orf_start),
+                           device=device)
+    stop9 = torch.as_tensor(decode_windows(codes[:, 1], orf_end - 1, STOP_LEFT, orf_start),
+                            device=device)
+    kidx = torch.arange(K, device=device)
+    u = torch.as_tensor(struct, dtype=torch.float32, device=device)
+    with torch.no_grad():
+        e_init = enc.init(atg9, kidx)
+        e_atg = enc.atg(atg9, kidx)
+        e_stop = enc.stop(stop9, kidx)
+        u_emb = torch.relu(model.struct_fc(u))
+        z_p0 = model.init_head(e_init).squeeze(-1)
+        z_d0 = model.decay_head(model.decay_body(
+            torch.cat([e_atg, e_stop, u_emb], dim=-1))).squeeze(-1)
+        mask1 = torch.ones(1, K, dtype=torch.bool, device=device)
+        base_logit = float(model.aggregate(z_p0[None], z_d0[None], mask1).item())
+
+    # ---- observed base and validity, from the codes themselves -------------
+    obs = np.full(P, -1, dtype=np.int8)
+    valid = np.zeros(P, dtype=bool)
+    fill = (codes & 7)
+    for k in range(K):
+        for w, lo, hi, anchor, left in ((0, a_lo[k], a_hi[k], orf_start[k], ATG_LEFT),
+                                        (1, s_lo[k], s_hi[k], orf_end[k] - 1, STOP_LEFT)):
+            if hi < lo:
+                continue
+            p = np.arange(lo, hi + 1)
+            st = fill[k, w, p - anchor + left]
+            # states are 0 unfilled, 1-4 ACGT, 5 filled but not ACGT (tensor_io).
+            # State 5 must map to -1 and not to 4: a bare `st - 1` makes it index 4,
+            # which is not a base and which passes an `obs >= 0` validity test.
+            obs[p - 1] = np.where((st >= 1) & (st <= 4), st - 1, -1).astype(np.int8)
+            valid[p - 1] = True
+    # A position holding something other than ACGT has no observed base to
+    # substitute for itself, so it carries no floor and is not measurable here.
+    valid &= obs >= 0
+
+    vals = np.full((P, 4), np.nan, dtype=np.float32)
+
+    # ---- the substitutions --------------------------------------------------
+    keep = valid[pos - 1]
+    pos_v, cand_v, win_v = pos[keep], cand[keep], win[keep]
+    order = np.argsort(pos_v, kind="stable")
+    pos_v, cand_v, win_v = pos_v[order], cand_v[order], win_v[order]
+
+    # The floor is sampled from the positions that HAVE an observed base to
+    # substitute for itself, not from 1..tx_length: a sample drawn before validity
+    # is known lands mostly on unprobeable positions and the floor ends up
+    # measured over far fewer samples than it claims.
+    noop_max = 0.0
+    vp = np.flatnonzero(valid) + 1
+    floor_set = set(rng.choice(vp, size=min(n_floor, len(vp)),
+                               replace=False).tolist()) if len(vp) else set()
+    starts = np.searchsorted(pos_v, np.unique(pos_v))
+    upos = np.unique(pos_v)
+
+    i = 0
+    while i < len(upos):
+        # take as many positions as fit the row budget; each contributes up to
+        # 3 substitutions (4 where the position is a floor sample) per covering pair
+        j, rows = i, 0
+        while j < len(upos):
+            lo = starts[j]
+            hi = starts[j + 1] if j + 1 < len(starts) else len(pos_v)
+            nb = 4 if int(upos[j]) in floor_set else 3
+            r = (hi - lo) * nb
+            if rows and rows + r > chunk_rows:
+                break
+            rows += r; j += 1
+        block = upos[i:j]
+        lo, hi = starts[i], (starts[j] if j < len(starts) else len(pos_v))
+        bp, bc, bw = pos_v[lo:hi], cand_v[lo:hi], win_v[lo:hi]
+
+        # expand each covering pair over the bases being substituted
+        rc, rw, rb, rp = [], [], [], []
+        for n, p in enumerate(block):
+            m = bp == p
+            o = int(obs[p - 1])
+            bases = range(4) if int(p) in floor_set else [b for b in range(4) if b != o]
+            for b in bases:
+                c = int(m.sum())
+                rc.append(bc[m]); rw.append(bw[m]); rb.append(np.full(c, b))
+                rp.append((n, b, c))
+        # perturbation ids, one per (position, base)
+        pid = np.concatenate([np.full(c, t) for t, (_, _, c) in enumerate(rp)])
+        rc = np.concatenate(rc); rw = np.concatenate(rw); rb = np.concatenate(rb)
+        rpos = np.concatenate([np.full(c, block[n]) for (n, _, c) in rp])
+        n_pert = len(rp)
+
+        # build the perturbed codes: bits 0-2 take the new base, bit 3 (junction)
+        # is a property of the annotation and is preserved
+        anchor = np.where(rw == 0, orf_start[rc], orf_end[rc] - 1)
+        left = np.where(rw == 0, ATG_LEFT, STOP_LEFT)
+        widx = rpos - anchor + left
+        pc = codes[rc, rw].copy()
+        pc[np.arange(len(pc)), widx] = (pc[np.arange(len(pc)), widx] & 8) | (rb + 1)
+
+        is_atg = rw == 0
+        z_p = z_p0[None].repeat(n_pert, 1).clone()
+        z_d = z_d0[None].repeat(n_pert, 1).clone()
+        with torch.no_grad():
+            if is_atg.any():
+                sel = np.flatnonzero(is_atg)
+                x = torch.as_tensor(decode_windows(pc[sel], orf_start[rc[sel]],
+                                                   ATG_LEFT, orf_start[rc[sel]]),
+                                    device=device)
+                ci = torch.as_tensor(rc[sel], device=device, dtype=torch.long)
+                pi = torch.as_tensor(pid[sel], device=device, dtype=torch.long)
+                ei = enc.init(x, ci)
+                ea = enc.atg(x, ci)
+                z_p[pi, ci] = model.init_head(ei).squeeze(-1)
+                z_d[pi, ci] = model.decay_head(model.decay_body(
+                    torch.cat([ea, e_stop[ci], u_emb[ci]], dim=-1))).squeeze(-1)
+            if (~is_atg).any():
+                sel = np.flatnonzero(~is_atg)
+                x = torch.as_tensor(decode_windows(pc[sel], orf_end[rc[sel]] - 1,
+                                                   STOP_LEFT, orf_start[rc[sel]]),
+                                    device=device)
+                ci = torch.as_tensor(rc[sel], device=device, dtype=torch.long)
+                pi = torch.as_tensor(pid[sel], device=device, dtype=torch.long)
+                es = enc.stop(x, ci)
+                z_d[pi, ci] = model.decay_head(model.decay_body(
+                    torch.cat([e_atg[ci], es, u_emb[ci]], dim=-1))).squeeze(-1)
+            mask = torch.ones(n_pert, K, dtype=torch.bool, device=device)
+            out = model.aggregate(z_p, z_d, mask).cpu().numpy()
+
+        for t, (n, b, _) in enumerate(rp):
+            p = int(block[n])
+            d = float(out[t] - base_logit)
+            if b == int(obs[p - 1]):
+                noop_max = max(noop_max, abs(d))       # the floor, not an effect
+            else:
+                vals[p - 1, b] = d
+        i = j
+
+    return (vals, valid, obs, base_logit, (noop_max, len(floor_set)),
+            (a_lo, a_hi, s_lo, s_hi))
+
+
+def main():
+    sys.stdout.reconfigure(line_buffering=True)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--tensor", required=True)
+    ap.add_argument("--checkpoint", required=True)
+    ap.add_argument("--split", default="results_ism_v6/discovery_confirmation_split.tsv")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--n", type=int, default=1000)
+    ap.add_argument("--chunk-rows", type=int, default=4096)
+    ap.add_argument("--floor-samples", type=int, default=200)
+    ap.add_argument("--perm-draws", type=int, default=1,
+                    help="control arm only: paired permutation draws to average over")
+    ap.add_argument("--seed", type=int, default=20260801)
+    ap.add_argument("--device", default="")
+    ap.add_argument("--limit-transcripts", type=int, default=0)
+    args = ap.parse_args()
+
+    device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    t0 = time.time()
+
+    model, ck, cols, ckargs = load_model(args.checkpoint, device)
+    is_control = bool(ckargs.get("permute_bins", False))
+    R = args.perm_draws if is_control else 1
+    print(f"model      {args.checkpoint}")
+    print(f"  variant {ckargs['variant']}  conv_channels {ckargs['conv_channels']}  "
+          f"n_bins {ckargs['n_bins']}  permute_bins {is_control}  seed {ckargs['seed']}")
+    print(f"  structural columns {[STRUCTURAL_COLS[c] for c in cols]}")
+    if is_control:
+        print(f"  CONTROL ARM: {R} paired permutation draw(s), averaged")
+    if ckargs.get("blank_sequence"):
+        raise SystemExit(
+            "the sequence-blanked arm has no bank: it is trained and evaluated with "
+            "channels 0-3 and 5 zeroed, and a substitution changes channels 0-3 and 5 "
+            "and nothing else, so every entry would be exactly zero by construction "
+            "(plan §9.3 step 8)")
+
+    # ------------------------------------------------------------- the subset
+    sp_all = pd.read_csv(args.split, sep="\t")
+    sp = sp_all.sort_values("rank", kind="stable")
+    with h5py.File(str(Path(args.tensor) / "nmd_tensor.h5"), "r") as f:
+        iso = np.array([s.decode() for s in f["isoform_id"][:]])
+        row = {s: i for i, s in enumerate(iso)}
+        offset, count = f["offset"][:], f["count"][:]
+        split_lab = np.array([s.decode() for s in f["split"][:]])
+        gene = np.array([s.decode() for s in f["gene_id"][:]])
+        labels = f["labels"][:]
+        o_start_all, o_end_all = f["orf_start"][:], f["orf_end"][:]
+        struct_all = f["structural"][:]
+        codes_all = f["codes"][:]
+        atg_left = int(f.attrs["atg_left"])
+        pool_sha = f.attrs.get("pool_sha256", "")
+    assert atg_left == ATG_LEFT, f"tensor anchors at {atg_left}, this script assumes {ATG_LEFT}"
+
+    sp = sp[sp["isoform_id"].isin(row)]
+    take = sp.head(args.n if args.n > 0 else len(sp))
+    if args.limit_transcripts:
+        take = take.head(args.limit_transcripts)
+    print(f"\nsubset     {len(take):,} transcripts "
+          f"(rank < {int(take['rank'].max())+1:,} of the fixed order)")
+    print(f"  in the tensor {len(sp):,} of {len(sp_all):,} split rows; "
+          f"prevalence {take['is_nmd'].mean():.4f}")
+    for a in ("discovery", "confirmation"):
+        print(f"  {a:<13} {int((take['arm'] == a).sum()):>6,}")
+
+    # --------------------------------------------------------------- the bank
+    rng = np.random.default_rng(args.seed)
+    gen = torch.Generator(device=device); gen.manual_seed(args.seed)
+
+    recs, spans_rows, floors, spreads = [], [], [], []
+    n_floor_samples = 0
+    n_enc_rows = 0
+    for n, r in enumerate(take.itertuples()):
+        i = row[r.isoform_id]
+        sl = slice(int(offset[i]), int(offset[i]) + int(count[i]))
+        cds, os_, oe_ = codes_all[sl], o_start_all[sl].astype(np.int64), o_end_all[sl].astype(np.int64)
+        st = struct_all[sl][:, cols]
+
+        per_draw = []
+        for d in range(R):
+            enc = Encoders(model, draw_perms(model, len(os_), gen, device) if is_control else None)
+            v, valid, obs, base, noop, spans = transcript_bank(
+                model, enc, cds, os_, oe_, int(r.tx_length), st,
+                device, args.chunk_rows, args.floor_samples, rng)
+            per_draw.append(v)
+            floors.append(noop[0]); n_floor_samples += noop[1]
+        vals = per_draw[0] if R == 1 else np.nanmean(np.stack(per_draw), axis=0)
+        if R > 1:
+            spreads.append(float(np.nanstd(np.stack(per_draw), axis=0).mean()))
+
+        recs.append(dict(isoform_id=r.isoform_id, vals=vals, valid=valid, obs=obs,
+                         base_logit=base, label=int(labels[i]), arm=r.arm,
+                         split=split_lab[i], gene=gene[i], K=len(os_)))
+        a_lo, a_hi, s_lo, s_hi = spans
+        for k in range(len(os_)):
+            spans_rows.append((n, k, a_lo[k], a_hi[k], s_lo[k], s_hi[k]))
+        n_enc_rows += int(valid.sum())
+        if n % 25 == 0 or n == len(take) - 1:
+            print(f"  [{n+1:>5,}/{len(take):,}] {r.isoform_id:<32} K={len(os_):>3} "
+                  f"P={len(valid):>6,} valid={int(valid.sum()):>6,} "
+                  f"floor={max(floors):.2e}  ({time.time()-t0:.0f}s)", flush=True)
+
+    # ------------------------------------------------------------------ write
+    W = max(len(x["valid"]) for x in recs)
+    N = len(recs)
+    vals = np.full((N, W, 4), np.nan, np.float32)
+    valid = np.zeros((N, W), bool)
+    obs = np.full((N, W), -1, np.int8)
+    for i, x in enumerate(recs):
+        p = len(x["valid"])
+        vals[i, :p] = x["vals"]; valid[i, :p] = x["valid"]; obs[i, :p] = x["obs"]
+
+    cand_count = np.array([x["K"] for x in recs], np.int32)
+    cand_offset = np.concatenate([[0], np.cumsum(cand_count)])[:-1].astype(np.int32)
+    floor = float(max(floors))
+
+    outp = Path(args.out); outp.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(outp, "w") as f:
+        f.create_dataset("vals", data=vals, compression="lzf")
+        f.create_dataset("valid", data=valid, compression="lzf")
+        f.create_dataset("obs", data=obs, compression="lzf")
+        f.create_dataset("labels", data=np.array([x["label"] for x in recs], np.int8))
+        f.create_dataset("base_logit", data=np.array([x["base_logit"] for x in recs], np.float32))
+        f.create_dataset("transcript_id", data=np.array([x["isoform_id"] for x in recs], dtype="S"))
+        f.create_dataset("gene_id", data=np.array([x["gene"] for x in recs], dtype="S"))
+        f.create_dataset("arm", data=np.array([x["arm"] for x in recs], dtype="S"))
+        f.create_dataset("split", data=np.array([x["split"] for x in recs], dtype="S"))
+        f.create_dataset("spans", data=np.array(spans_rows, np.int32))
+        f.create_dataset("cand_offset", data=cand_offset)
+        f.create_dataset("cand_count", data=cand_count)
+        f.attrs["floor"] = floor
+        f.attrs["floor_samples"] = int(n_floor_samples)
+        f.attrs["floor_samples_requested_per_transcript"] = int(args.floor_samples)
+        f.attrs["checkpoint"] = str(args.checkpoint)
+        f.attrs["pool_sha256"] = pool_sha
+        f.attrs["perm_draws"] = R
+        f.attrs["split_file"] = str(args.split)
+        f.attrs["plan"] = "analysis_plans/RETRAIN_PLAN_2026-08-01.md §9"
+        f.attrs["config"] = json.dumps({k: ckargs[k] for k in
+                                        ("variant", "conv_channels", "n_bins",
+                                         "permute_bins", "blank_sequence",
+                                         "blank_junctions", "seed")})
+        f.attrs["vals_meaning"] = (
+            "vals[i,p,b] = logit(transcript i with base at 1-based position p+1 "
+            "replaced by ACGT[b], in every candidate window containing that "
+            "coordinate) - base_logit[i]. NaN where valid is False and at the "
+            "observed base. spans gives each candidate's window extents in "
+            "transcript coordinates: (transcript row, slot, atg_lo, atg_hi, "
+            "stop_lo, stop_hi), 1-based inclusive.")
+
+    dt = time.time() - t0
+    print(f"\nwrote {outp}  ({outp.stat().st_size/1e6:,.0f} MB)")
+    print(f"  n {N:,}   W {W:,}   valid positions {int(valid.sum()):,}")
+    print(f"  no-op floor (max |effect| substituting the observed base for itself): "
+          f"{floor:.3e} over {n_floor_samples:,} sampled positions "
+          f"in {len(recs):,} transcripts")
+    if spreads:
+        print(f"  control: mean sd across {R} paired draws = {np.mean(spreads):.3e}")
+    print(f"  {dt:.0f}s, {3*int(valid.sum())/max(dt,1e-9):,.0f} substitutions/s")
+
+
+if __name__ == "__main__":
+    main()

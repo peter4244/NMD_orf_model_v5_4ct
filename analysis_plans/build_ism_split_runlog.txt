@@ -1,0 +1,32 @@
+transcripts in TX and in the pool : 42,043
+  without a gene_id               : 0
+  on a composite locus (ENSGa::ENSGb)
+    transcripts excluded          : 278
+    composite loci                : 233
+  population carried forward      : 41,765
+  matches the tensor's population in plan §5.3 step 5
+
+STEP 1 — gene-level arm assignment, seed 20260801
+  genes                           : 12,380
+  discovery        6,224 genes   20,897 transcripts  (50.0%)  prevalence 0.2254
+  confirmation     6,156 genes   20,868 transcripts  (50.0%)  prevalence 0.2210
+  genes spanning both arms        : 0
+  genes spanning >1 chromosome    : 0
+
+STEP 2 — one fixed order, prevalence 0.2232
+    prefix n  positives  prevalence  discovery   genes
+         120         26      0.2167         47     120
+         250         55      0.2200        108     244
+         500        111      0.2220        220     481
+       1,000        223      0.2230        463     936
+       2,000        446      0.2230        975   1,798
+       5,000      1,115      0.2230      2,439   3,960
+      41,765      9,321      0.2232     20,897  12,380
+
+  discovery/confirmation balance at n = 1,000, within (label, arm):
+    is_nmd=1  discovery  105  confirmation  118  genes  219
+    is_nmd=0  discovery  358  confirmation  419  genes  735
+
+wrote results_ism_v6/discovery_confirmation_split.tsv
+  sha256 fe89053110bec64f5417e16518bf3c4841b6985731e368e33565d5cd6a6fe2ed
+  41,765 transcripts, 12,380 genes, 0.7s
