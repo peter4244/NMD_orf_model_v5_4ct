@@ -1,0 +1,113 @@
+$ python exp12_front_of_transcript.py
+Captured 2026-08-01T02:32:10Z, repo 059a336.
+
+====================================================================================================
+EXPERIMENT 12 -- the front of the transcript
+====================================================================================================
+
+  28,723 isoforms with a projected reference start codon
+  21,840 of those have a CLEAN main stop -- no junction beyond
+  stop+50. That is the population where the front can be the cause.
+  NMD+ in it: 5.0%
+
+====================================================================================================
+1. THE TWO RAW SIGNALS
+====================================================================================================
+
+  5UTR length quartile           n  median nt     NMD+
+  ------------------------ ------- ---------- --------
+  Q1                         5,225         91     1.2%
+  Q2                         5,221        215     1.7%
+  Q3                         5,206        428     4.3%
+  Q4                         5,214      1,186    13.8%
+
+  upstream AUG count             n  median 5UTR     NMD+
+  ------------------------ ------- ------------ --------
+  0                          6,655          126     1.1%
+  1                          3,452          218     1.2%
+  2                          2,120          295     2.4%
+  3                          1,442          366     3.3%
+  >=4                        7,197          877    12.2%
+
+  Note the median-5'UTR column: the two are confounded by
+  construction, because a longer 5'UTR has more room for AUGs.
+
+====================================================================================================
+2. LENGTH OR CONTENT? -- the two crossed
+====================================================================================================
+
+                      5UTR Q1        5UTR Q2        5UTR Q3        5UTR Q4
+  ------------------------------------------------------------------------
+  0 uAUG       3,914     1.3% 1,991     1.2%   717     0.6%    33     0.0%
+  1              918     0.8% 1,550     1.5%   875     1.1%   109     2.8%
+  2              286     1.4%   795     2.1%   913     2.6%   126     4.8%
+  3               84     1.2%   450     2.9%   720     3.6%   188     3.7%
+  >=4             23       --   435     3.0% 1,981     8.2% 4,758    14.7%
+
+  Read DOWN a column: 5'UTR length held roughly fixed, upstream AUGs varying.
+  Read ACROSS a row: upstream AUGs held fixed, length varying.
+  Whichever direction carries the gradient is the one that matters.
+
+  Same thing as adjusted contrasts, gene-clustered, both scales:
+    5'UTR length long vs short, adjusted for uAUG count
+      +0.03pp [-0.63, +6.62]   odds ratio 3.26 [1.48, 8.31]   n 5,214 vs 5,225
+    uAUG count >=4 vs <=1, adjusted for 5'UTR length
+      +5.14pp [+4.11, +6.08]   odds ratio 6.97 [5.01, 10.58]   n 7,197 vs 10,107
+
+====================================================================================================
+3. COUNT OR STRENGTH? -- Kozak context at fixed upstream AUG count
+====================================================================================================
+
+  A strong-Kozak start codon captures more scanning ribosomes. If
+  strength matters at fixed count, the element is the CONTEXT and not
+  merely the presence of an AUG.
+
+  uAUG count         strong=0       strong=1       strong=2       strong=3
+  ------------------------------------------------------------------------
+  1            2,762     1.2%   690     1.4%     0       --     0       --
+  2            1,365     1.9%   667     3.3%    88     3.4%     0       --
+  3              736     2.3%   566     4.1%   132     5.3%     8       --
+  >=4          1,327     4.8% 1,715     9.4% 1,293    13.9%   849    14.1%
+
+====================================================================================================
+4. WHERE DOES THE UPSTREAM ORF END? -- the only mechanism here
+====================================================================================================
+
+  An upstream ORF that stops inside the 5'UTR lets the ribosome resume scanning
+  and start again at the real start codon -- a leaky trigger. One that reads
+  PAST the real start codon out of frame and stops inside the coding sequence
+  has no such rescue. Mechanistically the second should be much the more
+  potent, and it is the one distinction here that is a sequence ARRANGEMENT
+  rather than a count.
+
+  class                           n     NMD+   median 5UTR
+  ------------------------ -------- -------- -------------
+  no upstream ORF             7,837     1.1%           142
+  uORF (ends in 5'UTR)          125     3.2%           261
+  oORF (overlaps CDS)        12,904     7.8%           497
+
+  and with 5'UTR length and upstream AUG count held fixed:
+    oORF minus uORF-in-5'UTR: -0.17pp [-7.45, +2.08]   odds ratio 1.54 [0.24, 2.08]
+    n 12,904 oORF vs 125 uORF
+
+====================================================================================================
+5. EVERYTHING SIDE BY SIDE, ONE SCALE
+====================================================================================================
+
+  odds ratios in the clean-main-stop population, each adjusted for
+  the others where they are confounded:
+
+  contrast                                               odds ratio         pp                n
+  ------------------------------------------ ---------------------- ---------- ----------------
+  5'UTR length, top vs bottom quartile             3.26 [1.48,8.31]     +0.03p   5,214/5,225   
+  upstream AUG count, >=4 vs <=1                  6.97 [5.01,10.58]     +5.14p   7,197/10,107  
+  oORF vs uORF ending in 5'UTR                     1.54 [0.24,2.08]     -0.17p  12,904/125     
+  5'UTR covered >50% by ORFs vs 0%                 5.31 [3.92,7.44]     +6.85p   7,081/6,833   
+
+  for comparison, from the back of the transcript:
+  stop codon TGA vs TAG                            1.24 [1.06,1.47]
+  every 3UTR motif tested                                      ~1.0
+
+====================================================================================================
+DONE
+====================================================================================================
