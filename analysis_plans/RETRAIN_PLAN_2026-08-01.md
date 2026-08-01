@@ -817,8 +817,8 @@ floor. An effect below the floor is not distinguishable from the arithmetic.
 
 **Step 7 — emit the bank.**
 
-One file per arm. `W` is the largest `last_covered` over the transcripts in the subset, so no stored
-column is invalid for every transcript.
+One file per (arm, seed). `W` is the largest `last_covered` over the transcripts in the subset, so no
+stored column is invalid for every transcript.
 
 | name | shape | type | content |
 |---|---|---|---|
@@ -826,7 +826,7 @@ column is invalid for every transcript.
 | `valid` | (n_iso, W) | bool | `valid(p)` of step 3 |
 | `obs` | (n_iso, W) | int8 | observed base, ACGT = 0123; −1 where `valid` is false or the base is not one of ACGT |
 | `labels` | (n_iso,) | int8 | `is_nmd` |
-| `floor` | scalar | float32 | step 6 |
+| `floor` | scalar attribute | float | step 6, the maximum over every sampled position and draw |
 | `transcript_id` | (n_iso,) | string | keys to `TX` |
 | `spans` | (n_cand, 6) | int32 | one row per candidate: transcript row index, slot, and the four bounds of `ATG_k` and `STOP_k` |
 | `cand_offset`, `cand_count` | (n_iso,) | int32 | the rows of `spans` belonging to each transcript |
@@ -834,6 +834,8 @@ column is invalid for every transcript.
 | `split` | (n_iso,) | string | `train`, `val`, `val_paralog`, `test`, `test_paralog`, from §5 step 5 |
 | `gene_id` | (n_iso,) | string | for clustering |
 | `base_logit` | (n_iso,) | float32 | the unperturbed logit |
+
+Provenance travels as file attributes beside these: the checkpoint path, the model configuration, the pool `sha256`, the split file, the number of paired draws, the number of positions the floor was sampled at, and a one-paragraph statement of what one `vals` entry means.
 
 `spans` is emitted because the interpretation window excludes positions within 25 bases of a window
 boundary, where a substitution perturbs the truncated denominator of the 50-base rolling mean of
@@ -864,13 +866,17 @@ evidence is the §8.3 accuracy comparison.
 
 The control redraws its bin permutation at every forward pass (§6.2 step 1), so a single forward pass
 of it is a draw rather than a prediction. Its effect at a position is the expectation over
-permutations, estimated by pairing: one permutation is drawn per candidate window and held fixed
-across the unperturbed pass and every substitution of that transcript, the whole bank is computed
-under it, and the result is averaged over `R` such draws.
+permutations, estimated by pairing: one permutation is drawn **per candidate and per encoder** and
+held fixed across the unperturbed pass and every substitution of that transcript, the whole bank is
+computed under it, and the result is averaged over `R` such draws.
+
+Per encoder, not per window: `enc_init` and `enc_atg` both read the ATG window, and in training each
+draws its own permutation at every pass. Sharing one between them at bank time would pair two
+encoders that the trained model never paired.
 
 ```
 for r in 1..R:
-    P_r = one permutation per (candidate, window), drawn once
+    P_r = one permutation per (candidate, encoder), drawn once   # 3 encoders, 2 windows
     vals_r = the bank of steps 4-7 computed with every forward pass using P_r
 vals = mean over r of vals_r
 ```
