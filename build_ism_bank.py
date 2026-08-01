@@ -541,12 +541,26 @@ def main():
                          data=np.array([x["base_logit"] for x in recs], np.float64))
         f.create_dataset("base_logit_training",
                          data=np.array([x["base_train"] for x in recs], np.float32))
-        # WHICH TRANSCRIPTS THE TRAINING OUTPUT WOULD HAVE PINNED. aggregate()
-        # clamps P(NMD) to [1e-6, 1-1e-6] for training stability, and at the clamp
-        # the logit is constant so EVERY substitution returns exactly 0.0 --
-        # indistinguishable from a position the model ignores. vals are computed
-        # on the unclamped log-odds in float64 and so are unaffected, but a
-        # transcript that far into a tail is a different regime and says so.
+        # WHICH TRANSCRIPTS THE TRAINING OUTPUT WOULD HAVE PINNED.
+        #
+        # Keyed on the STABLE logit, not the training one: the training logit can
+        # never exceed 13.8155 by construction, so a threshold on it would catch
+        # only the exactly-pinned and miss everything approaching the clamp.
+        #
+        # WHAT THIS FLAG DOES NOT COVER, measured on a z_d sweep at K=6. Near the
+        # clamp the training path does not only pin, it COMPRESSES: at z_d = -16
+        # with a step of 5.0 the training delta is 0.26x the true one, at -15 it
+        # is 0.60x, at -14 it is 0.93x. Every one of those IS flagged here, so the
+        # low end is covered. The high end is not: at z_d = +13 to +16 the stable
+        # base logit is 4.14, nowhere near the clamp, the flag is correctly false,
+        # and the training delta is still wrong by 1.12x to 1.44x and reaches
+        # exactly 0.0 at +16. That is the float32 round-trip through P, not the
+        # clamp, and no threshold on the base logit can find it.
+        #
+        # So the flag means "the clamp is active", not "the training path agrees
+        # here". base_logit and base_logit_training are BOTH shipped so the
+        # disagreement can be computed rather than inferred from the flag. vals
+        # use the stable path throughout and carry none of this.
         pinned = np.abs(np.array([x["base_logit"] for x in recs])) >= CLAMP_LOGIT
         f.create_dataset("pinned_in_training", data=pinned)
         f.create_dataset("transcript_id", data=np.array([x["isoform_id"] for x in recs], dtype="S"))
@@ -592,7 +606,13 @@ def main():
             "WITHOUT the [1e-6, 1-1e-6] clamp the training path applies. At the "
             "clamp the training logit is constant and every substitution returns "
             "exactly 0.0; base_logit_training and pinned_in_training record which "
-            "transcripts the training output would have pinned.")
+            "transcripts the training output would have pinned. That flag covers "
+            "the clamp only: near the clamp the training path also COMPRESSES "
+            "(0.26x to 0.93x at z_d -16 to -14, all flagged), and above it the "
+            "float32 round-trip through P is wrong by 1.12x to 1.44x while the "
+            "flag is correctly false. Difference base_logit against "
+            "base_logit_training to see the disagreement rather than reading it "
+            "off the flag.")
 
     dt = time.time() - t0
     print(f"\nwrote {outp}  ({outp.stat().st_size/1e6:,.0f} MB)")
