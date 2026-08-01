@@ -1,0 +1,72 @@
+$ python exp9_route_dependence.py
+Captured 2026-08-01T02:23:52Z, repo 36d93b2.
+
+====================================================================================================
+EXPERIMENT 9 -- route-dependence of the stop-codon effect
+====================================================================================================
+
+  28,723 isoforms on the reference-CDS anchor
+  scanning the full ORF set for upstream PTC-bearing ORFs ...
+  isoforms with an upstream ORF that is itself a PTC: 15,749
+
+====================================================================================================
+A. TRACK A'S THREE-WAY PARTITION, REPRODUCED ON MY ANCHOR
+====================================================================================================
+
+  route                         n     NMD+      (Track A)
+  ---------------------- -------- --------
+  EJC_dependent             6,883    69.9%      6,931 at 69.5%
+  long_3UTR                11,580     4.2%      11,584 at 4.3%
+  neither                  10,260     5.9%      10,260 at 5.9%
+
+  Their inversion reproduces: the 'neither' group sits ABOVE the
+  long-3'UTR group, so it is not a negative control.
+
+====================================================================================================
+B. THE FOUR-WAY PARTITION -- adding the route they omitted
+====================================================================================================
+
+  route                         n     NMD+   med 3UTR
+  ---------------------- -------- -------- ----------
+  1_EJC_dependent           6,883    69.9%      2,009
+  2_uORF_PTC               12,118     8.2%      1,192
+  3_long_3UTR               4,825     1.1%      2,097
+  4_no_route                4,897     1.1%        412
+
+  The no-route group now runs at 1.1%. Track A's
+  contaminated version ran at 5.9%. Pulling the uORF route out is
+  what makes it a control.
+
+====================================================================================================
+C. THE CONTRAST WITHIN EACH ROUTE, WITH POWER STATED
+====================================================================================================
+
+  route                      n    base   pos TGA/TAG            pp diff           odds ratio  min detectable OR
+  -------------------- ------- ------- ------------- ------------------ -------------------- ------------------
+  1_EJC_dependent        5,365   69.9%  2,885/867      +4.43 [+1.10,+8.01]     1.24 [1.06,1.47]              1.21
+  2_uORF_PTC             8,384    8.1%    502/176      +1.40 [-0.45,+3.18]     1.21 [0.94,1.58]              1.29
+  3_long_3UTR            3,327    1.3%     33/11       +0.35 [-0.48,+1.18]     1.36 [0.74,3.16]              2.67
+  4_no_route             3,219    1.2%     33/7        +0.69 [-0.11,+1.41]     1.90 [0.94,5.64]              3.22
+
+====================================================================================================
+D. READING IT HONESTLY
+====================================================================================================
+
+  EJC-dependent route : OR 1.24 [1.06, 1.47], 2,885/867 positives
+  no-route group      : OR 1.90 [0.94, 5.64], 33/7 positives, min detectable OR 3.22
+
+  The no-route group has 7 positives in its smaller arm.
+  Its interval cannot exclude an effect the size of the
+  EJC-dependent one (1.24), so this route CANNOT deliver
+  a decisive absence. Reported as underpowered, not as null.
+
+  What can be said either way: the odds ratios across routes are not obviously
+  ordered by whether a decay route exists. That is the same non-finding as the
+  two-group version, at finer resolution -- and Track A's stronger claim ("no
+  route-dependence at all") should be stated as "no evidence of
+  route-dependence", with the power in the sentence, because the group that
+  would carry the argument is the one with the fewest positives.
+
+====================================================================================================
+DONE
+====================================================================================================
