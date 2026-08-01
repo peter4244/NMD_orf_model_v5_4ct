@@ -276,18 +276,15 @@ One row per admitted candidate, replacing `selected_orfs.tsv`:
 | transcripts where the fallback fires | 42,043 transcripts | 58 |
 | GENCODE CDS start in the pool | 28,775 with an enumerable CDS start | 28,775 (100%) |
 | ...reaching it only by the always-admit rule | same | 3,825 (13.3%) |
-| coverage of upstream ORFs whose own stop has a junction >50 bases downstream | 133,765 such ORFs | 89,073 (66.6%) |
-| transcripts all of whose triggering upstream ORFs are admitted | 17,944 carrying at least one | not yet measured |
+| coverage of upstream ORFs whose own stop has a junction >50 bases downstream | 133,765 such ORFs | 89,062 (66.6%) |
+| transcripts all of whose triggering upstream ORFs are admitted | 17,944 carrying at least one | **7,896 (44.0%)** |
 
 "Upstream" means `orf_start < ref_utr5_length + 1`, over transcripts with `ref_atg_available` = 1;
 "triggering" means the ORF's own stop has a junction more than 50 bases past it. The transcript-level
 row is the one the aggregation of §6.2 Step 4 depends on: a transcript missing one of its triggering
 ORFs has the wrong leak product, which the ORF-level percentage does not show.
 
-Source: `build_orf_pool_runlog.txt`, which is this step's own output. The coverage rows are the
-exception — `build_orf_pool.py` does not yet classify non-admitted ORFs as upstream or triggering, so
-those two rows are carried from `design5_final_pool_runlog.txt` and are not yet produced by the code
-that implements this section.
+Source: `build_orf_pool_runlog.txt`, which is this step's own output.
 
 ### 3.5 Cost
 

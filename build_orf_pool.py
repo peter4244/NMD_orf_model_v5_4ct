@@ -254,7 +254,7 @@ def main():
     for iso, L in zip(tx["isoform_id"], tx["tx_length"]):
         seq = seqs.get(iso)
         if seq is None:
-            rec.append((iso, 0, 0, 0, False, False))
+            rec.append((iso, 0, 0, 0, False, False, 0, 0))
             continue
         n_done += 1
         if n_done % 5000 == 0:
@@ -262,7 +262,7 @@ def main():
 
         orfs = enumerate_orfs(seq)
         if not len(orfs):
-            rec.append((iso, 0, 0, 0, False, False))
+            rec.append((iso, 0, 0, 0, False, False, 0, 0))
             continue
         codes = NUC_INDEX[np.frombuffer(seq.encode("ascii"), dtype=np.uint8)]
         score = score_initiation(codes, orfs[:, 0])
@@ -296,12 +296,28 @@ def main():
             keep[order[:5]] = True
             admitted_by = ["fallback" if k else "" for k in keep]
 
+        # Classify every ORF, admitted or not, so section 3.4's coverage
+        # denominators are produced here rather than assumed. "Upstream" is
+        # strictly 5' of the reference start codon and is defined only where the
+        # transcript has one; "triggering" is the ORF's own stop carrying a
+        # junction more than EJC_RULE_NT bases past it.
+        n_up_trig = n_up_trig_adm = 0
+        j = junc.get(iso, np.empty(0, dtype=np.int64))
+        if cds_pos is not None and len(j):
+            upstream = orfs[:, 0] < cds_pos
+            if upstream.any():
+                ends = orfs[upstream, 1]
+                trig = (len(j) - np.searchsorted(j, ends + EJC_RULE_NT,
+                                                 side="right")) > 0
+                n_up_trig = int(trig.sum())
+                n_up_trig_adm = int((trig & keep[upstream]).sum())
+
         rec.append((iso, int(len(orfs)), int(above.sum()),
-                    int((above & ~first_half).sum()), cds_rescued, fallback))
+                    int((above & ~first_half).sum()), cds_rescued, fallback,
+                    n_up_trig, n_up_trig_adm))
 
         idx = np.flatnonzero(keep)
         idx = idx[np.argsort(orfs[idx, 0], kind="stable")]        # step 4, 5'->3'
-        j = junc.get(iso, np.empty(0, dtype=np.int64))
         sq_pos = sq_cds.get(iso, -1)
         for slot, k in enumerate(idx):
             s, e = int(orfs[k, 0]), int(orfs[k, 1])
@@ -319,7 +335,8 @@ def main():
         "frac_start", "frac_stop", "admitted_by"])
     record = pd.DataFrame(rec, columns=[
         "isoform_id", "n_enumerated", "n_above_floor", "n_discounted_by_position",
-        "reference_rescued", "fallback_fired"])
+        "reference_rescued", "fallback_fired",
+        "n_upstream_triggering", "n_upstream_triggering_admitted"])
 
     # ------------------------------------------------------------------- outputs
     pool.to_csv(outdir / "orf_pool.tsv", sep="\t", index=False,
@@ -360,7 +377,18 @@ def main():
     line("...reaching it only by the always-admit rule",
          f"{int(record['reference_rescued'].sum()):,}", "3,823")
     line("candidates admitted below FLOOR",
-         f"{int((pool['kozak_score'] < floor).sum()):,}", "2,423")
+         f"{int((pool['kozak_score'] < floor).sum()):,}", "2,493")
+    tot_trig = int(record["n_upstream_triggering"].sum())
+    adm_trig = int(record["n_upstream_triggering_admitted"].sum())
+    carrying = record["n_upstream_triggering"] > 0
+    full = (record.loc[carrying, "n_upstream_triggering_admitted"]
+            == record.loc[carrying, "n_upstream_triggering"])
+    line("triggering upstream ORFs, total", f"{tot_trig:,}", "133,765")
+    line("...admitted", f"{adm_trig:,} ({adm_trig/max(tot_trig,1)*100:.1f}%)",
+         "89,073 (66.6%)")
+    line("transcripts carrying at least one", f"{int(carrying.sum()):,}", "17,944")
+    line("...with ALL of theirs admitted",
+         f"{int(full.sum()):,} ({full.mean()*100:.1f}%)", "not yet measured")
 
     print(f"\n  admitted_by: {pool['admitted_by'].value_counts().to_dict()}")
     print(f"\nwrote {outdir/'orf_pool.tsv'}  ({len(pool):,} rows)")

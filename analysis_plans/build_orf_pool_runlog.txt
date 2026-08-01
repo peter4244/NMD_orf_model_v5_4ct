@@ -1,5 +1,5 @@
 $ python build_orf_pool.py --out results_pool_v6
-Captured 2026-08-01T04:25:30Z on Mac15,12, repo e7052ac, branch master.
+Captured 2026-08-01T05:04:21Z on Mac15,12, repo ed15f32.
 
 ============================================================================================
 build_orf_pool.py — section 3 of RETRAIN_PLAN_2026-08-01.md
@@ -21,14 +21,14 @@ INPUTS
           length disagreements with TX.tx_length: 0
 
 STEPS 1, 2, 4, 5 — enumerate, score, admit, attach
-  5,000 / 42,043   (31s)
-  10,000 / 42,043   (41s)
-  15,000 / 42,043   (49s)
-  20,000 / 42,043   (58s)
-  25,000 / 42,043   (66s)
-  30,000 / 42,043   (77s)
-  35,000 / 42,043   (87s)
-  40,000 / 42,043   (96s)
+  5,000 / 42,043   (9s)
+  10,000 / 42,043   (12s)
+  15,000 / 42,043   (14s)
+  20,000 / 42,043   (17s)
+  25,000 / 42,043   (19s)
+  30,000 / 42,043   (23s)
+  35,000 / 42,043   (26s)
+  40,000 / 42,043   (28s)
 
 ============================================================================================
 SECTION 3.4 — quantities this step reports
@@ -49,7 +49,11 @@ SECTION 3.4 — quantities this step reports
   transcripts where the fallback fires                             58             58
   reference start codon in the pool                            28,775         28,775
   ...reaching it only by the always-admit rule                  3,825          3,823
-  candidates admitted below FLOOR                               2,493          2,423
+  candidates admitted below FLOOR                               2,493          2,493
+  triggering upstream ORFs, total                             133,765        133,765
+  ...admitted                                          89,062 (66.6%) 89,073 (66.6%)
+  transcripts carrying at least one                            17,944         17,944
+  ...with ALL of theirs admitted                        7,896 (44.0%) not yet measured
 
   admitted_by: {'floor': 797987, 'reference': 3825, 'fallback': 223}
 
@@ -57,4 +61,4 @@ wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_pool_v6/o
 wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_pool_v6/orf_pool_record.tsv  (42,043 rows)
 wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_pool_v6/orf_pool_provenance.json
 
-total 115s
+total 34s
