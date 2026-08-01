@@ -276,17 +276,32 @@ The pool table from §3, `SEQ`, `JUNC`, `TX`, `HOLDOUT`.
 
 **Step 1 — give each candidate two sequence windows.**
 
-A candidate carries an ATG window centred on the middle base of its start codon and a stop window
-centred on the middle base of its stop codon, each 1000 bases wide. A window running off either end
-of the transcript is zero-padded on that side. Where the two windows would overlap, each is clipped
-at the midpoint of the ORF so that together they partition it and neither reads the other's half;
-the clipped side is padded.
+Each window spans `[anchor − left, anchor + right)` and is 1000 bases wide. The anchor sits at array
+index `left`, so a window that cannot be filled to its full extent is zero-padded without the anchor
+moving; the reading-frame channels then mean the same thing for an ORF of any length.
+
+| window | anchor | left | right |
+|---|---|---|---|
+| ATG | first base of the start codon | 900 | 100 |
+| stop | middle base of the stop codon | 500 | 500 |
+
+The ATG window is **asymmetric**: initiation depends on what a scanning ribosome has already
+traversed, so the window reaches 900 bases upstream and 100 into the ORF. That covers the whole
+region 5′ of the candidate for 62.0% of upstream candidates and the whole annotated 5′UTR for 85.8%
+of transcripts (measured, `design3_check_track_a_runlog.txt`).
+
+Filling is bounded at the ORF's midpoint so the two windows never read the same base: the ATG window
+fills no further than `mid`, the stop window no earlier. The bound applies to the fill, not to the
+frame, and is inert whenever the ORF is longer than the window reaches.
 
 ```
-mid   = (orf_start + orf_end) / 2
-atg  = SEQ[t][ orf_start+1 - 500 : orf_start+1 + 500 ]   fill bounded above by mid
-stop = SEQ[t][ orf_end-1  - 500 : orf_end-1  + 500 ]     fill bounded below by mid
+mid  = (orf_start + orf_end) // 2
+atg  = SEQ[t][ orf_start   - 900 : orf_start   + 100 ]   anchor index 900, fill bounded above by mid
+stop = SEQ[t][ orf_end - 1 - 500 : orf_end - 1 + 500 ]   anchor index 500, fill bounded below by mid
 ```
+
+For an ORF longer than 1000 bases the region between `orf_start + 100` and `mid` is unobserved.
+Features there are covered by the candidates that start in it, each of which carries its own windows.
 
 **Step 2 — encode nine channels at each window position.**
 
@@ -338,28 +353,43 @@ What does each part of the model compute, and from which inputs?
 
 ### 6.2 Approach
 
-**Step 1 — encode each candidate with shared weights.**
+**Step 1 — encode each window, preserving coarse position.**
 
-Each window passes through the existing two-layer convolution, and the length axis is then reduced
-by **binned** max pooling rather than a single global max: the axis is split into 8 equal bins and
-the maximum is taken within each. The output is 32 channels × 8 bins, flattened and projected to 32.
-
-```
-h = relu(bn1(conv1(x, 9->32, k=15)));  h = maxpool(h, 4)
-h = relu(bn2(conv2(h, 32->32, k=7)))
-h = concat over b in 0..7 of  max(h[:, b*L/8 : (b+1)*L/8])      # 32*8
-e = linear(h, 256 -> 32)
-```
-
-**Step 2 — initiation head, from a narrow slice of the ATG window only.**
-
-The initiation head reads the central 51 bases of the ATG window — positions −25 to +25 relative to
-the A of the start codon — through its own two-layer convolution, and emits one number per
-candidate through a sigmoid. It does not see the stop window, the structural block, or the rest of
-the ATG window.
+Each window passes through two convolutions, and the length axis is then reduced by **binned** max
+pooling: the axis is split into `B` equal bins and the maximum is taken within each, then
+concatenated. At `B = 1` this is the current global maximum, which records whether a pattern
+appeared anywhere and not where; at `B > 1` the position of a pattern survives to the resolution of
+one bin.
 
 ```
-p_k = sigmoid( linear( encode_narrow( atg_window[:, 225:276] ) ) )
+h = relu(bn1(conv1(x, 9 -> C, k=15)));  h = maxpool(h, 4)      # length 1000 -> 250
+h = relu(bn2(conv2(h, C -> C, k=7)))
+h = concat over b in 0..B-1 of  max(h[:, b*250/B : (b+1)*250/B])     # C*B
+e = linear(h, C*B -> 32)
+```
+
+`B` is swept over 1, 8, 16 and 32, giving bin widths of 1000, 125, 63 and 31 bases on the input.
+`B = 1` is the baseline the sweep is read against: it is the current architecture, so the sweep
+measures directly whether positional information is used at all. Bins finer than the 42-base
+receptive field of `conv2` cannot resolve position more precisely than that receptive field, which
+is what bounds the sweep at 32.
+
+The only parameter count that changes is the projection: `C*B -> 32` instead of `C -> 32`, which at
+`C = 32, B = 8` is 8,192 weights against 1,024.
+
+**Step 2 — initiation head, from the ATG window.**
+
+The initiation head reads the whole ATG window — 900 bases upstream of the start codon and 100 into
+the ORF — through **its own** convolutional encoder, and emits one number per candidate through a
+sigmoid. It does not read the stop window or the structural block.
+
+The encoder is not shared with the decay head's ATG branch. Both read the same window; each learns
+its own filters. A shared encoder would make "what the initiation head learned" and "what the decay
+head learned" the same object, and the initiation head's filters are what the interpretation window
+reads.
+
+```
+p_k = sigmoid( linear( encode_init( atg_window ), 32 -> 1 ) )
 ```
 
 **Step 3 — decay head, from everything else.**
@@ -419,8 +449,9 @@ checkpoint with the best validation AUC is kept.
 
 **Step 3 — seeds.** Each configuration is trained from 5 random initialisations.
 
-**Step 4 — convolution width sweep.** `conv_channels` takes each of 16, 32, 64, 128, at 5 seeds
-each, on the interpretable variant.
+**Step 4 — sweeps.** On the interpretable variant, at 5 seeds each: `conv_channels` over 16, 32, 64,
+128 at `B = 8`; and `B` over 1, 8, 16, 32 at `conv_channels = 32`. The two are swept on a cross
+rather than a grid.
 
 ### 7.4 Quantities this step reports
 
