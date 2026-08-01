@@ -1,0 +1,71 @@
+$ python exp4_junction_phase.py
+Captured 2026-08-01T01:31:11Z, repo 30970a8.
+
+================================================================================================
+EXPERIMENT 4 -- junction phase, run as a calibration null
+================================================================================================
+
+  28,603 isoforms with a reference-CDS slot and >= 10 nt of 3'UTR
+  NMD+ 20.6%
+
+================================================================================================
+NULL 1 -- phase of the first junction after the stop, (j - stop) mod 3
+================================================================================================
+
+  The 3'UTR is not translated. There is no reading frame there, so
+  this quantity is defined but meaningless. Anything it returns is the
+  machinery's own noise.
+
+  population: exactly one junction past the stop, n = 2,437
+  strata: ['ptc', 'utr3_q', 'len_q']
+
+  phase          n    crude   standardised
+  -------- ------- -------- --------------
+  0            815    27.1%          27.7%
+  1            832    28.1%          29.6%
+  2            790    30.3%          34.2%
+    phase 0 - phase 1 =  -2.07pp  95% CI [ -6.24,  +2.79]  p = 0.440
+    phase 0 - phase 2 =  -4.18pp  95% CI [ -9.48,  +0.46]  p = 0.075
+    phase 1 - phase 2 =  -2.12pp  95% CI [ -7.14,  +2.12]  p = 0.277
+
+  Same null on the whole cohort, not just the count==1 stratum:
+    phase 0 - phase 1 =  -4.11pp  95% CI [ -6.54,  -0.59]  p = 0.027
+    phase 0 - phase 2 =  -3.00pp  95% CI [ -6.22,  +0.12]  p = 0.057
+    phase 1 - phase 2 =  +1.33pp  95% CI [ -1.76,  +3.81]  p = 0.509
+
+================================================================================================
+NULL 2 -- phase of junctions INSIDE the coding sequence
+================================================================================================
+
+  An exon junction complex inside the CDS is displaced by the
+  elongating ribosome whatever its phase. Also a null.
+
+  n = 26,349 isoforms with >= 1 junction inside the CDS
+
+  arm            n    crude   standardised
+  -------- ------- -------- --------------
+  all        2,094    23.0%          10.3%
+  mixed     18,527    19.6%          21.4%
+  none       5,728    27.0%          14.5%
+    all-in-phase - none-in-phase = -4.74pp  95% CI [-7.41, -2.65]  p = 0.001
+
+================================================================================================
+POSITIVE CONTROL -- the >50 nt rule through the identical code path
+================================================================================================
+
+  n = 2,437, count held at exactly 1
+    >50 nt - <=50 nt = +37.37pp  95% CI [+33.29, +41.57]  p = 0.001
+
+================================================================================================
+READING
+================================================================================================
+  Compare the null arms above against the effects this project is
+  calling real:
+    Experiment 2, TGA - TAG          +2.00pp  CI [+0.75, +3.24]
+    Experiment 2, +10 A - T (control) +1.24pp  CI [-0.01, +2.55]
+  A null arm reaching the second number means +1.24pp is the floor.
+  A null arm reaching the first means Experiment 2 is not safe.
+
+================================================================================================
+DONE
+================================================================================================

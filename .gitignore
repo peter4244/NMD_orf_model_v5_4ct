@@ -25,3 +25,4 @@ results_interp_all/
 
 # Trained members: data, not code. Same rule as results_interp_all/ above.
 results_4ct_sweep/
+seq_store.npz

@@ -1,0 +1,127 @@
+$ python exp2_stop_context.py
+Captured 2026-08-01T01:32:15Z, repo 30970a8.
+
+================================================================================================
+EXPERIMENT 2 -- stop codon identity and the base that follows it
+================================================================================================
+
+  anchor: the model's reference-CDS slot, 28,723 isoforms
+  COORDINATE CHECK: bases [orf_end-2, orf_end] from the FASTA vs the
+    table's stop_codon column: 28,723 / 28,723 (100.00%)
+  proceeding on the 28,723 with a verified stop coordinate
+  with >= 60 nt of 3'UTR to read: 28,213, of which 27,802 have a readable +100 window
+  PTC+ 24.8%   NMD+ 21.0%
+  strata for every contrast below: ['ptc', 'utr3_q', 'gc_q']  (32 cells)
+
+================================================================================================
+A. THE PUBLISHED CLAIM -- is TGA more common in degraded transcripts?
+================================================================================================
+
+  stop     n non-NMD   % non-NMD    n NMD+    % NMD+   difference
+  ------ ----------- ----------- --------- --------- ------------
+  TAA          6,175       28.1%     1,332     22.8%        -5.3pp
+  TAG          4,757       21.7%     1,061     18.1%        -3.5pp
+  TGA         11,024       50.2%     3,453     59.1%        +8.9pp
+
+  This is the comparison the manuscript makes. It is confounded --
+  see B, where the same contrast is run inside matched strata.
+
+================================================================================================
+B. NMD RATE BY STOP CODON, CRUDE AND MATCHED
+================================================================================================
+
+  stop          n   crude NMD+   standardised  n in cells
+  ------ -------- ------------ -------------- -----------
+  TAA       7,507        17.7%          19.9%       7,477
+  TAG       5,818        18.2%          19.8%       5,812
+  TGA      14,477        23.9%          21.7%      14,477
+
+  TAG vs TGA -- the composition-matched pair, gene-clustered bootstrap
+    standardised NMD+(TGA) - NMD+(TAG) = +2.00pp   95% CI [+0.75, +3.24]   p = 0.002   (2000 draws)
+    pre-registered prediction was NEGATIVE (TGA leakier -> less NMD).
+    the manuscript's claim implies POSITIVE.
+
+================================================================================================
+C. THE BASE AFTER THE STOP, AGAINST THREE CONTROL POSITIONS
+================================================================================================
+
+  standardised NMD+ (%) by base identity, same strata throughout.
+  +4 is the mechanistic position. +10, +25, +50 are controls with no
+  proposed mechanism -- they measure what this contrast returns when
+  nothing is there.
+
+  position           A         C         G         T    spread         n
+  ----------------------------------------------------------------------
+  +4  <-- stop     20.7%     20.4%     20.0%     21.8%      1.8p    27,802
+  +10            22.1%     21.0%     20.4%     20.7%      1.7p    27,802
+  +25            21.0%     20.7%     20.7%     21.2%      0.5p    27,802
+  +50            20.9%     21.1%     21.2%     20.4%      0.7p    27,802
+
+  Composition-matched single contrast at each position, A vs T
+  (equal GC, so the recomputed GC channel cannot drive it):
+    +4   A - T =  -0.92pp  95% CI [ -2.32,  +0.43]  p = 0.180  <-- stop
+    +10  A - T =  +1.24pp  95% CI [ -0.01,  +2.55]  p = 0.052
+    +25  A - T =  -0.06pp  95% CI [ -1.21,  +1.16]  p = 0.965
+    +50  A - T =  +0.10pp  95% CI [ -1.13,  +1.46]  p = 0.815
+
+================================================================================================
+D. THE STOP TETRANUCLEOTIDE -- stop codon x +4 jointly
+================================================================================================
+
+  tetra          n    crude   standardised
+  -------- ------- -------- --------------
+  TAGC       1,683    14.4%          16.5%
+  TAGT       1,418    19.0%          18.1%
+  TAGG       1,390    18.3%          18.2%
+  TAAC       1,661    18.4%          18.3%
+  TAAG       1,685    17.4%          18.4%
+  TAAA       2,056    18.6%          18.5%
+  TAAT       2,105    16.6%          18.6%
+  TAGA       1,327    22.1%          19.3%
+  TGAG       3,595    22.7%          20.5%
+  TGAC       4,229    21.3%          20.7%
+  TGAA       3,030    26.1%          20.8%
+  TGAT       3,623    26.1%          22.9%
+
+  TGA-C is the leakiest context in the termination literature.
+
+================================================================================================
+E. SPLIT BY PTC STATUS -- readthrough can only matter where there is
+   something downstream to read through
+================================================================================================
+
+  PTC+ (junction >= 50 nt past the stop)  n = 6,882, NMD+ 69.9%
+    TAA 67.7% (n=1,517)  TAG 67.1% (n=1,300)  TGA 71.4% (n=4,065)
+    TGA - TAG = +4.41pp  95% CI [+1.11, +8.03]  p = 0.010
+
+  PTC- (no such junction)  n = 20,920, NMD+ 5.0%
+    TAA 4.9% (n=5,990)  TAG 4.3% (n=4,518)  TGA 5.4% (n=10,412)
+    TGA - TAG = +1.04pp  95% CI [-0.01, +2.04]  p = 0.055
+
+================================================================================================
+F. THE CONTROL THAT DECIDES WHETHER B IS REAL
+================================================================================================
+
+  Added after Experiment 4 measured this machinery's noise floor and
+  found it is NOT zero: null arms with no possible mechanism returned
+  point estimates of 2-5pp, one of them at p = 0.027. B's +2.00pp sits
+  inside that range, so B cannot be read as real on its own.
+
+  The decisive control: run the IDENTICAL contrast -- the 3-mer TGA
+  against the 3-mer TAG, same anagram logic, same strata, same
+  bootstrap -- at positions in the 3'UTR where neither string is a stop
+  codon and no mechanism exists. If those return ~0, the stop-codon
+  result stands above the floor. If they return ~2pp, it does not.
+
+    the stop codon itself    n TGA 14,477 TAG  5,818   TGA-TAG =  +2.00pp  CI [ +0.84,  +3.18]  p = 0.001  <-- the claim
+    3'UTR +10..+12           too few: TGA 573 TAG 199
+    3'UTR +25..+27           n TGA    541 TAG    214   TGA-TAG = +11.66pp  CI [ +3.67, +23.48]  p = 0.007
+    3'UTR +50..+52           n TGA    512 TAG    263   TGA-TAG =  +9.11pp  CI [ +2.67, +16.15]  p = 0.007
+    3'UTR +100..+102         n TGA    540 TAG    232   TGA-TAG = +11.13pp  CI [ -2.02, +19.64]  p = 0.104
+
+  Read the +10/+25/+50/+100 rows as the null distribution of this
+  exact statistic. The stop-codon row has to stand outside it.
+
+================================================================================================
+DONE
+================================================================================================

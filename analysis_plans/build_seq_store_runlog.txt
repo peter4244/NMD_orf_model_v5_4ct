@@ -1,0 +1,13 @@
+$ python build_seq_store.py
+
+want 42,043 isoforms
+  100,000 records scanned, 7,028 kept (1s)
+  200,000 records scanned, 14,224 kept (1s)
+  300,000 records scanned, 21,086 kept (2s)
+  400,000 records scanned, 27,839 kept (2s)
+  500,000 records scanned, 34,683 kept (3s)
+  600,000 records scanned, 41,183 kept (3s)
+scanned 614,992 records, kept 42,043 (3s)
+MISSING from the FASTA: 0
+LENGTH MISMATCH vs tx_summary.tx_length: 0 of 42,043
+wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/analysis_plans/seq_store.npz  (28 MB, 16s total)

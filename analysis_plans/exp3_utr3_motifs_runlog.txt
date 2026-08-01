@@ -1,0 +1,109 @@
+$ python exp3_utr3_motifs.py
+Captured 2026-08-01T01:29:27Z, repo 30970a8.
+
+/Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/analysis_plans/exp3_utr3_motifs.py:219: UserWarning: This pattern is interpreted as a regular expression, and has match groups. To actually get the groups, use str.extract.
+  f = d["win"].str.contains(f"(?=([CT]{{{thr}}}))", regex=True)
+/Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/analysis_plans/exp3_utr3_motifs.py:219: UserWarning: This pattern is interpreted as a regular expression, and has match groups. To actually get the groups, use str.extract.
+  f = d["win"].str.contains(f"(?=([CT]{{{thr}}}))", regex=True)
+/Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/analysis_plans/exp3_utr3_motifs.py:219: UserWarning: This pattern is interpreted as a regular expression, and has match groups. To actually get the groups, use str.extract.
+  f = d["win"].str.contains(f"(?=([CT]{{{thr}}}))", regex=True)
+================================================================================================
+EXPERIMENT 3 -- 3'UTR motifs in a fixed 200 nt window after the stop
+================================================================================================
+
+  isoforms with a reference-CDS slot and >= 200 nt of 3'UTR: 26,459
+  windows of the wrong length (dropped): 0
+  PTC+ 26.0%   NMD+ 21.7%   median window GC 46.5%
+  strata: ['ptc', 'utr3_q', 'gc_q'] (40 cells)
+
+================================================================================================
+A. AATAAA (polyadenylation signal) AGAINST ITS OWN ANAGRAMS
+   predicted direction: NEGATIVE (less NMD)
+================================================================================================
+
+  5 composition-matched controls: AAAAAT, AAAATA, AAATAA, ATAAAA, TAAAAA
+
+  string        n present   crude +   crude -   standardised diff
+  ------------ ---------- --------- --------- -------------------
+  AATAAA            2,998     15.0%     22.6%              -4.62pp  <-- PAS
+  AAAAAT            3,931     16.8%     22.6%              -3.08pp
+  AAAATA            3,412     13.9%     22.9%              -4.70pp
+  AAATAA            2,992     13.2%     22.8%              -6.17pp
+  ATAAAA            2,829     15.0%     22.5%              -3.20pp
+  TAAAAA            3,520     14.5%     22.8%              -3.54pp
+
+  control anagrams: mean -4.14pp, sd +1.30, range [-6.17, -3.08]
+  AATAAA sits -0.37 sd from its own composition controls
+
+================================================================================================
+B. TTATTTATT (AU-rich element) AGAINST 20 SAMPLED ANAGRAMS
+   predicted direction: POSITIVE (more NMD)
+================================================================================================
+
+  string        n present   standardised diff
+  ------------ ---------- -------------------
+  TTATTTATT           183             -17.76pp  <-- ARE
+  TTATTTTAT           151             -10.22pp
+  TATTTTATT           209             -18.33pp
+  TTTTAATTT           218             -11.57pp
+  TTATTTTTA           211             -16.37pp
+  ATTTTTTTA           242             -17.89pp
+  ATTTTATTT           244             -20.46pp
+  TATTTATTT           221             -15.82pp
+  TTTTATTAT           139             -13.58pp
+  TATATTTTT           215             -17.93pp
+  ATTATTTTT           148             -21.72pp
+  TTTTTTTAA           517             -17.59pp
+  TTTATTTTA           224             -14.76pp
+  TAATTTTTT           209             -19.57pp
+  TTTATTATT           139             -14.50pp
+  TTTTTAATT           204             -10.38pp
+  AATTTTTTT           319             -16.03pp
+  TTTTATTTA           134             -21.74pp
+  TTTAATTTT           198             -14.27pp
+  TTTTTATTA           140             -13.90pp
+
+  control anagrams: mean -16.14pp, sd 3.46, range [-21.74, -10.22]
+  TTATTTATT sits -0.47 sd from them
+
+================================================================================================
+C. CU-RICH RUN (PTBP1 site) -- predicted direction: NEGATIVE
+================================================================================================
+
+  NOTE: unlike A and B this one has NO composition-matched control,
+  because the motif IS a composition. It is reported as the
+  COMPOSITION SENTINEL: whatever a pure pyrimidine-content contrast
+  returns in this window, it returns here.
+  run of >= 9 pyrimidines: n present 11,442   standardised diff   -3.84pp
+  run of >= 10 pyrimidines: n present  8,182   standardised diff   -4.70pp
+  run of >= 13 pyrimidines: n present  3,051   standardised diff  -10.28pp
+
+================================================================================================
+D. THE THREE-DIRECTION TEST
+================================================================================================
+
+  If these are mechanisms, the signs are  PAS -, ARE +, CU-rich -.
+  If this is composition, all three carry the sign of the AT-content
+  effect in this window. That effect is measured directly:
+
+    window GC quintile 1: median GC  32.0%   n  5,559   NMD+   9.2%
+    window GC quintile 2: median GC  40.0%   n  5,283   NMD+  26.2%
+    window GC quintile 3: median GC  47.0%   n  5,172   NMD+  28.1%
+    window GC quintile 4: median GC  55.0%   n  5,274   NMD+  25.7%
+    window GC quintile 5: median GC  64.0%   n  5,171   NMD+  20.1%
+
+  So the composition gradient in this window runs in the direction
+  shown above, and any motif effect has to be read against it.
+
+================================================================================================
+E. RESTRICTED TO PTC+ TRANSCRIPTS -- where a 3'UTR-borne modifier of
+   decay has something to modify
+================================================================================================
+
+  n = 6,868, NMD+ 69.9%
+    PAS   AATAAA       n present    450   standardised diff   +4.68pp
+    ARE   TTATTTATT    n present     15   standardised diff    +nanpp
+
+================================================================================================
+DONE
+================================================================================================
