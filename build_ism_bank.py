@@ -322,6 +322,9 @@ def main():
     ap.add_argument("--seed", type=int, default=20260801)
     ap.add_argument("--device", default="")
     ap.add_argument("--limit-transcripts", type=int, default=0)
+    ap.add_argument("--only", default="",
+                    help="comma-separated isoform_ids; for testing the geometry "
+                         "extremes rather than the head of the order")
     ap.add_argument("--from-index", type=int, default=0, dest="from_index",
                     help="build only take[from:to); shards let tasks share a directory")
     ap.add_argument("--to-index", type=int, default=0, dest="to_index")
@@ -364,9 +367,16 @@ def main():
     assert atg_left == ATG_LEFT, f"tensor anchors at {atg_left}, this script assumes {ATG_LEFT}"
 
     sp = sp[sp["isoform_id"].isin(row)]
-    take = sp.head(args.n if args.n > 0 else len(sp))
-    if args.limit_transcripts:
-        take = take.head(args.limit_transcripts)
+    if args.only:
+        want = [x for x in args.only.split(",") if x]
+        take = sp[sp["isoform_id"].isin(want)]
+        missing_only = sorted(set(want) - set(take["isoform_id"]))
+        if missing_only:
+            raise SystemExit(f"--only: not in the split/tensor: {missing_only}")
+    else:
+        take = sp.head(args.n if args.n > 0 else len(sp))
+        if args.limit_transcripts:
+            take = take.head(args.limit_transcripts)
     print(f"\nsubset     {len(take):,} transcripts "
           f"(rank < {int(take['rank'].max())+1:,} of the fixed order)")
     print(f"  in the tensor {len(sp):,} of {len(sp_all):,} split rows; "
