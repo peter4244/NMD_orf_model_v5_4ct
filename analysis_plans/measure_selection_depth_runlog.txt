@@ -1,0 +1,35 @@
+WHERE DOES THE REFERENCE CODING SEQUENCE SIT IN THE 5'->3' SLOT ORDER?
+The pool is ordered by transcript position, and slot 0 is the 5'-most
+admitted candidate, NOT the annotated one (plan §3.3 step 4).
+
+  transcripts with a reference CDS in the pool : 28,775
+  its slot index: median 1  mean 3.7  p90 11  max 564
+
+   slot of ref CDS  transcripts   cumulative %
+              <= 0       11,408          39.6%
+              <= 1       16,730          58.1%
+              <= 2       19,730          68.6%
+              <= 3       21,628          75.2%
+              <= 4       22,825          79.3%
+              <= 5       23,679          82.3%
+              <= 9       25,559          88.8%
+             <= 14       26,683          92.7%
+             <= 19       27,423          95.3%
+             <= 29       28,261          98.2%
+             <= 49       28,700          99.7%
+            <= 564       28,775         100.0%
+
+Against where the selection mass is, on UNTRAINED weights (99.8% in slots 0-9):
+  reference CDS inside slots 0-9   :  88.8% of transcripts
+  reference CDS inside slots 0-19  :  95.3% of transcripts
+
+  So 11.2% of transcripts have their reference CDS beyond slot 9,
+  where an untrained model retains 0.2% of the selection mass.
+
+  THIS IS THE CHECK THAT MATTERS ON THE TRAINED CHECKPOINT. If the fitted
+  p_k still halve the mass every slot, the model cannot express anything
+  about the main ORF for those transcripts, and the bank will report zero
+  there for architectural reasons rather than biological ones. If instead
+  the model learns small p_k at weak start codons, mass reaches deeper and
+  the concern dissolves. It is one forward pass to settle and it is not
+  settled by anything measured so far.

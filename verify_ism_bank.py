@@ -203,6 +203,7 @@ def main():
                 d = abs(ref - float(vals[p0, bb]))
                 worst_val = max(worst_val, d)
                 by_k.setdefault(K, ([], [], []))[0].append(d)
+                by_k[K][1].append(abs(ref))
                 by_k[K][2].append(iso_id)
                 n_cmp += 1
 
@@ -265,10 +266,18 @@ def main():
     print(f"  The encoder has three batch-shape regimes (1, 2-7, 8+). The bank now")
     print(f"  differences against a same-chunk baseline and the reference against a")
     print(f"  batch-K pass, so any residual should NOT track K.")
-    print(f"  {'K':>6} {'transcripts':>12} {'comparisons':>12} {'max |bank-ref|':>16}")
+    print(f"  {'K':>5} {'regime':>7} {'n':>5} {'max resid':>12} {'median |eff|':>13} "
+          f"{'resid/|eff|':>12}")
     for k in sorted(by_k):
-        v = by_k[k]
-        print(f"  {k:>6} {len(set(v[2])):>12} {len(v[0]):>12} {max(v[0]):>16.3e}")
+        d, e, iso = by_k[k]
+        reg = 1 if k == 1 else (2 if k <= 7 else 3)
+        med = float(np.median(e)) if e else float("nan")
+        # pair each residual with its own effect rather than dividing maxima
+        rel = float(np.median([x / y for x, y in zip(d, e) if y > 0])) if e else float("nan")
+        print(f"  {k:>5} {reg:>7} {len(d):>5} {max(d):>12.3e} {med:>13.3e} {rel:>12.3e}")
+    print(f"\n  Chunks sit in regime 3. If the residual were only regime DISTANCE,")
+    print(f"  K=15 and K=146 (both regime 3, distance 0) would match. If it were only")
+    print(f"  relative float precision, resid/|eff| would be flat across every K.")
     print(f"\n{time.time()-t0:.0f}s")
 
 
