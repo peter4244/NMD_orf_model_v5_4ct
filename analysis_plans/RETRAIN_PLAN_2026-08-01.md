@@ -658,12 +658,26 @@ later against a specific finding, rather than answered in advance against nothin
 
 Per variant and seed: `test_clean` AUC and AUPRC, epochs to stop, wall time.
 
-Each metric carries a **bootstrap interval resampled over genes**. Genes are the resampling unit
-because transcripts of one gene are alternative versions of one sequence and usually carry the same
-label, so they are not independent observations: `test_clean` holds 10,520 transcripts in 3,234
-genes, 90.0% of them in a multi-transcript gene. The design effect is **measured on this split and
-reported**, rather than carried over from the 5.47 recorded elsewhere in this project, which is not
-stated as a variance or a standard-deviation ratio.
+Each metric carries a bootstrap interval resampled **both over transcripts and over genes**, with
+both reported and their ratio printed. That ratio is the design effect on the metric, and it is
+measured rather than assumed.
+
+Transcripts of one gene are not independent, but they are far less dependent than this project has
+been assuming. Measured over the test chromosomes: 41.0% of multi-transcript genes carry **both**
+labels, sibling pairs share a label 75.2% of the time against 64.8% expected by chance, and the ICC
+of `is_nmd` within gene is **0.300** at an effective cluster size of 3.36 — a design effect of
+**1.71**, so an interval widens by 1.31×. Isoforms of one gene having different NMD fates is the
+phenomenon this model exists to predict, and the clustering correction has to be sized to that rather
+than to an assumption that siblings agree.
+
+The **5.47** previously cited here and in `SEQUENCE_DISCOVERY_BRIEF.md` is not a design effect. It
+originates in `exp2b_control_validity_runlog.txt` as `sd 5.47`, a standard deviation in percentage
+points of a bootstrap distribution, reported beside a companion `sd 3.69` in a section comparing two
+spreads to test power matching. It concerns neither genes nor clustering.
+
+The label ICC above bounds nothing directly: what governs the interval is how the model's *errors*
+correlate within a gene, which is why both resamplings are computed on the predictions rather than
+inferred from the labels.
 
 Seeds vary initialisation only — the split is fixed — so the range over seeds contains no sampling
 variance at all. It is reported beside the interval and labelled differently.

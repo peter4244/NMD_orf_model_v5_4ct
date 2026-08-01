@@ -1,0 +1,26 @@
+
+=== all 41,765 ===
+  transcripts 41,765   genes 12,380   mean transcripts/gene 3.37
+  genes with >=2 transcripts        : 8,610
+    of those, MIXED (both labels)   : 3,539 (41.1%)
+    all-NMD                         : 526 (6.1%)
+    all-non-NMD                     : 4,545 (52.8%)
+  ICC of is_nmd within gene         : 0.303
+  effective cluster size m0         : 3.37
+  DESIGN EFFECT 1+(m0-1)*ICC        : 1.72   (-> intervals widen by sqrt = 1.31x)
+  sibling pairs                     : 93,298
+    same label                      : 76.3%
+    expected if independent         : 65.3%
+
+=== test chromosomes (chr1/3/5/7) ===
+  transcripts 10,642   genes 3,169   mean transcripts/gene 3.36
+  genes with >=2 transcripts        : 2,158
+    of those, MIXED (both labels)   : 885 (41.0%)
+    all-NMD                         : 122 (5.7%)
+    all-non-NMD                     : 1,151 (53.3%)
+  ICC of is_nmd within gene         : 0.300
+  effective cluster size m0         : 3.36
+  DESIGN EFFECT 1+(m0-1)*ICC        : 1.71   (-> intervals widen by sqrt = 1.31x)
+  sibling pairs                     : 24,041
+    same label                      : 75.2%
+    expected if independent         : 64.8%

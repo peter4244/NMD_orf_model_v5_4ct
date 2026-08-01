@@ -7,12 +7,20 @@ Implements section 8.3 of analysis_plans/RETRAIN_PLAN_2026-08-01.md. Nothing els
 in this repository computes metrics for the v6 architecture: evaluate.py is the
 old model and reads attention weights that no longer exist.
 
-THE INTERVAL IS RESAMPLED OVER GENES, NOT TRANSCRIPTS. test_clean holds 10,520
-transcripts in 3,234 genes with 90.0% of them in a multi-transcript gene, and
-this project measured the inflation from ignoring that clustering at 5.47. An
-interval over transcripts would be about five times too narrow, and the
-comparisons this script exists to support are between arms whose difference is
-smaller than that error.
+THE INTERVAL IS RESAMPLED OVER GENES, AND BOTH RESAMPLINGS ARE REPORTED.
+Transcripts of one gene are not independent, but they are far less dependent than
+this project's documents assert: 41.0% of multi-transcript genes on the test
+chromosomes carry BOTH labels, and sibling pairs share a label 75.2% of the time
+against 64.8% expected by chance. Measured ICC of is_nmd within gene is 0.300 at
+an effective cluster size of 3.36, so the design effect is 1.71 and an interval
+widens by 1.31x -- not the 5.47 the plan and the discovery brief both cite, which
+traces back to a standard deviation in PERCENTAGE POINTS from a power-matching
+analysis and is not a design effect at all.
+
+So the script reports the transcript-resampled and gene-resampled intervals side
+by side and prints their ratio, which is the design effect ON THE METRIC. The
+label ICC bounds nothing directly: what matters is how the model's errors
+correlate within a gene, and that is only measurable once predictions exist.
 
 THE RANGE OVER SEEDS IS NOT AN INTERVAL. Seeds vary initialisation only and the
 split is fixed, so the spread across them contains no sampling variance at all.
@@ -188,13 +196,23 @@ def main():
     point = {c: arm_auc(full, c) for c in preds}
     point_pr = {c: arm_auprc(full, c) for c in preds}
 
-    print(f"\nbootstrap: {args.bootstrap:,} resamples of {n_g:,} genes", flush=True)
+    # BOTH RESAMPLINGS. The ratio of their widths is the design effect ON THE
+    # METRIC, which is the quantity that matters and the only one worth quoting.
+    # Resampling transcripts assumes independence; resampling genes assumes a
+    # transcript tells you nothing beyond its gene. The truth is between them and
+    # the data says where.
+    n_t = len(y)
+    print(f"\nbootstrap: {args.bootstrap:,} resamples, over {n_g:,} genes and "
+          f"over {n_t:,} transcripts", flush=True)
     boot = {c: np.empty(args.bootstrap) for c in preds}
+    boot_tx = {c: np.empty(args.bootstrap) for c in preds}
     for b in range(args.bootstrap):
         pick = rng.integers(0, n_g, n_g)
         idx = np.concatenate([groups[i] for i in pick])
+        idx_t = rng.integers(0, n_t, n_t)
         for c in preds:
             boot[c][b] = arm_auc(idx, c)
+            boot_tx[c][b] = arm_auc(idx_t, c)
         if (b + 1) % max(1, args.bootstrap // 5) == 0:
             print(f"  {b+1:,}/{args.bootstrap:,}  ({time.time()-t0:.0f}s)", flush=True)
 
@@ -208,6 +226,17 @@ def main():
                        seeds=len(preds[c]), **meta[c])
         print(f"{c:<26} {len(preds[c]):>5} {point[c]:>9.4f} "
               f"{f'[{lo:.4f}, {hi:.4f}]':>22} {point_pr[c]:>11.4f}")
+
+    print(f"\nDESIGN EFFECT, measured on the metric rather than assumed:")
+    print(f"  {'configuration':<26} {'sd(gene)':>10} {'sd(transcript)':>15} "
+          f"{'ratio':>8} {'variance ratio':>15}")
+    for c in preds:
+        sg, st_ = float(np.std(boot[c])), float(np.std(boot_tx[c]))
+        print(f"  {c:<26} {sg:>10.5f} {st_:>15.5f} {sg/st_:>8.2f} "
+              f"{(sg/st_)**2:>15.2f}")
+    print(f"  The variance ratio is the design effect. The label ICC of is_nmd within")
+    print(f"  gene is 0.300 on the test chromosomes, predicting about 1.71; what is")
+    print(f"  printed above is what the model's errors actually do.")
 
     # ---- the paired comparison, which is the one to read ------------------
     cfgs = list(preds)
