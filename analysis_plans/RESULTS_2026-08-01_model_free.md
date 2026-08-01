@@ -211,6 +211,78 @@ right; the metadata is wrong.)
 
 ---
 
+## 6. The threshold is a window, and that contradicts a standing decision
+
+Opened after Track A argued I had undersold it. They were right, and their reason is the good one:
+they had withdrawn an earlier version of this drop as a nearest-versus-last-junction artifact, and
+**that explanation cannot apply at `count == 1`, where nearest IS last by construction.**
+
+Splitting the >200 bin and standardising over baseline expression:
+
+| stop → junction | n | NMD+ crude | standardised |
+|---|---|---|---|
+| ≤37 | 847 | 7.0% | 10.2% |
+| 38–50 | 175 | 8.0% | 9.8% |
+| 51–100 | 387 | 54.8% | 53.1% |
+| **101–200** | 414 | 69.6% | **63.7%** |
+| 201–500 | 252 | 34.1% | 32.2% |
+| >500 | 362 | 9.7% | 10.0% |
+
+It rises to a peak and comes all the way back down. Excluded as explanations:
+
+- **Baseline expression.** Computed from DMSO samples only. The confound I expected was that lowly
+  expressed isoforms fall into the negative class by lack of power — the negative class requires
+  adj.P > 0.30 in all four cell types. It runs the other way: expression Q1 is 60.7% NMD+ and Q5 is
+  14.8%, because substrates are degraded and therefore lowly expressed at baseline. And the far bins
+  are **better** expressed (median 0.37, 0.43) than the peak bin (0.24). Restricting to the top two
+  expression quintiles keeps the shape: 3.7 / 5.6 / 49.3 / 58.2 / 22.7 / 8.9.
+- **Nearest vs last junction** — impossible at `count == 1`.
+- **Slot-0 selection** — the slot-0 anchor gives 12.9 / 15.8 / 56.4 / 65.8 / 36.5 / 11.5.
+- **Junction-to-3'-end position** — flat within each distance bin (at >500: 10.8 / 13.5 / 5.7 / 9.0
+  across quartiles).
+- **Junction count** — standardised over junction-count band and expression: 9.9 / 6.2 / 56.4 /
+  70.7 / 45.4 / 10.6.
+
+### What is NOT excluded, and it matters
+
+**Junction-call quality degrades sharply with distance.** SQANTI's `all_canonical` runs
+97.6 / 98.3 / 95.3 / 89.4 / **68.3** / **61.6** % across the bins, and the share of
+`novel_not_in_catalog` transcripts runs 10.9 / 14.9 / 31.8 / 36.5 / **50.4** / **53.0** %. The far
+bins are largely novel transcripts carrying non-canonical splice calls.
+
+Restricted to canonical, non-RTS-flagged transcripts the shape attenuates but does not vanish:
+
+| | ≤37 | 38–50 | 51–100 | 101–200 | 201–500 | >500 |
+|---|---|---|---|---|---|---|
+| all | 10.2% | 9.8% | 53.1% | 63.7% | 32.2% | 10.0% |
+| **canonical, not RTS** | 9.1% | 10.4% | 53.9% | **72.1%** | **45.1%** | **17.4%** |
+
+(Short-read support columns are unpopulated in this classification file — `min_cov` is entirely NaN
+— so that filter could not be applied.)
+
+### The conclusion, stated at the confidence it earns
+
+- **The rise from 51–100 to 101–200 is solid.** Both bins have good junction quality (95.3% and
+  89.4% canonical) and similar structural composition, and on the clean subset the rise is
+  **53.9% → 72.1%, about 18 points, entirely beyond the 50 nt threshold.**
+- **The decline at 201–500 is real but roughly half what the raw numbers say** — 45.1% against a
+  ~72% peak once junction quality is controlled, not 32%.
+- **The collapse at >500 cannot be separated from annotation quality.** 53% novel-not-in-catalog and
+  38% non-canonical. I cannot distinguish "distant junctions stop triggering decay" from "distant
+  junction calls in this dataset are largely wrong." Do not report it.
+
+**This contradicts a decision on the record.** The plan states, and the brief lists as dead: *the 50
+nt rule is a threshold, so there is no dose to respond to, and the question is empty even for a
+perfect model.* The 51–100 versus 101–200 contrast is a dose, it is 18 points, and it is on the
+cleanest data in the set.
+
+**Consequence for Part 2 Step 1.** The fix to `n_downstream_ejc` is currently specified as applying
+the 50 nt rule — i.e. replacing a thresholdless count with a thresholded one. That would still
+discard the 18-point difference between a junction at 80 nt and one at 150 nt. If the feature is
+being rebuilt anyway, it should carry graded distance, not a second threshold.
+
+---
+
 ## What this implies for the plan
 
 **The design resolves +37pp and does not resolve +2pp.**
