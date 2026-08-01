@@ -138,29 +138,39 @@ score(t, i) = sum over o in offsets, where 0 <= i+o < len(SEQ[t]),
               of PWM[ SEQ[t][i+o], o ]
 ```
 
-**Step 3 — set the admission floor from real start codons.**
+**Step 3 — read the admission floor.**
 
-The floor is the 1st percentile of the PWM score of annotated start codons. The annotated start
-codons are the candidates whose `start` equals `ref_utr5_length` (0-based), taken over the
-transcripts where `ref_atg_available` is 1. Admitting at the 1st percentile means a candidate is
-kept when its initiation context is at least as good as that of the weakest 1% of start codons the
-annotation actually uses.
+`FLOOR` is the MANE-calibrated Kozak threshold, `threshold_q05` in
+`~/claude_projects/Isopair/inst/extdata/kozak_mane_calibration.rds` — **−1.2508**. It is the 5th
+percentile of the PWM score at the annotated CDS start of 19,226 of 19,276 MANE Select transcripts
+in GENCODE v49, computed 2026-04-19 by `Isopair/data-raw/calibrate_mane_kozak.R`, and it is
+Isopair's own default, returned by `defaultKozakThreshold()`.
+
+The threshold is read from the `.rds` at run time rather than copied into code, so a recalibration
+propagates. The scale matches: the calibration scores with `Isopair::scoreKozakPWM` under
+`.defaultKozakPWM()`, and the step-2 matrix is the validated Python port of that function.
 
 ```
-annotated = [ score(t, ref_utr5_length[t]) for t in REFCDS where ref_atg_available == 1 ]
-FLOOR = percentile(annotated, 1)
+FLOOR = readRDS(kozak_mane_calibration.rds)$threshold_q05      # -1.2508
 ```
 
 **Step 4 — admit and order.**
 
-A candidate is admitted when its score is at or above `FLOOR`. Admitted candidates are ordered by
-`start` ascending, which is the order a scanning ribosome encounters them, and the slot index is
-that position in the order. Slot index carries no priority: slot 0 is the 5′-most admitted
-candidate, not the annotated one.
+A candidate is admitted when its score is at or above `FLOOR`. The candidate matching the annotated
+CDS start is admitted regardless of score, where the transcript has one — at `FLOOR` it otherwise
+drops out for 8.4% of transcripts (measured, §3.4), and the main ORF is where 51.5% of NMD-positive
+transcripts are degraded. Unconditional admission places the ORF in the pool; nothing marks which
+one it is.
+
+Admitted candidates are ordered by `start` ascending, which is the order a scanning ribosome
+encounters them, and the slot index is that position in the order. Slot index carries no priority:
+slot 0 is the 5′-most admitted candidate, not the annotated one.
 
 ```
 for each transcript t:
-    admitted = [ orf for orf in ORFs(t) if score(orf) >= FLOOR ]
+    admitted = [ orf for orf in ORFs(t)
+                 if score(orf) >= FLOOR
+                 or orf.start == ref_utr5_length[t] ]
     admitted = sort(admitted, key = orf.start, ascending)
     for k, orf in enumerate(admitted):
         orf.slot = k
@@ -204,23 +214,24 @@ sequences.
 | quantity | population | predicted |
 |---|---|---|
 | candidates per transcript before the floor | 42,043 transcripts | mean 54.6 |
-| candidates per transcript after the floor | 42,043 transcripts | mean 50.1 |
-| candidates in the largest transcript | 42,043 transcripts | 1,789 |
-| share of upstream ORFs whose own stop has a junction >50 bases downstream that are admitted | 133,765 such ORFs over 17,944 transcripts | 93.4% |
-| share of transcripts whose annotated start codon is admitted | 28,775 transcripts with `ref_atg_available == 1` | not yet measured |
+| candidates per transcript after the floor | 42,043 transcripts | mean 36.4 |
+| candidates in the largest transcript | 42,043 transcripts | 1,190 |
+| share of upstream ORFs whose own stop has a junction >50 bases downstream that are admitted | 133,765 such ORFs over 17,944 transcripts | 70.6% |
+| share of transcripts whose annotated start codon clears `FLOOR` on its own | 28,775 transcripts with `ref_atg_available == 1` | 91.6% |
+| the same share after unconditional admission | same | 100% |
 
-The last row is the one with no prediction: admission by initiation score does not guarantee the
-annotated CDS a slot, and 51.5% of NMD-positive transcripts are degraded through the main ORF
-(measured elsewhere, `build_mechanism_classes_runlog.txt`, over 41,765 transcripts).
+All predicted values are measured in `design2_mane_floor_runlog.txt` on the same sequences with the
+same enumeration.
 
-### 3.5 Decisions this step needs before it runs
+### 3.5 Cost
 
-**The floor percentile.** 1st percentile gives mean 50.1 candidates per transcript and 93.4%
-coverage of triggering upstream ORFs; 5th gives 41.6 and 79.3%; 25th gives 21.9 and 44.4% (all
-measured in `design1_orf_pool_size_runlog.txt`). The choice sets the size of the training tensor and
-therefore the compute for everything downstream.
+Training-tensor size scales linearly in candidates per transcript. The current 5-slot tensor is
+2.9 GB, so 36.4 candidates projects to roughly 21 GB. This does not fit in the 8 GiB on this
+machine; the tensor is built on the cluster.
 
-**The tail.** The largest transcript carries 1,789 admitted candidates. Either every transcript
+### 3.6 Decision this step needs before it runs
+
+**The tail.** The largest transcript carries 1,190 admitted candidates. Either every transcript
 keeps all of its candidates and batches are bucketed by candidate count, or a cap applies and the
 number of dropped candidates is recorded per transcript.
 

@@ -1,0 +1,40 @@
+$ python design2_mane_floor.py
+Captured 2026-08-01T02:59:42Z, repo 3c6f590.
+
+====================================================================================================
+DESIGN 2 -- pool under the MANE-calibrated Kozak threshold
+====================================================================================================
+
+  calibration: /Users/petecastaldi/claude_projects/Isopair/inst/extdata/kozak_mane_calibration.rds
+    19,226 of 19,276 MANE Select transcripts, GENCODE_v49, computed 2026-04-19T03:20:52Z
+    q01 -2.2987   q05 -1.2508  <- Isopair default   q10 -0.7719   q25 0.0370   q50 0.9035
+
+  enumerating ORFs with no length floor over 42,043 transcripts ...
+    10,000 ...
+    20,000 ...
+    30,000 ...
+    40,000 ...
+  42,043 transcripts with at least one ORF
+
+====================================================================================================
+POOL SIZE, COVERAGE, AND WHETHER THE MAIN ORF SURVIVES
+====================================================================================================
+
+  no floor at all: mean 54.6 candidates per transcript, 2,296,921 total, max 1,789
+  relevant ORFs (upstream, own stop has a junction >50 nt downstream): 133,765
+  transcripts whose annotated start codon is enumerable: 28,775
+
+  MANE quantile         cut    mean  median     p99     max        total   coverage   main ORF kept      HDF5
+  ---------------- -------- ------- ------- ------- ------- ------------ ---------- --------------- ---------
+  q01               -2.2987    47.5      42     143   1,548    1,997,144      89.3%           97.9%     27.6G
+  q05               -1.2508    36.4      32     107   1,190    1,530,321      70.6%           91.6%     21.1G  <- default
+  q10               -0.7719    29.4      26      85     942    1,236,343      58.4%           84.4%     17.1G
+  q25                0.0370    17.3      15      50     556      726,485      35.3%           67.7%     10.0G
+  q50                0.9035     7.5       7      23     228      317,214      16.4%           43.8%      4.4G
+
+  current model: 5 slots, 210,215 total, 2.9 GB
+  HDF5 column scales the current 2.9 GB file linearly in slots.
+
+====================================================================================================
+DONE
+====================================================================================================
