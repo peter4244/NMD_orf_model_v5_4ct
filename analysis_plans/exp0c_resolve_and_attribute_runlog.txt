@@ -1,0 +1,114 @@
+$ python exp0c_resolve_and_attribute.py
+Captured 2026-08-01T01:09:25Z.
+
+HDF5 model universe : 41,765 isoforms (41,765 unique)
+Table universe      : 42,043 isoforms
+In tables, not in H5: 278
+
+==========================================================================================
+1. DOES THE HEADLINE CLOSE EXACTLY ON THE MODEL'S OWN UNIVERSE?
+==========================================================================================
+  population                           near n   near %    far n    far %
+  ---------------------------------- -------- -------- -------- --------
+  PUBLISHED                             1,389    10.8%    2,084    46.8%
+  all 42,043 table isoforms             1,397    10.7%    2,107    46.8%
+  restricted to the 41,765 H5           1,389    10.8%    2,084    46.8%
+
+==========================================================================================
+2. THE GRADIENT -- published vs. the one on the headline's own population
+==========================================================================================
+
+  slot 0, count >= 1  (what the published gradient actually is)
+    bin              n     NMD+   published
+    ---------- -------  -------  ----------
+    <=37         2,556    45.8%       45.8%
+    38-50          785    61.4%       61.4%
+    51-100       2,718    75.5%       75.5%
+    101-200      2,628    76.3%       76.3%
+    >200         2,079    32.8%       32.8%
+
+  slot 0, count == 1  (the headline's population -- count held fixed)
+    bin              n     NMD+
+    ---------- -------  -------
+    <=37         1,171    10.2%
+    38-50          218    13.8%
+    51-100         587    57.6%
+    101-200        629    70.6%
+    >200           868    22.2%
+
+  The published gradient does NOT hold the model's feature fixed. In it
+  the junction count varies with distance, and count is the dominant
+  predictor -- so part of that gradient is count, not distance.
+
+  mean n_downstream_ejc by bin, in the count>=1 population:
+    bin              n   mean count
+    <=37         2,556         3.49
+    38-50          785         4.51
+    51-100       2,718         4.83
+    101-200      2,628         4.67
+    >200         2,079         3.41
+
+==========================================================================================
+3. ATTRIBUTING THE TERMINAL DROP AT > 200 nt  (count == 1 population)
+==========================================================================================
+
+  bin             n    NMD+  is_ref_cds  is_sqanti  med ORF len  med tx len  med orf_end  med n_junc
+  ---------- ------ ------- ----------- ---------- ------------ ----------- ------------ -----------
+  <=37        1,171   10.2%       71.8%      86.7%          858       2,740        1,431           7
+  38-50         218   13.8%       79.8%      85.8%          720       2,329        1,014           6
+  51-100        587   57.6%       64.7%      75.3%          609       2,353        1,022           6
+  101-200       629   70.6%       65.0%      76.3%          606       2,476          941           6
+  >200          868   22.2%       70.6%      75.7%          566       3,292        1,049           3
+
+  Same gradient, split by whether slot 0 IS the reference CDS:
+
+  slot 0 IS the reference CDS   (n = 2,417)
+    bin              n     NMD+
+    ---------- -------  -------
+    <=37           841     7.0%
+    38-50          174     8.0%
+    51-100         380    55.5%
+    101-200        409    70.4%
+    >200           613    19.6%
+
+  slot 0 is NOT the reference CDS   (n = 1,056)
+    bin              n     NMD+
+    ---------- -------  -------
+    <=37           330    18.5%
+    38-50           44    36.4%
+    51-100         207    61.4%
+    101-200        220    70.9%
+    >200           255    28.6%
+
+==========================================================================================
+4. THE CLAIM THAT WAS MADE ABOUT THE DROP
+==========================================================================================
+  DAY_SUMMARY: "it falls within class (PTC+ 78.7% -> 34.1%), so it is a
+  real ceiling on the rule". PTC+ here means junction > 50 nt past the stop,
+  which every isoform in the 51-100, 101-200 and >200 bins satisfies BY
+  CONSTRUCTION. Conditioning on PTC+ therefore removes nothing from those
+  three bins -- it is not a control. Recomputed, count >= 1, PTC+ only:
+
+  count >= 1 and dist > 50 nt (the 'within PTC+' comparison)
+    bin              n     NMD+
+    ---------- -------  -------
+    <=37             0     nan%
+    38-50            0     nan%
+    51-100       2,718    75.5%
+    101-200      2,628    76.3%
+    >200         2,079    32.8%
+
+==========================================================================================
+5. WHAT ELSE CHANGES AT > 200 nt -- 3'UTR length
+==========================================================================================
+  bin             n    NMD+   med 3UTR  frac 3UTR>1kb   NMD+ | 3UTR<=1kb   NMD+ | 3UTR>1kb
+  ---------- ------ ------- ---------- -------------- ------------------ -----------------
+  <=37        1,171   10.2%      1,084          51.9%              11.7%              8.9%
+  38-50         218   13.8%      1,263          54.6%              16.2%             11.8%
+  51-100        587   57.6%      1,041          51.4%              51.9%             62.9%
+  101-200       629   70.6%      1,252          57.2%              61.3%             77.5%
+  >200          868   22.2%      1,970          79.5%              37.1%             18.4%
+
+==========================================================================================
+DONE
+==========================================================================================

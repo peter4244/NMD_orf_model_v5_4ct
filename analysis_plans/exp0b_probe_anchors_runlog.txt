@@ -1,0 +1,56 @@
+$ python exp0b_probe_anchors.py
+Captured 2026-08-01T01:09:18Z.
+
+selected_orfs slots 209,174 over 42,043 isoforms
+full scan ORFs      1,540,674 over 42,043 isoforms
+tx_summary          42,043
+
+PUBLISHED TARGET: near n=1,389 @ 10.8%   far n=2,084 @ 46.8%   (total 3,473)
+
+====================================================================================================
+A. ANCHORS THAT PICK ONE ORF PER ISOFORM, then condition on that ORF's count == 1
+====================================================================================================
+  slot flagged is_ref_cds, count==1                     n= 2,437  near 1,022/  7.1%   far 1,415/ 43.9%
+  slot flagged is_sqanti_cds, count==1                  n= 3,158  near 1,373/ 13.9%   far 1,785/ 51.8%
+  slot 0 (orf_rank == 1), count==1                      n= 3,504  near 1,397/ 10.7%   far 2,107/ 46.8%  <== MATCHES PUBLISHED
+  longest ORF in the 5 slots, count==1                  n= 3,492  near 1,468/ 13.8%   far 2,024/ 47.2%
+  longest ORF in the full scan, count==1                n= 3,466  near 1,457/ 13.9%   far 2,009/ 46.6%
+  first ORF in the full scan (5'-most), count==1        n= 3,632  near   823/  5.3%   far 2,809/ 21.1%
+  reference-AUG projection, ref_downstream_ejc==1       n= 2,417  near   775/ 12.3%   far   951/ 24.5%
+
+====================================================================================================
+B. POOLED OVER SLOTS -- every (isoform, ORF) pair with count == 1
+====================================================================================================
+  all 5-slot ORFs with count==1 (slot-level rows)       n=16,056  near 5,472/ 15.2%   far 10,584/ 29.8%
+  ...deduplicated to one row per isoform                n= 8,699  near 3,042/ 16.0%   far 5,657/ 28.3%
+  all full-scan ORFs with count==1 (ORF-level rows)     n=90,575  near 27,019/ 18.8%   far 63,556/ 23.0%
+  ...deduplicated to one row per isoform                n=23,034  near 7,516/ 22.4%   far 15,518/ 23.4%
+
+====================================================================================================
+C. TRANSCRIPT-LEVEL COUNT
+====================================================================================================
+  tx_summary max_downstream_ejc==1, ref-CDS stop        n= 2,227  near    95/  3.2%   far   331/ 18.1%
+
+====================================================================================================
+D. THE PUBLISHED GRADIENT -- which population, if any, produces
+   45.8 / 61.4 / 75.5 / 76.3 / 32.8 % over <=37 / 38-50 / 51-100 / 101-200 / >200
+====================================================================================================
+  population                                        <=37          38-50         51-100        101-200           >200
+  ref-CDS slot, count==1                     847/  7.0%    175/  8.0%    387/ 54.8%    414/ 69.6%    614/ 19.7%
+  ref-CDS slot, count>=1                   1,833/ 47.0%    610/ 63.3%  2,069/ 77.3%  1,923/ 79.5%  1,477/ 34.2%
+  ref-CDS slot, any (incl. count==0)       1,833/ 47.0%    610/ 63.3%  2,069/ 77.3%  1,923/ 79.5%  1,477/ 34.2%
+  slot 0, count>=1                         2,576/ 46.0%    790/ 61.1%  2,752/ 75.4%  2,654/ 76.3%  2,086/ 32.9%   <== MATCHES PUBLISHED GRADIENT
+  slot 0, count==1                         1,177/ 10.2%    220/ 13.6%    597/ 57.3%    640/ 70.3%    870/ 22.4%
+  full-scan ORFs, count>=1 (ORF rows)      104,795/ 30.8%  35,002/ 33.3%  114,740/ 35.7%  102,470/ 33.6%  154,264/ 14.5%
+  ref-AUG projection, count>=1             1,284/ 45.3%    397/ 51.1%    908/ 66.4%    628/ 64.6%    847/ 21.4%
+
+====================================================================================================
+E. INTERNAL CONSISTENCY OF THE PUBLISHED PAIR OF TABLES
+====================================================================================================
+  If the gradient partitions the same population as the headline, then
+  pooling its two lowest bins must reproduce the headline's near cell.
+  Published near cell : n = 1,389 at 10.8% NMD+
+  Published <=37 bin  : 45.8%      published 38-50 bin : 61.4%
+  Any weighted mean of 45.8 and 61.4 lies in [45.8, 61.4].
+  10.8 is not in that interval, so the two tables CANNOT describe one
+  population under any bin sizes. At most one of them is right.
