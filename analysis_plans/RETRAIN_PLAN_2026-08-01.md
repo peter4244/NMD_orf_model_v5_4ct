@@ -808,6 +808,28 @@ product couples the candidates: an earlier candidate's capture changes every lat
 selection mass. Only the encoders are cached. That cache is 4.2× fewer encoder passes than
 re-encoding every candidate for every substitution (measured, §9.4).
 
+**Step 5b — the response variable is the unclamped log-odds.**
+
+The model's training output clamps `P(NMD)` to [1e-6, 1 − 1e-6] and forms the logit from the clamped
+probability. Both operations destroy the response to a substitution, in different places:
+
+- at the clamp the logit is constant, so **every** substitution returns exactly 0.0 — measured at
+  `z_d` = −14 with 6 candidates, where the true response is 7.916e-02;
+- away from the clamp the round-trip through a float32 probability loses it — measured at `z_d` = +16,
+  where `P` is 0.984 and its float32 spacing exceeds the change the substitution makes.
+
+Both are indistinguishable from a position the model does not use, and the no-op floor is zero in
+both, so the floor does not catch either.
+
+The bank's response is therefore `log P(NMD) − log(1 − P(NMD))` formed from `log P(NMD)` directly,
+never through `P`, with the second term evaluated in two regimes split at log(1/2), and the whole
+aggregation carried in float64. It equals the training output to 4.2e-06 wherever the clamp is
+inactive. The encoders remain float32; only the arithmetic over the *K* candidate values changes.
+
+The model's own output layer is unchanged — the clamp is correct for training. `base_logit_training`
+and `pinned_in_training` record which transcripts that output would have pinned, so that regime can
+be conditioned on rather than inferred.
+
 **Step 6 — measure the no-op floor.**
 
 `sub(t, p, obs(p))` substitutes the observed base for itself and must return an effect of zero. It is
@@ -822,7 +844,7 @@ stored column is invalid for every transcript.
 
 | name | shape | type | content |
 |---|---|---|---|
-| `vals` | (n_iso, W, 4) | float32 | logit under `sub(t, p, b)` minus the unperturbed logit; NaN where `valid` is false, and at the observed base |
+| `vals` | (n_iso, W, 4) | float32 | the response of step 5b under `sub(t, p, b)` minus its unperturbed value; NaN where `valid` is false, and at the observed base |
 | `valid` | (n_iso, W) | bool | `valid(p)` of step 3 |
 | `obs` | (n_iso, W) | int8 | observed base, ACGT = 0123; −1 where `valid` is false or the base is not one of ACGT |
 | `labels` | (n_iso,) | int8 | `is_nmd` |
@@ -833,7 +855,9 @@ stored column is invalid for every transcript.
 | `arm` | (n_iso,) | string | `discovery` or `confirmation`, from step 1 |
 | `split` | (n_iso,) | string | `train`, `val`, `val_paralog`, `test`, `test_paralog`, from §5 step 5 |
 | `gene_id` | (n_iso,) | string | for clustering |
-| `base_logit` | (n_iso,) | float32 | the unperturbed logit |
+| `base_logit` | (n_iso,) | float64 | the unperturbed response of step 5b |
+| `base_logit_training` | (n_iso,) | float32 | what the model's own output layer emits, clamp included |
+| `pinned_in_training` | (n_iso,) | bool | `|base_logit| >= 13.8155`, where that clamp is active |
 
 Provenance travels as file attributes beside these: the checkpoint path, the model configuration, the pool `sha256`, the split file, the number of paired draws, the number of positions the floor was sampled at, and a one-paragraph statement of what one `vals` entry means.
 
