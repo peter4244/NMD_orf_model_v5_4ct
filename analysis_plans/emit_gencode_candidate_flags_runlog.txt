@@ -1,0 +1,17 @@
+persisted exon blocks out of session scratchpad -> /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/isoform_exon_blocks.tsv
+exon blocks for 110,705 isoforms
+pool: 802,035 candidates over 42,043 transcripts
+GENCODE transcripts with a CDS: 234,024
+  annotated start projected for 16,655 transcripts
+  no GENCODE transcript      : 15,364
+  associated transcript non-coding: 4,309
+  annotated AUG not exonic here   : 5,592
+
+wrote /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_ism_v6/gencode_candidate_flags.tsv
+  rows 802,035  (one per pool candidate)
+  candidates with a GENCODE CDS on their transcript: 311,581 (38.8%)
+  transcripts with one : 16,655 of 42,043
+  is_gencode_start          = 1 : 15,526
+  upstream_of_gencode_start = 1 : 25,764
+  overlaps_gencode_start    = 1 : 3,190
+  NULL (no annotation, written empty not 0) : 490,454 candidates

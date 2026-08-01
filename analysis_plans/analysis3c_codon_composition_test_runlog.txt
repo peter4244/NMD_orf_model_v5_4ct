@@ -1,0 +1,31 @@
+measuring codon-position base composition over 3,000 annotated coding frames
+
+=== observed base frequency by codon position ===
+  CODING region (downstream of the annotated AUG), 297,837 positions
+  codon pos          A        C        G        T   most enriched
+  1             0.2488   0.2588   0.3352   0.1571   A  (x1.124 vs window mean)
+  2             0.2584   0.2556   0.2061   0.2798   T  (x1.366 vs window mean)
+  3             0.1562   0.3031   0.3617   0.1790   G  (x1.200 vs window mean)
+  window mean   0.2214   0.2724   0.3013   0.2048
+
+  5'UTR region (upstream), 772,084 positions — negative control
+  codon pos          A        C        G        T   most enriched
+  1             0.1874   0.2968   0.3280   0.1878   G  (x1.013 vs window mean)
+  2             0.1879   0.3030   0.3206   0.1885   C  (x1.006 vs window mean)
+  3             0.1855   0.3036   0.3224   0.1885   C  (x1.008 vs window mean)
+  window mean   0.1869   0.3011   0.3237   0.1883
+
+=== the model's signed capture preference, same phases ===
+  measured downstream of the AUG (offsets 3..99), five-seed mean
+  1            -0.0041  -0.0091   0.0124  -0.0027   G
+  2             0.0296  -0.0156  -0.0221   0.0031   A
+  3            -0.0141   0.0096  -0.0038   0.0016   C
+
+=== does the model's preference track real coding composition? ===
+  codon position 1: coding-enriched base A, model prefers G   differ   rank correlation of the four bases r = +0.411
+  codon position 2: coding-enriched base T, model prefers A   differ   rank correlation of the four bases r = +0.695
+  codon position 3: coding-enriched base G, model prefers C   differ   rank correlation of the four bases r = +0.609
+
+  0/3 codon positions agree on the most-preferred base
+  correlation over all twelve position-by-base cells: r = +0.612
+  same against the 5'UTR composition (negative control): r = +0.623

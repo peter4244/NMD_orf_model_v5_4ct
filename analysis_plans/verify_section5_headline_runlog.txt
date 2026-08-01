@@ -1,0 +1,28 @@
+test split: 10,520 transcripts, 2,405 NMD (22.9%)
+legacy comparator declares n 10520, n_nmd 2405
+
+  b8_s100.pt: done
+  b8_s200.pt: done
+  b8_s300.pt: done
+  b8_s400.pt: done
+  b8_s500.pt: done
+cached test logits -> test_logits_interp_c32_b8.npz
+
+exact ties in the mean-logit ensemble score: 1 of 10,520
+
+=== A1: per seed ===
+  b8_s100                    AUC 0.9301   AUPRC 0.8597 (step-wise 0.8597, gap 5.05e-08)
+  b8_s200                    AUC 0.9280   AUPRC 0.8539 (step-wise 0.8539, gap 1.26e-07)
+  b8_s300                    AUC 0.9237   AUPRC 0.8515 (step-wise 0.8515, gap 9.12e-08)
+  b8_s400                    AUC 0.9248   AUPRC 0.8529 (step-wise 0.8529, gap 9.92e-08)
+  b8_s500                    AUC 0.9260   AUPRC 0.8577 (step-wise 0.8577, gap 2.92e-08)
+  seed mean AUC 0.9265   range [0.9237, 0.9301]
+
+=== A1: ensemble, both rules ===
+  mean logit                 AUC 0.9327   AUPRC 0.8684 (step-wise 0.8684, gap 1.72e-08)  <- MATCHES reported
+  mean probability           AUC 0.9322   AUPRC 0.8679 (step-wise 0.8679, gap 1.93e-08)  <- MATCHES reported
+
+=== A5: tabular baseline, refitted from its own specification ===
+  train 26,711  val 4,356  test 10,520  features 16
+  selected on val: AUC 0.8829
+  tabular GBM (test)         AUC 0.8633   AUPRC 0.7055 (step-wise 0.7055, gap 4.29e-08)  <- DIFFERS from reported 0.8638/0.7013 by 0.0005/0.0042

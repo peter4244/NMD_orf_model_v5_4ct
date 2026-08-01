@@ -1,0 +1,96 @@
+full splice matches in the pool: 16,109 transcripts of 42,043
+
+==========================================================================
+PANEL A — GENCODE-anchored, full splice matches only
+==========================================================================
+  transcripts classified : 12,828   genes 7,886
+  NMD classified         : 1,371  (14.5% of the 9,425 NMD isoforms in the pool)
+  non-premature-stop route among them : 381 / 1,371 = 27.8%
+
+  group                             n   5UTR  #capab     >=1  per kb  overlap
+  NMD, main-ORF stop              990     90       0   27.3%    0.00    10.6%
+  NMD, no main-ORF stop           381    256       1   64.3%    4.89    32.0%
+  control, main-ORF stop          242    108       0   36.4%    0.00    14.0%
+  control, no main-ORF stop    11,215    172       0   42.2%    0.00    13.5%
+
+  primary contrast, both arms with an intact main ORF: n = 381 vs 11,215, 7,390 genes
+    decay-capable upstream ORFs (count)     +1.408   95% CI [+1.051, +1.782]  *
+    same, per kb of 5'UTR                   +2.497   95% CI [+1.828, +3.222]  *
+    overlapping upstream ORFs (count)       +0.335   95% CI [+0.247, +0.434]  *
+    strongest upstream initiation score     +0.355   95% CI [+0.211, +0.499]  *
+
+  conditioned on 5'UTR length (quartiles), % with >=1 decay-capable:
+        0-88      NMD   5.9% (n=  68)   control   7.7% (n=2,863)
+       89-175     NMD  33.3% (n=  60)   control  28.6% (n=2,829)
+      176-318     NMD  76.2% (n= 105)   control  53.9% (n=2,781)
+      319-6231    NMD  95.3% (n= 148)   control  80.5% (n=2,742)
+
+==========================================================================
+PANEL B — reference-AUG-traced, SAME full-splice-match population
+==========================================================================
+  transcripts classified : 13,003   genes 7,876
+  NMD classified         : 1,044  (11.1% of the 9,425 NMD isoforms in the pool)
+  non-premature-stop route among them : 309 / 1,044 = 29.6%
+
+  group                             n   5UTR  #capab     >=1  per kb  overlap
+  NMD, main-ORF stop              735    110       0   38.8%    0.00    21.0%
+  NMD, no main-ORF stop           309    553       4   84.1%    6.71    54.4%
+  control, main-ORF stop          393    125       0   39.9%    0.00    21.9%
+  control, no main-ORF stop    11,566    185       0   44.9%    0.00    17.0%
+
+  primary contrast, both arms with an intact main ORF: n = 309 vs 11,566, 7,688 genes
+    decay-capable upstream ORFs (count)     +3.783   95% CI [+3.063, +4.534]  *
+    same, per kb of 5'UTR                   +3.639   95% CI [+3.007, +4.285]  *
+    overlapping upstream ORFs (count)       +0.900   95% CI [+0.661, +1.163]  *
+    strongest upstream initiation score     +0.485   95% CI [+0.364, +0.604]  *
+
+  conditioned on 5'UTR length (quartiles), % with >=1 decay-capable:
+        0-91      NMD   7.4% (n=  27)   control   8.2% (n=2,968)
+       92-188     NMD  32.0% (n=  25)   control  31.0% (n=2,920)
+      189-370     NMD  91.1% (n=  56)   control  58.4% (n=2,913)
+      371-63372   NMD  99.0% (n= 201)   control  84.5% (n=2,765)
+
+==========================================================================
+PANEL C (context) — reference-AUG-traced, full pool including novel isoforms
+==========================================================================
+  transcripts classified : 28,775   genes 10,788
+  NMD classified         : 5,915  (62.8% of the 9,425 NMD isoforms in the pool)
+  non-premature-stop route among them : 1,100 / 5,915 = 18.6%
+
+  group                             n   5UTR  #capab     >=1  per kb  overlap
+  NMD, main-ORF stop            4,815    240       1   57.2%    3.10    24.3%
+  NMD, no main-ORF stop         1,100    916       7   91.0%    7.54    56.2%
+  control, main-ORF stop        2,116    222       1   53.5%    2.32    21.2%
+  control, no main-ORF stop    20,744    267       1   57.5%    2.96    23.3%
+
+  primary contrast, both arms with an intact main ORF: n = 1,100 vs 20,744, 10,474 genes
+    decay-capable upstream ORFs (count)     +6.077   95% CI [+5.443, +6.735]  *
+    same, per kb of 5'UTR                   +3.328   95% CI [+2.995, +3.662]  *
+    overlapping upstream ORFs (count)       +1.226   95% CI [+0.995, +1.474]  *
+    strongest upstream initiation score     +0.679   95% CI [+0.596, +0.763]  *
+
+  conditioned on 5'UTR length (quartiles), % with >=1 decay-capable:
+        0-132     NMD  11.5% (n=  61)   control  15.0% (n=5,437)
+      133-281     NMD  59.0% (n=  83)   control  49.0% (n=5,355)
+      282-618     NMD  95.3% (n= 212)   control  76.3% (n=5,240)
+      619-63372   NMD  99.9% (n= 744)   control  95.6% (n=4,712)
+
+==========================================================================
+DO THE TWO DEFINITIONS AGREE WHERE BOTH APPLY?
+==========================================================================
+  transcripts classified by both : 11,592
+  agree on premature-stop status : 97.9%
+ref-AUG stop  False  True 
+GENCODE stop              
+False         10639    107
+True            132    714
+
+==========================================================================
+SIDE BY SIDE — the primary contrast under each
+==========================================================================
+  matched population (FSM) — so this isolates the reading-frame call
+  quantity                                        A GENCODE            B ref-AUG        C ref-AUG all
+  decay-capable upstream ORFs (count)   +1.408 [+1.05,+1.78]   +3.783 [+3.06,+4.53]   +6.077 [+5.44,+6.73]
+  same, per kb of 5'UTR                 +2.497 [+1.83,+3.22]   +3.639 [+3.01,+4.28]   +3.328 [+2.99,+3.66]
+  overlapping upstream ORFs (count)     +0.335 [+0.25,+0.43]   +0.900 [+0.66,+1.16]   +1.226 [+0.99,+1.47]
+  strongest upstream initiation score   +0.355 [+0.21,+0.50]   +0.485 [+0.36,+0.60]   +0.679 [+0.60,+0.76]

@@ -1,0 +1,31 @@
+full splice matches with the annotated start projected: 33,140
+pool candidates in those transcripts: 254,150
+
+transcripts analysed: 12,828   genes: 7,886
+grp
+control, no main-ORF stop    11215
+NMD, main-ORF stop             990
+NMD, no main-ORF stop          381
+control, main-ORF stop         242
+
+group                             n  5UTR nt  #upstr  #capable  %with>=1  per kb  #overlap
+NMD, main-ORF stop              990       90       0         0     27.3%    0.00     10.6%
+NMD, no main-ORF stop           381      256       2         1     64.3%    4.89     32.0%
+control, main-ORF stop          242      108       0         0     36.4%    0.00     14.0%
+control, no main-ORF stop    11,215      172       0         0     42.2%    0.00     13.5%
+
+=== primary contrast: both have an intact main ORF ===
+    NMD, no main-ORF stop  vs  control, no main-ORF stop
+  decay-capable upstream ORFs (count)        1.00 vs     0.00   mean diff  +1.408   gene-clustered 95% CI [+1.051, +1.782]
+  same, per kb of 5'UTR                      4.89 vs     0.00   mean diff  +2.497   gene-clustered 95% CI [+1.828, +3.222]
+  overlapping upstream ORFs (count)          0.00 vs     0.00   mean diff  +0.335   gene-clustered 95% CI [+0.247, +0.434]
+  5'UTR length (nt)                        256.00 vs   172.00   mean diff +94.675   gene-clustered 95% CI [+58.319, +133.315]
+  longest upstream ORF (nt)                168.00 vs    78.00   mean diff +92.755   gene-clustered 95% CI [+44.332, +150.366]
+  strongest upstream initiation score        1.36 vs     0.86   mean diff  +0.355   gene-clustered 95% CI [+0.211, +0.499]
+
+=== conditioned on 5'UTR length (quartiles) ===
+  5UTR quartile       n NMD  n ctrl   %NMD with capable   %ctrl with capable
+  0-88                   68   2,863                5.9%                 7.7%
+  89-175                 60   2,829               33.3%                28.6%
+  176-318               105   2,781               76.2%                53.9%
+  319-6231              148   2,742               95.3%                80.5%
