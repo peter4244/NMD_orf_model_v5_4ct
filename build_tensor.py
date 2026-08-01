@@ -200,6 +200,8 @@ def main():
         print(f"\n  RESTRICTED to {args.chrom}: {len(tx):,} transcripts")
 
     # -------------------------------------------------------------- the pool
+    provenance = json.loads((pooldir / "orf_pool_provenance.json").read_text())
+    record = pd.read_csv(pooldir / "orf_pool_record.tsv", sep="\t")
     pool = pd.read_csv(pooldir / "orf_pool.tsv", sep="\t")
     pool = pool[pool["isoform_id"].isin(set(tx["isoform_id"]))]
     pool = pool.sort_values(["isoform_id", "slot"], kind="stable").reset_index(drop=True)
@@ -229,10 +231,10 @@ def main():
     junc = read_junctions()
     print(f"\nSTEPS 1, 2, 4 — encode {len(pool):,} candidates", flush=True)
     n = len(pool)
-    est_gb = n * 2 * N_CHANNELS * WINDOW * 2 / 1e9
+    est_gb = n * 2 * WINDOW / 1e9        # one uint8 per position per window
     print(f"  window {WINDOW} wide, ATG anchored at index {ATG_LEFT}, "
           f"stop at index {STOP_LEFT}")
-    print(f"  projected {est_gb:.1f} GB of float16 window data", flush=True)
+    print(f"  projected {est_gb:.2f} GB of codes before compression", flush=True)
 
     h5path = outdir / "nmd_tensor.h5"
     with h5py.File(h5path, "w") as f:
@@ -289,6 +291,19 @@ def main():
         f.create_dataset("split", data=np.array(tx["split"], dtype="S"))
         f.create_dataset("gene_id", data=np.array(tx["gene_id"].astype(str), dtype="S"))
         f.create_dataset("labels", data=tx["is_nmd"].to_numpy(np.int8))
+
+        # Per transcript: are ALL of its triggering upstream ORFs in the pool?
+        # The stick-breaking product runs per transcript, so on an incomplete one
+        # P_select is conditioned on a candidate set that is not the real one.
+        # 44.0% are complete, and nothing downstream can condition on that
+        # without this flag travelling with the tensor.
+        rec = record.set_index("isoform_id").reindex(tx["isoform_id"])
+        n_trig = rec["n_upstream_triggering"].fillna(0).to_numpy(np.int32)
+        n_adm = rec["n_upstream_triggering_admitted"].fillna(0).to_numpy(np.int32)
+        f.create_dataset("n_upstream_triggering", data=n_trig)
+        f.create_dataset("n_upstream_triggering_admitted", data=n_adm)
+        f.create_dataset("pool_complete",
+                         data=(n_trig == n_adm).astype(np.int8))
         f.create_dataset("offset", data=offsets)
         f.create_dataset("count", data=counts)
         g = f.create_group("normalization")
@@ -302,6 +317,10 @@ def main():
         f.attrs["stop_left"], f.attrs["stop_right"] = STOP_LEFT, STOP_RIGHT
         f.attrs["built_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         f.attrs["pool"] = str(pooldir)
+        # The pool's identity travels with the tensor, and the tensor's with
+        # every checkpoint, so a downstream artifact states its own population.
+        f.attrs["pool_sha256"] = provenance.get("pool_sha256", "")
+        f.attrs["admission"] = json.dumps(provenance.get("admission", {}))
 
     print(f"\n  candidates whose ATG window is clipped by the midpoint : "
           f"{n_atg_clipped:,} ({n_atg_clipped/max(n,1)*100:.1f}%)")

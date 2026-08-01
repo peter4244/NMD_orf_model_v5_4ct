@@ -117,6 +117,12 @@ class TensorSource:
             self.stop_left = int(f.attrs["stop_left"])
             self.orf_start = f["orf_start"][:]
             self.orf_end = f["orf_end"][:]
+            self.pool_sha256 = f.attrs.get("pool_sha256", "")
+            self.admission = f.attrs.get("admission", "{}")
+            self.norm_mean = f["normalization/mean"][:]
+            self.norm_std = f["normalization/std"][:]
+            self.pool_complete = (f["pool_complete"][:]
+                                  if "pool_complete" in f else None)
 
     @property
     def f(self):
@@ -251,6 +257,23 @@ def main():
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     tr = src.indices("train"); va = src.indices("val")
+    # Everything a downstream artifact needs to state its own population and
+    # configuration, as first-class fields rather than buried in an arg string.
+    provenance = dict(
+        pool_sha256=src.pool_sha256,
+        admission=json.loads(src.admission),
+        tensor=str(Path(args.tensor) / "nmd_tensor.h5"),
+        conv_channels=args.conv_channels, n_bins=args.n_bins,
+        permute_bins=bool(args.permute_bins), variant=args.variant,
+        blank_sequence=bool(args.blank_sequence),
+        blank_junctions=bool(args.blank_junctions), seed=args.seed,
+        structural_columns=[STRUCTURAL_COLS[c] for c in cols],
+        normalization=dict(columns=STRUCTURAL_COLS,
+                           mean=src.norm_mean.tolist(),
+                           std=src.norm_std.tolist()),
+        split_sizes={s: int((src.split == s).sum())
+                     for s in ["train", "val", "val_paralog",
+                               "test", "test_paralog"]})
     print(f"device {device}   parameters {count_parameters(model):,}")
     print(f"variant {args.variant}   structural columns "
           f"{[STRUCTURAL_COLS[c] for c in cols] if cols else '(none)'}")
@@ -281,7 +304,8 @@ def main():
         if improved:
             best, patience = vauc, 0
             torch.save(dict(model=model.state_dict(), epoch=epoch,
-                            val_auc=float(vauc), args=vars(args)), best_path)
+                            val_auc=float(vauc), args=vars(args),
+                            **provenance), best_path)
         else:
             patience += 1
         print(f"epoch {epoch:>3}  loss {tot/max(nb,1):.4f}  "

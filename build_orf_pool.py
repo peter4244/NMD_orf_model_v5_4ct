@@ -342,8 +342,19 @@ def main():
     pool.to_csv(outdir / "orf_pool.tsv", sep="\t", index=False,
                 float_format="%.6f")
     record.to_csv(outdir / "orf_pool_record.tsv", sep="\t", index=False)
+    # A hash of the table itself, so anything derived from this pool can name the
+    # population it came from. orf_rank once meant two different things in two
+    # artifacts and cost an hour and a wrong pair count; a filename is not an
+    # identity.
+    import hashlib
+    pool_sha = hashlib.sha256((outdir / "orf_pool.tsv").read_bytes()).hexdigest()
     meta = dict(built_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                floor=floor, calibration=calib, ejc_rule_nt=EJC_RULE_NT,
+                pool_sha256=pool_sha,
+                admission=dict(kozak_floor=floor, calibration=calib,
+                               position_rule="orf_start <= tx_length // 2",
+                               reference_start_always_admitted=True,
+                               fallback="top 5 by score when the pool is empty",
+                               min_orf_length=0, ejc_rule_nt=EJC_RULE_NT),
                 n_transcripts=int(len(tx)), n_candidates=int(len(pool)),
                 script=str(Path(__file__).name))
     (outdir / "orf_pool_provenance.json").write_text(json.dumps(meta, indent=2))
