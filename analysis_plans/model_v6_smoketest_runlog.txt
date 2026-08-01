@@ -1,0 +1,20 @@
+$ python model_v6.py
+Captured 2026-08-01T09:12:53Z, repo 423abe2.
+
+ScanningNMDModel: 44,578 trainable parameters (conv_channels=32, n_bins=1, n_structural=1, permute_bins=False)
+ScanningNMDModel: 66,082 trainable parameters (conv_channels=32, n_bins=8, n_structural=1, permute_bins=False)
+ScanningNMDModel: 90,658 trainable parameters (conv_channels=32, n_bins=16, n_structural=1, permute_bins=False)
+ScanningNMDModel: 139,810 trainable parameters (conv_channels=32, n_bins=32, n_structural=1, permute_bins=False)
+ScanningNMDModel: 66,082 trainable parameters (conv_channels=32, n_bins=8, n_structural=1, permute_bins=False)
+
+  logit (3,)   p_nmd [0.42462068796157837, 0.21876361966133118, 0.44705355167388916]
+  sum P(select) per transcript : [0.927565, 0.482359, 0.982745]
+  residual (passes everything) : [0.072435, 0.517641, 0.017255]
+  sum + residual == 1          : True
+  masked slots carry zero mass : True
+  capture invariant to the stop window : True
+  decay DOES move with it              : True
+  permuted-bin arm redraws per pass    : True
+
+  backward: OK, loss 0.6402
+  gradient reaches enc_init 443.515 and enc_stop 116.498

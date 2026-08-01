@@ -490,8 +490,12 @@ resolve position more precisely than that receptive field, which is what bounds 
 **`B = 1` is not the control.** It differs from `B = 8` in parameter count as well as in positional
 resolution — 1,024 projection weights against 8,192, on a model with 34,050 — so a difference between
 them is consistent with either. The control is a **`B = 8` arm whose bin order is randomly permuted
-before concatenation**, once per model at initialisation and fixed thereafter: identical parameter
-count, positional information destroyed. The sweep is read against that arm.
+before concatenation, redrawn per candidate at every forward pass**: identical parameter count,
+positional information destroyed. The sweep is read against that arm.
+
+The permutation must be redrawn rather than fixed at initialisation. The projection that follows is
+fully connected over the flattened bins, so it can undo any fixed reordering by permuting its own
+weights, and a fixed-permutation arm would measure nothing.
 
 `B = 1` is also not the current architecture. The encoder at `B = 1` is the current `SequenceCNN`,
 but §6 replaces the fusion, the aggregator and the head, so no arm of this sweep is the model whose
