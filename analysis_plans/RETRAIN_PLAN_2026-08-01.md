@@ -157,14 +157,13 @@ FLOOR = readRDS(kozak_mane_calibration.rds)$threshold_q05      # -1.2508
 **Step 4 — admit, discount by position, and order.**
 
 A candidate is admitted when its score is at or above `FLOOR` **and** its start lies in the first
-half of the transcript. The position rule discounts ORFs a scanning ribosome is unlikely to reach:
-it removes 47.8% of the above-floor pool for 4.0 points of coverage of triggering upstream ORFs
-(measured, §3.4).
+half of the transcript. The position rule discounts ORFs a scanning ribosome is unlikely to reach.
 
-Where the admitted set is then empty, a fallback admits five candidates: the GENCODE CDS start plus
-the four highest-scoring AUGs from the scan where the transcript has an enumerable CDS start, or the
-five highest-scoring AUGs where it does not. The fallback triggers on the pool being empty **after**
-both the floor and the position rule, not on the floor alone.
+The GENCODE CDS start is always admitted, whatever its score and wherever it sits. It reaches the
+pool by this rule alone for 13.3% of the transcripts that have one (measured, §3.4).
+
+Where the pool is still empty — which happens only for transcripts with no enumerable GENCODE CDS
+start — the five highest-scoring candidates are admitted.
 
 Admitted candidates are ordered by `start` ascending, which is the order a scanning ribosome
 encounters them, and the slot index is that position in the order. Slot index carries no priority:
@@ -173,21 +172,21 @@ slot 0 is the 5′-most admitted candidate, not the annotated one.
 ```
 for each transcript t:
     L        = tx_length[t]
+    cds      = the orf with orf.start == ref_utr5_length[t] + 1, if any
     admitted = [ orf for orf in ORFs(t)
-                 if score(orf) >= FLOOR and orf.start <= L/2 ]
+                 if (score(orf) >= FLOOR and orf.start <= L/2) or orf is cds ]
 
     if admitted is empty:
-        ranked = sort(ORFs(t), key = score, descending)
-        cds    = the orf with orf.start == ref_utr5_length[t] + 1, if any
-        admitted = ([cds] + ranked[:4]) if cds exists else ranked[:5]
+        admitted = sort(ORFs(t), key = score, descending)[:5]
 
     admitted = sort(admitted, key = orf.start, ascending)
     for k, orf in enumerate(admitted):
         orf.slot = k
 ```
 
-Each transcript records how many candidates the position rule discounted and whether the fallback
-fired, so neither is a silent exclusion.
+Each transcript records how many candidates the position rule discounted, whether the GENCODE CDS
+start needed the always-admit rule, and whether the fallback fired. None of the three is a silent
+exclusion or a silent rescue.
 
 **Step 5 — attach the per-candidate quantities the model is given.**
 
@@ -224,21 +223,22 @@ One row per admitted candidate, replacing `selected_orfs.tsv`:
 |---|---|---|
 | candidates per transcript, no floor | 42,043 transcripts | mean 54.6 |
 | ...above `FLOOR` | same | mean 36.4 |
-| ...and in the first half of the transcript | same | **mean 19.0**, median 17, p99 58, max 564 |
+| **...after all four admission rules** | same | **mean 19.1**, median 17, p90 35, p99 59, max 565 |
+| candidates total | same | 802,430 |
+| transcripts with an empty pool | same | 0 |
 | candidates discounted by position | above-floor pool of 1,530,321 | 731,937 (47.8%) |
-| coverage of upstream ORFs whose own stop has a junction >50 bases downstream | 133,765 such ORFs | 70.6% above `FLOOR`, **66.6%** after the position rule |
-| transcripts where the fallback fires | 42,043 transcripts | 68 |
-| transcripts with an empty pool after all rules | 42,043 transcripts | 0 |
-| GENCODE CDS start below `FLOOR` | 28,775 with an enumerable CDS start | 2,423 (8.4%) |
-| GENCODE CDS start past the transcript midpoint | same | 1,617 (5.6%) |
+| transcripts where the fallback fires | 42,043 transcripts | 58 |
+| GENCODE CDS start in the pool | 28,775 with an enumerable CDS start | 28,775 (100%) |
+| ...reaching it only by the always-admit rule | same | 3,823 (13.3%) |
+| coverage of upstream ORFs whose own stop has a junction >50 bases downstream | 133,765 such ORFs | 89,073 (66.6%) |
 
-All predicted values are measured in `design4_position_and_fallback_runlog.txt` on the same
-sequences with the same enumeration.
+All predicted values are measured in `design5_final_pool_runlog.txt` on the same sequences with
+the same enumeration.
 
 ### 3.5 Cost
 
 Training-tensor size scales linearly in candidates per transcript and in window width. The current
-5-slot tensor at 500-wide windows is 2.9 GB, so 19.0 candidates at 1000-wide windows projects to
+5-slot tensor at 500-wide windows is 2.9 GB, so 19.1 candidates at 1000-wide windows projects to
 roughly 22 GB. This does not fit in the 8 GiB on this machine; the tensor is built on the cluster.
 
 ### 3.6 The tail
