@@ -1,0 +1,72 @@
+$ python design3_check_track_a.py
+Captured 2026-08-01T03:03:29Z, repo d1637ac.
+
+================================================================================================
+DESIGN 3 -- checking Track A on my own pool
+================================================================================================
+
+  MANE cuts: q05 -1.2508   q01 -2.2987
+
+  enumerating ...
+    12,000
+    24,000
+    36,000
+
+================================================================================================
+A. DOES THE START WINDOW ALREADY CONTAIN THE STOP?
+================================================================================================
+
+  upstream ORFs enumerated: 160,973
+  length: median 60 nt   p75 141   p90 594
+
+  A start window of width W centred on the start codon reaches
+  W/2 downstream, so an ORF of length <= W/2 has its stop inside it.
+
+  window W       reaches   upstream ORFs with stop inside
+  ------------ --------- --------------------------------
+  1000               500                            89.2%
+  500                250                            84.4%
+  200                100                            66.3%
+  100                 50                            44.5%
+  50                  25                            25.3%
+
+  Track A reported 84.4% at W=1000 and median 96 nt.
+  Here: 89.2% and 60 nt.
+
+================================================================================================
+B. DO WEAK-INITIATION TRIGGERING uORFs CARRY SIGNAL?
+================================================================================================
+
+  triggering upstream ORFs (own stop has a junction >50 nt downstream): 133,765
+  background NMD+ over all transcripts: 22.4%
+
+  PWM band                    n uORFs   NMD+ of their transcript
+  ------------------------ ---------- --------------------------
+  below q01 (-2.30)            14,306                      17.1%
+  q01 to q05                   25,030                      19.5%
+  q05 to 0                     45,786                      21.0%
+  above 0                      48,643                      22.3%
+
+  pooled at the default cut:
+    discarded by q05    39,336 uORFs   NMD+ 18.6%
+    kept by q05         94,429 uORFs   NMD+ 21.7%
+    discarded by q01    14,306 uORFs   NMD+ 17.1%
+
+================================================================================================
+C. THE TAIL, ON THIS POOL
+================================================================================================
+
+  candidates per transcript at MANE q05 with the main ORF forced in:
+    p50 32   p90 65   p99 107   max 1,191
+
+  cap           transcripts truncated     share   candidates dropped
+  ---------- ------------------------ --------- --------------------
+  50                            9,325    22.18%              176,345
+  100                             595     1.42%               16,281
+  200                              22     0.05%                2,196
+  400                               1     0.00%                  791
+  800                               1     0.00%                  391
+
+================================================================================================
+DONE
+================================================================================================

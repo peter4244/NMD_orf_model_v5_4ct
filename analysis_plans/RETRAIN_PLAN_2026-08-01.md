@@ -157,10 +157,10 @@ FLOOR = readRDS(kozak_mane_calibration.rds)$threshold_q05      # -1.2508
 **Step 4 — admit and order.**
 
 A candidate is admitted when its score is at or above `FLOOR`. The candidate matching the annotated
-CDS start is admitted regardless of score, where the transcript has one — at `FLOOR` it otherwise
-drops out for 8.4% of transcripts (measured, §3.4), and the main ORF is where 51.5% of NMD-positive
-transcripts are degraded. Unconditional admission places the ORF in the pool; nothing marks which
-one it is.
+CDS start is admitted regardless of score, where the transcript has one: at `FLOOR` it otherwise
+drops out for 8.4% of transcripts (measured, §3.4), leaving those transcripts with no candidate at
+their annotated coding sequence. Unconditional admission places the ORF in the pool; nothing marks
+which one it is.
 
 Admitted candidates are ordered by `start` ascending, which is the order a scanning ribosome
 encounters them, and the slot index is that position in the order. Slot index carries no priority:
@@ -229,11 +229,15 @@ Training-tensor size scales linearly in candidates per transcript. The current 5
 2.9 GB, so 36.4 candidates projects to roughly 21 GB. This does not fit in the 8 GiB on this
 machine; the tensor is built on the cluster.
 
-### 3.6 Decision this step needs before it runs
+### 3.6 The tail
 
-**The tail.** The largest transcript carries 1,190 admitted candidates. Either every transcript
-keeps all of its candidates and batches are bucketed by candidate count, or a cap applies and the
-number of dropped candidates is recorded per transcript.
+No cap applies. Every transcript keeps all of its admitted candidates, and batches are bucketed by
+candidate count so that a batch holds transcripts of similar width. Candidates per transcript at
+`FLOOR` with the annotated CDS forced in: median 32, p90 65, p99 107, maximum 1,191 (measured,
+`design3_check_track_a_runlog.txt`).
+
+If a cap is ever imposed, the pool table carries a per-transcript column recording whether it was
+hit and how many candidates were dropped.
 
 ---
 
@@ -248,10 +252,189 @@ These take the slot count from the data instead. `compute_uorf_attention_metrics
 
 ## 5. Build the training tensor
 
+### 5.1 Question
+
+What array does the model consume, and what is in each channel?
+
+### 5.2 Starting data
+
+The pool table from §3, `SEQ`, `JUNC`, `TX`, `HOLDOUT`.
+
+### 5.3 Approach
+
+**Step 1 — give each candidate two sequence windows.**
+
+A candidate carries an ATG window centred on the middle base of its start codon and a stop window
+centred on the middle base of its stop codon, each 500 bases wide. A window running off either end
+of the transcript is zero-padded on that side. Where the two windows would overlap, each is clipped
+at the midpoint of the ORF so that together they partition it and neither reads the other's half;
+the clipped side is padded.
+
+```
+mid   = (orf_start + orf_end) / 2
+atg  = SEQ[t][ orf_start+1 - 250 : orf_start+1 + 250 ]   clipped to [1, mid], zero-padded
+stop = SEQ[t][ orf_end-1  - 250 : orf_end-1  + 250 ]     clipped to [mid, tx_length], zero-padded
+```
+
+**Step 2 — encode nine channels at each window position.**
+
+| channel | content |
+|---|---|
+| 0–3 | one-hot A, C, G, T; all zero at a padded position |
+| 4 | 1 where the position is listed in `JUNC` for this transcript, else 0 |
+| 5 | fraction of G or C over the 50 bases centred here, computed from this window's own sequence |
+| 6–8 | one-hot reading frame of this position relative to this candidate's start codon |
+
+**Step 3 — attach the structural block.**
+
+The interpretable model's block is the single number `n_downstream_ejc` from §3 step 5. The
+predictor's block is five numbers: that one plus `is_ref_cds`, `is_sqanti_cds`, `frac_start` and
+`frac_stop`, where the fractions are `orf_start / tx_length` and `orf_end / tx_length`.
+
+Each number is centred and scaled by its mean and standard deviation over candidates belonging to
+**training-split transcripts only**. Those constants are written into the tensor file and are read
+back at inference rather than recomputed.
+
+**Step 4 — assemble ragged, not padded.**
+
+Candidates per transcript run from 1 to 1,191 with a median of 32, so padding every transcript to
+the maximum would store mostly zeros. Candidates are stored as one flat array in transcript order
+with a per-transcript start offset and count.
+
+```
+candidates[i]  = (atg_window[9,500], stop_window[9,500], structural[1 or 5])
+offset[t], count[t]   such that transcript t owns candidates[offset[t] : offset[t]+count[t]]
+```
+
+**Step 5 — assign splits.**
+
+Split comes from `chr` in `TX`: test chr1/3/5/7, validation chr2/4, training the rest. Transcripts
+of genes listed in `HOLDOUT` are removed from the training split.
+
+### 5.4 Quantities this step reports
+
+Candidates written, transcripts written, bytes on disk, and the normalization constants with the
+number of training candidates each was computed over.
+
+---
+
 ## 6. Architecture
+
+### 6.1 Question
+
+What does each part of the model compute, and from which inputs?
+
+### 6.2 Approach
+
+**Step 1 — encode each candidate with shared weights.**
+
+Each window passes through the existing two-layer convolution, and the length axis is then reduced
+by **binned** max pooling rather than a single global max: the axis is split into 8 equal bins and
+the maximum is taken within each. The output is 32 channels × 8 bins, flattened and projected to 32.
+
+```
+h = relu(bn1(conv1(x, 9->32, k=15)));  h = maxpool(h, 4)
+h = relu(bn2(conv2(h, 32->32, k=7)))
+h = concat over b in 0..7 of  max(h[:, b*L/8 : (b+1)*L/8])      # 32*8
+e = linear(h, 256 -> 32)
+```
+
+**Step 2 — initiation head, from a narrow slice of the ATG window only.**
+
+The initiation head reads the central 51 bases of the ATG window — positions −25 to +25 relative to
+the A of the start codon — through its own two-layer convolution, and emits one number per
+candidate through a sigmoid. It does not see the stop window, the structural block, or the rest of
+the ATG window.
+
+```
+p_k = sigmoid( linear( encode_narrow( atg_window[:, 225:276] ) ) )
+```
+
+**Step 3 — decay head, from everything else.**
+
+The decay head reads the full ATG embedding, the stop embedding and the structural block, and emits
+one number per candidate through a sigmoid.
+
+```
+d_k = sigmoid( linear( concat[ e_atg(32), e_stop(32), relu(linear(structural)) (32) ] ) )
+```
+
+**Step 4 — aggregate by stick-breaking in transcript order.**
+
+Candidates are already ordered 5′→3′ by slot index. Selection probability at candidate *k* is
+capture at *k* times the probability that every earlier candidate was passed over. The product is
+computed in log space.
+
+```
+log_pass[k] = sum over j < k of log(1 - p_j)
+P_select[k] = exp( log_pass[k] + log(p_k) )
+P_nmd       = sum over k of P_select[k] * d_k
+```
+
+The residual mass `exp(sum over all k of log(1 - p_k))` is the ribosome passing every candidate;
+it contributes nothing to `P_nmd`.
+
+**Step 5 — output.**
+
+The training output is `logit(P_nmd)`, clamped away from 0 and 1 by 1e-6.
+
+### 6.3 What each model variant receives
+
+| | interpretable | predictor |
+|---|---|---|
+| structural block | `n_downstream_ejc` | that plus `is_ref_cds`, `is_sqanti_cds`, `frac_start`, `frac_stop` |
+| everything else | identical | identical |
+
+---
 
 ## 7. Training
 
+### 7.1 Question
+
+How is each variant fit, and what is varied?
+
+### 7.2 Starting data
+
+The tensor from §5.
+
+### 7.3 Approach
+
+**Step 1 — loss and optimizer.** Binary cross-entropy on the transcript logit against `is_nmd`.
+Adam. Batches are bucketed by candidate count (§3.6).
+
+**Step 2 — stopping.** Training stops when validation AUC has not improved for 5 epochs; the
+checkpoint with the best validation AUC is kept.
+
+**Step 3 — seeds.** Each configuration is trained from 5 random initialisations.
+
+**Step 4 — convolution width sweep.** `conv_channels` takes each of 16, 32, 64, 128, at 5 seeds
+each, on the interpretable variant.
+
+### 7.4 Quantities this step reports
+
+Per run: epochs to stop, validation AUC at the kept checkpoint, wall time. Per configuration:
+the five seeds' test AUC and AUPRC.
+
+---
+
 ## 8. Model comparisons
 
-*Sections 5–8 are written after section 3 is agreed.*
+### 8.1 Question
+
+Which arm licenses which kind of claim?
+
+### 8.2 Approach
+
+Five arms, each 5 seeds, all evaluated on the test split (chr1/3/5/7, 10,719 transcripts).
+
+| arm | differs from the interpretable model by | licenses |
+|---|---|---|
+| interpretable | — | claims about which sequence features matter |
+| predictor | structural block carries 5 numbers (§6.3) | claims about accuracy |
+| sequence-blanked | channels 0–3 set to zero | whether sequence carries usable signal at all |
+| no-junction-feature | structural block empty | whether supplying the junction rule masks anything |
+| label-sensitivity | training set excludes the 2,334 `no_ref_isoform` transcripts | whether behaviour depends on that subgroup |
+
+Each arm reports test AUC and AUPRC as the mean and range over its 5 seeds, against the current
+model's 0.9310 AUC / 0.8351 AUPRC (measured elsewhere, `SEQUENCE_DISCOVERY_BRIEF.md` §5, at
+`atg1000_stop1000`) and against a tabular-only GBM at 0.8035 AUPRC (same source).
