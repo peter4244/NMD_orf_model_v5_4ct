@@ -1,0 +1,37 @@
+perm_junc: 100.0% of candidates received a different candidate's junction track, matched on fill decile
+
+chr21: 502 transcripts, 9,437 candidates, 5 seeds, 330 reference starts. IN-SAMPLE.
+
+  full            AUC 0.8382  |slot 0.8905  |kozak 0.8051  |fill 0.8748   mean_p 0.2498
+  keep_seq        AUC 0.9060  |slot 0.8859  |kozak 0.8911  |fill 0.8803   mean_p 0.0435
+  keep_junc       AUC 0.5892  |slot 0.7224  |kozak 0.5819  |fill 0.6524   mean_p 0.0402
+  keep_gc         AUC 0.8095  |slot 0.8144  |kozak 0.7791  |fill 0.8353   mean_p 0.0298
+  keep_phase      AUC 0.8132  |slot 0.8609  |kozak 0.7869  |fill 0.8606   mean_p 0.0524
+  keep_geom       AUC 0.8353  |slot 0.8785  |kozak 0.8083  |fill 0.8574   mean_p 0.0771
+  keep_seq_phase  AUC 0.8676  |slot 0.8878  |kozak 0.8401  |fill 0.8781   mean_p 0.1681
+  perm_junc       AUC 0.8354  |slot 0.8892  |kozak 0.8012  |fill 0.8747   mean_p 0.2443
+
+=== SUFFICIENCY: what one group alone can do ===
+  full model AUC 0.8382. Share of its distance above 0.5 that each
+  group reproduces ON ITS OWN:
+    keep_seq        AUC 0.9060    120.1%
+    keep_junc       AUC 0.5892     26.4%
+    keep_gc         AUC 0.8095     91.5%
+    keep_phase      AUC 0.8132     92.6%
+    keep_geom       AUC 0.8353     99.2%
+    keep_seq_phase  AUC 0.8676    108.7%
+
+=== the on-manifold junction control ===
+    perm_junc       AUC 0.8354     99.2% retained
+    (zero_junc, from pass 2, retained 99.6% -- two different operators)
+
+=== per-seed, every condition ===
+  condition         b8_s100   b8_s200   b8_s300   b8_s400   b8_s500
+  full               0.8565    0.8118    0.8096    0.8288    0.8538
+  keep_seq           0.8873    0.8562    0.9060    0.9107    0.8788
+  keep_junc          0.5649    0.5945    0.6370    0.6308    0.4607
+  keep_gc            0.6222    0.7951    0.7733    0.1858    0.6179
+  keep_phase         0.9054    0.9007    0.7498    0.8740    0.7526
+  keep_geom          0.8742    0.8329    0.8073    0.8271    0.8514
+  keep_seq_phase     0.8775    0.8348    0.8351    0.8645    0.8973
+  perm_junc          0.8560    0.8081    0.8059    0.8230    0.8531

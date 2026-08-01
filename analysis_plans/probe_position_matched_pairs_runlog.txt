@@ -1,0 +1,41 @@
+chr2 (VALIDATION): 2,826 transcripts, 57,921 candidates, 1,909 reference starts, 5 seeds
+
+=== 1. marginal, which is the comparison I over-read ===
+  capture        AUC 0.8553
+  slot           AUC 0.8279
+  first filled   AUC 0.7756
+  orf_start      AUC 0.7744
+  kozak_score    AUC 0.6196
+
+=== 2. within-transcript pairs, matched on orf_start ===
+  reference vs a non-reference candidate of the SAME transcript whose
+  orf_start is within D nt. Position held fixed by construction.
+  D= 10nt     207 pairs over   198 reference candidates   capture wins  76.8%   geometry-only  33.8%
+  D= 25nt     590 pairs over   478 reference candidates   capture wins  82.5%   geometry-only  34.2%
+  D= 50nt   1,318 pairs over   905 reference candidates   capture wins  84.6%   geometry-only  33.6%
+  D=100nt   2,723 pairs over 1,365 reference candidates   capture wins  83.4%   geometry-only  29.4%
+
+=== 3. THE DIRECTION CONTROL (D=50) ===
+  If position were still doing the work, the reference would win when it
+  is the upstream member and lose when it is the downstream one.
+    reference UPSTREAM of competitor        78.2%   n 888
+    reference DOWNSTREAM of competitor      97.9%   n 430
+    difference                             -19.8 pp
+
+=== 4. by Kozak advantage (D=50) ===
+    reference WORSE Kozak (< -0.25)     81.9%   n 612
+    roughly equal                       85.0%   n 133
+    reference BETTER Kozak (> +0.25)    87.4%   n 573
+
+=== 5. per seed (D=50) ===
+    b8_s100.pt    86.3%
+    b8_s200.pt    83.5%
+    b8_s300.pt    86.6%
+    b8_s400.pt    83.7%
+    b8_s500.pt    82.9%
+
+=== 6. is first_filled a deterministic function of orf_start? ===
+    distinct first_filled values per orf_start value: max 1, mean 1.000  (deterministic)
+    -> if deterministic, 'first_filled falls to chance inside orf_start
+       bands' is guaranteed by construction and is not an independent
+       check that geometry has been removed.

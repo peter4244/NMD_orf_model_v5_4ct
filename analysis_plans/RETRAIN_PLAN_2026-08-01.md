@@ -741,6 +741,60 @@ computed on 10,131 transcripts of a different universe with a different pool and
 AUPRC is prevalence-dependent, so it does not transport. The existing checkpoint is re-evaluated on
 `test_clean` and that number is the comparison; the tabular-only GBM is refitted on the same split.
 
+### 8.5 The matched-pair initiation test, pre-registered
+
+**Written before `test_clean` is read, and before the configuration is selected.** The exploratory
+version of this analysis ran on validation and is not reported: two independent geometric leaks were
+found in it, each of which inflated the estimate, and the corrected residual did not survive
+gene-clustered inference at that sample size. This section fixes the analysis so that the test-set
+run is confirmatory rather than another exploration.
+
+**The question.** Does the capture head prefer the annotated start codon over a competing start codon
+in the same transcript, once every geometric property of the reading window is held fixed?
+
+**The two leaks this design controls.** Both live in *which positions of the ATG window are filled*,
+and neither is visible to an ablation over channels.
+
+| leak | mechanism | control |
+|---|---|---|
+| 5′ padding | the window reaches 900 upstream, so its left fill boundary is `max(901 − orf_start, 0)` — distance to the 5′ end, exactly | pairs matched on `orf_start` to ±50, and the direction split below |
+| midpoint clip | fill stops at the ORF midpoint, so right-hand fill is `min(100, (orf_length // 2) + 1)` — a readout of ORF length. Reference coding sequences are long and competing ORFs are usually very short | **both** candidates required to have the full 100 bases of right-hand fill |
+
+**Construction.** Over `test_clean`:
+
+```
+eligible   = candidates with kozak_score >= -1.2508          # both arms cleared the same bar
+pairs      = (r, c) with r reference, c not, same transcript,
+             |orf_start[r] - orf_start[c]| <= 50,
+             right_fill[r] == 100 and right_fill[c] == 100
+statistic  = fraction of pairs where p_capture[r] > p_capture[c],
+             ties counted as one half
+```
+
+`p_capture` is the mean over the five seeds of the configuration selected in §7 step 5; the per-seed
+range is reported beside it.
+
+**Inference is a bootstrap resampling GENES**, not pairs — the pairs of one gene are not independent
+and the design effect measured on this statistic in the exploratory run was 3.15, against 1.71 for
+the label-level ICC. The pair-resampled interval is reported alongside so that ratio is visible
+again on the test split.
+
+**The claim is supported only if the gene-clustered 95% interval excludes 0.5.** If it includes 0.5
+that is reported as the result.
+
+**Pre-specified secondary — the direction split.** Matching on `orf_start` to ±50 still leaves one
+member upstream. The statistic is reported separately for pairs where the reference is upstream and
+where it is downstream. A monotone positional preference must push one of those below 0.5; both
+above 0.5 is evidence no positional account can produce.
+
+**Pre-specified baselines, on the identical pairs**, ties counted as one half throughout:
+`orf_length`, right-hand window fill, `kozak_score`, 5′ proximity (`−orf_start`), `n_downstream_ejc`,
+and the tabular gradient-boosted model of §8.3 with `is_ref_cds` withheld, since that column is the
+label of this test.
+
+**Reported whatever it shows**, with the number of pairs, the number of genes, and the pairs-per-gene.
+
+
 ---
 
 ## 9. The in-silico mutagenesis bank

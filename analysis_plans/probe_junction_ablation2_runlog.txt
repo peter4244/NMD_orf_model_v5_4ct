@@ -1,0 +1,91 @@
+VERIFIED: channels 6-8 == fixed period-3 carrier x fill mask, so their
+          only candidate-specific content is WHERE THE WINDOW IS FILLED.
+
+chr21: 502 transcripts, 9,437 candidates, 5 seeds; ATG window 900+100
+reference starts 330; chr21 is a TRAINING chromosome
+
+=== full ===
+  mean p_capture 0.2498   median 0.0393
+  AUC ref-vs-other        raw 0.8382
+    within slot           0.8905  (n_ref 279)
+    within Kozak decile   0.8051  (n_ref 323)  thin: [(1, 7, 936)]
+    within up-fill decile 0.8748  (n_ref 330)
+
+=== zero_junc ===
+  liveness  66.3% moved, median |delta| 0.00112, max 0.3698
+  mean p_capture 0.2258   median 0.0317
+  AUC ref-vs-other        raw 0.8369
+    within slot           0.8876  (n_ref 279)
+    within Kozak decile   0.8026  (n_ref 323)  thin: [(1, 7, 936)]
+    within up-fill decile 0.8740  (n_ref 330)
+
+=== zero_gc ===
+  liveness 100.0% moved, median |delta| 0.02300, max 0.3421
+  mean p_capture 0.1932   median 0.0144
+  AUC ref-vs-other        raw 0.8666
+    within slot           0.8922  (n_ref 279)
+    within Kozak decile   0.8392  (n_ref 323)  thin: [(1, 7, 936)]
+    within up-fill decile 0.8797  (n_ref 330)
+
+=== zero_phase ===
+  liveness 100.0% moved, median |delta| 0.03462, max 0.7942
+  mean p_capture 0.1064   median 0.0532
+  AUC ref-vs-other        raw 0.8205
+    within slot           0.8826  (n_ref 279)
+    within Kozak decile   0.7969  (n_ref 323)  thin: [(1, 7, 936)]
+    within up-fill decile 0.8572  (n_ref 330)
+
+=== zero_seq ===
+  liveness 100.0% moved, median |delta| 0.02247, max 0.8470
+  mean p_capture 0.1245   median 0.0274
+  AUC ref-vs-other        raw 0.7934
+    within slot           0.8835  (n_ref 279)
+    within Kozak decile   0.7605  (n_ref 323)  thin: [(1, 7, 936)]
+    within up-fill decile 0.8575  (n_ref 330)
+
+=== phase_nofill ===
+  liveness  84.1% moved, median |delta| 0.09784, max 0.6153
+  mean p_capture 0.3687   median 0.2555
+  AUC ref-vs-other        raw 0.7904
+    within slot           0.8582  (n_ref 279)
+    within Kozak decile   0.7545  (n_ref 323)  thin: [(1, 7, 936)]
+    within up-fill decile 0.8442  (n_ref 330)
+
+=== THE COMPARISON — AUC is the column that means the same thing in every row ===
+  condition      mean diff  AUC raw  AUC|slot  AUC|kozak  AUC|fill   mean p   moved
+  full             +0.4417   0.8382    0.8905     0.8051    0.8748   0.2498    0.0%
+  zero_junc        +0.4007   0.8369    0.8876     0.8026    0.8740   0.2258   66.3%
+  zero_gc          +0.4415   0.8666    0.8922     0.8392    0.8797   0.1932  100.0%
+  zero_phase       +0.1233   0.8205    0.8826     0.7969    0.8572   0.1064  100.0%
+  zero_seq         +0.1440   0.7934    0.8835     0.7605    0.8575   0.1245  100.0%
+  phase_nofill     +0.3028   0.7904    0.8582     0.7545    0.8442   0.3687   84.1%
+
+  retained share of the raw AUC's distance above 0.5:
+    full           100.0%
+    zero_junc       99.6%
+    zero_gc        108.4%
+    zero_phase      94.8%
+    zero_seq        86.8%
+    phase_nofill    85.9%
+
+=== does capture read padding extent directly? ===
+  Spearman(upstream fill, p_capture) all candidates       +0.0225  n 9,437
+  Spearman(upstream fill, p_capture) non-reference only   +0.0713  n 9,107
+  Spearman(upstream fill, p_capture) reference only       +0.2688  n 330
+  up-fill decile profile, non-reference candidates only:
+    decile 0: up_fill 0.131   p_capture 0.1561   n 786
+    decile 1: up_fill 0.355   p_capture 0.2236   n 883
+    decile 2: up_fill 0.558   p_capture 0.2438   n 906
+    decile 3: up_fill 0.757   p_capture 0.2332   n 921
+    decile 4: up_fill 0.992   p_capture 0.2457   n 5,611
+
+=== per-seed AUC, so no row rests on one checkpoint ===
+  condition       b8_s100   b8_s200   b8_s300   b8_s400   b8_s500
+  full             0.8565    0.8118    0.8096    0.8288    0.8538
+  zero_junc        0.8580    0.8127    0.8073    0.8354    0.8523
+  zero_gc          0.8744    0.8306    0.8358    0.8551    0.8968
+  zero_phase       0.8209    0.7922    0.8446    0.8215    0.7725
+  zero_seq         0.8309    0.7907    0.7641    0.7808    0.7492
+  phase_nofill     0.8048    0.7260    0.7899    0.7327    0.7976
+
+cached capture -> /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_interp_all/junction_ablation_capture_chr21.npz

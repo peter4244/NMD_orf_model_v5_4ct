@@ -1,0 +1,5 @@
+tight residual set: 327 pairs | 293 distinct reference candidates | 138 genes
+  naive win rate 59.3%   pairs per gene 2.37
+  GENE-CLUSTERED bootstrap 95% CI [49.6, 68.4]   p(<=0.5) = 0.0307
+  naive se 2.72pp   clustered se 4.82pp   design effect 3.15
+  collapsed to one value per gene: 54.8%  n 138 genes

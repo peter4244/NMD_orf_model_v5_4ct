@@ -1,0 +1,33 @@
+chr2: 57,921 candidates, 1,909 reference starts
+right-hand fill == min(100, mid - orf_start + 1) in 100.0% of candidates  <- the clip rule, verified on data
+
+=== 1. does the clip separate the arms? ===
+  full 100 bases of right fill, reference      96.0%
+  full 100 bases of right fill, non-reference  25.8%
+  median ORF length  reference     831 nt   non-reference      66 nt
+
+=== 2. baselines on the 1,154 floor-restricted matched pairs ===
+    orf_length                    97.9%
+    p_capture (the model)         86.1%
+    right-hand window fill        69.0%
+    5'-proximity (-orf_start)     67.0%
+    kozak_score                   53.0%
+
+=== 3. pairs where BOTH windows are untruncated ===
+    no ORF-length information available to either arm
+    capture                             58.8%   n   354   z  3.30   95% CI [53.6, 63.8]
+      reference upstream                55.9%   n   320   z  2.12   95% CI [50.5, 61.3]
+      reference downstream              85.3%   n    34   z  4.12   95% CI [69.9, 93.6]
+    at least one truncated              98.2%   n   800   z 27.29   95% CI [97.1, 99.0]
+
+=== 4. RE-CUT: my below-floor result, both arms untruncated ===
+    below-floor, as I reported it       73.8%   n   164   z  6.09   95% CI [66.6, 79.9]
+    below-floor, both untruncated       43.4%   n    76   z -1.15   95% CI [32.9, 54.6]
+        mean Kozak deficit of the reference: -2.629
+
+=== 5. is any geometry left after BOTH leaks are controlled? ===
+    both untruncated AND upstream fill matched to within 0.05
+    capture                             59.3%   n   327   z  3.37   95% CI [53.9, 64.5]
+      control: right-hand fill           0.0%   n   327   z -18.08   95% CI [-0.0, 1.2]
+      control: upstream fill             5.5%   n   327   z -16.09   95% CI [3.5, 8.5]
+      control: orf_length               94.5%   n   327   z 16.09   95% CI [91.5, 96.5]

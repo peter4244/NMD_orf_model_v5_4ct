@@ -1,0 +1,36 @@
+chr21: 9,437 candidates, 330 reference starts
+ATG window 900+100; 'first' is the index of the first
+filled position, so 900-first is how much real 5' context exists.
+
+=== every feature is a property of the STORED WINDOW. No model. ===
+  feature                          AUC  AUC|slot  AUC|kozak
+  first filled index            0.8127    0.5648     0.8117
+  n filled positions            0.7662    0.6612     0.7675
+  upstream fill fraction        0.8127    0.5648     0.8117
+  downstream fill fraction      0.8384    0.8529     0.8154
+  junction marks in window      0.6098    0.6680     0.6057
+  mean GC over filled           0.7623    0.6197     0.7543
+  slot (candidate rank)         0.8573    0.5000     0.8522
+  kozak_score (PWM)             0.6056    0.6027     0.5345
+
+=== the geometry-only combination ===
+  logistic on 5 geometry features, IN-SAMPLE (so an upper bound):
+    AUC 0.9337
+    within slot 0.8190
+
+=== side by side with the trained capture head ===
+  trained capture head (5-seed mean)   AUC 0.8382
+  geometry-only logistic, in-sample    AUC 0.9337
+  best single geometry feature         AUC 0.8573
+  kozak_score (PWM) alone              AUC 0.6056
+
+=== the comparison that geometry cannot confound ===
+  Within a transcript, every candidate shares the same 5' end and the
+  same exon structure. Restricting to transcripts that hold a reference
+  start AND at least one non-reference candidate, and asking whether the
+  reference start outranks its OWN transcript's competitors, removes
+  between-transcript geometry entirely.
+    within-transcript AUC (capture) 0.8336   over 5,919 reference-vs-competitor pairs
+    within-transcript AUC (first filled index) 0.8378
+    within-transcript AUC (slot) 0.8358
+    within-transcript AUC (kozak_score) 0.6205

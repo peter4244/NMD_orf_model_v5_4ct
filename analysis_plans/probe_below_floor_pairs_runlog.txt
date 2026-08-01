@@ -1,0 +1,28 @@
+chr2: 1,909 reference starts; 178 below the MANE floor -1.250792
+  1909 - 178 = 1,731   (Maude reports 1,731)
+  non-reference candidates below the floor: 7  <- must be ~0 if the floor binds
+  admitted_by for below-floor references: {'reference': 178}
+
+cached capture -> capture_chr2.npz
+
+=== position-matched pairs, D=50, three populations ===
+  ALL references (mine)
+    pairs  1,318   refs   905   capture wins  84.6%
+      ref upstream      78.2%   n 888
+      ref downstream    97.9%   n 430
+      ref has worse Kozak:  81.9%   n 612
+  FLOOR-RESTRICTED (Maude's)
+    pairs  1,154   refs   785   capture wins  86.1%
+      ref upstream      80.5%   n 773
+      ref downstream    97.6%   n 381
+      ref has worse Kozak:  84.6%   n 449
+
+=== THE SHARP CUT — reference BELOW the floor vs competitor ABOVE it ===
+  the reference carries the worst available PWM disadvantage, is in the
+  pool only because it is the reference, and is position-matched.
+  below-floor refs only
+    pairs    164   refs   120   capture wins  73.8%
+      ref upstream      62.6%   n 115
+      ref downstream   100.0%   n 49
+      ref has worse Kozak:  74.2%   n 163
+    mean Kozak deficit of the reference in these pairs: -2.308

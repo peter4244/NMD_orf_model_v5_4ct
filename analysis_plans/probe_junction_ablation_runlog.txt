@@ -1,0 +1,81 @@
+chr21: 502 transcripts, 9,437 candidates, 5 checkpoints from /private/tmp/claude-502/-Users-petecastaldi/6ea6b1ee-b03e-42c4-8a85-487850841c94/scratchpad/ckpt_snapshot
+ATG window: atg_left=900 atg_right=100 W=1000
+chr21 is a TRAINING CHROMOSOME for these checkpoints. In-sample.
+
+=== 0. what geometry alone says, before any model ===
+  the two channels-groups that are not sequence identity, ref vs other:
+    junction marks in window         ref   1.2848   other   2.6865   diff  -1.4017
+    fill fraction (whole window)     ref   0.4419   other   0.7607   diff  -0.3188
+    fill fraction (900nt upstream)   ref   0.3818   other   0.7888   diff  -0.4070
+    windows with NO junction mark : ref 28.8%   other 33.9%
+    upstream fully filled (==1.0) : ref 10.9%   other 54.8%
+  admitted_by among reference candidates: {'floor': 269, 'reference': 61}
+
+=== full ===
+  (baseline)
+  p_capture mean 0.2498  median 0.0393
+  [full] raw gap  +0.4417   ref 0.6761 (n=330)   other 0.2343 (n=9,107)
+  [full] slot-matched (n_ref weighted, slots 0-5, >=20/arm) +0.4862   over n_ref 260
+  [full] Kozak-decile-matched (n_ref weighted, >=8/arm) +0.4026   over n_ref 323 of 330
+        decile 1 EXCLUDED: n_ref 7, n_other 936 (below 8)
+
+=== zero_junc ===
+  LIVENESS: 66.3% of candidates moved at all; 50.9% moved > 1e-3; median |delta| 0.00112; max 0.3698
+  p_capture mean 0.2258  median 0.0317
+  [zero_junc] raw gap  +0.4007   ref 0.6125 (n=330)   other 0.2118 (n=9,107)
+  [zero_junc] slot-matched (n_ref weighted, slots 0-5, >=20/arm) +0.4335   over n_ref 260
+  [zero_junc] Kozak-decile-matched (n_ref weighted, >=8/arm) +0.3636   over n_ref 323 of 330
+        decile 1 EXCLUDED: n_ref 7, n_other 936 (below 8)
+
+=== zero_gc ===
+  LIVENESS: 100.0% of candidates moved at all; 98.6% moved > 1e-3; median |delta| 0.02300; max 0.3421
+  p_capture mean 0.1932  median 0.0144
+  [zero_gc] raw gap  +0.4415   ref 0.6193 (n=330)   other 0.1778 (n=9,107)
+  [zero_gc] slot-matched (n_ref weighted, slots 0-5, >=20/arm) +0.4630   over n_ref 260
+  [zero_gc] Kozak-decile-matched (n_ref weighted, >=8/arm) +0.4091   over n_ref 323 of 330
+        decile 1 EXCLUDED: n_ref 7, n_other 936 (below 8)
+
+=== zero_phase ===
+  LIVENESS: 100.0% of candidates moved at all; 98.5% moved > 1e-3; median |delta| 0.03462; max 0.7942
+  p_capture mean 0.1064  median 0.0532
+  [zero_phase] raw gap  +0.1233   ref 0.2254 (n=330)   other 0.1021 (n=9,107)
+  [zero_phase] slot-matched (n_ref weighted, slots 0-5, >=20/arm) +0.1401   over n_ref 260
+  [zero_phase] Kozak-decile-matched (n_ref weighted, >=8/arm) +0.1148   over n_ref 323 of 330
+        decile 1 EXCLUDED: n_ref 7, n_other 936 (below 8)
+
+=== zero_seq ===
+  LIVENESS: 100.0% of candidates moved at all; 97.3% moved > 1e-3; median |delta| 0.02247; max 0.8470
+  p_capture mean 0.1245  median 0.0274
+  [zero_seq] raw gap  +0.1440   ref 0.2635 (n=330)   other 0.1195 (n=9,107)
+  [zero_seq] slot-matched (n_ref weighted, slots 0-5, >=20/arm) +0.1778   over n_ref 260
+  [zero_seq] Kozak-decile-matched (n_ref weighted, >=8/arm) +0.1268   over n_ref 323 of 330
+        decile 1 EXCLUDED: n_ref 7, n_other 936 (below 8)
+
+=== THE COMPARISON ===
+  condition          raw   slot-matched   kozak-matched
+  full           +0.4417        +0.4862         +0.4026
+  zero_junc      +0.4007        +0.4335         +0.3636
+  zero_gc        +0.4415        +0.4630         +0.4091
+  zero_phase     +0.1233        +0.1401         +0.1148
+  zero_seq       +0.1440        +0.1778         +0.1268
+
+=== 5. the gap inside strata of upstream fill ===
+  zeroing channel 4 leaves padding extent intact, and padding extent
+  is close to distance-to-5'-end. If the gap lives there it survives
+  the junction ablation while still not being a sequence finding.
+  --- full ---
+    up_fill 0.00-0.56        ref 0.6684 (n=242)   other 0.2062 (n=2116)   diff +0.4621
+    up_fill 0.56-1.00        ref 0.6973 (n= 88)   other 0.2429 (n=6991)   diff +0.4544
+    fill-matched (n_ref weighted): +0.4601   over n_ref 330
+  --- zero_junc ---
+    up_fill 0.00-0.56        ref 0.5994 (n=242)   other 0.1830 (n=2116)   diff +0.4164
+    up_fill 0.56-1.00        ref 0.6487 (n= 88)   other 0.2206 (n=6991)   diff +0.4282
+    fill-matched (n_ref weighted): +0.4195   over n_ref 330
+
+=== 6. per-seed, so the answer is not one checkpoint ===
+  seed           full raw   zero_junc raw     delta
+  b8_s100.pt      +0.5222         +0.5031   -0.0190
+  b8_s200.pt      +0.5178         +0.4949   -0.0229
+  b8_s300.pt      +0.4116         +0.3882   -0.0235
+  b8_s400.pt      +0.3583         +0.2453   -0.1130
+  b8_s500.pt      +0.3987         +0.3719   -0.0268
