@@ -68,6 +68,20 @@ def capture(model, atg, zero_channels=()):
         return torch.sigmoid(model.init_head(model.enc_init(x)).squeeze(-1)).numpy()
 
 
+def auc(y, s):
+    """Rank AUC. Invariant to any monotone rescaling of s, which is the whole
+    reason it is used here instead of a difference of means."""
+    y = np.asarray(y); s = np.asarray(s)
+    npos, nneg = int(y.sum()), int((1 - y).sum())
+    if npos == 0 or nneg == 0:
+        return float("nan")
+    o = np.argsort(s, kind="stable")
+    r = np.empty(len(s), float); r[o] = np.arange(1, len(s) + 1)
+    _, inv, cnt_ = np.unique(s, return_inverse=True, return_counts=True)
+    r = (np.bincount(inv, weights=r) / cnt_)[inv]
+    return float((r[y == 1].sum() - npos * (npos + 1) / 2) / (npos * nneg))
+
+
 def gap(cap, ref, mask=None):
     m = np.ones(len(cap), bool) if mask is None else mask
     a, b = m & ref, m & ~ref
@@ -106,7 +120,18 @@ def main():
         f"{k}={v:,}" for k, v in pool.admitted_by.value_counts().items()))
 
     ckpts = sorted(Path(args.ckpt_dir).glob("b8_s*.pt"))
-    caps = {k: [] for k in ("base", "no_junc", "no_gc", "seq_only")}
+    # NECESSITY (zero one group, keep the rest) and SUFFICIENCY (keep one group,
+    # zero the rest). Necessity alone measures a channel's UNIQUE contribution and
+    # reads near zero for everything when the channels encode redundantly, so
+    # "the gap survived zeroing X" would license the same conclusion about every
+    # X and cannot support any of them.
+    GROUPS = dict(seq=(0, 1, 2, 3), junc=(4,), gc=(5,), phase=(6, 7, 8))
+    ALL = tuple(range(9))
+    CONDS = {"full": ()}
+    for g, ch in GROUPS.items():
+        CONDS[f"zero_{g}"] = ch
+        CONDS[f"only_{g}"] = tuple(c for c in ALL if c not in ch)
+    caps = {k: [] for k in CONDS}
     for cp in ckpts:
         model, ck = load(cp)
         acc = {k: [] for k in caps}
@@ -114,14 +139,13 @@ def main():
             sl = slice(int(off[i]), int(off[i]) + int(cnt[i]))
             s0 = o_s[sl].astype(np.int64)
             atg = torch.as_tensor(decode_windows(codes[sl][:, 0], s0, 900, s0))
-            acc["base"].append(capture(model, atg))
-            acc["no_junc"].append(capture(model, atg, (4,)))
-            acc["no_gc"].append(capture(model, atg, (5,)))
-            acc["seq_only"].append(capture(model, atg, (4, 5)))
+            for k, ch in CONDS.items():
+                acc[k].append(capture(model, atg, ch))
         for k in caps:
             caps[k].append(np.concatenate(acc[k]))
         print(f"  {cp.name}: done", flush=True)
     cap = {k: np.mean(v, axis=0) for k, v in caps.items()}
+    cap["base"] = cap["full"]
 
     ref = pool.is_ref_cds.to_numpy() == 1
     kz = pool.kozak_score.to_numpy()
@@ -145,7 +169,7 @@ def main():
                        ("...and slot 0 only", above & (slot == 0)),
                        ("...and slot 1-4", above & (slot >= 1) & (slot <= 4)),
                        ("...and slot 5+", above & (slot >= 5))):
-        g, na, nb = gap(cap["base"], ref, mask)
+        g, na, nb = gap(cap["full"], ref, mask)
         print(f"  {name:<34} {g:>+9.4f} {na:>7,} {nb:>9,}")
 
     print(f"\n  Kozak-decile matched, restricted to at or above the floor:")
@@ -153,30 +177,40 @@ def main():
     num = den = 0.0
     print(f"  {'decile':>7} {'kozak':>8} {'n ref':>6} {'n other':>8} {'gap':>9}")
     for i in sorted(set(d)):
-        m = np.zeros(len(cap["base"]), bool); m[np.flatnonzero(above)[d == i]] = True
-        g, na, nb = gap(cap["base"], ref, m)
+        m = np.zeros(len(cap["full"]), bool); m[np.flatnonzero(above)[d == i]] = True
+        g, na, nb = gap(cap["full"], ref, m)
         if not np.isnan(g):
             num += na * g; den += na
             print(f"  {i:>7} {kz[m].mean():>8.3f} {na:>6,} {nb:>8,} {g:>+9.4f}")
     print(f"  n-weighted mean gap, floor-restricted and Kozak-matched: {num/den:+.4f}")
 
-    print(f"\n=== what the capture head is reading (Track A's ablation) ===")
-    print(f"  Capture sees the start-codon window alone. Zeroing a channel of that")
-    print(f"  window at inference asks what the preference survives on.")
-    print(f"  {'channels zeroed':<34} {'gap':>9} {'vs base':>9} {'median p':>10}")
-    base_g, _, _ = gap(cap["base"], ref, above)
-    for name, k in (("none (baseline)", "base"),
-                    ("4  junction mark", "no_junc"),
-                    ("5  rolling GC", "no_gc"),
-                    ("4 and 5  bases only", "seq_only")):
-        g, _, _ = gap(cap[k], ref, above)
-        print(f"  {name:<34} {g:>+9.4f} {100*g/base_g:>8.0f}% {np.median(cap[k]):>10.4f}")
-    print(f"\n  A gap that survives with 4 and 5 zeroed is carried by base identity")
-    print(f"  in the start-codon window -- initiation context. One that collapses when")
-    print(f"  channel 4 goes was junction geometry.")
+    print(f"\n=== what the capture head is reading ===")
+    print(f"  ON AUC, NOT ON A DIFFERENCE OF MEANS. Zeroing channels compresses the")
+    print(f"  p_capture distribution -- the median moves from {np.median(cap['full']):.4f} to")
+    print(f"  {np.median(cap['only_phase']):.4f} across these conditions -- so a probability-point gap")
+    print(f"  shrinks whether or not the ORDERING changed. AUC is invariant to any")
+    print(f"  monotone rescaling and asks only whether reference starts still outrank")
+    print(f"  their competitors. The difference-in-means column is kept alongside so")
+    print(f"  the size of that artifact is visible.")
+    m = above
+    yv = ref[m].astype(np.int8)
+    base_auc = auc(yv, cap["full"][m])
+    base_g, _, _ = gap(cap["full"], ref, above)
+    print(f"\n  {'condition':<26} {'AUC':>8} {'% of AUC-0.5 kept':>19} "
+          f"{'mean gap':>10} {'% of gap':>9} {'median p':>10}")
+    order = ["full"] + [f"zero_{g}" for g in GROUPS] + [f"only_{g}" for g in GROUPS]
+    for k in order:
+        a_ = auc(yv, cap[k][m])
+        g_, _, _ = gap(cap[k], ref, above)
+        print(f"  {k:<26} {a_:>8.4f} {100*(a_-0.5)/(base_auc-0.5):>18.0f}% "
+              f"{g_:>+10.4f} {100*g_/base_g:>8.0f}% {np.median(cap[k]):>10.4f}")
+    print(f"\n  NECESSITY (zero_*) measures a group's UNIQUE contribution and is small")
+    print(f"  for every group when the encoding is redundant. SUFFICIENCY (only_*) is")
+    print(f"  the direction that can support a claim: it asks what one group alone")
+    print(f"  can still rank on.")
 
     print(f"\n=== selection depth, out of sample ===")
-    p = cap["base"]
+    p = cap["full"]
     # P_select from the capture probabilities alone: stick-breaking needs nothing else
     sel = np.empty_like(p)
     at = 0

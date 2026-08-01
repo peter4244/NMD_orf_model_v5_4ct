@@ -1,54 +1,27 @@
-tensor results_tensor_chr2
-  2,826 transcripts, 57,921 candidates
-  splits: val=2,787, val_paralog=39
-  admitted_by: floor=57,638, reference=272, fallback=11
-  b8_s100.pt: done
-  b8_s200.pt: done
-  b8_s300.pt: done
-  b8_s400.pt: done
-  b8_s500.pt: done
+=== what the capture head is reading ===
+  ON AUC, NOT ON A DIFFERENCE OF MEANS. Zeroing channels compresses the
+  p_capture distribution -- the median moves from 0.0329 to
+  0.0135 across these conditions -- so a probability-point gap
+  shrinks whether or not the ORDERING changed. AUC is invariant to any
+  monotone rescaling and asks only whether reference starts still outrank
+  their competitors. The difference-in-means column is kept alongside so
+  the size of that artifact is visible.
 
-=== the admission-rule confound, sized ===
-  reference start codons below the Kozak floor : 178 of 1,909 (9.3%)
-  non-reference candidates below the floor     : 7
-  -> below the floor the non-reference arm is nearly empty, so a decile
-     spanning it is not matched. Restricting both arms to >= the floor
-     removes the truncation instead of bounding it.
+  condition                       AUC   % of AUC-0.5 kept   mean gap  % of gap   median p
+  full                         0.8584                100%    +0.4770      100%     0.0329
+  zero_seq                     0.8023                 84%    +0.1530       32%     0.0261
+  zero_junc                    0.8661                102%    +0.4473       94%     0.0255
+  zero_gc                      0.8785                106%    +0.4553       95%     0.0125
+  zero_phase                   0.8330                 93%    +0.1235       26%     0.0464
+  only_seq                     0.9090                114%    +0.0866       18%     0.0170
+  only_junc                    0.5417                 12%    +0.0026        1%     0.0373
+  only_gc                      0.8600                100%    +0.0057        1%     0.0282
+  only_phase                   0.8249                 91%    +0.0794       17%     0.0135
 
-=== p_capture: reference start vs everything else ===
-  condition                                gap   n ref   n other
-  all candidates                       +0.4686   1,909    56,012
-  both arms at or above the floor      +0.4770   1,731    56,005
-  ...and slot 0 only                   +0.5510     682     2,106
-  ...and slot 1-4                      +0.4600     668    10,285
-  ...and slot 5+                       +0.4728     381    43,614
-
-  Kozak-decile matched, restricted to at or above the floor:
-   decile    kozak  n ref  n other       gap
-        0   -1.114     85    5,690   +0.4987
-        1   -0.864     74    5,725   +0.4850
-        2   -0.630     81    5,668   +0.4742
-        3   -0.405    113    5,659   +0.4487
-        4   -0.167     86    5,688   +0.4954
-        5    0.095    108    5,671   +0.4380
-        6    0.382    206    5,566   +0.4725
-        7    0.710    203    5,566   +0.4003
-        8    1.146    286    5,490   +0.4489
-        9    1.984    489    5,282   +0.4452
-  n-weighted mean gap, floor-restricted and Kozak-matched: +0.4518
-
-=== what the capture head is reading (Track A's ablation) ===
-  Capture sees the start-codon window alone. Zeroing a channel of that
-  window at inference asks what the preference survives on.
-  channels zeroed                          gap   vs base   median p
-  none (baseline)                      +0.4770      100%     0.0329
-  4  junction mark                     +0.4473       94%     0.0255
-  5  rolling GC                        +0.4553       95%     0.0125
-  4 and 5  bases only                  +0.4177       88%     0.0098
-
-  A gap that survives with 4 and 5 zeroed is carried by base identity
-  in the start-codon window -- initiation context. One that collapses when
-  channel 4 goes was junction geometry.
+  NECESSITY (zero_*) measures a group's UNIQUE contribution and is small
+  for every group when the encoding is redundant. SUFFICIENCY (only_*) is
+  the direction that can support a claim: it asks what one group alone
+  can still rank on.
 
 === selection depth, out of sample ===
   slots 0-4       75.98% of mass   13,841 candidates

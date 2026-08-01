@@ -1,0 +1,48 @@
+  b8_s100.pt: done
+  b8_s200.pt: done
+  b8_s300.pt: done
+  b8_s400.pt: done
+  b8_s500.pt: done
+
+57,921 candidates, 57,736 at or above the Kozak floor
+  reference 1,731   other 56,005
+
+=== marginal: what discriminates reference from non-reference? ===
+  p_capture (trained)        AUC 0.8584
+  first filled index         AUC 0.2110
+  window fill fraction       AUC 0.7330
+  slot                       AUC 0.8436
+  orf_start                  AUC 0.7892
+  kozak_score (PWM)          AUC 0.6833
+  (positional features negated so that 5'-proximal scores high)
+
+=== 1. within bands of orf_start ===
+  Inside a band the positional features are nearly constant, so they
+  must fall to chance. Anything capture retains is not positional.
+   10 bands: capture 0.8715   first-filled 0.4673   kozak 0.6679   (9,227,747 pairs, 10 bands)
+   25 bands: capture 0.8741   first-filled 0.4886   kozak 0.6680   (3,685,870 pairs, 25 bands)
+   50 bands: capture 0.8741   first-filled 0.4969   kozak 0.6675   (1,840,625 pairs, 50 bands)
+
+=== 2. within bands of orf_start AND fill fraction ===
+  capture 0.8568   first-filled 0.4746   kozak 0.6759   (3,701,823 pairs, 24 strata)
+
+=== 3. WITHIN TRANSCRIPT, matched on start position (+/- 50 nt) ===
+  Same 5' end, same exon structure, same amount of 5' context. Two start
+  codons a few dozen bases apart, one annotated and one not.
+  matched pairs: 1,154 over 1,731 reference candidates
+  reference has the HIGHER p_capture in 86.1% (994 won, 0 tied, 160 lost)
+  mean Kozak difference within these pairs: +0.2499
+  -> 50% is what pure position predicts; the pairs are matched on it.
+
+=== 4. WITHIN TRANSCRIPT, matched on position, SPLIT BY KOZAK ADVANTAGE ===
+  Test 3 gave 86.1%, but the reference had +0.25 mean Kozak in those pairs.
+  If the win rate holds where the reference has the WORSE Kozak score, the
+  preference is not the PWM either.
+  Kozak advantage of the reference         pairs   ref wins
+  reference has WORSE Kozak (< -0.25)        449      84.6%
+  roughly equal (-0.25 to +0.25)             132      85.6%
+  reference has BETTER Kozak (> +0.25)       573      87.4%
+  ALL                                      1,154      86.1%
+
+  Pure position predicts 50%. The PWM predicts the win rate should track
+  the Kozak advantage. Neither describes what is there.
