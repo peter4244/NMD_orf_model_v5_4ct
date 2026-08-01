@@ -57,6 +57,14 @@ STRUCTURAL_COLS = ["n_downstream_ejc", "is_ref_cds", "is_sqanti_cds",
                    "frac_start", "frac_stop"]
 INTERPRETABLE, PREDICTOR = [0], [0, 1, 2, 3, 4]
 REPO_POOL = Path(__file__).resolve().parent / "results_pool_v6" / "orf_pool.tsv"
+# The GENCODE-projected start, produced ONCE by the interpretability window's
+# probe_gencode_target_pairs.py and written durably here. Not reimplemented: the
+# projection needs the GENCODE GTF and per-transcript exon blocks, and a second
+# implementation of a coordinate projection is exactly the thing that drifts.
+# Absent, the bank still builds and says the field is missing rather than
+# silently shipping the expression-derived one under a name implying otherwise.
+GENCODE_FLAGS = (Path(__file__).resolve().parent / "results_ism_v6"
+                 / "gencode_candidate_flags.tsv")
 CLAMP_LOGIT = 13.815511057963775      # log((1-1e-6)/1e-6), aggregate()'s clamp
 
 
@@ -420,6 +428,24 @@ def main():
             "(plan §9.3 step 8)")
 
     # ------------------------------------------------------------- the subset
+    # ---- the GENCODE-projected start, if it has been produced -------------
+    gc_flags = None
+    if GENCODE_FLAGS.exists():
+        _g = pd.read_csv(GENCODE_FLAGS, sep="\t")
+        gc_flags = {}
+        for iso_id, g in _g.groupby("isoform_id", sort=False):
+            g = g.sort_values("slot", kind="stable")
+            gc_flags[iso_id] = (g.is_gencode_start.to_numpy(np.int8),
+                                g.upstream_of_gencode_start.to_numpy(np.int8))
+        print(f"\nGENCODE-projected start flags: {GENCODE_FLAGS.name}, "
+              f"{len(gc_flags):,} transcripts")
+    else:
+        print(f"\nGENCODE-projected start flags: ABSENT ({GENCODE_FLAGS}).")
+        print(f"  The bank ships cand_upstream_of_ref only, which uses the")
+        print(f"  EXPRESSION-DERIVED reference start and is label-adjacent by")
+        print(f"  construction. Any analysis of upstream ORFs must say which")
+        print(f"  definition it used; they are not interchangeable.")
+
     # per-candidate mechanism flags, read from the pool table
     _pool = pd.read_csv(REPO_POOL, sep="\t",
                         usecols=["isoform_id", "slot", "orf_start", "is_ref_cds"])
@@ -568,6 +594,7 @@ def main():
     recs, spans_rows, floors, spreads = [], [], [], []
     pcap, psel, pdec = [], [], []
     is_ref, upstream = [], []
+    gc_is, gc_up = [], []
     fills, masses, dsels = [], [], []
     n_floor_samples = 0
     for n, r in enumerate(take.itertuples()):
@@ -575,6 +602,16 @@ def main():
         pcap.append(z["p_capture"]); psel.append(z["p_select"]); pdec.append(z["p_decay"])
         pr = pool_ref.get(r.isoform_id)
         is_ref.append(pr[0]); upstream.append(pr[1])
+        if gc_flags is not None:
+            # -1 where the isoform has no GENCODE transcript at all: 36.5% of the
+            # pool. A stratification keyed on this field silently drops the novel
+            # isoforms, which is where most NMD lives, so absence is a value and
+            # not a zero.
+            gf = gc_flags.get(r.isoform_id)
+            n_k = len(pr[0])
+            g_is = gf[0] if gf is not None else np.full(n_k, -1, np.int8)
+            g_up = gf[1] if gf is not None else np.full(n_k, -1, np.int8)
+            gc_is.append(g_is); gc_up.append(g_up)
         fills.append(z["fill_count"]); masses.append(z["mass"])
         dsels.append(z["dsel"])
         i = row[r.isoform_id]
@@ -667,6 +704,22 @@ def main():
         # to everything this project distrusts about the TD2 CDS calls.
         f.create_dataset("cand_is_ref_cds", data=np.concatenate(is_ref))
         f.create_dataset("cand_upstream_of_ref", data=np.concatenate(upstream))
+        if gc_is:
+            f.create_dataset("cand_is_gencode_start", data=np.concatenate(gc_is))
+            f.create_dataset("cand_upstream_of_gencode",
+                             data=np.concatenate(gc_up))
+        f.attrs["upstream_definitions"] = (
+            "cand_upstream_of_ref: orf_start < the orf_start of the candidate "
+            "with is_ref_cds==1, where the reference isoform is the "
+            "highest-DMSO-CPM non-NMD coding isoform of the gene (plan 2.4). "
+            "Covers every transcript; LABEL-ADJACENT by construction. "
+            "cand_upstream_of_gencode: orf_start < the GENCODE-annotated start "
+            "projected into this isoform's exon coordinates. Free of that "
+            "circularity; -1 where the isoform has no GENCODE transcript, which "
+            "is 36.5% of the pool, and the annotated start is admitted for 95.0% "
+            "of full splice matches against 30.8% of incomplete ones. THE TWO "
+            "ARE NOT INTERCHANGEABLE: every analysis must state which it used "
+            "and report the resulting n.")
         f.create_dataset("cand_offset", data=cand_offset)
         f.create_dataset("cand_count", data=cand_count)
         f.attrs["batch_shape_offset"] = floor
