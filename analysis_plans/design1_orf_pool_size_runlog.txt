@@ -1,0 +1,141 @@
+$ python design1_orf_pool_size.py
+Captured 2026-08-01T02:37:02Z, repo 80c8a91.
+
+====================================================================================================
+DESIGN 1 -- candidate ORF pool size with no length floor
+====================================================================================================
+
+  rescanning 42,043 transcripts with NO length floor ...
+    8,000 ...
+    16,000 ...
+    24,000 ...
+    32,000 ...
+    40,000 ...
+  scanned; 42,043 transcripts with at least one ORF
+
+====================================================================================================
+1. HOW MANY CANDIDATES, FLOOR 0 AGAINST FLOOR 33
+====================================================================================================
+
+                             mean   median      p90      p99      max          total
+  ---------------------- -------- -------- -------- -------- -------- --------------
+  floor 33 nt (current)      36.6       32       66      108    1,124      1,540,674
+  floor 0 (Pete's ruling)     54.6       47      101      170    1,789      2,296,921
+
+  dropping the floor multiplies the pool by 1.49x
+  ORFs shorter than 33 nt: 756,247 (32.9% of the new pool)
+    exactly  6 nt (0 codons between start and stop):  112,497
+    exactly  9 nt (1 codon  between start and stop):   98,295
+    exactly 12 nt (2 codons between start and stop):   94,989
+    exactly 15 nt (3 codons between start and stop):   85,625
+    exactly 21 nt (5 codons between start and stop):   75,297
+    exactly 33 nt (9 codons between start and stop):   59,425
+
+====================================================================================================
+2. ARE THE NEW SHORT ORFs WEAK? -- Kozak score by length
+====================================================================================================
+
+  ORF length                  n   median PWM      p75      p90
+  ------------------ ---------- ------------ -------- --------
+  6-15 nt               305,781       -1.081   -0.152    0.670
+  16-32 nt              450,466       -0.789    0.157    1.007
+  33-99 nt              799,024       -0.702    0.242    1.098
+  >=100 nt              741,650       -0.299    0.637    1.455
+
+  REAL ANNOTATED START CODONS (the calibration set), n = 28,775
+     1th percentile of annotated starts:  -2.705
+     5th percentile of annotated starts:  -1.668
+    10th percentile of annotated starts:  -1.126
+    25th percentile of annotated starts:  -0.283
+    50th percentile of annotated starts:   0.684
+
+====================================================================================================
+3. POOL SIZE AT THRESHOLDS CALIBRATED ON ANNOTATED START CODONS
+====================================================================================================
+
+  A threshold set at the qth percentile of real start codons admits
+  candidates at least as good as (100-q)% of genuine initiation sites.
+
+  threshold                    PWM cut  mean slots   median      p99      max          total
+  -------------------------- --------- ----------- -------- -------- -------- --------------
+  annotated q1                  -2.705        50.1       44      153    1,634      2,106,843
+  annotated q5                  -1.668        41.6       37      124    1,368      1,749,392
+  annotated q10                 -1.126        34.7       31      102    1,125      1,458,858
+  annotated q25                 -0.283        21.9       20       63      716        921,898
+  annotated q50                  0.684         9.6        8       29      300        401,588
+
+  current model: exactly 5 slots per transcript, 210,215 total
+
+====================================================================================================
+4. WHAT IT COSTS, AND THE LANDMINE
+====================================================================================================
+
+  HDF5 size and training time scale linearly in slots per transcript.
+  Current 5 slots at atg500/stop500 gives a 2.9 GB file (results_4ct_dn/nmd_orf_data.h5).
+
+  threshold                   mean slots  vs current   projected HDF5
+  -------------------------- ----------- ----------- ----------------
+  annotated q1                      50.1      10.02x            29.1 GB
+  annotated q5                      41.6       8.32x            24.1 GB
+  annotated q10                     34.7       6.94x            20.1 GB
+  annotated q25                     21.9       4.39x            12.7 GB
+  annotated q50                      9.6       1.91x             5.5 GB
+
+  infer_uorf_attention.py hardcodes attn_0..attn_4 and range(5) at lines 174 and
+  207. At any K above 5 it does not fail -- it silently uses the first five and
+  produces plausible numbers. That has to be fixed BEFORE the pool changes, not
+  after, because nothing about its output would look wrong.
+
+====================================================================================================
+5. DOES A THRESHOLD ADMIT THE THING THE FLOOR WAS BLOCKING?
+====================================================================================================
+
+  The floor's cost was named specifically: ATF4's regulatory uORF1 is 3 codons
+  and cannot be a candidate at 33 nt. Below, how many sub-33 nt ORFs survive
+  each threshold -- i.e. whether dropping the floor actually buys anything once
+  the Kozak cut is applied, or whether the threshold removes what the floor
+  removed.
+
+  threshold                    short ORFs kept   % of short   % of kept pool
+  -------------------------- ----------------- ------------ ----------------
+  annotated q1                         669,648        88.5%            31.8%
+  annotated q5                         529,275        70.0%            30.3%
+  annotated q10                        425,045        56.2%            29.1%
+  annotated q25                        247,750        32.8%            26.9%
+  annotated q50                         96,134        12.7%            23.9%
+
+====================================================================================================
+6. THE OTHER HALF OF THE DECISION -- what does each pool size BUY?
+====================================================================================================
+
+  Cost without benefit is not a decision. The ORFs that matter for the uORF
+  mechanism are those starting upstream of the main AUG whose OWN stop has a
+  junction more than 50 nt downstream -- each one is a PTC in its own right and
+  a candidate trigger. The prior window measured that HALF of this population is
+  invisible to the model at K = 5. So: what fraction does each threshold admit,
+  and how does that trade against slots?
+
+  PTC-bearing upstream ORFs in the full no-floor scan: 133,765
+  transcripts carrying at least one:                   17,944
+
+  threshold             mean slots   ORFs admitted   coverage  transcripts fully covered
+  -------------------- ----------- --------------- ---------- --------------------------
+  annotated q1                50.1         124,973      93.4%                      76.5%
+  annotated q5                41.6         106,084      79.3%                      53.4%
+  annotated q10               34.7          90,453      67.6%                      41.3%
+  annotated q25               21.9          59,371      44.4%                      23.6%
+  annotated q50                9.6          27,401      20.5%                      10.6%
+
+  and for comparison, keeping the top-K by Kozak score with no
+  threshold at all:
+  top-K                 mean slots   ORFs admitted   coverage
+  -------------------- ----------- --------------- ----------
+  K = 5                        5.0          13,982      10.5%
+  K = 10                      10.0          26,701      20.0%
+  K = 20                      20.0          49,722      37.2%
+  K = 30                      30.0          68,740      51.4%
+  K = 50                      50.0          96,876      72.4%
+
+====================================================================================================
+DONE
+====================================================================================================
