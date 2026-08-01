@@ -1,0 +1,77 @@
+chr21: 502 transcripts, 9,437 candidates, 5 checkpoints
+chr21 is a TRAINING chromosome for these checkpoints. In-sample reconnaissance.
+
+  b8_s100.pt: done
+  b8_s200.pt: done
+  b8_s300.pt: done
+  b8_s400.pt: done
+  b8_s500.pt: done
+
+=== 1. p_capture: has the initiation head learned a preference? ===
+  0.5 means no preference at all. Averaged over 5 seeds.
+  percentiles  1% 0.0030  10% 0.0070  25% 0.0131  50% 0.0393  75% 0.4694  90% 0.8844  99% 0.9852
+  mean 0.2498   sd 0.3368
+  fraction within 0.05 of 0.5: 3.1%
+    b8_s100.pt   median 0.0295  sd 0.3594
+    b8_s200.pt   median 0.0489  sd 0.4095
+    b8_s300.pt   median 0.0762  sd 0.3500
+    b8_s400.pt   median 0.0059  sd 0.3318
+    b8_s500.pt   median 0.0232  sd 0.2978
+
+=== 2. how deep does selection mass reach? ===
+  slots 0-4       74.84% of mass     2,441 candidates
+  slots 5-9       16.61% of mass     2,102 candidates
+  slots 10-19      6.59% of mass     2,716 candidates
+  slots 20-49      1.89% of mass     1,842 candidates
+  slots 50+        0.08% of mass       336 candidates
+  candidates with P_select < 1e-4: 34.6%  (a substitution there cannot move the output)
+  candidates with P_select < 1e-2: 71.2%
+
+=== 3. does p_capture prefer the annotated start codon? ===
+  is_ref_cds is supplied to the PREDICTOR only; this model never sees it.
+  reference start codons: 330 of 9,437
+    p_capture at the reference start : mean 0.6761  median 0.6954
+    p_capture elsewhere              : mean 0.2343  median 0.0360
+  matched within slot (slot is confounded with being the reference):
+    slot 0: ref 0.6240 (n=138)   other 0.1318 (n=364)   diff +0.4922
+    slot 1: ref 0.7160 (n=74)   other 0.2018 (n=425)   diff +0.5141
+    slot 2: ref 0.6790 (n=28)   other 0.2265 (n=463)   diff +0.4524
+    slot 3: ref 0.6399 (n=20)   other 0.2513 (n=460)   diff +0.3887
+
+=== 4. does p_capture track the Kozak score? ===
+  kozak_score decides pool admission and is supplied to NEITHER variant.
+  Pearson r  +0.1612     Spearman rho +0.1459   over 9,437
+  by Kozak decile:
+    decile 0: kozak  -1.158   p_capture 0.2121   n 946
+    decile 1: kozak  -0.871   p_capture 0.1814   n 943
+    decile 2: kozak  -0.629   p_capture 0.2335   n 947
+    decile 3: kozak  -0.389   p_capture 0.2025   n 939
+    decile 4: kozak  -0.132   p_capture 0.2021   n 944
+    decile 5: kozak   0.129   p_capture 0.2735   n 943
+    decile 6: kozak   0.439   p_capture 0.2319   n 944
+    decile 7: kozak   0.788   p_capture 0.2951   n 943
+    decile 8: kozak   1.260   p_capture 0.2591   n 946
+    decile 9: kozak   2.151   p_capture 0.4070   n 942
+  within slot 0 only (order cannot confound): r +0.2117, n 502
+
+=== IS THE REFERENCE-START PREFERENCE JUST KOZAK? ===
+Kozak deciles computed over ALL candidates; ref vs non-ref compared inside each.
+   decile    kozak  n ref  p_cap ref  n other  p_cap other     diff
+        0   -1.158     59     0.6609      887       0.1822  +0.4787
+        2   -0.629     28     0.7863      919       0.2167  +0.5696
+        3   -0.389     18     0.7020      921       0.1927  +0.5092
+        4   -0.132     11     0.7269      933       0.1959  +0.5310
+        5    0.129      8     0.3698      935       0.2727  +0.0971
+        6    0.439     20     0.4821      924       0.2265  +0.2556
+        7    0.788     32     0.7635      911       0.2786  +0.4849
+        8    1.260     35     0.7148      911       0.2416  +0.4732
+        9    2.151    112     0.6657      830       0.3721  +0.2936
+
+  Kozak-matched mean difference (n-weighted): +0.4026
+  Unmatched difference                      : +0.4417
+  -> Kozak explains 9% of the raw gap
+
+  So the initiation head is not simply reading the PWM: at matched Kozak the
+  annotated start still gets far more capture than its competitors, which means
+  it uses context the PWM does not encode. THAT is what the mutagenesis bank is
+  for, and it is the first evidence today that there is something there to find.
