@@ -1,244 +1,242 @@
-# Plan — a model built to be read
+# Retrain plan — sequence interpretability model
 
-*Model-side window, 2026-08-01. Plain English, per Pete's standing instruction.*
+Specification of what is done to the data. Reasoning lives in
+`RETRAIN_RATIONALE_2026-08-01.md`.
 
-**What we are building:** a model that predicts NMD well enough to be worth reading, and is
-arranged so that reading it names sequence features that trigger decay. Prediction is the entry
-ticket. The design question throughout is not "what makes it accurate" but **"what does this force
-the model to compute from sequence, and what does it let the model look up instead."**
-
-**What this builds on**
-
-| | |
-|---|---|
-| Pete's rulings | `EXPERIMENT_AND_RETRAIN_PLAN_2026-07-31.md` — keep the junction feature but fix it; no minimum ORF length; accuracy floor deferred; put the rigour on confidence that a *specific feature* matters |
-| The scanning form | `nmd_lung_longread_2026/docs/SCANNING_SELECTION_SPEC_2026-07-31.md` (Track A) — ribosomes scan, each start codon captures some and the rest leak past. Pete: *"I'm pretty convinced this framing is correct."* Blockers B1–B5 are theirs |
-| The architecture facts | `SEQUENCE_DISCOVERY_BRIEF.md` §3, and `model.py` read directly |
-| What died and why | `SEQUENCE_DISCOVERY_BRIEF.md` §6 — do not re-propose |
-| Today's measurements | `RESULTS_2026-08-01_model_free.md`, `design1_orf_pool_size_runlog.txt` |
+Section 3 is written in full for review. Sections 4–8 are listed by name only and are written after
+section 3 is agreed.
 
 ---
 
-## 1. What we are aiming the model at, and why that changed today
+## 1. Purpose
 
-Everything at the **back** of the transcript has died or shrunk to nothing. Three 3'UTR motifs were
-base composition wearing a motif's name. The +4 base failed against an equal-sized control. The stop
-codon survives as an association with no mechanism that holds up — and the other window's route-2
-measurement put the effect on the stop that *cannot* be triggering decay, with nothing on the one
-that can.
+> "The goal of this is a 'sequence interpretability' model that acheves good performance but is
+> designed in such as way that interpretation of that model will identify sequence features that
+> trigger NMD."
+>
+> — Pete, 2026-08-01
 
-Everything at the **front** is an order of magnitude larger:
-
-| | odds ratio |
-|---|---|
-| upstream start-codon count, ≥4 vs ≤1, at fixed 5'UTR length | **6.97** [5.01, 10.58] |
-| 5'UTR more than half covered by ORFs vs not at all | **5.31** [3.92, 7.44] |
-| 5'UTR length, at fixed start-codon count | 3.26 [1.48, 8.31] |
-| stop codon TGA vs TAG | 1.24 [1.06, 1.47] |
-| every 3'UTR motif tested | ~1.0 |
-
-And within that, the part that is a **nameable sequence element** rather than a count. Holding the
-number of upstream start codons fixed and varying how many sit in strong initiation context:
-
-| upstream AUGs | 0 strong | 1 strong | 2 strong | 3 strong |
-|---|---|---|---|---|
-| 2 | 1.9% | 3.3% | 3.4% | — |
-| 3 | 2.3% | 4.1% | 5.3% | — |
-| ≥4 | **4.8%** | 9.4% | **13.9%** | 14.1% |
-
-Same number of start codons, ~3× difference. That is a specific motif — the bases either side of an
-upstream AUG — at a specific place, with a testable prediction.
-
-**So the model's job is to be forced to discover that, and things like it.** Not to be told.
-
-*Owed before this is quoted anywhere: strong initiation context is purine-rich, so this contrast is
-not composition-matched. It needs the anagram-style control that killed the three 3'UTR motifs.*
+> "identify the best approach to use sequence-based modelling to identify sequence elements that
+> influence NMD susceptibility"
+>
+> — Pete, 2026-08-01
 
 ---
 
-## 2. The one principle the whole design follows
+## 2. Data
 
-**Whatever the model is handed, it will not learn.** Measured four times over, independently:
+Every dataset the plan touches. All paths are on this machine.
 
-| the model never learned | because it was handed |
-|---|---|
-| that a junction must be >50 nt past the stop | a count of junctions at any distance |
-| what makes a good start codon | a flag saying "this one is annotated" |
-| which ORF the ribosome actually uses | the same flag — the answer was in slot 0 |
-| how the ORFs sit relative to each other | features giving their positions directly |
+### 2.1 `SEQ` — transcript sequences
 
-So the design reduces to two lists, and getting them right matters more than any hyperparameter.
+`~/claude_projects/nmd_deposit_2026/source_data/sqanti/nmd_lungcells_corrected.fasta`
 
-**Supplied** — solved biology, no discovery value, and soaking it up makes the residual cleaner:
-- exon junction positions (already a sequence channel)
-- **the junction rule, fixed**: does a junction lie more than 50 nt past this ORF's stop
+One record per transcript assembled by SQANTI3 from the long-read data: 614,992 records. A record
+is the spliced mRNA sequence in 5′→3′ transcript coordinates, so position 1 is the first
+transcribed base and introns are already removed. 42,043 of these records are the model universe
+(§2.2); the rest are transcripts SQANTI called but the labelling pipeline did not retain.
 
-**Withheld** — the discovery targets:
-- `is_ref_cds`, `is_sqanti_cds` — these *are* the answer to "which ORF is real"
-- `frac_start`, `frac_stop` — ORF geometry, handed over
-- any Kozak score as an input feature
+Positions throughout this plan are 1-based transcript coordinates on this sequence.
 
-### One thing that is settled and should not be reopened
+### 2.2 `TX` — transcript labels and split
 
-Pete asked how graded junction distance would help identify *other* sequence features rather than a
-binary indicator. It doesn't — measured, `exp7`. Each candidate sequence feature adjusted for the
-binary rule versus six distance bins: median shift 0.45pp, and for the two 5'-end features that
-matter, 1% and 8% of their effect. **The junction fix stays as already agreed** — thresholdless
-count becomes the 50 nt rule — and stops there. The 18-point gradient beyond 50 nt is a biology
-finding to report, not a design change.
+`~/claude_projects/nmd_w69_tables_2026-07-30/tx_summary.tsv`, 42,043 rows, one per transcript,
+written by `export_rds.R`.
+
+`isoform_id` keys every other table. `is_nmd` is the training label: 1 where mashr called the
+transcript NMD-responsive (lfsr < 0.05 and posterior logFC > 0) in **any** of the four cell types
+AT, DD, FB, MV; 0 where adj.P.Val > 0.30 in **all** four. Transcripts satisfying neither are absent
+from the file. Counts: 9,425 label 1 and 32,618 label 0 (measured here from the file).
+
+`chr` gives the split. Test is chr1, chr3, chr5, chr7 — 10,719 transcripts. Validation is chr2 and
+chr4 — 4,437. Training is everything else — 26,887 (measured here). No gene spans two splits.
+
+`tx_length` is the transcript length in bases and equals the length of the matching `SEQ` record.
+
+### 2.3 `JUNC` — exon junction positions
+
+`~/claude_projects/nmd_w69_tables_2026-07-30/junctions.tsv`, 95,623 rows, one per transcript in the
+structure set, of which all 42,043 model transcripts are present.
+
+`junctions` is a comma-separated ascending list of transcript coordinates. Each value is the
+position of the last base before an exon–exon junction, so a junction listed at 393 means the
+boundary falls between bases 393 and 394. A transcript with no junctions has an empty field.
+
+### 2.4 `REFCDS` — the annotated coding sequence projected onto each transcript
+
+`~/claude_projects/nmd_w69_tables_2026-07-30/ref_cds_features.tsv`, 42,063 rows, written by
+`05t_ref_cds_features.R`.
+
+For each transcript, its gene's reference isoform is the highest-DMSO-CPM isoform of that gene that
+is both coding and labelled non-NMD. `ref_utr5_length` is the number of bases in the transcript
+before the first base of that reference start codon, so the reference start codon begins at
+transcript position `ref_utr5_length + 1`. `ref_atg_available` is 1 where that projection succeeded.
+`gene_id` groups transcripts for clustered uncertainty.
+
+### 2.5 `HOLDOUT` — paralog gene lists
+
+`paralog_genes.tsv` (56 genes) and `val_paralog_genes.tsv` (19 genes) in the same directory. Genes
+withheld from training so that a paralog of a training gene cannot appear in evaluation.
+
+### 2.6 Datasets this plan replaces
+
+`orf_features.tsv` (1,540,674 rows) and `selected_orfs.tsv` (209,174 rows) are the current candidate
+ORF scan and its 5-slot selection. Section 3 produces their replacements. They are not inputs to
+anything specified here.
 
 ---
 
-## 3. The four things to change, each with the measurement behind it
+## 3. Build the candidate ORF pool
 
-### 3.1 The candidate pool — the biggest single defect
+### 3.1 Question
 
-The model sees **5 ORFs out of a mean of 55**, chosen by annotation priority. Measured today
-against the population that matters — upstream ORFs whose own stop has a junction more than 50 nt
-downstream, each one a decay trigger in its own right, 133,765 of them across 17,944 transcripts:
+Which reading frames does the model see, and does that set contain the ORFs through which NMD is
+actually triggered?
 
-| admission rule | slots per transcript | of those triggers, how many the model can see |
+### 3.2 Starting data
+
+`SEQ`, `TX`, `JUNC`, `REFCDS`.
+
+### 3.3 Approach
+
+**Step 1 — enumerate every ORF in every transcript.**
+
+For each transcript, every ATG that has an in-frame stop codon downstream defines a candidate ORF,
+running from the A of the ATG to the last base of that stop. There is no minimum length: an ATG
+immediately followed by a stop is a candidate. Overlapping ORFs in different frames are separate
+candidates; two ATGs in the same frame sharing one stop are separate candidates.
+
+```
+for each transcript t in TX:
+    s = SEQ[t]
+    for i in every position where s[i:i+3] == "ATG":
+        j = i + 3
+        while j + 3 <= len(s):
+            if s[j:j+3] in {"TAA","TAG","TGA"}:
+                emit ORF(transcript=t, start=i, end=j+3, length=j+3-i)
+                break
+            j = j + 3
+```
+
+**Step 2 — score initiation context at each candidate's start codon.**
+
+Each start codon is scored by the Cavener–Ray position weight matrix over the eight positions −6 to
+−1 and +4, +5 relative to the A of the ATG, which is the matrix `Isopair::scoreKozakPWM` uses. The
+score is the sum of log2(observed frequency / 0.25) over the positions that exist; positions running
+off either end of the transcript are skipped and the remainder summed. A candidate whose start codon
+has no scorable position gets no score and is not admitted.
+
+```
+PWM[base, position] = log2(CavenerRay_freq[base, position] / 0.25)
+offsets = [-6,-5,-4,-3,-2,-1,+3,+4]        # relative to the A of ATG at offset 0
+
+score(t, i) = sum over o in offsets, where 0 <= i+o < len(SEQ[t]),
+              of PWM[ SEQ[t][i+o], o ]
+```
+
+**Step 3 — set the admission floor from real start codons.**
+
+The floor is the 1st percentile of the PWM score of annotated start codons. The annotated start
+codons are the candidates whose `start` equals `ref_utr5_length` (0-based), taken over the
+transcripts where `ref_atg_available` is 1. Admitting at the 1st percentile means a candidate is
+kept when its initiation context is at least as good as that of the weakest 1% of start codons the
+annotation actually uses.
+
+```
+annotated = [ score(t, ref_utr5_length[t]) for t in REFCDS where ref_atg_available == 1 ]
+FLOOR = percentile(annotated, 1)
+```
+
+**Step 4 — admit and order.**
+
+A candidate is admitted when its score is at or above `FLOOR`. Admitted candidates are ordered by
+`start` ascending, which is the order a scanning ribosome encounters them, and the slot index is
+that position in the order. Slot index carries no priority: slot 0 is the 5′-most admitted
+candidate, not the annotated one.
+
+```
+for each transcript t:
+    admitted = [ orf for orf in ORFs(t) if score(orf) >= FLOOR ]
+    admitted = sort(admitted, key = orf.start, ascending)
+    for k, orf in enumerate(admitted):
+        orf.slot = k
+```
+
+**Step 5 — attach the per-candidate quantities the model is given.**
+
+Each admitted candidate carries one supplied structural number and nothing else. `n_downstream_ejc`
+is the count of junctions lying more than 50 bases past the last base of that candidate's stop
+codon. This is the canonical exon-junction rule; the count is over junctions from `JUNC` for that
+transcript.
+
+```
+n_downstream_ejc(orf) = count of j in JUNC[orf.transcript] where j > orf.end + 50
+```
+
+Withheld, and therefore not written into the pool table as model inputs: which candidate matches the
+reference CDS, which matches the TD2 CDS, each candidate's fractional start and stop position, and
+the PWM score itself. The PWM score decides admission in step 4 and is not a feature.
+
+**Step 6 — emit the pool table.**
+
+One row per admitted candidate, replacing `selected_orfs.tsv`:
+
+| column | definition |
+|---|---|
+| `isoform_id` | transcript, keys to `TX` |
+| `slot` | 0-based index in 5′→3′ order among admitted candidates of this transcript |
+| `orf_start` | 1-based transcript position of the A of the ATG |
+| `orf_end` | 1-based transcript position of the last base of the stop codon |
+| `orf_length` | `orf_end − orf_start + 1` |
+| `n_downstream_ejc` | step 5 |
+| `is_ref_cds` | 1 where `orf_start == ref_utr5_length + 1`. Recorded for evaluation and for the interpretation window; **not a model input** |
+
+### 3.4 Quantities this step reports
+
+Each is a count or proportion over the pool, and each is compared against the value predicted from
+the measurement in `design1_orf_pool_size_runlog.txt`, which used the same enumeration on the same
+sequences.
+
+| quantity | population | predicted |
 |---|---|---|
-| **current: top 5 by priority** | 5 | **10.5%** |
-| top 50 by initiation score | 50 | 72.4% |
-| **floor at the 1st percentile of real start codons** | **50.1** | **93.4%** |
-| floor at the 5th percentile | 41.6 | 79.3% |
-| floor at the 25th percentile | 21.9 | 44.4% |
+| candidates per transcript before the floor | 42,043 transcripts | mean 54.6 |
+| candidates per transcript after the floor | 42,043 transcripts | mean 50.1 |
+| candidates in the largest transcript | 42,043 transcripts | 1,789 |
+| share of upstream ORFs whose own stop has a junction >50 bases downstream that are admitted | 133,765 such ORFs over 17,944 transcripts | 93.4% |
+| share of transcripts whose annotated start codon is admitted | 28,775 transcripts with `ref_atg_available == 1` | not yet measured |
 
-Two things fall out. **A floor beats a fixed count at matched cost** — 93.4% against 72.4% at ~50
-slots, because transcripts differ enormously in how many plausible start codons they carry. And
-**the current model is blind to nine-tenths of the mechanism we most want it to learn.**
+The last row is the one with no prediction: admission by initiation score does not guarantee the
+annotated CDS a slot, and 51.5% of NMD-positive transcripts are degraded through the main ORF
+(measured elsewhere, `build_mechanism_classes_runlog.txt`, over 41,765 transcripts).
 
-**Recommendation: floor at the 1st percentile of real annotated start codons (PWM ≥ −2.705).**
+### 3.5 Decisions this step needs before it runs
 
-The reason for the *1st* percentile and not a stricter one is a trap, and it is the same shape as
-one already on the dead list. **We must not admit ORFs by the thing we are trying to discover.** If
-we filter on initiation strength and then ask whether the model learned initiation strength, the
-weak examples were removed before it ever saw them — the answer is contaminated by construction. A
-floor at the 1st percentile is defensible as *"weaker than 99% of sites biology actually uses"*
-rather than as a selection on strength. Anything stricter is selecting on the discovery target.
+**The floor percentile.** 1st percentile gives mean 50.1 candidates per transcript and 93.4%
+coverage of triggering upstream ORFs; 5th gives 41.6 and 79.3%; 25th gives 21.9 and 44.4% (all
+measured in `design1_orf_pool_size_runlog.txt`). The choice sets the size of the training tensor and
+therefore the compute for everything downstream.
 
-**Also settled:** no length floor. Track A's correction stands — `findORFs(minimumLength = 9)`
-counts codons excluding start and stop, so 9 gives exactly the 33 nt floor we observe. Pete's ruling
-means **`minimumLength = 0`**. Anyone reading that field as nucleotides sets 9 again and gets 33
-again. Dropping it adds 756,247 ORFs, a third of the new pool, and 112,497 of them are a start codon
-immediately followed by a stop — start-stop elements, which are real.
-
-**Cost: ~50 slots per transcript, roughly 29 GB of training data, ~10× the current compute.** This
-does not fit on this machine and needs the cluster. I will ask before connecting.
-
-### 3.2 The model cannot represent *where* anything is
-
-`SequenceCNN.forward` ends in `x.max(dim=-1).values` — a maximum over the whole window. It records
-*whether* a pattern appeared, never *where*. Combined with a 42-base receptive field, the model
-physically cannot see a stop codon and a junction together beyond ~42 bases, and the biology's
-action is at 51–200.
-
-**Change:** keep the maximum, add a small positional summary alongside it. Cheap — on the order of
-10,000 extra parameters against the current 34,050.
-
-### 3.3 The aggregator can say *which* ORF matters but not *how many*
-
-`AttentionAggregator` is a softmax over slots. A softmax normalises to 1, so "this transcript has
-twelve upstream start codons" is not expressible — and that is half of Pete's mechanism.
-
-**Change:** the stick-breaking form from Track A's spec. Each start codon captures a fraction of
-scanning ribosomes and the rest leak past, so selection probability is the product of everything
-upstream having leaked, times capture here. Both halves of the mechanism then fall out of one
-computation: five weak upstream ORFs and one strong one are the same equation at different values.
-
-**And one restriction the spec does not contain, which I think is load-bearing.** The initiation
-head must see **only the start-codon window**. If it can also see the stop window or the structural
-block, it can identify the real ORF from its stop context and never learn initiation at all — which
-is exactly the failure the whole rebuild exists to prevent. Architecturally enforcing what each head
-may look at is what makes its output readable as initiation.
-
-Compute the product in log space; at 50 slots it underflows otherwise.
-
-### 3.4 Vocabulary size has never been checked
-
-64 learned sequence patterns, total, across both branches. If we intend to report "we found N
-sequence features", 64 is the hard ceiling and nobody has tested whether it binds. Train at 16, 32,
-64, 128 and find where performance stops improving.
+**The tail.** The largest transcript carries 1,789 admitted candidates. Either every transcript
+keeps all of its candidates and batches are bucketed by candidate count, or a cap applies and the
+number of dropped candidates is recorded per transcript.
 
 ---
 
-## 4. Two models, not one
+## 4. Prerequisite code repair
 
-| | **the predictor** | **the one we read** |
-|---|---|---|
-| junction rule | supplied, fixed | supplied, fixed |
-| "this is the annotated start" flags | kept | **removed** |
-| ORF position features | kept | **removed** |
-| how it picks the ORF | reads the flag | **must work it out from sequence** |
-| what it licenses | any claim about accuracy | any claim about biology |
-
-Plus one cheap arm without the junction rule, as a check that supplying it is not masking something
-unexpected. Not the main design.
+`infer_uorf_attention.py` derives its attention columns from a literal list of five and a `range(5)`
+at lines 174 and 207, and `compute_uorf_attention_metrics_pathB.R:95` selects five named columns.
+These take the slot count from the data instead. `compute_uorf_attention_metrics.R:89` and
+`audit_uorf_attention.R:92,188` already do.
 
 ---
 
-## 5. How we will read it — written now, before training
+## 5. Build the training tensor
 
-The failure mode this guards against is real and recent: I retracted a published claim today on the
-strength of a control I had not checked, then retracted the retraction. Fixing the analysis after
-seeing the answer is how that happens.
+## 6. Architecture
 
-**Before any interpretation runs, these are fixed:**
+## 7. Training
 
-1. **Every claim carries a composition-matched control.** For a motif, its own anagrams — same
-   bases, same length, different order. This killed all three 3'UTR motifs today when GC-quintile
-   matching had not.
-2. **Every control is power-matched to its target.** Compare like sample sizes, or subsample the
-   target and show the distributions overlap. An unmatched control produced a wrong retraction today
-   through a 25-fold sample-size difference.
-3. **Both scales, always.** Percentage points and odds ratio. A percentage-point difference cannot
-   be compared across groups with different base rates, and reading one without the other cost two
-   retractions in one day.
-4. **Uncertainty clustered by gene**, and confirmed across all five independently trained copies.
-5. **A null is a distribution, not three estimates.** Sweep many mechanism-free positions.
+## 8. Model comparisons
 
-**The pre-registered prediction, and it can fail:** the initiation head's learned capture
-probability should correlate with the Kozak PWM **without ever being supervised on it**. If it does
-not, the head learned something else, however well the model predicts. Track A's check; it is the
-right one.
-
-**Two state checks:** on transcripts degraded through an upstream ORF, selection mass should sit on
-an upstream ORF; on the rest, on the main ORF. And as the pool grows, the main ORF must keep
-sensible mass — it is where 51.5% of all positives live, and drowning it out would look like a uORF
-success while breaking the common case.
-
----
-
-## 6. What would make us stop
-
-- **Performance stops improving at 16 patterns** → the vocabulary is tiny and there are far fewer
-  findable features than hoped.
-- **The interpretable model cannot beat its own sequence-blanked version** → sequence carries no
-  usable signal at this window size. A real result, and it stops the project rather than being
-  worked around.
-- **Learned capture probability does not track initiation context** → the selection head is not
-  doing what its name says, and no reading of it is safe.
-
----
-
-## 7. Order of work
-
-1. **Fix `infer_uorf_attention.py` first.** It hardcodes `attn_0..attn_4` and `range(5)` at lines
-   174 and 207. Above 5 slots it does not fail — it silently uses the first five and produces
-   plausible numbers. This must be fixed *before* the pool changes, because nothing about its output
-   would look wrong.
-2. Rebuild the pool: `minimumLength = 0`, floor at the 1st percentile of annotated starts, ordered
-   by position in the transcript rather than by annotation priority.
-3. Architecture: positional summary, stick-breaking aggregator with the initiation head restricted
-   to the start window, filter-count sweep.
-4. Train both models plus the two check arms. Cluster.
-5. Hand the checkpoints to the interpretation window with the contract in §5 already fixed.
-
-**One thing that is not on this list, deliberately.** Step 1 item 3 of the current plan says to
-delete 2,334 transcripts as "NMD+ by construction". That is backwards — the labels are measurements
-and the *category* is what was constructed by filtering on them. They are 24.8% of all positives,
-they respond in all four cell types more consistently than the rest of the positive class, and they
-are enriched roughly 2× for the upstream-ORF mechanism. **Deleting them would preferentially delete
-the mechanism this entire rebuild is aimed at.** Keep them; run one sensitivity arm without them,
-which now has a clean meaning.
+*Sections 5–8 are written after section 3 is agreed.*
