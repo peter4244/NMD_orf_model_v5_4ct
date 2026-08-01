@@ -56,6 +56,7 @@ NT = "ACGT"
 STRUCTURAL_COLS = ["n_downstream_ejc", "is_ref_cds", "is_sqanti_cds",
                    "frac_start", "frac_stop"]
 INTERPRETABLE, PREDICTOR = [0], [0, 1, 2, 3, 4]
+REPO_POOL = Path(__file__).resolve().parent / "results_pool_v6" / "orf_pool.tsv"
 CLAMP_LOGIT = 13.815511057963775      # log((1-1e-6)/1e-6), aggregate()'s clamp
 
 
@@ -200,6 +201,7 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
         # weak". Both ship, because the second decides whether a substitution can
         # move the output at all and the first is what a start-codon check reads.
         _, parts = model.aggregate(z_p0[None], z_d0[None], mask1, return_parts=True)
+        base_sel = parts["p_select"][0].double()
         p_cap = parts["p"][0].cpu().numpy().astype(np.float32)
         p_sel = parts["p_select"][0].cpu().numpy().astype(np.float32)
         p_dec = parts["d"][0].cpu().numpy().astype(np.float32)
@@ -225,6 +227,7 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
     valid &= obs >= 0
 
     vals = np.full((P, 4), np.nan, dtype=np.float32)
+    dsel_out = np.full((P, 4), np.nan, dtype=np.float32)
 
     # ---- the substitutions --------------------------------------------------
     keep = valid[pos - 1]
@@ -318,6 +321,16 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
             mask = torch.ones(n_pert, K, dtype=torch.bool, device=device)
             out = model.aggregate(z_p.double(), z_d.double(), mask,
                                   stable=True).cpu().numpy()
+            # HOW FAR THE SELECTION DISTRIBUTION MOVED. With selection worth
+            # 0.063 of AUC on test and sequence 0.005, a substitution that
+            # changes WHICH ORF the model commits to is the mechanism rather
+            # than noise -- and it is a different event from one that only
+            # shifts decay. Without this the two are indistinguishable in vals.
+            # Total variation between the perturbed and unperturbed P_select.
+            lq = torch.nn.functional.logsigmoid(-z_p.double())
+            lsel = (torch.cumsum(lq, 1) - lq
+                    + torch.nn.functional.logsigmoid(z_p.double()))
+            dsel = (0.5 * (lsel.exp() - base_sel[None]).abs().sum(1)).cpu().numpy()
 
         # THE DIFFERENCE IS TAKEN AGAINST THE NO-OP FROM THIS SAME CHUNK, never
         # against the batch-K base pass. row_of maps (position index, base) to the
@@ -334,6 +347,7 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
             for b in range(4):
                 if b != o:
                     vals[p - 1, b] = float(out[row_of[(n, b)]]) - ref
+                    dsel_out[p - 1, b] = float(dsel[row_of[(n, b)]])
         i = j
 
     # ---- two per-position quantities today's findings made necessary ----------
@@ -360,7 +374,8 @@ def transcript_bank(model, enc, codes, orf_start, orf_end, tx_len, struct,
                 mass[lo - 1:hi] += p_sel[k]
 
     return (vals, valid, obs, (base_logit, base_train), (noop_max, int(valid.sum())),
-            (a_lo, a_hi, s_lo, s_hi), (p_cap, p_sel, p_dec), (fill_count, mass))
+            (a_lo, a_hi, s_lo, s_hi), (p_cap, p_sel, p_dec), (fill_count, mass),
+            dsel_out)
 
 
 def main():
@@ -405,6 +420,18 @@ def main():
             "(plan §9.3 step 8)")
 
     # ------------------------------------------------------------- the subset
+    # per-candidate mechanism flags, read from the pool table
+    _pool = pd.read_csv(REPO_POOL, sep="\t",
+                        usecols=["isoform_id", "slot", "orf_start", "is_ref_cds"])
+    pool_ref = {}
+    for iso_id, g in _pool.groupby("isoform_id", sort=False):
+        g = g.sort_values("slot", kind="stable")
+        r_ = g.loc[g.is_ref_cds == 1, "orf_start"]
+        ref_start = int(r_.iloc[0]) if len(r_) else -1
+        pool_ref[iso_id] = (g.is_ref_cds.to_numpy(np.int8),
+                            ((g.orf_start.to_numpy() < ref_start) & (ref_start > 0)
+                             ).astype(np.int8))
+
     sp_all = pd.read_csv(args.split, sep="\t")
     sp = sp_all.sort_values("rank", kind="stable")
     with h5py.File(str(Path(args.tensor) / "nmd_tensor.h5"), "r") as f:
@@ -481,7 +508,8 @@ def main():
             v = valid = None
             for attempt in range(5):
                 try:
-                    v, valid, obs, base, noop, spans, per_cand, per_pos = transcript_bank(
+                    (v, valid, obs, base, noop, spans, per_cand, per_pos,
+             dsel_arr) = transcript_bank(
                         model, enc, cds, os_, oe_, int(r.tx_length), struct_k,
                         device, chunk_rows, rng)
                     break
@@ -517,7 +545,7 @@ def main():
                  base_logit_training=np.float64(base[1]),
                  spans=np.stack([a_lo, a_hi, s_lo, s_hi], 1).astype(np.int32),
                  p_capture=per_cand[0], p_select=per_cand[1], p_decay=per_cand[2],
-                 fill_count=per_pos[0], mass=per_pos[1],
+                 fill_count=per_pos[0], mass=per_pos[1], dsel=dsel_arr,
                  noop=np.float64(noop[0]), n_floor=np.int64(noop[1]),
                  spread=spread)
         os.replace(tmp, shard)            # a shard is never half-written
@@ -539,12 +567,16 @@ def main():
 
     recs, spans_rows, floors, spreads = [], [], [], []
     pcap, psel, pdec = [], [], []
-    fills, masses = [], []
+    is_ref, upstream = [], []
+    fills, masses, dsels = [], [], []
     n_floor_samples = 0
     for n, r in enumerate(take.itertuples()):
         z = np.load(shard_dir / f"{r.isoform_id}.npz")
         pcap.append(z["p_capture"]); psel.append(z["p_select"]); pdec.append(z["p_decay"])
+        pr = pool_ref.get(r.isoform_id)
+        is_ref.append(pr[0]); upstream.append(pr[1])
         fills.append(z["fill_count"]); masses.append(z["mass"])
+        dsels.append(z["dsel"])
         i = row[r.isoform_id]
         recs.append(dict(isoform_id=r.isoform_id, vals=z["vals"], valid=z["valid"],
                          obs=z["obs"], base_logit=float(z["base_logit"]),
@@ -564,11 +596,13 @@ def main():
     obs = np.full((N, W), -1, np.int8)
     fill_count = np.zeros((N, W), np.int16)
     mass = np.zeros((N, W), np.float32)
+    dsel = np.full((N, W, 4), np.nan, np.float32)
     for i, x in enumerate(recs):
         p = len(x["valid"])
         vals[i, :p] = x["vals"]; valid[i, :p] = x["valid"]; obs[i, :p] = x["obs"]
         fill_count[i, :len(fills[i])] = fills[i]
         mass[i, :len(masses[i])] = masses[i]
+        dsel[i, :len(dsels[i])] = dsels[i]
 
     cand_count = np.array([x["K"] for x in recs], np.int32)
     cand_offset = np.concatenate([[0], np.cumsum(cand_count)])[:-1].astype(np.int32)
@@ -620,6 +654,19 @@ def main():
         f.create_dataset("p_decay", data=np.concatenate(pdec))
         f.create_dataset("fill_count", data=fill_count, compression="lzf")
         f.create_dataset("mass", data=mass, compression="lzf")
+        f.create_dataset("dsel", data=dsel, compression="lzf")
+        # THE MECHANISM STRATIFIER. Pete measured that 70.8% of candidates
+        # meeting the uORF definition carry a downstream junction, against 24.1%
+        # of reference-traced main ORFs, and the driver is length -- 69.4% of
+        # ORFs under 100 nt against 7.1% above 1,000 nt. So PTC status of the
+        # SELECTED candidate collapses the mechanism distinction: when the model
+        # picks a uORF, that uORF is PTC-positive by the rule, and both NMD
+        # routes terminate before a junction. The distinction that survives is
+        # WHICH ORF carries the premature stop -- the main one or an upstream
+        # one -- and that needs only a rough main-ORF position, so it is robust
+        # to everything this project distrusts about the TD2 CDS calls.
+        f.create_dataset("cand_is_ref_cds", data=np.concatenate(is_ref))
+        f.create_dataset("cand_upstream_of_ref", data=np.concatenate(upstream))
         f.create_dataset("cand_offset", data=cand_offset)
         f.create_dataset("cand_count", data=cand_count)
         f.attrs["batch_shape_offset"] = floor
