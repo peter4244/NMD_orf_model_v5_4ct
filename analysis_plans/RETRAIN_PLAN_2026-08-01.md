@@ -658,12 +658,69 @@ later against a specific finding, rather than answered in advance against nothin
 
 Per variant and seed: `test_clean` AUC and AUPRC, epochs to stop, wall time.
 
-Each metric carries a **bootstrap interval resampled over genes**, computed within each seed. Seeds
-vary initialisation only — the split is fixed — so the range over seeds contains no sampling variance
-at all, and the sampling variance it omits is inflated by clustering: `test_clean` holds 10,520
-transcripts in 3,234 genes, 90.0% of them in a multi-transcript gene, and this project measured the
-inflation from ignoring that at 5.47. A comparison between arms in §8.2 is read as an overlap of
-gene-clustered intervals, not as a difference of point estimates.
+Each metric carries a **bootstrap interval resampled over genes**. Genes are the resampling unit
+because transcripts of one gene are alternative versions of one sequence and usually carry the same
+label, so they are not independent observations: `test_clean` holds 10,520 transcripts in 3,234
+genes, 90.0% of them in a multi-transcript gene. The design effect is **measured on this split and
+reported**, rather than carried over from the 5.47 recorded elsewhere in this project, which is not
+stated as a variance or a standard-deviation ratio.
+
+Seeds vary initialisation only — the split is fixed — so the range over seeds contains no sampling
+variance at all. It is reported beside the interval and labelled differently.
+
+**A comparison between arms is a paired difference, bootstrapped on the same gene resamples.** Both
+arms are scored on the same transcripts, so most of the sampling uncertainty is shared and cancels;
+asking whether two separately computed intervals overlap is a strictly weaker test and can hide a
+real difference. One resample of genes is drawn per replicate and every arm is scored on it, and the
+interval reported for a comparison is the interval of the difference.
+
+**The permuted-bin arm's score is a draw, not a number.** It redraws its bin permutation at every
+forward pass, so it is evaluated under `R` draws and **the average is taken over AUCs, not over
+predicted scores** — averaging the scores would build an ensemble, which is a different and better
+model than the one under evaluation. `R` is not fixed in advance: the across-draw spread is measured,
+and `R` is raised until that spread divided by √`R` is small against the gene-clustered half-width.
+Both quantities are reported.
+
+### 8.4 The two arms that answer the position question
+
+The comparison that identifies the permutation is **`interp_c32_b8` against `interp_c32_b8_perm`,
+matched**, and it is run whatever configuration §7 step 5 selects. Comparing the *selected*
+configuration against `c32_b8_perm` would confound bin count with the permutation whenever selection
+does not land on `c32_b8`, and it would set a maximum over seven configurations against an arm that
+was not selected that way. The selected configuration's own `test_clean` metrics are reported
+separately, for the accuracy claim rather than for this one.
+
+`interp_c32_b1` is not this comparison and is not read as it: it differs from `c32_b8` in parameter
+count as well as in positional resolution (§6.2 step 1).
+
+**AUC is secondary evidence for the position claim, and this is stated before the numbers exist.**
+The binned pooling of §6.2 step 1 exists to make position *readable*, not to raise accuracy, and a
+model can encode position that barely helps prediction or route around it and score the same. The
+primary evidence is:
+
+1. the **selection-mass profile** of §9.3 step 7, which reads the initiation head's selectivity
+   directly; and
+2. the **positional profile of the mutagenesis bank**, mean effect by offset from the anchor,
+   compared between `c32_b8` and `c32_b1`. Structure at specific offsets in one and a flat profile in
+   the other is position being used, measured on the mechanism.
+
+Because AUC is secondary, a small AUC difference is **not** evidence against position either. That
+symmetry is recorded here so it cannot be applied in one direction only.
+
+**Where the two arms disagree, and on which transcripts.** A mechanism that decides a small fraction
+of transcripts produces a small average difference and is still a mechanism, so the per-transcript
+disagreement between the two arms is examined as well as its mean. Concentration alone is weak —
+two initialisations also disagree somewhere — so the disagreement is stratified by three quantities
+**named here before the predictions exist**, to keep this from becoming a search:
+
+| stratum | why it is a place position should matter |
+|---|---|
+| upstream ORF count | more upstream candidates, more for a positional rule to do |
+| slot of the reference start codon | the 11.2% of transcripts whose main ORF sits beyond slot 9 (§9.4) |
+| stop-to-junction distance, banded at 50 bases | the one distance relation the previous architecture provably could not express |
+
+Disagreement that concentrates **and** concentrates on these is a mechanism. Disagreement that
+concentrates but scatters across them is initialisation noise with a pattern read into it.
 
 The reference points are re-derived rather than quoted. The published 0.9310 AUC / 0.8351 AUPRC was
 computed on 10,131 transcripts of a different universe with a different pool and feature set, and
