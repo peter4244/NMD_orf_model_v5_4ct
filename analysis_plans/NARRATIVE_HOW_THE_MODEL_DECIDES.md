@@ -49,7 +49,9 @@ worse than "take the most 5′ candidate" at 0.424, while the queue reaches 0.69
 We misread it for most of a day by looking at where it was loudest.
 
 ⚠ **Those numbers are scored on main-ORF recovery**, which for an NMD substrate is close to
-a disjoint concept from the decay-causing frame. Section 4 replaces them.
+a disjoint concept from the decay-causing frame. **On the question that matters — finding
+the frame that causes decay — the figure is 0.883**, and §4 derives it. If you read no
+further, carry 0.883 and not 0.697.
 
 ## 2. What the picker reads
 
@@ -73,7 +75,9 @@ than 50%. Capture's upstream sensitivity is **diffuse, not sparse**. *Job 890042
 **And that length route is partly ours.** The ATG window's fill stops at the ORF midpoint,
 so fill extent = `min(100, length/2)`, and fill saturation alone is a **47× marker** for
 "this is the real ORF" — `P(reference | saturated)` 11.1% against 0.24%. *Verified on
-`orf_pool.tsv`; retrain item 3.* **Whether the head uses it is not established.**
+`orf_pool.tsv`; retrain item 3.* `[unclaimed]` **Whether the head uses it is not
+established** — the information is present and discriminative; that the head reads it has
+no measurement behind it.
 
 **What it does not read is the thing biology says decides.** Among ORFs under 200 nt — 69%
 of candidates, median 81 nt — `capture ~ kozak` is +0.061 against `capture ~ length` +0.429.
@@ -96,8 +100,20 @@ ones. **The head fails precisely where initiation biology says context should de
 other in opposite directions, so holding either alone manufactures a signal that is
 not there; holding both returns −0.067, agreeing with the marginal −0.050.
 
-⇒ **Pete's founding hypothesis does not hold at the routing step, under any
-conditioning.** The junction preference enters at the decay multiplication.
+⇒ **Pete's founding hypothesis does not hold at the routing step under the only valid
+conditioning.** The two single partials show large signal (+0.452, −0.543) and both are
+artifacts — each is the other confounder leaking. The junction preference enters at the
+decay multiplication.
+
+**And an independent second route reaches the same place.** `p_select ~ ejc` is positive
+*by construction*: the queue's survival factor falls monotonically with slot, and earlier
+slots carry more downstream junctions. Measured in-bank, a **queue with no model in it**
+scores +0.334 raw and **+0.568** holding length, against the model's −0.050 and +0.442. So
+zero was the wrong reference, and against the right one the model routes toward
+junction-bearing candidates *less* than pure ordering does — a deficit of 0.125.
+*Interpretability window's argument, run in-bank; job committed at f523f72.* **Bound:** the
+degenerate null maximises queue influence, so 0.125 is an upper bound on head aversion and
+may be generic dilution.
 
 *This paragraph asserted the opposite for forty minutes.* C16 claimed routing was
 junction-seeking at matched length (+0.442); it held length and not position, and is
@@ -134,7 +150,10 @@ belongs to main-ORF recovery. This number currently has no floor under it.
 **It is handed the answer.** In the `interpretable` variant the decay head's entire
 non-sequence input is one column: `n_downstream_ejc`. *Retrain item 8.* But `d ~ ejc` is only
 +0.445 and `capture ~ d` survives holding that column at **+0.400**, so `d` is not a readout
-of it.
+of it. *That +0.400 is a single measurement — `capture ~ d` among short candidates, holding
+the junction column — and it is used twice: here, to show `d` is more than the column, and
+in §6, to show the head became decay-predictive. One number, two readings, and both are
+legitimate; flagged so it is not mistaken for two independent results.*
 
 **It does not read the stop codon it is anchored on** — every candidate had one by
 construction, so no negative example and no gradient. *Retrain item 6.*
@@ -148,7 +167,8 @@ PWM explains 1.73% of importance variance.**
 **The forward separation is verified** — three encoders, and an invariance test that
 scrambles the stop window and leaves `p_capture` unmoved. **The coupling is derived** —
 `∂L/∂z_p_k ∝ d_k` is calculus on verified code, not an observation. **The consequence is
-measured** — `capture ~ d` is +0.362 among short candidates, +0.400 tie-proof.
+measured** — `capture ~ d` is +0.362 among short candidates, +0.400 holding the junction
+column. *Same measurement as §5's; see the note there.*
 
 **But scoped.** In aggregate the separation *holds*: `p_capture ~ d` is +0.091 and the two
 heads read **different bases**, agreement ~0.02 within mass band (job 8899820). It is given
@@ -181,5 +201,9 @@ back **only among short candidates**, where the head must choose among uORFs.
 | capture sensitivity is **sparse** upstream | diffuse — 32 tiles within ~6% (job 8900420) |
 | **C16 — routing junction-seeking at matched length (+0.442)** | held length, not position; holding both gives −0.067. **C14 stands.** |
 
-**Four of the five were caught by a reader outside the derivation asking what a sentence
-rested on. None was caught by a check.**
+**Six entries. Of those, four were caught by a reader outside the derivation asking what
+a sentence rested on** — 0.941 by an arithmetic ceiling, the marginal routing claim by a
+demand for the direct measurement, the objective sentence by "measured or argued?", the
+sparsity prediction by someone else's tiling. **One (C16) was caught by the author, using
+a rule a reader had proposed an hour earlier. One (1.148) surfaced from a cross-window
+discrepancy.** **None was caught by a check.**
