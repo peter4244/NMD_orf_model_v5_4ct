@@ -198,7 +198,12 @@ def build_cells(f, N, edges, nb, floor, spans, cand_off, cand_cnt, p_select,
     the gate at scoring time, not here -- so its census is visible.
     """
     cells = []
-    census = np.zeros((nb + 1, len(REGIONS), 3), dtype=np.int64)  # n_cells, n_qual, n_live
+    # n_cells, n_qualifying_cells, n_live_positions, n_live_positions_IN_QUALIFYING
+    # The fourth column exists because the freeze condition is written on
+    # POSITION-level retention and the first version of this census reported a
+    # CELL-level fraction under the same word "retained" -- so the criterion
+    # could not be evaluated from the output that was supposed to decide it.
+    census = np.zeros((nb + 1, len(REGIONS), 4), dtype=np.int64)
     for i in range(N):
         t = transcript_slice(f, i, spans, cand_off, cand_cnt, p_select,
                              orf_start, orf_end)
@@ -220,6 +225,7 @@ def build_cells(f, N, edges, nb, floor, spans, cand_off, cand_cnt, p_select,
                 if n < floor:
                     continue
                 census[bi, ri, 1] += 1
+                census[bi, ri, 3] += n
                 cells.append(dict(
                     tx=i, band=bi, region=ri, n=n,
                     e=t["e"][sel], keto=kmask[sel],
@@ -410,7 +416,8 @@ def verdict_by_region(rows, nb):
     return out
 
 
-def run_seed(path, nb, top_frac, floor, n_rep, seed_rng, verify):
+def run_seed(path, nb, top_frac, floor, n_rep, seed_rng, verify,
+             census_only=False):
     with h5py.File(path, "r") as f:
         spans = f["spans"][:]
         cand_off = f["cand_offset"][:]
@@ -426,6 +433,8 @@ def run_seed(path, nb, top_frac, floor, n_rep, seed_rng, verify):
         cells, census = build_cells(f, N, edges, nb, floor, spans, cand_off,
                                     cand_cnt, p_select, orf_start, orf_end)
 
+    if census_only:
+        return [], census, n_live, N
     rows = score(cells, genes, nb, top_frac, seed_rng, n_rep, verify)
     return rows, census, n_live, N
 
@@ -433,20 +442,30 @@ def run_seed(path, nb, top_frac, floor, n_rep, seed_rng, verify):
 def print_census(census, nb, n_live, N):
     print("\n  THE THREE-WAY CENSUS -- emitted before any composition statistic")
     print(f"  {'band':>6} {'region':>13} {'cells':>8} {'qualifying':>11}"
-          f" {'live pos':>12} {'retained':>9}")
+          f" {'live pos':>12} {'pos kept':>8} {'cells kept':>8}")
     tot_pos = tot_keep = 0
     for bi in range(nb + 1):
         for ri, rname in enumerate(REGIONS):
-            c, q, p = census[bi, ri]
+            c, q, p, pq = census[bi, ri]
             if c == 0:
                 continue
             tag = "DEAD" if bi == nb else str(bi)
             print(f"  {tag:>6} {rname:>13} {c:>8,} {q:>11,} {p:>12,}"
-                  f" {'-' if c == 0 else f'{q/c:.1%}':>9}")
+                  f" {pq/p:>8.1%} {q/c:>8.1%}")
     live_cells = census[:nb]
     kept = live_cells[:, :, 1].sum()
     allc = live_cells[:, :, 0].sum()
-    print(f"\n  live bands: {allc:,} cells, {kept:,} qualifying ({kept/allc:.1%})")
+    pos_all = live_cells[:, :, 2].sum()
+    pos_keep = live_cells[:, :, 3].sum()
+    print(f"\n  live bands: {allc:,} non-empty cells, {kept:,} qualifying "
+          f"({kept/allc:.1%} of cells)")
+    print(f"  THREE-WAY POSITION-LEVEL RETENTION: {pos_keep:,} / {pos_all:,} "
+          f"= {pos_keep/pos_all:.1%}")
+    print(f"  pre-registered freeze condition: >=90% keeps 8 bands, below drops "
+          f"to 4 -> {'8 BANDS STANDS' if pos_keep/pos_all >= 0.90 else 'DROP TO 4'}")
+    print("  NOTE: cell fractions here are over NON-EMPTY cells. Job 8896584's")
+    print("  46.0% was over ALL transcript x band cells including empty ones.")
+    print("  Different denominators; the two are not comparable.")
     print(f"  transcripts {N}, live positions {n_live:,}")
 
 
@@ -461,6 +480,7 @@ def main():
     ap.add_argument("--n-rep", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=20260802)
     ap.add_argument("--verify-null", action="store_true")
+    ap.add_argument("--census-only", action="store_true")
     ap.add_argument("--json-out", default=None)
     args = ap.parse_args()
 
@@ -479,8 +499,11 @@ def main():
         print("=" * 78)
         rows, census, n_live, N = run_seed(path, args.bands, args.top_frac,
                                            args.floor, args.n_rep, rng,
-                                           args.verify_null)
+                                           args.verify_null,
+                                           census_only=args.census_only)
         print_census(census, args.bands, n_live, N)
+        if args.census_only:
+            continue
 
         print(f"\n  {'band':>6} {'region':>13} {'n_tx':>6} {'keto':>8}"
               f" {'null p95':>9} {'95% CI':>18} {'mean fill':>10} {'verdict':>10}")
