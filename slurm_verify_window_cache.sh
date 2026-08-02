@@ -68,7 +68,7 @@ echo "  transcripts: $ONLY"
 # verification running, until the queue killed it at the wall clock.
 if [ -z "$ONLY" ]; then echo "FATAL: transcript selection produced nothing" >&2; exit 1; fi
 $PY build_ism_bank.py --tensor results_tensor_v6 \
-    --checkpoint results_interp_all/v6_checkpoints/b8_s100.pt \
+    --checkpoint runs/interp_c32_b8_s100/best.pt \
     --split results_ism_v6/ism_subset.tsv \
     --only "$ONLY" --out $SC/bank_cached.h5 --device cuda
 rc=$?
@@ -94,7 +94,7 @@ if [ ! -f "$REF" ]; then
 fi
 echo "  reference builder sha256: $(sha256sum $REF | cut -d' ' -f1)"
 PYTHONPATH=$PWD $PY $REF --tensor results_tensor_v6 \
-    --checkpoint results_interp_all/v6_checkpoints/b8_s100.pt \
+    --checkpoint runs/interp_c32_b8_s100/best.pt \
     --split results_ism_v6/ism_subset.tsv \
     --only "$ONLY" --out $SC/bank_decoded.h5 --device cuda
 rc=$?
@@ -111,6 +111,6 @@ echo ""
 
 echo "=== STEP 2: the bank against the model's own forward(), no shared path ==="
 $PY verify_ism_bank.py --tensor results_tensor_v6 \
-    --checkpoint results_interp_all/v6_checkpoints/b8_s100.pt \
+    --checkpoint runs/interp_c32_b8_s100/best.pt \
     --bank $SC/bank_cached.h5 --transcripts 3 --device cuda
 echo "=== step 2 exit: $? ==="
