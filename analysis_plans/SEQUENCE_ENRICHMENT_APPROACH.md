@@ -162,6 +162,21 @@ places. That is local by construction, requires no region scheme to be chosen, a
 sidesteps §5.2 — a cluster drawn mostly from PTC intervals gets a PTC-interval null,
 which is neither the upstream nor the downstream one.
 
+**Two things that design needs, and the first is load-bearing.**
+
+*It inherits the small-sample KL bias, exactly where it hurts.* A per-cluster null is
+computed at that cluster's n, and small clusters will show apparent information that
+is pure bias — while small clusters are precisely what a "we found five patterns"
+claim rests on. The fix is a **permutation null at matched n**: shuffle the
+contributing positions' bases within the cluster and recompute. That absorbs the bias
+for free because it carries the same n, and it is the same move as measuring the
+sub-floor null in-sample rather than taking the analytic one.
+
+*A purely compositional cluster carries zero information against it.* That is correct
+— a composition is not a motif — but it means **composition must be reported
+separately or it vanishes entirely**. Which is the second half of the pairing above,
+arriving inside the seqlet machinery.
+
 Not yet implemented. **The ~0.016–0.018 figure quoted so far is the global one and is
 a floor on the bar, not the bar.**
 
@@ -272,6 +287,36 @@ where it matters, the sentence you may **not**.
 | **across seeds** | "a property of the architecture, not one initialization" | that it generalizes to other genes |
 | **across gene arms** | "generalizes to genes it was not found on" | that it is seed-independent |
 | **across subsample draws** | "not a sampling artifact" | anything about the population, if the draw was not stratified |
+
+**Two things go in writing for every adjustment, and they pull in opposite
+directions:**
+
+- **every adjustment narrows the claim.** "Given X held fixed" is part of the
+  sentence, and dropping the qualifier is exactly where claims inflate.
+- **every adjustment blinds you to the thing adjusted.** A null result after adjusting
+  for composition is "no preference *beyond* composition" — never "no sequence
+  preference."
+
+#### The ladder, and where our results actually sit
+
+This is the most useful form of the table, because it makes the word "motif" earn
+itself:
+
+    mass stratified + composition held + autocorrelation-preserving null
+      -> "Among positions the model routes to equally, and beyond what base
+          frequencies predict, sensitivity clusters into short arrangements."
+         THIS is the motif claim. Nothing weaker earns the word.
+
+    mass stratified, composition FREE
+      -> "Among equally-routed positions, these bases are preferred."
+         A composition claim.  <-- THIS IS WHAT WE CURRENTLY HAVE
+
+    nothing held
+      -> "These positions move the output most."  Mostly routing.
+
+**We have never been in the top row.** Every enrichment result of the last two days
+sits in the second or third, and "motif" was doing work the adjustments had not
+earned. That is the single most useful sentence this document contains.
 
 **Combinations are where the useful sentences live:**
 
@@ -388,6 +433,13 @@ Two operational consequences:
   distribution of pairwise seqlet similarities is diagnostic — multimodal for genuine
   clusters, smooth and unimodal for a manifold. Reporting it alongside any clusters
   makes "we found five patterns" falsifiable rather than assumed.
+
+**And this caution is not hypothetical for us — we have already measured a manifold
+where we assumed structure.** The effect track's autocorrelation runs 0.965 at lag 1
+to 0.740 at lag 80 with no decay and no characteristic scale. That is a continuum,
+and it is the same fact that retracted the run-length result (§7.1). We know what a
+smooth answer looks like in this data because we have already mistaken one for
+clusters.
 
 ---
 
