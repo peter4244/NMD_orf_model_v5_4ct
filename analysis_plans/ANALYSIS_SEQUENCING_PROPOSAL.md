@@ -549,6 +549,49 @@ and the sampling floor at ~28 elevated per cell is far larger.
 > percentile and "retains X% of the unstratified ratio" was explicitly ruled out. Writing the rule
 > defensively is what made this a documentation problem rather than a re-run.
 
+#### THE RESULT — SEQ-A2 has run. Job 8896969, `model_a2_gate2_runlog.txt`
+
+*Read against the decision rule below, which was fixed before the run.*
+
+**Per-bank verdicts, all five banks, counted from the log:**
+
+| locale | banks POSITIVE | verdict |
+|---|---|---|
+| 5′ of start | NEG, POS, POS, NEG, POS | **3/5 — inconsistent** |
+| in ORF | NEG, POS, POS, POS, POS | **4/5** |
+| **3′ of stop** | POS × 5 | **5/5 — unanimous** |
+
+Downstream of the stop the keto ratio runs **1.084–1.150** across all eight mass bands against a
+permutation ceiling near **1.012**, with intervals entirely above it. That is the cleanest
+measurement in this programme. **The signature survives mass stratification at 3′**, which is the
+question A2 was built to answer.
+
+> ⇒ **TWO NUMBERS OF THE SAME SHAPE LIVE IN THIS LOG AND THEY DIFFER. Do not take one for the
+> other.** The per-bank **verdict count** above (3/5, 4/5, 5/5) is the band-criterion gate. The log
+> also reports a **direction-stability** line reading 4/5, 5/5, 5/5 — a different quantity, and it
+> disagrees with the verdict count at 5′-of-start by exactly one. I first reported A2 as positive in
+> all three locales by reading a single bank's block as the summary; the model window then guarded
+> against the converse error and verified against me. Both of us aimed at the right hazard. It is on
+> record here so the next reader does not have to rediscover it.
+
+**What it licenses**, per field 11 and D55: at 3′ of the stop, **two separable channels** — routing
+locates importance, *and* within equally-routed positions the decay head has its own composition
+preference. Not established at 5′ of start. **B1's premise therefore holds at 3′ and nowhere else.**
+
+**The caveat that keeps it open.** The unresponsive strata — the intended instrumental control — also
+come out above null (1.104, 1.104, 1.153, 1.100, 1.087). Per the dead-band block above, that is what a
+scale-free statistic does: a real preference reproduces at every mass level. **So the control cannot
+separate a genuine preference from an encoder artifact, and that question stays open.** A2 is a
+positive with an unmeasured bound.
+
+**And one consequence from the capture-head thread** (`CAPTURE_HEAD_STORY.md`, cited not restated):
+A2 stratifies on `p_select`, which that thread has been dismantling. Two things follow — the 3′
+positive sits in the **one locale the capture head is architecturally blind to**, so it cannot be
+selection leakage, which is a defence of A2 obtained from the architecture rather than from a control;
+and **D55's "routing locates importance" needs rewording**, because what routing largely is, is ORF
+length plus a fill artifact we introduced. A2's decay channel is untouched; its routing channel is not.
+That rewording is Pete's and Larry's, not ours.
+
 #### The decision rule, fixed before the run
 
 A gate whose reading is chosen after the run is not a gate.
