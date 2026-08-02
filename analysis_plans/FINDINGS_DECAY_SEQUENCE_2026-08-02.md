@@ -136,7 +136,7 @@ Recorded because the final numbers are only interpretable with them.
   was the error, and Pete's question is what exposed it.
 - **The GC confound never existed.** We inferred one because the k-mers *looked* AU-rich and neither
   window measured base composition at the selected positions — one line, and it settles it.
-- **The GC-preserving control was itself GC-biased**, 0.679 against 0.502, because an A/T position
+- **The GC-preserving control was itself GC-biased**, 0.682 against 0.501, because an A/T position
   can only be scored A↔T and a C/G position only C↔G. Its k-mer output is discarded, not fixed.
 - **The elevation rule was wrong.** Fold-over-median selected 1.7% of positions on a short-transcript
   pilot and 10.7% on the real banks, and the random null *beat* the data. Replaced by a fixed
@@ -147,6 +147,12 @@ Recorded because the final numbers are only interpretable with them.
   ~15% above an analytic null that does not describe this noise → **20.5% above the measured
   in-sample null**, 22% of the range 0.387–0.75
   (`analysis_plans/probe_directionality_insample_null.py`). Each correction made it smaller.
+  **And the quantity is now unsettled, so none of these is quotable.** Three magnitudes are in
+  circulation across four documents — 20.5% and "22% of the range" here, ~21% in
+  `SEQUENCE_ENRICHMENT_APPROACH.md` §6, the interpretability handoff and the modeling handoff. Only
+  the figure here cites a producer. 21% may be a rounding of 20.5% rather than an independent
+  measurement, and **nobody has checked which**, so it is not established even that this is a
+  disagreement. A3 decides whether the quantity survives at all; until it runs, quote no number.
 
 ---
 

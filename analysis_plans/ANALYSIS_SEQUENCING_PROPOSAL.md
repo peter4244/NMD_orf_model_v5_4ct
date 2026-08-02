@@ -92,11 +92,20 @@ here is why." What it cannot do is be absent.
 
 ## Phase A — repair. Cheap, existing code, and a go/no-go on the rest
 
-**Phase A is A2. One measurement.** A1 is dropped, A3 is tidying the other window owns, A4 is deferred pending the Hill/Dy interaction-attribution work. Pete asked whether ORF weighting should be
-accounted for at all, and the model window independently concluded the same thing from the other
-direction: **every surviving claim is downstream of A2**, while A1 can only retire something already
-retracted. A4 runs last because it is the only item needing new forward passes, and a negative A2 is
-what makes it urgent.
+**Phase A is A2. One measurement.** A1 is dropped, A3 is tidying the other window owns, and **A4 is
+resurrected and scoped to called regions — see D48**, with its ordering set below. Pete asked whether
+ORF weighting should be accounted for at all, and the model window independently concluded the same
+thing from the other direction: **every surviving claim is downstream of A2**, while A1 can only
+retire something already retracted.
+
+> ⇒ *This paragraph used to say "A4 is deferred pending the Hill/Dy interaction-attribution work,"
+> and the document then said "RESURRECTED" three hundred lines later while
+> `SEQUENCE_ENRICHMENT_APPROACH.md:144` said "DEFERRED, deliberately (Pete, 2026-08-02)." Three
+> statements, two documents, one date, all attributed to Pete. Settled by asking him — which is the
+> point: a parameter contradiction can be closed by measurement, a decision contradiction can only be
+> closed by the person who decided. **D48 is now the single record and this document cites it rather
+> than restating it.** The correction to `SEQUENCE_ENRICHMENT_APPROACH.md:144` belongs to the model
+> window, which owns that document.*
 
 **A correction to how these were first written, and it is the error the toolbox exists to prevent.**
 A1's row said *stratification* in one line and *residualized track* in the next. Those are different
@@ -611,30 +620,68 @@ produces none at all.
 > because it is written and owned by the other window — it is not a Phase A gate, and the same
 > criterion that dropped A1 applies to it.
 
-### A4 — can single-base ISM see a motif at all?
+### A4 — see the section below
 
-> **Hypothesis.** The model's sequence recognition is additive across positions, so single-base
-> substitution measures it fully.
-> **Test.** Substitute two positions at once within a window; compare against the sum of the two
-> single-base effects.
-> **Why it bounds everything else.** Single-base ISM detects a pattern only insofar as it is
-> **fragile** to single substitutions. A model recognizing "at least 6 of these 8 match" is
-> unaffected by any one substitution and would show ≈0 importance at every position of a real,
-> working motif — and conv→ReLU *is* an m-of-n detector when the weights are near-uniform, so this
-> is representable here rather than hypothetical.
-> **Licensed if additive:** single-base ISM sees everything; the fragility caveat comes out of the
-> documents and every negative in the programme strengthens.
-> **Licensed if superadditive:** the caveat stands with a number attached, and every negative —
-> including this morning's stop-codon nulls — is scoped to "not visible to single-base ISM."
-
-Cost: one job. **It bounds the interpretation of every other result here**, which is why it belongs
-in Phase A rather than after it.
-
----
+⇒ *A superseded A4 row stood here and is deleted rather than struck, which is the exception to this
+document's keep-the-wrong-value practice. It is deleted because its licensing line was **wrong in the
+direction that inflates a claim** — it read "Licensed if additive: single-base ISM sees everything" —
+and the corrected version three hundred lines below narrows it to "these pairs did not jointly cross
+a ReLU threshold," since a ReLU network is exactly additive within a linear region and additivity is
+therefore the default rather than evidence. A reader going in order hit the retracted version first.
+Struck-in-place works for a number that is merely wrong; it does not work for a licensing statement,
+because the risk is a reader acting on it before reaching the correction.*
 
 ## A4 — RESURRECTED, scoped to regions. Decided 2026-08-02 after reading Torop et al.
 
-**Decision: A4 returns, restricted to called regions, and decoupled from SmoothHess.**
+**Decision: A4 returns, restricted to called regions, and decoupled from SmoothHess — D48.**
+
+### Ordering, decided 2026-08-02 by the interpretability window under D48's delegation
+
+*Pete resurrected A4 and delegated the ordering, explicitly including the right to re-order as
+results arrive. This is that decision, with the reasoning, so it can be re-opened against its reasons
+rather than re-argued from scratch.*
+
+**The constraint nobody had written down: as ruled, A4 is downstream of infrastructure that does not
+exist and can fail.** Region-scoped A4 needs the region caller, which is specified and unimplemented;
+whose null I have just had to correct on four counts, the load-bearing one being that iAAFT preserves
+autocorrelation but not the mass envelope; and whose criterion 1 can fail, in which case
+`REGION_CALLER_SPEC.md` §5 says the line of work stops — **which would strand A4 entirely.** A2, by
+contrast, is running now.
+
+**So the ordering turns on when A4's result changes a decision, and the answer is narrow: it changes
+how a *negative* A2 is written up.** The stopping rule already scopes a negative to "not separable
+from routing **by single-base ISM at this resolution**." A4 supplies the magnitude of that scoping. A
+positive A2 needs it far less — a positive is a positive, and A4 then bounds what we *missed*, which
+is worth knowing and is not urgent.
+
+| A2 outcome | A4 ordering | why |
+|---|---|---|
+| **negative or conditional** | **sampled A4 immediately**; region-scoped afterwards | the write-up is blocked on A4's bound, and the region-caller chain is far too long to block a write-up on |
+| **positive** | **region-scoped A4 as ruled**, no shortcut | not on the critical path; take the better instrument since there is time for it |
+
+**Starting now, in parallel with A2:** implement the region caller with the repaired null. It is on
+A4's critical path in the ruled form, it is mine, writing it costs no cluster time, and **its
+criterion 1 is itself a gate that can fail — better to learn that while A2 is still running than
+after.**
+
+**The sampled form, and why it is a contingency rather than a rival.** Superadditivity is a
+statistical claim, so pairs can be sampled at controlled separations within candidates rather than
+enumerated exhaustively — motif-scale separations (1–8 bases) against far separations (>50) from the
+same job, where **the far pairs are the null and cost nothing extra**, which is a measured internal
+control rather than an artificial background. It needs no region caller and no new infrastructure
+beyond forward passes on pairs. It is genuinely **weaker** than the region-scoped version: called
+regions are selected for high importance, which is where a threshold crossing is most likely, so
+that version has the power this one lacks. It exists so a negative A2 is not stranded behind the
+region chain, not to replace the ruled analysis.
+
+**What would re-order this, stated in advance:** the region caller failing criterion 1, which makes
+sampled A4 the only available form rather than the fallback; or A2 returning **conditional**, which
+sharpens the instrument question rather than softening it and moves A4 up to the same urgency as the
+negative branch.
+
+**Rides with whichever A4 job runs:** the `probe_stop_codon_control.py` rerun (review item 1.2 — the
+T-first skip rate is computed as `codon_ok` and never printed, so the diagnostic for a mixed anchor is
+discarded). It needs the same forward-pass machinery and should not cost its own login.
 
 Once a region is called, exhaustive pairwise substitution inside it is 28 position-pairs for an
 eight-base region. The quadratic cost that deferred A4 was only ever the genome-wide version, so it

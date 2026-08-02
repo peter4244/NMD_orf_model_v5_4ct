@@ -32,7 +32,7 @@ Each has been hit for real. The "cost of getting it wrong" column is what actual
 | **2** | **window coverage** — `fill_count` | removes how many candidate windows contain the position | correlates with the track at r ≈ 0.54; distinct from mass and not removed by it |
 | **3** | **positional region** — 5′ of start / in ORF / 3′ of stop | fixes locale | not held: elevated positions concentrate 3′ of the stop and any whole-transcript background recovers 3′UTR composition |
 | **4** | **compositional region** — coding-like vs UTR-like | fixes composition | **decouples from axis 3 exactly at PTC transcripts.** Not a confound — the decoupling *is* what a PTC transcript is, and conditioning it away removes the exposure |
-| **5** | **local base composition** — GC, keto/amino, per-base | fixes what letters are present | our GC-preserving operator drove G+C from 0.502 to **0.679**, so the control was three times more biased than the thing it tested |
+| **5** | **local base composition** — GC, keto/amino, per-base | fixes what letters are present | our GC-preserving operator drove G+C from **0.501 to 0.682** (measured, `HANDOFF_2026-08-01_night_banks.md:770`, "elevated, neutral scoring"). That is a **0.181 shift** in the control against a **0.002 shift** in the thing it was built to test |
 | **6** | **distance to a boundary** — fill edge, start, stop, junction, transcript end | fixes edge effects | window fill edges and *natural* boundaries are the same hazard, and a natural boundary **moves** in PTC transcripts, so "distance to the stop" is ambiguous exactly where the biology is |
 | **7** | **effect magnitude** | fixes signal-to-noise | any statistic conditioned on being elevated is conditioned on magnitude. Directionality rose with \|effect\| across *all* positions, so "elevated positions are more directional" may be tautological |
 | **8** | **transcript identity** — per-transcript vs pooled | fixes which positions compete | global and per-transcript top-1% overlap at Jaccard **0.24**. Global over-weights responsive transcripts; per-transcript takes the same share from each |
@@ -91,7 +91,7 @@ Both were written this week before being caught:
 - **"X is enriched at elevated positions"** with nothing held fixed — mostly says elevated positions
   are high-mass positions.
 - **"X survives the control, therefore X is real"** where the control was adjusted for something on
-  the causal path — the GC-preserving operator, which was itself GC-biased at 0.679 against 0.502.
+  the causal path — the GC-preserving operator, which was itself GC-biased at **0.682 against 0.501**.
 
 ---
 

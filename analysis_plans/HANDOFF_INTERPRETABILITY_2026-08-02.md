@@ -44,15 +44,15 @@ All on the five production ISM banks: `results_ism_v6/bank_interp_s{100..500}.h5
 | retracted | why it died |
 |---|---|
 | run-length clustering, "hundreds of times a count-matched null" | the null placed marks at random, destroying autocorrelation the track has **architecturally**. The track is smooth because selection mass is smooth (log-mass correlation 0.93 with the effect track). The statistic showed the track is autocorrelated, not that a sequence feature exists |
-| "AU-rich element" | G+C is flat at the elevated position — 0.505 against 0.502. AU and GC are complementary, so there is no AU enrichment at the center |
-| the GC confound, and the control built for it | the elevated set was never GC-biased. The GC-preserving operator drove G+C to **0.679** — the control was three times more biased than the thing it tested. Its k-mer output is discarded, not fixed |
-| directionality, "21% above the noise floor" | moved to *not settled*. Elevated positions are **defined** as the largest effects, and directionality rises with effect magnitude across all positions, so the claim may be tautological. Untestable until magnitude is held fixed |
+| "AU-rich element" | G+C is flat at the elevated position — **0.512 against 0.511** (re-measured 2026-08-02 over 4,999 transcripts; the 0.505/0.502 pair quoted here previously came from the struck 600-transcript table). AU and GC are complementary, so there is no AU enrichment at the center |
+| the GC confound, and the control built for it | the elevated set was never GC-biased. The GC-preserving operator drove G+C to **0.682** against a background of 0.501 — a 0.181 shift in the control against the 0.002 shift it was built to test. Its k-mer output is discarded, not fixed |
+| directionality, "21% above the noise floor" | moved to *not settled*. **Quote no magnitude for it.** Three are in circulation — 21% here and in `SEQUENCE_ENRICHMENT_APPROACH.md` §6, 20.5% and "22% of the range 0.387–0.75" in `FINDINGS_DECAY_SEQUENCE_2026-08-02.md`. Only the last cites a producer (`probe_directionality_insample_null.py`); 21% may be a rounding of 20.5% rather than a second measurement, and nobody has checked which. Elevated positions are **defined** as the largest effects, and directionality rises with effect magnitude across all positions, so the claim may be tautological. Untestable until magnitude is held fixed |
 | "§5's mechanism claim rests on the capture arm" | E4/E5 read `p_select` / `p` off forward passes and never touch `vals_capture`. The capture floor threatens D3 and sequence-level *explanations* of capture, nothing else |
 | the fold-over-median elevation rule | selected 1.7% of positions on a short-transcript pilot and 10.7% on the real banks. On the banks the **null beat the data**. Replaced by a fixed top-fraction per transcript |
 
 ---
 
-## The plan: one gate
+## The plan: four gates, one of which is A2
 
 **A2** — is the U-rich/keto signature something the decay head reads, or a reflection of where the
 model routes? Routing held fixed **by stratification, never by removal** — the weighting is the
@@ -64,7 +64,7 @@ window writes the second against my specification, so only the code is independe
 
 Also live: **A4** resurrected but scoped to called regions (28 pairs for an 8-base region — the
 quadratic cost was only ever the genome-wide version). **B2 is blocked** on an annotation-derived
-PTC definition; as specified its cell is 51.3% NMD against a 44.0% background. **C** is gated on
+PTC definition; its cell is **282 NMD against 268 control of 550** (`SEQUENCE_ENRICHMENT_APPROACH.md:671-680`). The "51.3% against a 44.0% background" phrasing is withdrawn: 51.3% is just 282/550, and **the 44.0% has no producer anywhere in the corpus** — treat as struck. **C** is gated on
 recovering GT/AG from SpliceAI, which is now the *only* positive control — the stop-codon one is
 retired, because recovering a stop codon from a stop-anchored profile is guaranteed by the anchoring
 and tests indexing, not method.
