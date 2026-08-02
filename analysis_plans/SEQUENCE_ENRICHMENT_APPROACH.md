@@ -97,15 +97,68 @@ Three nulls are in use, and the distinction between them matters:
 - **in-sample noise null** — positions whose effect lies below the pipeline's own
   numerical floor. These are noise by construction and give the value a statistic
   takes when nothing is there.
-- **composition null** — for motif work, the information content a column would carry
-  from base composition alone. Currently ~0.016–0.018 bits, from the measured
-  composition of the elevated set.
+- **composition null** — for motif work, the information a CWM column could carry
+  from base composition alone, as `KL(elevated composition ‖ background composition)`.
+  A column carrying less than this is explained by composition and is not a motif
+  position. **This null is currently GLOBAL, which is a defect rather than a choice —
+  see §3.2.1.**
 
 **An analytic null is not a substitute for a measured one, even when they agree.** We
 found the noise floor matching an analytic random-sign prediction and treated that as
 validation. It matched on one summary statistic and missed by half on the other. The
 agreement was real and meaningless — and it was the agreement that stopped us
 looking.
+
+#### 3.2.1 The composition null is currently global. It should be local.
+
+`KL(elevated ‖ background)` needs a background, and **which positions are pooled into
+it changes the bar by a factor of six.** Measured, seed 100, 600 transcripts, top-1%
+elevation (`probe_composition_null_locality.py`):
+
+    locality                              A      C      G      T     KL (bits)
+    GLOBAL      background             0.256  0.243  0.258  0.243
+                elevated               0.214  0.206  0.297  0.284      0.0186
+    REGIONAL    upstream background    0.243  0.260  0.278  0.219
+                upstream elevated      0.258  0.226  0.307  0.209      0.0064
+                downstream background  0.269  0.226  0.238  0.267
+                downstream elevated    0.191  0.194  0.316  0.299      0.0405
+    PER-TRANSCRIPT                                            median   0.1421
+
+**The global null is anti-conservative exactly where our data is.** Elevated positions
+concentrate downstream of the operative stop, and the correct downstream bar is
+**0.0405 bits — more than twice the global 0.0186**. A CWM column drawn mostly from
+downstream seqlets and carrying 0.03 bits would clear the global bar and fail the one
+that applies to it. Pooling regions averages a strict bar and a lenient one into a
+middling bar that is right for neither.
+
+**The per-transcript figure looks strictest and is mostly artifact.** KL is positively
+biased at small samples: with ~20 elevated positions per transcript and four
+categories, the expected bias alone is ≈ (K−1)/(2N ln2) ≈ **0.108 bits**, which
+accounts for most of the 0.142 median. Per-transcript nulls are unusable at this
+sample size without a bias correction, and quoting one would overstate the bar
+roughly threefold.
+
+**What each locality costs, in both directions:**
+
+| null | tests | lets through | wrongly rejects |
+|---|---|---|---|
+| global | non-random given transcriptome-wide composition | regional preferences, credited as motif | little |
+| regional | non-random *given where it sits* | nothing regional | a genuine preference *for* a region |
+| per-transcript | non-random given this transcript's composition | nothing at transcript scale | anything learned about transcript class |
+
+No locality is correct in general. **The null must be matched to the claim** — "the
+model has learned a motif" needs one local enough to exclude composition and no more
+local than the feature itself.
+
+**The principled version for the seqlet work: build each cluster's null from the
+composition of the positions that actually contributed to it.** A CWM averages
+seqlets drawn from identifiable places; its columns should be judged against those
+places. That is local by construction, requires no region scheme to be chosen, and
+sidesteps §5.2 — a cluster drawn mostly from PTC intervals gets a PTC-interval null,
+which is neither the upstream nor the downstream one.
+
+Not yet implemented. **The ~0.016–0.018 figure quoted so far is the global one and is
+a floor on the bar, not the bar.**
 
 ### 3.3 Controls are checked for bias of their own
 
@@ -180,6 +233,27 @@ problem. Seqlet threshold, similarity metric, cluster granularity and alignment
 window are all assumptions capable of manufacturing structure. They are assumptions
 about *the signal* rather than about what a fair comparison population is, which is
 the better thing to have to defend — but it is a trade, not an escape.
+
+
+**The clustering problem is smaller than it looks, if the standard is set correctly**
+(Pete, 2026-08-02). Much of a similarity structure is usually **manifold rather than
+clustered** — a smooth continuum with no natural partition — and the failure mode is
+imposing a partition on it and then interpreting the pieces. The discipline that
+follows: **take only the obvious clusters, and reject readily whenever the response
+surface is flat.** Committing to that in advance makes the parameter sensitivity
+largely moot, because an obvious cluster is stable across reasonable parameter
+choices, and a cluster that appears at one setting and not its neighbors is by
+construction not obvious.
+
+Two operational consequences:
+
+- **sweep the clustering parameters and keep only what survives the sweep** — the
+  same move as sweeping the elevation threshold (§3.1), for the same reason: a result
+  that depends on a number we chose is a property of that number.
+- **check whether cluster structure exists at all before partitioning.** The
+  distribution of pairwise seqlet similarities is diagnostic — multimodal for genuine
+  clusters, smooth and unimodal for a manifold. Reporting it alongside any clusters
+  makes "we found five patterns" falsifiable rather than assumed.
 
 ---
 
