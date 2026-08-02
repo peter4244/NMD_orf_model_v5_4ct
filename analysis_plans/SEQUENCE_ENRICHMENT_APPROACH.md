@@ -38,9 +38,15 @@ them, and compare against a reference set. **"Enriched" has no meaning until you
 "compared to what,"** and every possible answer embeds an assumption about what
 counts as unremarkable.
 
-This is not a subtlety we discovered. It is the central problem of motif discovery
-and the main thing distinguishing MEME, HOMER and their successors. What is specific
-to us is *which* backgrounds fail, and why.
+This is not a subtlety we discovered. It is the central problem of **enrichment
+testing**, which is what we are doing — scoped deliberately, because it would
+overstate the case to call it the central problem of motif discovery generally.
+Classical de novo discovery (MEME, Gibbs sampling) has its principal difficulties
+elsewhere: search over a combinatorial space, significance under heavy multiple
+testing, and representing degeneracy. The background model is one issue among those.
+For *our* method — take a selected set of positions, count what is under them,
+compare to a reference — it is the whole game. What is specific to us is *which*
+backgrounds fail, and why.
 
 **Four failures in one working session, all of which produced plausible tables and
 none of which raised an error:**
@@ -131,9 +137,15 @@ lower cost, since ISM requires a forward pass per substitution. We use ISM direc
 because we can afford it: the decode optimisation brought a full bank from ~32 hours
 to under an hour per seed.
 
-**Consequence worth noting:** ISM gives *exactly* what attribution methods
-approximate. Anything built to consume attribution output can consume ours, and ours
-does not carry the approximation error those methods are known for.
+**Consequence worth noting, stated carefully:** ISM is a *direct measurement of the
+model's output* under a defined intervention, so there is no completeness property to
+verify and no attribution error to bound. That is not the same as saying it gives
+"exactly what attribution methods approximate" — ISM measures the causal effect of a
+substitution, while DeepLIFT and SHAP decompose an output into per-feature
+contributions against a reference. The two answer related questions and coincide only
+under local linearity. What matters here is the weaker and sufficient claim: anything
+built to consume per-base attribution can consume ours, and ours carries no method
+error of its own.
 
 ### 4.2 The background problem
 
@@ -320,6 +332,12 @@ consensus base.**
 the observed base, so `np.isfinite(x).all(1)` is **never true**. Use
 `(np.isfinite(x).sum(1) == 3)`.
 
+*And a second recurring one:* dividing by a transcript's median importance blows up
+on the ~2.8% of transcripts whose median is near zero — importance values of 1e5 to
+1e8. Two independent occurrences on the same day. **Rank statistics are immune and
+should be the default reach**, which is also why elevation is a top fraction rather
+than a fold change (§3.1).
+
 ### 5.5 Most positions cannot respond at all
 
 The model chooses among candidate reading frames by a stick-breaking competition, so
@@ -338,39 +356,98 @@ must state whether it counts unreachable candidates.**
 
 ## 6. What is not settled
 
-- **The sequence enrichment is not yet a claim.** It survives the regional control;
-  the k-mer instrument is the wrong one and we are switching.
-- **§5.2 is an interpretive requirement, not an open technical problem.** The
-  position/composition decoupling is not corrected for; every positional result states
-  which of the three readings it supports. The three-cell comparison that would settle
-  it has not been run.
+Ordered by how much each bounds what the rest can be worth.
+
+- **The PWM ceiling: a single position weight matrix explains 1.73% of importance
+  variance at width 9, held out.** That bounds how much *any* single motif can
+  account for, and it belongs beside every enrichment claim rather than after it. An
+  enrichment can be real and still be a small part of what the branch is doing.
+- **Directionality may be a magnitude artifact, and is therefore NOT established.**
+  Elevated positions are *defined* as the largest effects, and small effects sit near
+  the numerical floor where the three substitutions have near-random signs. Our own
+  banded measurement rises monotonically with |effect| across all positions
+  (0.359 → 0.427). If directionality is simply a function of magnitude, then
+  "elevated positions are more directional" is tautological and the ~21% figure is
+  not independent evidence of learned structure. It was listed as established in an
+  earlier draft; it is not, until a magnitude-matched comparison exists.
+- **The observed-base convention for the port is unsettled and consequential.**
+  Mean-centring against observed-equals-zero produce **different motifs from
+  identical data**. Both will be run; the prediction that the second under-weights
+  the consensus base is recorded in §5.4.
+- **Whether the U-rich context is causal or merely associated.** The profile shows
+  association. Nothing run so far distinguishes "the model responds to this context"
+  from "this context co-occurs with whatever the model responds to."
+- **§5.2 is an interpretive requirement with a live definitional problem.** The
+  three-cell comparison is specified but the PTC interval is currently defined by the
+  model's own selection, which conflates genuine premature termination with the model
+  choosing a shorter ORF — evidenced by the near-balanced 282 NMD / 268 control
+  split. It needs an annotation-derived definition, and the cell is the small one, so
+  power bounds the comparison as well.
+- **The sequence enrichment itself is not a claim.** It survives the regional
+  control; the k-mer instrument is the wrong one and we are switching.
 - **Seqlet calling has two defensible criteria** — signed and unsigned — selecting
   sets that overlap at Jaccard 0.52. Both will be run and the overlap reported.
-- **The gate before any of this counts:** run the pipeline on a model known to encode
-  a sequence feature — SpliceAI and GT/AG. If it cannot recover a known motif,
-  nothing it says about our model is worth reading. This separates "the method
-  failed" from "the model has nothing," a distinction this project has not previously
-  been able to make.
 
----
+### The gate, and why it is the only one
+
+**Run the pipeline on a model known to encode a sequence feature: SpliceAI, and
+GT/AG.** If it cannot recover a known motif, nothing it says about our model is worth
+reading. This separates "the method failed" from "the model has nothing," a
+distinction this project has not previously been able to make.
+
+**It is the only such gate, which is sharper than it first appeared.** Recovering the
+stop codon from a *stop-anchored* importance profile is guaranteed by the anchoring —
+it checks indexing, not the enrichment method. So the stop-codon profile was never a
+positive control, and SpliceAI is not merely the best available check but the only
+one. *(Pete's point; it retires a check we had been counting.)*
+
+### A negative result worth keeping: no stop-codon context preference
+
+Presence of a stop codon has no variation to learn from, but its **identity and
+context** do. Median percentile rank of importance by offset from the stop:
+
+    offset        TAA      TAG      TGA
+    -2 .. 0     71-73    80-84    72-78     the codon itself
+    +1           70.4     81.4     73.9     the +4 readthrough position
+    +2 .. +6    72-78    79-85    75-79
+
+Flat everywhere. No peak at +4, no gradient away from the stop. The only separation
+is a whole-window offset — TAG runs ~8 points above TAA at *every* offset including
+the codon — which is a property of TAG-terminating transcripts as a class rather than
+a context preference, and is not worth chasing at n = 124.
+
+**The pairing is what makes this useful.** The +4 composition in the *data* is real
+and structured — A at 0.32/0.35 after TAA/TAG, G at 0.33 after TGA, C depleted after
+all three, against a 0.25 background. **So the termination-context bias is present in
+the sequence and absent from what the model reads.** A negative result with a
+demonstrated positive alongside it is worth far more than a bare absence.
 
 ## 7. Established, with its controls
 
-For completeness, what currently survives:
+What currently survives, stated in the form the measurements support:
 
-- decay-branch importance clusters into short runs, at every threshold from 0.2% to
-  5%, at hundreds of times a count-matched null
-- it replicates on **disjoint gene sets** — the discovery/confirmation split, which is
-  the only axis that answers "does this hold on genes it was not found on"
-- it survives with the GC channel held **bitwise constant**, at 57% of its
+- **decay-branch importance clusters into short runs**, at every threshold from 0.2%
+  to 5%. The null is **exactly 0** below the 5% threshold, so the ratio is undefined
+  there and "hundreds of times chance" is the wrong summary. The better statement is
+  that the null reproduces closed-form binomial arithmetic — 45.13 runs of ≥4
+  expected against 50 observed at density 0.05, under 0.1 expected at 0.01 — so a
+  zero null is *correct* rather than suspicious, and the data gives 1,865 against
+  ~0.08 expected at the 1% threshold.
+- **the excess is at motif scale, and the typical run is not.** Mean run length is
+  **1.38**; runs of ≥4 are **3.3%** of runs (1,865 of 56,675, seed 100). What sits at
+  4–8 bases is the *excess over chance*, not the typical run. A reader must not take
+  "runs of 4–6" as typical, and an earlier draft of this document said exactly that.
+- it **replicates on disjoint gene sets** — the discovery/confirmation split, the only
+  axis that answers "does this hold on genes it was not found on"
+- it **survives with the GC channel held bitwise constant**, at 57% of its
   arity-matched level
-- the run lengths are **4–6 bases**, which is motif scale and *wrong* for the ±25
-  averaging window of the GC channel — so the encoding cannot be producing them
-- the five model seeds agree on the *sequence* far better than on the *positions*,
-  which is what a binding preference at variable locations produces
-- directionality at elevated positions is **~21% above the measured noise floor**,
-  under per-transcript elevation, with the rule stated
+- the run lengths are **wrong for the encoding**: an artifact of channel 5's ±25
+  averaging window would produce runs on the order of tens of bases, and the excess
+  sits at 4–8
+- the five model seeds agree on the **sequence** (k-mer enrichment r = 0.75) far
+  better than on the **positions** (Jaccard 0.125), which is what a binding preference
+  at variable locations produces
 
-That number was corrected three times in one morning and shrank each time. The first
-figure travelled between windows before any of the corrections did, which is the part
-worth remembering.
+**Everything above is `vals_decay`.** The capture branch is out of scope for this
+document, not merely unreported.
+
