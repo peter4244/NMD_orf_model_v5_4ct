@@ -56,6 +56,19 @@ selection accuracy against the *annotated* ORF is not the only thing the head co
 be for. Its low scores upstream are what let the queue work (C3), and that behaviour
 is invisible to this baseline.
 
+**AND C11 DOES NOT IDENTIFY A MECHANISM** (interpretability window, and they are
+right). If the head reads the *fill boundary* rather than length-as-such, then
+"prefer the longest ORF" and "read where the fill stops" make the **same prediction**
+on this baseline, so it cannot separate them. C11 bounds how much the head can be
+*adding* over a heuristic; it says nothing about what the head is *doing*. C12 is
+what separates them, and it says: partly fill, not only fill.
+
+**A consequence worth testing, and the artifacts already exist.** If the head's way
+of saying "not this one" is reading how early the fill stops, its behaviour should
+change with window size in a specific way — and `results_4ct_sweep/` holds
+checkpoints at `atg1000` and `atg2000` alongside the `atg500` primary. Different
+window, different fill geometry, same sequences. Not run.
+
 ### The caveat on C12, which is mine and applies to both band splits
 
 Comparing correlations between an under-200 band and an over-200 band shares the
@@ -138,5 +151,12 @@ against 0.729 of controls, so NMD ORFs are not invisible to it. **Not establishe
    stop. Measured +0.176 and −0.490 — backwards. The split does not test that
    mechanism; it tests where ORF length still has range, so it re-expressed C8
    rather than probing its cause. A badly designed test, not a surprising world.
-3. I cited `model.py` for architecture earlier in the day. It is the superseded v5
+3. The interpretability window argues my band-split failure was not a design error
+   but the same 200 nt boundary seen from the other side. **I do not accept the
+   rescue.** My split was at 100 nt and my `>100` band mixes the fill-encodes regime
+   (100–200) with the fill-pinned regime (>200), so it cannot test C10 cleanly in
+   either direction, and it measured `capture ~ EJC` rather than `capture ~ length`.
+   Recorded because a generous reinterpretation I do not believe is worse than the
+   error it excuses.
+4. I cited `model.py` for architecture earlier in the day. It is the superseded v5
    file; the current model is `model_v6.py`. Caught by the interpretability window.
