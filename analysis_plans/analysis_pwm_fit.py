@@ -46,11 +46,19 @@ time and it is not to be repeated in a new costume.
 THE COMPOSITION FLOOR. The elevated set is keto-skewed -- G+T at 1.16x, A+C at
 0.85x, GC flat at 1.00x, measured over 4,999 transcripts and 11,062,149 valid
 positions (model_a2_enumeration.py) -- so a fitted column can be entirely
-composition. Each
-column's KL against background composition is reported beside it; the
-composition-only bar is 0.016-0.018 bits, measured independently at 600 and 800
-transcripts. Reported per column rather than as a verdict, because at the weak end
-(a 35/25/25/15 column is only 3x the bar) multiplicity eats it.
+composition. Each column's KL against background composition is reported beside it.
+
+THE BAR IS NOT ONE NUMBER, corrected 2026-08-02. This docstring used to say "the
+composition-only bar is 0.016-0.018 bits." That is the GLOBAL bar, and section 3.2.1
+measured that locality changes it by a factor of six -- 0.0064 upstream, 0.0186
+global, 0.0405 downstream -- so the global figure is a floor on the bar rather than
+the bar. Elevated positions concentrate downstream, which is the strict end. All
+three are printed and the strict one is the divisor. See KL_BARS below for why this
+file is not simply switched to the downstream number.
+
+Reported per column rather than as a verdict, because at the weak end multiplicity
+eats it: against the strict bar a 35/25/25/15 column is barely above 1x, not the 3x
+the old global denominator made it look.
 """
 
 import argparse
@@ -64,7 +72,38 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
 NT = "ACGT"
-KL_BAR = (0.0159, 0.0183)          # measured, 800 and 600 transcripts
+
+# THE COMPOSITION BAR IS LOCALITY-DEPENDENT, AND THE GLOBAL ONE IS A FLOOR RATHER
+# THAN THE BAR. Corrected 2026-08-02 (interpretability window), against
+# SEQUENCE_ENRICHMENT_APPROACH.md section 3.2.1 and probe_composition_null_locality.py.
+#
+# This constant used to be a single pair, (0.0159, 0.0183), described as "the"
+# composition-only bar. That is KL(elevated composition || background composition)
+# computed GLOBALLY, and 3.2.1 measured that pooling regions changes it by a factor
+# of six:
+#
+#     upstream    0.0064 bits      the lenient end
+#     global      0.0186 bits      what this file used to report against
+#     downstream  0.0405 bits      the strict end, and where our signal sits
+#
+# Elevated positions concentrate downstream of the operative stop, so a column drawn
+# mostly from downstream sequence and carrying 0.03 bits would clear the global bar
+# and fail the one that actually applies to it. Pooling averages a strict bar and a
+# lenient one into a middling bar that is right for neither.
+#
+# WHY THIS FILE IS NOT SIMPLY SWITCHED TO 0.0405. The regression here has no
+# elevated set -- it runs over every valid position -- so no single locality is
+# "the" one by construction. What drives the fit is where the importance is, and
+# that is downstream-weighted but not exclusively downstream. Reporting one number
+# would replace a wrong bar with a differently wrong bar. All three are printed and
+# the STRICT one is the divisor, so "x bar" is a conservative statement rather than
+# a flattering one.
+#
+# The principled version, per 3.2.1, is a bar built from the composition of the
+# positions that actually contributed -- with a permutation at matched n, since KL
+# is positively biased at small n. Not implemented here; this is the honest interim.
+KL_BARS = {"upstream": 0.0064, "global": 0.0186, "downstream": 0.0405}
+KL_BAR_STRICT = KL_BARS["downstream"]
 
 
 def importance(vals, mode):
@@ -159,10 +198,13 @@ def main():
           "  ".join(f"{NT[j]} {bg[j]:.3f}" for j in range(4)))
 
     print(f"\n  the fitted PSSM, and each column's KL against that background")
-    print(f"  (composition-only bar {KL_BAR[0]:.4f}-{KL_BAR[1]:.4f} bits, "
-          f"measured at 800 and 600 tx)\n")
+    print(f"  composition bar is LOCALITY-DEPENDENT (section 3.2.1): "
+          + ", ".join(f"{k} {v:.4f}" for k, v in KL_BARS.items()) + " bits")
+    print(f"  'x bar' divides by the STRICT (downstream) bar {KL_BAR_STRICT:.4f}, "
+          f"because elevated positions concentrate downstream and a conservative")
+    print(f"  denominator is the only one that does not flatter the column.\n")
     print(f"    {'offset':>7} " + "".join(f"{NT[j]:>10}" for j in range(4))
-          + f"{'KL bits':>10} {'x bar':>7}")
+          + f"{'KL bits':>10} {'x strict':>9} {'x global':>9}")
     half = args.width // 2
     for j in range(args.width):
         w = W[j * 4:(j + 1) * 4]
@@ -171,7 +213,7 @@ def main():
         e = np.exp(w - w.max()); p = e / e.sum()
         kl = kl_bits(p, bg)
         print(f"    {j - half:>+7} " + "".join(f"{w[b]:>10.3e}" for b in range(4))
-              + f"{kl:>10.4f} {kl / KL_BAR[0]:>6.1f}x")
+              + f"{kl:>10.4f} {kl / KL_BAR_STRICT:>8.1f}x {kl / KL_BARS['global']:>8.1f}x")
 
     # ---- HELD OUT. The only number that is evidence. ----------------------
     XtX2, Xty2, yty2, n_ho, _ = accumulate(args.bank, args.width, args.mode,

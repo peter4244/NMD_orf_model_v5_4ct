@@ -182,8 +182,31 @@ the upstream/downstream composition difference and reports it as a keto effect. 
 large and measured: `SEQUENCE_ENRICHMENT_APPROACH.md` §3.2.1 puts the downstream composition null at
 **0.0405 bits against 0.0064 upstream**, a factor of six.
 
-**Locale = upstream / downstream of the operative stop**, the same two-way split §3.2.1 already uses,
-so the two analyses share a definition rather than inventing a second one.
+**Locale = 5′ of start / in ORF / 3′ of stop — three-way.** ⇒ *Ruled 2026-08-02, and it reverses what
+this row first specified.* I wrote two-way (upstream/downstream of the operative stop) citing §3.2.1,
+and the model window implemented three-way, flagged the deviation, and offered to conform.
+
+**The deviation was mine.** `ADJUSTMENT_TOOLBOX.md` axis 3 — the governing definition of this axis —
+reads "**5′ of start / in ORF / 3′ of stop**." `REGION_CALLER_SPEC.md` §6 reads the same three.
+§3.2.1's two-way split is a *composition-null* probe answering which background applies to a CWM
+column, which is a different question; I took the one document that said two and called it the shared
+definition, having read the toolbox that says three.
+
+**This matters for how the ruling is justified, not just for its outcome.** The model window declined
+to overwrite the specification on the strength of their own output — their three regions came back
+5′-of-start keto-**depleted** at 0.92–0.94 with intervals entirely below the null, in-ORF flat near
+1.00, downstream 1.09–1.15, so a two-way pool would average a real depletion against a flat and land
+near 0.96–0.98, describing neither — and they correctly noted that adopting three-way *on that basis*
+is the exact shape of a control chosen after seeing the result. It would have been.
+
+It is not, because **three-way is the pre-existing definition in two governing documents and predates
+any of these numbers.** The output is consistent with the ruling; it is not the reason for it. Had the
+toolbox said two, the right move would have been to keep two and report the three-way split as the
+finding it is.
+
+*Naming, agreed with the model window:* one word, **locale**, everywhere — the toolbox's "positional
+region," the code's `region`, and this document's "locale" were three names for one axis, which is the
+"only gate" collision in miniature.
 
 **The cost, stated because it lands on parameters that are already provisional:** this doubles the
 cell count and roughly halves cell size, and it interacts directly with the dead-fraction problem
