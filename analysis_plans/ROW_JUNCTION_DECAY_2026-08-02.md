@@ -22,6 +22,105 @@ on the other, that is a complete account of the architecture's behaviour.
 
 ---
 
+## THE PLAN, in plain terms
+
+*Added after Pete asked whether the row was readable as a plan. It was not — the thirteen fields are
+a pre-registration format built to expose implicit choices, and they never state the **procedure**.
+That is a gap in the template rather than in this row: our path stages check the work and none of
+them makes it legible to a reader who was not in the conversation.*
+
+### The question
+
+The model predicts NMD in two steps: it spreads weight across up to five candidate reading frames,
+then asks how likely each one is to trigger decay. We want to know whether the **second** step has
+learned real biology.
+
+There is a textbook rule for this. A stop codon triggers decay when it sits **more than about 50–55
+bases before the last splice junction** in the transcript. That rule is the core of how NMD works,
+and it is quantitative, so a model that learned it should show a step change in its output right
+around that distance.
+
+**So: does it?**
+
+### Why the answer matters
+
+If it did learn the rule, we have a clear statement about the model reproducing the central
+mechanism of the biology it was trained on — the first such statement we would have.
+
+If it did not, that is equally informative, because we **gave** it the junction positions. It would
+mean the model was handed the ingredient and never learned the recipe — the same thing we already
+found with the stop codon, which it also ignores despite being anchored on one. Two instances stop
+being an oddity and start being a description of how this model works.
+
+And it feeds the larger question you posed. If the decay step turns out to be doing very little,
+then whatever the model is really doing must be happening in the ORF-weighting step — which is the
+arm Maude is taking.
+
+### The trick that makes the answer trustworthy
+
+The worry with any result like this is that something else explains it. Transcripts with distant
+junctions differ from transcripts with close ones in many ways — longer tails, different sequence
+content — and any of those could produce a pattern we misread as the model knowing biology.
+
+We avoid that by testing at **two** distances:
+
+- **50–55 bases** — where the biology says a step change belongs.
+- **500 bases** — where nothing biological belongs, but where *our own engineering* creates one,
+  because that is the edge of the window the model reads. Inside it the model sees exactly where a
+  junction is; outside it, only that one more exists.
+
+Because everything else about a transcript changes *smoothly* across both distances, a sharp step at
+either one can only come from what that distance means. **One is a check that we can detect a real
+effect; the other is a check that we are not fooling ourselves.** We have not had either before.
+
+### What we will actually do
+
+1. **Verify the input encoding is correct.** A bug that put junctions in the wrong window was fixed
+   in July; confirm on the current data that a junction lands in exactly the window it belongs to.
+   The whole analysis is about which side of a boundary a junction falls on, so this is not a
+   formality.
+2. **Pick the candidates we can read cleanly** — those with exactly one junction after the stop. With
+   more than one, a single candidate has some junctions inside the window and some outside, and no
+   single distance describes it. Measured: **65,832 candidates** qualify.
+3. **Recompute the distances using the stop the model actually commits to**, rather than the
+   annotated one. They differ precisely in the transcripts with premature stops, which are the
+   interesting ones.
+4. **Run the model forward** over those candidates to get its decay probability for each. No
+   mutagenesis, no substitution banks — this is the cheap kind of job.
+5. **Look for a step change at each distance**, at three different zoom levels, so a result that only
+   appears at one setting is visible as such.
+6. **Measure the noise floor honestly** by running the identical test at about twenty distances where
+   nothing should be happening. Whatever size of apparent step those produce is what "nothing" looks
+   like, and our real result has to beat it.
+
+### What each result would mean
+
+| what we see | what it means |
+|---|---|
+| step at 50–55, none at 500 | the decay step learned the real rule, and our window size is not distorting anything. Best case |
+| step at both | it learned the rule, **and** our window size is leaking into predictions. Both true, both reported |
+| step at 500 only | predictions partly reflect an arbitrary engineering choice rather than biology. Fixable — the window is too small |
+| step at neither | the decay step is just counting junctions and ignoring where they are. Pairs with the stop-codon finding |
+| step at 50–55 the **wrong way round** | a threshold exists but runs backwards from the biology. Named here so it cannot get quietly reported as the first row |
+
+### What could go wrong
+
+- **The honest limit:** we supplied junction positions to the model, so if it shows the rule, what it
+  learned is the *shape* of the response, not where junctions are. Worth stating plainly rather than
+  letting the claim inflate.
+- **Sample size at the 500 boundary is thinner** — about 1,800 candidates against 13,400 at the
+  biological one. The positive control is better powered than the negative one.
+- **Nothing here says anything about ORF weighting.** That is Maude's arm and this row does not
+  license a word about it.
+
+### What it costs
+
+One forward-pass job over the candidate pool. Everything before it is local. The follow-up question —
+whether the model's *sequence* sensitivity clusters near junctions — is a separate job on data we
+already have, and is deliberately not part of this.
+
+---
+
 ## Known answer, written down before measuring
 
 *Path stage 3, and the stage we have never had. Recorded so the result cannot be rationalised
