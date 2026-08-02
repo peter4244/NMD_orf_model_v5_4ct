@@ -1,0 +1,28 @@
+=== code (sha256) ===
+049f7a58c91c7750820262d7b132abf1e74f648b3a95d10f69f15c34b3904980  analysis_plans/model_c16_retraction.py
+
+
+======================================================================
+CANDIDATE FILTER  k >= 4
+======================================================================
+  p_select ~ ejc, conditioning on nothing        -0.050   n 4,815
+  p_select ~ ejc, holding ORF LENGTH             +0.447   n 4,623
+  p_select ~ ejc, holding POSITION               -0.553   n 4,397
+  p_select ~ ejc, holding LENGTH AND POSITION    -0.070   n 4,272
+  [check] one-covariate partial, regression +0.447 vs closed form +0.442  -> AGREE
+  -> COLLAPSES — C16 retracted
+
+======================================================================
+CANDIDATE FILTER  k >= 6
+======================================================================
+  p_select ~ ejc, conditioning on nothing        -0.023   n 4,516
+  p_select ~ ejc, holding ORF LENGTH             +0.452   n 4,456
+  p_select ~ ejc, holding POSITION               -0.546   n 4,199
+  p_select ~ ejc, holding LENGTH AND POSITION    -0.067   n 4,153
+  [check] one-covariate partial, regression +0.452 vs closed form +0.452  -> AGREE
+  -> COLLAPSES — C16 retracted
+
+The k>=4 row is the one the narrative should quote: it matches job 8900685's
+population. The k>=6 row is what the uncommitted temp file used, and is the
+source of the +0.452 that appeared in the table against 8900685's +0.442.
+=== exit: 0 ===
