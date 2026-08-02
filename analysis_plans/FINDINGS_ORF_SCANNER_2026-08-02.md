@@ -87,7 +87,27 @@ itself**, which is the BETTER outcome registered before the run.
 
 **The anchor choice was the largest lever in the measurement**: 0.753 on the pool
 reference against 0.908 on the GENCODE annotation. Both were run because an
-unexamined choice between them is this project's error class.
+unexamined choice between them is this project's error class — and measured, the
+two anchors agree on only **40.2%** of candidates. "The reference ORF" and "the
+GENCODE CDS" are different objects in six cases out of ten.
+
+**Population, verified against two independent routes** (the bank's h5 and
+`gencode_candidate_flags.tsv` joined to `orf_pool.tsv`, which agree exactly at
+4,916 bank transcripts): **40,914** transcripts pool-wide carry a GENCODE-start
+candidate and **25,982** of those have it PTC-bearing. The stratum is well-powered,
+not marginal.
+
+*A definitional exposure of my own, recorded rather than resolved by preference:*
+for the same bank transcripts the h5 route gives 3,260 PTC-bearing GENCODE anchors
+and the pool route gives 3,391 — a 4% gap, because my loop takes the **first**
+GENCODE-start candidate per transcript while the pool version asks whether **any**
+carries an EJC. The rebuilt benchmark used the first-candidate rule. One name, two
+sets, in my own code.
+
+*Circularity bound, per field 5:* defining the target as "annotated frame with a
+downstream EJC" uses the EJC rule to build a benchmark that partly tests whether
+the model uses the EJC rule. Annotation-derived rather than model-derived, so not
+fatal — but it bounds what a positive licenses.
 
 > **⇒ C2, C3 and C11 are hereby scoped to MAIN-ORF RECOVERY.** "A length heuristic
 > reproduces 97%" is a statement about finding the main ORF and says nothing about
