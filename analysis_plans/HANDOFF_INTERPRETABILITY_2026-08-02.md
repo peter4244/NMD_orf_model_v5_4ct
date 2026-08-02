@@ -87,15 +87,24 @@ per-transcript top-1% (Jaccard 0.24 between them) · the elevation threshold's s
 quoting any proportion, size, ratio or cross-implementation comparison, enumerate what is in the set
 and measure both reference points in-sample.
 
-Two failure modes that are *not* that one, and both bit:
+Three failure modes that are *not* that one, and all three bit:
 
 - **Treating a feature of the exposure as a confounder.** Selection mass is the architecture;
   the position/composition decoupling at a PTC is what a PTC transcript *is*. Stratify and state,
   never adjust away. No amount of checking denominators catches this — it needs someone who knows the
   biology.
-- **Compression.** A correction was made, accepted by both windows, and then **reintroduced when the
-  document was summarized for a reader.** Summarizing is where corrections go to die, and this
-  handoff is the artifact most exposed to it.
+- **Provenance.** A commit that claimed edits it did not contain. The message is not evidence of the
+  diff; `git show` is. Same rule as the cluster, where `git rev-parse HEAD` is not the provenance of
+  what ran.
+- **Compression.** A correction made, accepted by both windows, verified, committed — and then
+  **reintroduced when the state was summarized for a new reader.** This is not hypothetical and not
+  historical: the modeling handoff written at 09:44 today tells its incoming window not to start
+  until three fixes land that had landed at 09:37. Seven minutes. A correction became a blocking
+  instruction inside a document that lists compression as a failure mode.
+
+  Neither window caught that by being careful. It was caught by going to the commit before repeating
+  a claim about it, which is mechanical. **When any document — including this one — tells you
+  something is owed, blocked, settled or retracted, check the commit before acting on it.**
 
 And the limit of the arrangement: **replication catches errors the two implementations do not
 share.** Both windows built the run-length statistic independently, agreed to four decimals, and were
