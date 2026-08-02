@@ -24,7 +24,8 @@ claim→code map; `RETRAIN_ARCHITECTURE_CHANGES.md`.
 **Findings** `FINDINGS_ORF_SCANNER_2026-08-02.md`, `FINDINGS_TILED_PERTURBATION_2026-08-02.md`,
 `FINDINGS_DECAY_SEQUENCE_2026-08-02.md`. **Retrain items** 3, 4, 6, 8.
 **Jobs** 8898926 · 8898939 · 8899132 · 8899353 · 8899766 · 8899820 · 8899905 · 8899965 ·
-8900114 · 8900209 · 8900229 · 8900407 · 8900420 · 8900473 · 8900631 · 8900643 · 8900685.
+8900114 · 8900209 · 8900229 · 8900407 · 8900420 · 8900473 · 8900631 · 8900643 · 8900685 ·
+8900746.
 
 ---
 
@@ -89,11 +90,18 @@ ones. **The head fails precisely where initiation biology says context should de
 | `p_select ~ junction count`, conditioning on | median |
 |---|---|
 | nothing (marginal) | **−0.050** |
-| ORF length only | +0.452 |
-| position only | −0.543 |
-| **length and position together** | **−0.067** |
+| ORF length only | +0.447 |
+| position only | −0.553 |
+| **length and position together** | **−0.070** |
 
-*C14 (jobs 8900643, 8900685). The head's own aversion, `p_capture ~ junction count`
+*C14. Producer `model_c16_retraction.py`, **job 8900746**, candidate filter k ≥ 4 —
+the same population as job 8900685. An earlier version of this table quoted +0.452
+and −0.067, which came from a k ≥ 6 run in an uncommitted temp file; the producer
+now reports both filters so the difference is visible rather than resolved by
+preference, and the conclusion is identical under each. Internal check: the
+rank-residual partial agrees with the closed form at one covariate.*
+
+*Also (jobs 8900643, 8900685). The head's own aversion, `p_capture ~ junction count`
 −0.453, collapses to −0.009 holding length — that arm is entirely length.*
 
 **Routing is indifferent to junction structure.** Length and position each mask the
@@ -179,8 +187,13 @@ PWM explains 1.73% of importance variance.**
 **The forward separation is verified** — three encoders, and an invariance test that
 scrambles the stop window and leaves `p_capture` unmoved. **The coupling is derived** —
 `∂L/∂z_p_k ∝ d_k` is calculus on verified code, not an observation. **The consequence is
-measured** — `capture ~ d` is +0.362 among short candidates, +0.400 holding the junction
-column. *Same measurement as §5's; see the note there.*
+measured** — `[unclaimed — jobs 8900114, 8900473]` `capture ~ d` is +0.362 among short
+candidates, +0.400 holding the junction column. *Same measurement as §5's; see the note
+there.* **The marker is restored:** it was in the handover draft, I removed it while
+rewriting, and the number is still not a claim row in `CAPTURE_HEAD_STORY.md` — it appears
+there only in prose. This is the *measured* leg of the architecture-verified /
+mechanism-derived / consequence-measured sentence, so it is the last number in the document
+that should be living unfiled.
 
 **But scoped.** In aggregate the separation *holds*: `p_capture ~ d` is +0.091 and the two
 heads read **different bases**, agreement ~0.02 within mass band (job 8899820). It is given
