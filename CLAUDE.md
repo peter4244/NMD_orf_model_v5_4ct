@@ -47,6 +47,18 @@ The model architecture is identical to the original v5: multi-branch transformer
 - Labels: carried by the ORFik scan and written by `export_rds.R`; vintage recorded in
   `tx_summary_provenance.json`. `relabel_tx_summary_4ct.R` is retired (D18).
 
+## BEFORE ANY RETRAIN OR RE-ARCHITECTURE
+
+**Read [`RETRAIN_ARCHITECTURE_CHANGES.md`](RETRAIN_ARCHITECTURE_CHANGES.md) first.** It is
+the accumulated list of things the current design does that interpretation found — the ATG
+window's fill boundary leaking ORF length into the initiation head, the bin-max
+representation discarding motif multiplicity and spacing, the forward separation between
+the heads being given back by the loss, and four more. Each item states what it is, how we
+know, and what a retrain should do.
+
+Pointers to it also sit at the top of `03_train.py` and `train_v6.py`, because a retrain
+can be started from either direction. **The file is the single copy — add findings there.**
+
 ## Working Conventions
 - Best model tag: `atg500_stop500`
 - All output goes to `results_4ct/`
@@ -72,6 +84,19 @@ because each one was learned by hitting it — see `analysis_plans/HANDOFF_INTER
 - **Namespace everything**, including cluster scratch scripts — outputs `interp_*` / `model_*`, jobs
   `hi_*` / `md_*`. Two windows once wrote `autocorr.py` to the same cluster directory and the second
   silently replaced the first.
+- **Conference protocol.** A **conference** is called by Pete on a **specific topic**.
+  While it is open, **every message goes to all conference members**, not just to
+  whoever asked the question. Exceptions can be made per message; this is the
+  default. **Communication reverts to baseline once the topic is deemed addressed** —
+  and someone has to say so, or the conference never ends.
+
+  *Why it exists, from 2026-08-02:* the results window sent a narrative-process
+  design to the interpretability window without copying the model window, which
+  owned the work; and the interpretability window summarised state for Pete using a
+  framing the model window had already retracted, which the results window could not
+  catch because they had never seen it. Both are bilateral-routing failures and both
+  are what all-members messaging prevents.
+
 - **Ask before every Explorer login.** A loaded ssh-agent is not standing authorization.
 - **Where a document does not cover what you hit, add a row.** None of this structure was designed;
   it is a record of failures, so it stops exactly where our failures stopped. Do not work around a

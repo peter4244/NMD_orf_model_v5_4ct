@@ -1,0 +1,59 @@
+=== code (sha256) ===
+55638aac9341b8dc6cbd0f0abd270fbdef376fafafe120a4193c4b94301b25a9  analysis_plans/model_capture_premise.py
+
+BANK results_ism_v6/bank_interp_s100.h5
+checkpoint runs/interp_c32_b8_s100/best.pt
+transcripts 4999   with >=2 candidates 4,974   with a reference candidate 3,412
+candidates per transcript: median 15  mean 17.6  max 103
+candidates in the Q1 sample 62,149   chance rate 0.055
+
+======================================================================
+Q1  DOES THE SCANNER BEAT POSITION ALONE?
+======================================================================
+  fraction landing on the reference candidate
+    argmax p_select  (model)          0.697
+    argmax p_capture (head alone)     0.305
+    most 5' candidate (prior alone)   0.424
+    chance                            0.055
+    model, NMD      transcripts        0.658  (n=1,504)
+    model, control  transcripts        0.729  (n=1,908)
+  If the model does not beat the 5'-most baseline, 'the scanner works'
+  is a statement about the stick-breaking ordering, not about the head.
+
+======================================================================
+Q2  IS CAPTURE CONCENTRATED, OR IS THE PRIOR SELECTING?
+======================================================================
+  p_capture CV within transcript      0.732 0.954 1.232 1.557 1.919
+  p_select normalised entropy         0.061 0.145 0.290 0.451 0.605
+  p_select max share                  0.433 0.567 0.762 0.914 0.969
+  deciles 10/25/50/75/90. Entropy 0 = one candidate takes everything,
+  1 = uniform. Low capture CV with low select entropy means the
+  ordering is doing the work.
+
+======================================================================
+Q3  IS CAPTURE BLIND TO THE STRUCTURAL BLOCK, ON REAL DATA?
+======================================================================
+  within-transcript rank corr, p_capture vs n_downstream_ejc
+    median -0.460   mean -0.390   n 4,917
+  within-transcript rank corr, p_capture vs kozak_score  (comparator)
+    median +0.124   mean +0.116   n 4,917
+
+  PARTIAL, holding candidate start position fixed
+    median -0.582   mean -0.517   n 4,526
+    capture~position median -0.197    ejc~position median -0.378
+    If the raw association collapses here, it is POSITION, which is
+    what the architecture predicts. If it survives, capture is
+    tracking junction structure by some route we have not found.
+
+======================================================================
+Q4  DOES DECAY DISCRIMINATE AMONG CANDIDATES?
+======================================================================
+  p_decay CV within transcript        0.346 0.517 0.770 1.025 1.293
+  p_decay at the SELECTED candidate   0.008 0.033 0.171 0.807 0.975
+  p_decay max over candidates         0.143 0.267 0.563 0.879 0.980
+  If decay were flat it could not be carrying selection; if it is
+  sharp, 'decay does everything and capture is decorative' is live.
+  Architecture says capture sees the ATG window only, so any EJC
+  association must be INDIRECT via start context. A large direct
+  association would mean the invariance is broken -- worth finding.
+=== exit: 0 ===

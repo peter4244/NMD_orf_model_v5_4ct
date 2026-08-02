@@ -2,6 +2,17 @@
 """
 train_v6.py — fit one configuration of the scanning-selection model.
 
+!!  BEFORE RETRAINING OR RE-ARCHITECTING, READ  RETRAIN_ARCHITECTURE_CHANGES.md  !!
+
+    Seven things the current design does that interpretation found and that a
+    retrain should fix rather than reproduce -- among them: the ATG window's fill
+    boundary leaks ORF length into the initiation head; the bin-max representation
+    discards motif multiplicity and spacing; and the forward separation between the
+    heads is given back by the loss, so p_capture cannot be read as initiation.
+
+    That file is the single copy. Add findings there, not here.
+
+
 Implements section 7 of analysis_plans/RETRAIN_PLAN_2026-08-01.md. One run per
 invocation, so a sweep is a SLURM array rather than a loop in here.
 

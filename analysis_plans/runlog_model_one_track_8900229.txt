@@ -1,0 +1,22 @@
+=== code (sha256) ===
+75276522600d518efcc8c406e50cbec1a56af78cf9745db936868da8b46de2b4  analysis_plans/model_one_track.py
+
+CROSS-CHECK -- two routes to P(NMD) must agree
+  sum p*d vs sigmoid(base_logit):  r = 1.0000   max|diff| = 3.35e-07
+  medians  0.1883  vs  0.1883
+
+========================================================================
+IS THERE A CHANNEL FOR NON-JUNCTION NMD?
+========================================================================
+  stratum                                 n  median P(NMD)
+  has junction-bearing cand, NMD       2438         0.6620
+  has junction-bearing cand, control   2357         0.0706
+  NO junction-bearing cand, NMD          49         0.0811
+  NO junction-bearing cand, control     155         0.0334
+
+  NMD-vs-control AUC, WITH a junction-bearing candidate: 0.887   (n 2,438 / 2,357)
+
+  NMD-vs-control AUC, WITHOUT a junction-bearing candidate: 0.787   (n 49 / 155)
+
+  -> UNDERPOWERED -- only 49 NMD transcripts lack one
+=== exit: 0 ===

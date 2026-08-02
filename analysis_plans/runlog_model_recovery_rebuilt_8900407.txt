@@ -1,0 +1,30 @@
+=== code (sha256) ===
+0181c586c012354e5ad4d0bc1bd8315e9b0c510aaf96f4023db1aa38c848fac9  analysis_plans/model_recovery_rebuilt.py
+
+
+==========================================================================
+ANCHOR = cand_is_ref_cds (pool reference)
+==========================================================================
+  stratum                                           n   prior    post
+  anchor IS PTC-bearing, NMD                     1147   0.753   0.799
+  anchor IS PTC-bearing, control                  400   0.600   0.672
+  anchor NOT PTC-bearing, NMD                     357   0.350   0.227
+  anchor NOT PTC-bearing, control                1508   0.763   0.499
+
+  NMD transcripts, prior recovery:      PTC-bearing anchor 0.753   non-PTC 0.350   gap +0.403
+  NMD transcripts, posterior recovery:  PTC-bearing anchor 0.799   non-PTC 0.227   gap +0.572
+  -> MEANINGFUL -- comparable to the 0.697 headline
+
+==========================================================================
+ANCHOR = cand_is_gencode_start (GENCODE annotation)
+==========================================================================
+  stratum                                           n   prior    post
+  anchor IS PTC-bearing, NMD                     1995   0.908   0.941
+  anchor IS PTC-bearing, control                 1254   0.849   0.892
+  anchor NOT PTC-bearing, NMD                     453   0.722   0.483
+  anchor NOT PTC-bearing, control                1193   0.900   0.661
+
+  NMD transcripts, prior recovery:      PTC-bearing anchor 0.908   non-PTC 0.722   gap +0.186
+  NMD transcripts, posterior recovery:  PTC-bearing anchor 0.941   non-PTC 0.483   gap +0.458
+  -> MEANINGFUL -- comparable to the 0.697 headline
+=== exit: 0 ===

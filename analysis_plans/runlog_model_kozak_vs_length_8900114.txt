@@ -1,0 +1,33 @@
+=== code (sha256) ===
+58f66cf02055900a10c9a4da981b4183a9bff320c4381855958e7adf78576881  analysis_plans/model_kozak_vs_length.py
+
+BANK results_ism_v6/bank_interp_s100.h5
+checkpoint runs/interp_c32_b8_s100/best.pt
+
+========================================================================
+DOES THE MODEL FIND THE REFERENCE ORF WHEN IT IS SHORT?
+========================================================================
+  reference ORF long    accuracy 0.735   n 3,088
+  reference ORF short   accuracy 0.276   n 294
+  gap long - short = +0.460
+  NMD transcripts only:
+    reference ORF long    accuracy 0.699   n 1,345
+    reference ORF short   accuracy 0.294   n 153
+
+========================================================================
+DOES A STRONG KOZAK RESCUE A SHORT REFERENCE ORF?
+========================================================================
+  short reference, kozak >= median  accuracy 0.311   n 206
+  short reference, kozak <  median  accuracy 0.193   n 88
+
+========================================================================
+WHAT DOES CAPTURE READ AMONG SHORT CANDIDATES?
+========================================================================
+  capture ~ kozak, ORFs < 200 nt               median +0.061   n 4,293
+  capture ~ kozak, ORFs >= 200 nt              median +0.071   n 3,144
+  capture ~ length, ORFs < 200 nt              median +0.429   n 4,293
+
+  among short candidates, length beats kozak by 7.0x
+
+  -> A -- LENGTH-DRIVEN
+=== exit: 0 ===

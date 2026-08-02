@@ -1,0 +1,17 @@
+=== code (sha256) ===
+5671c004a94614d3281efb12dc21ca74e7767e95c6ffc209ccf619e1b91700bf  analysis_plans/model_route_to_ptc.py
+
+============================================================================
+DOES THE MODEL ROUTE TO PREMATURE-STOP-BEARING FRAMES?
+============================================================================
+  p_capture ~ n_downstream_ejc   [the head]        median -0.453   n 4,815
+  p_select  ~ n_downstream_ejc   [THE ANSWER]      median -0.050   n 4,815
+  posterior ~ n_downstream_ejc   [p_select * d]    median +0.101   n 4,815
+  start position ~ ejc  (5' = more junctions?)     median -0.334   n 4,815
+
+  p_select ~ ejc, NMD transcripts                  median +0.119   n 2,415
+  p_select ~ ejc, control transcripts              median -0.189   n 2,400
+
+  ordering's contribution = p_select - p_capture = +0.403
+  -> INDIFFERENT -- routing ignores junction structure; the product's alignment is all d
+=== exit: 0 ===

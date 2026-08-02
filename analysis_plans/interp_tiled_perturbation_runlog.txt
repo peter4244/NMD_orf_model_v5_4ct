@@ -1,0 +1,34 @@
+=== code provenance (the sha is what ran, not the branch) ===
+2d829acb9e8d0ef7857fb78134634bc9d92526a869191350166309d11861c6b4  analysis_plans/interp_tiled_perturbation.py
+=== self-test, must pass before the model is loaded ===
+SELF-TEST on 400 real ATG windows, 12 tiles
+
+  shuffle     fill-mask/outside violations     0   junction violations     0   composition changed     0
+  substitute  fill-mask/outside violations     0   junction violations     0   composition changed     0
+  unfilled (window, tile) pairs checked 1,115   changed by perturbation 0
+
+  SELF-TEST PASSED
+=== the measurement ===
+checkpoint n_bins=8  permute_bins=False  conv_channels=32  variant=interpretable
+bin width 125 positions; receptive field ~42
+
+sampled 12,000 candidates of 796,584;  12 tiles (coarse 125 upstream, fine 25 downstream)
+
+          tile  offset   fill%          <80      80-160     160-200       >=200
+         0-125    -838  53.9%      0.03085     0.03128     0.02651    0.009147
+       125-250    -713  61.1%      0.03331     0.03008     0.02782     0.02303
+       250-375    -588  68.5%       0.0378     0.03539     0.04055     0.03173
+       375-500    -463  76.3%      0.06686     0.06768     0.07733     0.07157
+       500-625    -338  83.8%      0.05528     0.05766     0.05573     0.05948
+       625-750    -213  90.6%       0.1075      0.1144      0.1181      0.1265
+       750-875     -88  96.5%       0.1836      0.1528      0.1587      0.1451
+       875-900     -13  99.6%       0.4055      0.2743      0.2437       0.275
+       900-925     +12  81.2%       0.2193      0.3437      0.3113      0.3183
+       925-950     +37  52.9%            0      0.2459      0.3153      0.3264
+       950-975     +62  40.2%            0     0.03258      0.2601      0.3323
+      975-1000     +87  33.4%            0           0      0.3045      0.5811
+
+  Read DOWN each length-band column for the peak, then ACROSS bands:
+  a peak at a fixed offset is prediction A; a peak whose offset tracks
+  min(100, length/2) is prediction B. Both registered before this ran.
+=== exit: 0 ===

@@ -2,6 +2,17 @@
 """
 03_train.py — Training loop for NMD ORF model.
 
+!!  BEFORE RETRAINING OR RE-ARCHITECTING, READ  RETRAIN_ARCHITECTURE_CHANGES.md  !!
+
+    Seven things the current design does that interpretation found and that a
+    retrain should fix rather than reproduce -- among them: the ATG window's fill
+    boundary leaks ORF length into the initiation head; the bin-max representation
+    discards motif multiplicity and spacing; and the forward separation between the
+    heads is given back by the loss, so p_capture cannot be read as initiation.
+
+    That file is the single copy. Add findings there, not here.
+
+
 Features:
   - Differential weight decay (higher on CNN, lower on attention/head)
   - Mixed precision training (AMP)

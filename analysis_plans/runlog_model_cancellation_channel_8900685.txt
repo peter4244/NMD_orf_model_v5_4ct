@@ -1,0 +1,18 @@
+=== code (sha256) ===
+29cd4de19ffb4fa8610d6ad8f820dd867f71530dbff954a9df38959c725f72a7  analysis_plans/model_cancellation_channel.py
+
+============================================================================
+IS THE CANCELLATION ONE LENGTH RELATIONSHIP SEEN TWICE?
+============================================================================
+  p_capture ~ ejc                    raw         median -0.453   n 4,815
+  p_capture ~ ejc   | ORF LENGTH HELD            median -0.009   n 4,682
+
+  p_select  ~ ejc                    raw         median -0.050   n 4,815
+  p_select  ~ ejc   | ORF LENGTH HELD            median +0.442   n 4,672
+
+  ORF length ~ ejc          (the shared driver?) median -0.575   n 4,815
+  p_capture ~ ORF length                         median +0.761   n 4,815
+  p_select  ~ ORF length                         median +0.533   n 4,815
+
+  -> INVERTED -- length was SUPPRESSING it; the account is wrong a third way
+=== exit: 0 ===

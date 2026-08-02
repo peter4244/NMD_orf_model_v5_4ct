@@ -1,0 +1,40 @@
+{
+  "built_at": "2026-08-01T16:57:00Z",
+  "script": "emit_gencode_candidate_flags.py",
+  "sha256": "b312507d9e800bc227205129a80c94e5e8e791ff9410979e6b231bbfc0733306",
+  "n_rows": 802035,
+  "n_transcripts": 42043,
+  "WARNING_SENTINELS": {
+    "rule": "NEVER cast a flag column in this file with astype(bool). Use == 1.",
+    "why": "Three of the four flag columns are float with NaN where the transcript has no GENCODE CDS. NaN is TRUTHY, so astype(bool) selects the 61.2% of rows that mean 'not applicable'. The same information in the h5 is int8 with a -1 sentinel, which is also truthy. This cost the model window three wrong numbers on 2026-08-02 (job 8900473 supersedes the contaminated run) and no check caught it; it was found by an arithmetic ceiling -- 40,914 transcripts claimed against 16,655 that have a GENCODE CDS at all.",
+    "columns_with_nan_sentinel": {
+      "is_gencode_start": {
+        "dtype": "float64",
+        "nan_fraction": 0.6115
+      },
+      "upstream_of_gencode_start": {
+        "dtype": "float64",
+        "nan_fraction": 0.6115
+      },
+      "overlaps_gencode_start": {
+        "dtype": "float64",
+        "nan_fraction": 0.6115
+      }
+    },
+    "columns_safe": {
+      "has_gencode_cds": {
+        "dtype": "int64",
+        "values": [
+          0,
+          1
+        ]
+      }
+    }
+  },
+  "SECOND_TRAP": "has_gencode_cds is a TRANSCRIPT-level flag repeated on every candidate row: 311,581 rows against 16,655 transcripts. Counting rows where it is 1 does not count transcripts. Group and take max.",
+  "counts_for_cross_check": {
+    "transcripts_with_has_gencode_cds": 16655,
+    "transcripts_with_is_gencode_start": 15526,
+    "candidate_rows_is_gencode_start": 15526
+  }
+}
