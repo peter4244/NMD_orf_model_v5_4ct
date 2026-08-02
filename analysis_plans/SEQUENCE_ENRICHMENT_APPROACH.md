@@ -24,7 +24,7 @@ each of the three possible substitutions — the most direct importance measure
 available, with no approximation. One bank is ~33 million such numbers.
 
 ISM tells us **where** the model is sensitive. We want to know **what it is sensitive
-to**: whether the decay branch has learned a recognisable sequence feature.
+to**: whether the decay branch has learned a recognizable sequence feature.
 
 Getting from the first to the second is the whole problem, and it is harder than it
 looks.
@@ -67,13 +67,13 @@ without ever checking the positions themselves.
 
 ## 3. What we do specifically
 
-### 3.1 Elevation is self-normalising, and the rule is fixed in advance
+### 3.1 Elevation is self-normalizing, and the rule is fixed in advance
 
 "High-importance" is the **top fraction of each transcript's own valid positions**,
 not a fold-change over that transcript's median.
 
 The fold rule was tried first and **inverted on real data** — random placement
-produced *more* long runs than the data. Cause: fold-over-median normalises for
+produced *more* long runs than the data. Cause: fold-over-median normalizes for
 magnitude but not for tail shape, so the same rule selected 1.7% of positions on a
 short-transcript pilot and 10.7% on the real banks, reaching 43% on transcripts with
 very small medians. A fixed fraction makes the count identical by construction, so a
@@ -157,7 +157,7 @@ Well-trodden. Standard mitigations each fix one axis and leave others:
 - **position-matched controls** hold geometry, not sequence
 
 There is no neutral background. There are only backgrounds whose biases have been
-characterised.
+characterized.
 
 ### 4.3 The alternative: TF-MoDISco
 
@@ -279,7 +279,7 @@ essentially balanced. "Operative stop before annotated stop" therefore conflates
 populations: transcripts with a genuine premature termination codon, and transcripts
 where the model simply commits to a shorter ORF than the annotation. A control
 transcript does not have NMD-triggering premature termination, so those 268 are
-largely the second — a fact about model behaviour, not about the transcript.
+largely the second — a fact about model behavior, not about the transcript.
 
 **The interval must be defined from an annotation-derived PTC call**, not from the
 model's selection, so that the cell does not depend on what the model chose. The
@@ -318,8 +318,8 @@ on, and whether the result survives anchoring on the other one.
 You cannot substitute a base for itself, so ISM gives three values where attribution
 methods give four. Filling that gap is a convention with consequences:
 
-- **mean-centring**, `hyp[b] = vals[b] − mean_b(vals[b])` with `vals[obs] := 0`, is
-  well-defined and recovers mean-centred contributions exactly — the common offset
+- **mean-centering**, `hyp[b] = vals[b] − mean_b(vals[b])` with `vals[obs] := 0`, is
+  well-defined and recovers mean-centered contributions exactly — the common offset
   cancels, nothing is invented
 - the alternative — observed = 0, others = −Δ — additionally asserts that the observed
   base contributes nothing, which is false precisely when the observed base is the
@@ -374,7 +374,7 @@ Ordered by how much each bounds what the rest can be worth.
   directional" is tautological.** `probe_directionality_null.py` tests it and has not
   been run.
 - **The observed-base convention for the port is unsettled and consequential.**
-  Mean-centring against observed-equals-zero produce **different motifs from
+  Mean-centering against observed-equals-zero produce **different motifs from
   identical data**. Both will be run; the prediction that the second under-weights
   the consensus base is recorded in §5.4.
 - **Whether the U-rich context is causal or merely associated.** The profile shows
