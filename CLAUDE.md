@@ -61,7 +61,7 @@ because each one was learned by hitting it — see `analysis_plans/HANDOFF_INTER
   window wrote, review it first and send back the choices it leaves open. **Do not resolve an
   ambiguity in code** — a choice made inside an implementation is invisible to review, and that is
   the origin of essentially every error this project has had. A row with an empty field in the
-  twelve-field template (`ANALYSIS_SEQUENCING_PROPOSAL.md`) is not ready to implement.
+  thirteen-field template (`ANALYSIS_SEQUENCING_PROPOSAL.md`) is not ready to implement.
 - **Two implementations means one shared specification and independent code.** Writing your own
   specification produces two analyses, not a replication.
 - **Check the artifact before repeating a claim about it.** When any document says something is
