@@ -532,11 +532,48 @@ s100, 500 transcripts, 1,036,981 positions:
     sub-floor band     0.370    pure noise (median 7.4e-08 against a floor of 1.7e-06)
     top 1%             0.427    above the null by 14%
 
-**So directional structure is real but modest.** "62% of the maximum attainable"
-becomes "14% above the random-sign null". The conclusion that the branch has learned
-both directional and non-directional features stands — it is the size of the
-directional part that shrinks, and it should be quoted against 0.37 rather than
-against 0.
+**RECONCILED, and my own null was wrong.** The 0.373-against-0.391 gap between the
+two windows is **mean versus median**, not data: median of the ratio gives 0.3911
+against their reported 0.391. Ruled out first, on one sample: pooling method
+(per-transcript 0.3733 against pooled 0.3732), floor restriction (0.3737), column
+(`vals` 0.372, `vals_capture` 0.365), dead substitutions (0.3732), mean over three
+rather than four (0.4975, far too high).
+
+**And the null is statistic-dependent, which broke my correction of theirs:**
+
+    RANDOM-SIGN NULL          mean      median
+      equal magnitudes       0.3749    0.2500
+      exponential            0.2585    0.2502
+      half-normal            0.2627    0.2503
+
+    MEASURED                  mean      median          n
+      all positions          0.3731    0.3913   1,108,267
+      sub-floor (noise)      0.3709    0.3888     171,041
+      top 1% by |effect|     0.4273    0.4481      11,083
+
+I claimed the sub-floor band "lands on the analytic prediction without being told
+to". **That was a coincidence of the mean.** On the median it misses badly — 0.389
+measured against 0.250 predicted — so the sub-floor data is **not sign-random
+noise**: its three substitutions agree in sign far more than chance, meaning a
+shared per-position component dominates at that scale. The analytic random-sign null
+is the wrong reference, and I used it to correct the other window while making the
+parallel error.
+
+**The right null is the one the data measures — the sub-floor band — and it makes
+both statistics agree:**
+
+    against the in-sample sub-floor null      mean      median
+      all positions                          +0.6%     +0.6%
+      top 1% by |effect|                    +15.2%    +15.3%
+
+**So: elevated positions are ~15% above the noise null; all positions are
+indistinguishable from it.** Robust to the summary statistic. "62% of the attainable
+ceiling" overstates it and "14% above the analytic null" was right by accident.
+
+The conclusion that the branch learned both directional and non-directional features
+stands. The size of the directional part is ~15% over noise, and it should be quoted
+against the measured sub-floor band rather than against 0 or against an analytic
+sign-null.
 
 **The error class, again, and from the other end.** The ceiling was checked and
 corrected; the floor was never checked because 0 *looks* like a null. A ratio
