@@ -276,6 +276,33 @@ modulates 34.7% against 2.7%, so extent is a partial proxy rather than a pure on
 Saturated upstream extent means `orf_start >= 901`, so many AUGs precede the
 candidate and its stick-breaking mass is a product over a long prefix.
 
+**FULLY RESOLVED: the deaths are float64 underflow in the aggregation.** The
+interpretability window argued the zeros could not be the mass annihilating a real
+change — float64 resolves a `Δz_p` of 1e-3 at mass 2e-8 by ~90,000 ulps — and so
+must be `enc_init` returning a bitwise-identical embedding. That is true **above a
+boundary they did not state**: unresolvable needs `mass × Δz_p < 2.2e-16`, so with
+`Δz_p` ~1e-3 the boundary is mass ~2.2e-13, and stick-breaking mass reaches 1e-15
+by slot 50. Splitting the dead stratum by magnitude:
+
+    p_select band            n      dead rate   regime
+    [0, 1e-30)              97       100.00%    underflow possible
+    [1e-30, 1e-20)       1,022       100.00%    underflow possible
+    [1e-20, 1e-16)         590       100.00%    underflow possible
+    [1e-16, 1e-13)       1,626        69.31%    underflow possible
+    [1e-13, 1e-11)       1,540         5.97%    encoder must be bitwise-equal
+    [1e-11, 1e-8)        4,169         0.00%    encoder must be bitwise-equal
+    p_select exactly 0      84       100.00%
+
+The rate collapses **exactly at the derived boundary**. So the deaths are
+aggregation underflow, and the question does not relocate to `enc_init` except for
+the 5.97% residual just above the boundary, where underflow should not reach.
+
+**That also closes the fill-extent puzzle.** Saturated windows mean 3′-proximal
+candidates, which means deeper ordinal position, which means lower mass, which
+means more underflow. The twelvefold modulation inside the dead stratum was further
+mass stratification, not a separate effect. Everything here is arithmetic and none
+of it is about the encoder.
+
 **This changes what a liveness gate means.** It is not a geometric artifact
 corrupting the measurement. At `p_select` < 1e-8 a dead perturbation is a *true
 statement*: nothing done to that window moves the output, because no mass reaches
