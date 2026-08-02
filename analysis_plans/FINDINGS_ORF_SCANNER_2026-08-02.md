@@ -208,10 +208,27 @@ heuristic; it does not establish what the head *does*.
 
 ### The sentence this yields
 
-> **The separation the architecture buys in the forward pass is given back by the
-> loss.** Three encoders, a stop-window invariance test, and a comment stating that
-> all of it exists to license reading `p_k` as initiation — and then a
-> decay-weighted gradient trains that head anyway.
+> **The separation holds in aggregate and is given back in the short-candidate
+> class** — where the head must choose among uORFs.
+
+> **⚠ SCOPED 2026-08-02, after the results window asked "measured or argued?"**
+> This read *"the separation the architecture buys in the forward pass is given
+> back by the loss"* — stated as a global claim and written as though globally
+> measured. Checked:
+>
+> - **ARGUED, not measured.** The gradient coupling — `∂L/∂z_p_k` scaled by `d_k`,
+>   from `model_v6.py:199-200` and `train_v6.py:8,358`. The lines are verified; the
+>   inference from them is calculus, not an observation. **No claim id.**
+> - **MEASURED, and it cuts AGAINST the sentence.** `p_capture ~ d` is **+0.091** in
+>   aggregate (C13), and the two heads read **different bases** — branch agreement
+>   +0.093 within mass band against a +0.075 blind control. In aggregate the
+>   separation largely **holds**.
+> - **MEASURED, and it supports the sentence in ONE CLASS.** `capture ~ d` is
+>   **+0.362** among short candidates, **+0.400** holding the EJC column fixed.
+>
+> True where the head chooses among uORFs; false globally. It had survived two
+> windows and a full narrative, and what broke it was someone asking which half of
+> it was evidence.
 
 ---
 
