@@ -112,6 +112,39 @@ the loss.
                       by more seeds rather than by looking
 
 --------------------------------------------------------------------------------
+THIRD ARM -- PRIOR AGAINST POSTERIOR. Pete, and it is the most informative number
+in the study. Added before the run.
+
+The model NEVER PICKS AN ORF. It produces a mixture: P(NMD) = sum_k p_select_k * d_k
+(model_v6.py:199-200). So a candidate's actual contribution is p_select_k * d_k, and
+the principled reading of "which ORF did it use" is the POSTERIOR --
+p_select_k * d_k normalised -- not the prior p_select_k.
+
+EVERY NUMBER WE HAVE REPORTED USED THE PRIOR. Consequences:
+
+  - C11's 0.697 is the PRIOR's argmax. It says nothing about where the prediction
+    actually concentrates.
+  - C3 stops being surprising. A prior is not supposed to be sharp. Stick-breaking
+    supplies a prior over start sites, decay supplies the likelihood, the product
+    is the posterior. Capture being a poor ranker ALONE is the expected shape of a
+    prior, not a discovery about the head.
+  - And it is Pete's original hypothesis at the level we were not looking. d_k is
+    high exactly for premature-stop candidates with downstream junctions, so the
+    posterior shifts weight onto them REGARDLESS of what capture does. The
+    architecture forbids selection-by-PTC in the head; THE PRODUCT DOES IT ANYWAY.
+
+  MEASUREMENT: in the not-longest subset and overall, report argmax of the prior
+  and argmax of the posterior side by side. The prior answers "is the capture head
+  beyond length"; the posterior answers "is the MODEL beyond length"; and THE GAP
+  BETWEEN THEM MEASURES HOW MUCH ORF SELECTION IS DONE BY DECAY.
+
+  AND THE SHIFT CARRIES A SIGN, which is Pete's hypothesis made falsifiable:
+  compare the prior-weighted mean downstream-junction count against the
+  posterior-weighted mean. Positive shift = the product moves weight TOWARD
+  premature-stop-bearing candidates. Negative or zero = it does not, and the
+  hypothesis fails at the product as well as in the head.
+
+--------------------------------------------------------------------------------
 Run from the repo root.
 """
 
@@ -135,6 +168,7 @@ def main():
         off, cnt = f["cand_offset"][:], f["cand_count"][:]
         pcap, psel = f["p_capture"][:], f["p_select"][:]
         is_ref = f["cand_is_ref_cds"][:]
+        ejc = f["cand_n_downstream_ejc"][:]
         o_s, o_e = f["cand_orf_start"][:], f["cand_orf_end"][:]
         pdec = f["p_decay"][:]
         N = len(cnt)
@@ -146,6 +180,8 @@ def main():
     ref_rank_cap, ref_rank_len = [], []
     disc_up, disc_down = [], []
     rd_raw, rd_par, rr_raw, rr_par, favours_d = [], [], [], [], []
+    post_hit = post_sub_hit = 0
+    ejc_prior, ejc_post = [], []
 
     for i in range(N):
         lo, k = int(off[i]), int(cnt[i])
@@ -159,6 +195,14 @@ def main():
         length = (o_e[lo:lo + k] - o_s[lo:lo + k]).astype(float)
 
         sel_i = int(np.argmax(ps))
+        # THIRD ARM: the posterior, p_select * d_k normalised
+        post = ps * pdec[lo:lo + k]
+        post_i = int(np.argmax(post))
+        post_hit += ref[post_i]
+        if post.sum() > 0 and ps.sum() > 0:
+            e_c = ejc[lo:lo + k].astype(float)
+            ejc_prior.append(float((ps / ps.sum() * e_c).sum()))
+            ejc_post.append(float((post / post.sum() * e_c).sum()))
         lng_i = int(np.argmax(length))
         p5_i = int(np.argmin(start))
         cell[int(ref[sel_i]), int(ref[lng_i])] += 1
@@ -207,6 +251,8 @@ def main():
         sub_n += 1
         sub_cand += k
         sub_model += ref[sel_i]
+        sub_post_hit = None  # placeholder
+        post_sub_hit += ref[post_i]
         sub_5p += ref[p5_i]
         sub_long += ref[lng_i]          # zero by construction; printed as a check
 
@@ -237,7 +283,11 @@ def main():
     else:
         print(f"  transcripts {sub_n:,}   candidates {sub_cand:,}"
               f"   chance {sub_n/sub_cand:.3f}")
-        print(f"    model  (argmax p_select)          {sub_model/sub_n:.3f}")
+        print(f"    model  PRIOR     (argmax p_select)     {sub_model/sub_n:.3f}")
+        print(f"    model  POSTERIOR (argmax p_sel*d_k)    {post_sub_hit/sub_n:.3f}")
+        print(f"    gap posterior - prior = "
+              f"{(post_sub_hit - sub_model)/sub_n:+.3f}"
+              f"   <- how much selection is done by DECAY")
         print(f"    most-5' WITHIN subset  [the bar]  {sub_5p/sub_n:.3f}")
         print(f"    longest WITHIN subset  [check=0]  {sub_long/sub_n:.3f}")
         verdict = ("BEYOND LENGTH -- clause 1 is wrong"
@@ -266,6 +316,19 @@ def main():
           f"   median {np.median(dd):+.3f}   n {len(dd):,}")
     print(f"  asymmetry (up - down) {du.mean() - dd.mean():+.3f}")
     print("  C3 survives only if upstream is positive AND larger than downstream.")
+
+    print("\n" + "=" * 70)
+    print("THIRD ARM -- PRIOR vs POSTERIOR, and the sign of the shift")
+    print("=" * 70)
+    print(f"  all transcripts: prior argmax hits reference "
+          f"{cell[1].sum()/tot:.3f}   posterior argmax {post_hit/tot:.3f}")
+    ep, eq = np.array(ejc_prior), np.array(ejc_post)
+    print(f"  mean downstream-junction count, PRIOR-weighted     {ep.mean():.3f}")
+    print(f"  mean downstream-junction count, POSTERIOR-weighted {eq.mean():.3f}")
+    print(f"  shift {eq.mean() - ep.mean():+.3f}"
+          f"   ({(eq > ep).mean():.3f} of transcripts shift toward junctions)")
+    print("  positive shift => the PRODUCT moves weight toward premature-stop")
+    print("  candidates even though the capture head cannot see them.")
 
     print("\n" + "=" * 70)
     print("SECOND ARM -- does capture track DECAY or ANNOTATION, beyond length?")
