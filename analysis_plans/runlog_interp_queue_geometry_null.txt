@@ -1,0 +1,50 @@
+=== code provenance ===
+293761aff8d46a8ea40f1c199f40e629edef7db88ea1532f709c8ca328c77df0  interp_queue_geometry_null.py
+
+=== self-test, must pass before any data is read ===
+  survival term ranks as -slot for c in {0.05, 0.3, 0.9}   OK
+  partial removes a common cause: raw +0.998 -> partial +0.054   OK
+  partial preserves a relationship independent of c: +0.998   OK
+  SELF-TEST PASSED
+
+=== data ===
+/Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/results_pool_v6/orf_pool.tsv
+  802,035 candidates, 42,043 transcripts
+  slot ~ orf_start   median +1.0000  over 40,520 transcripts
+  ISM subset (what the bank covers): 4,999 transcripts
+
+============================================================================
+FULL POOL -- context only, NOT the comparison
+============================================================================
+  candidates per transcript: median 17  q1 11  q3 26  (Spearman is coarse at small k -- why medians land on round values)
+
+  -- premise checks --
+  orf_start ~ ejc        (5' start, more downstream EJC?) median -0.500   n 40,520
+  ORF length ~ ejc       (C16 measured -0.575)         median -0.500   n 40,520
+  orf_start ~ ORF length (is length a proxy for position?) median -0.147   n 40,520
+
+  -- the null: p_select with every p_capture equal --
+  QUEUE-ONLY p_select ~ ejc          raw               median +0.500   n 40,520
+  QUEUE-ONLY p_select ~ ejc   | LENGTH HELD            median +0.678   n 39,081
+
+============================================================================
+MATCHED TO THE BANK -- this is the comparison
+============================================================================
+  candidates per transcript: median 15  q1 10  q3 24  (Spearman is coarse at small k -- why medians land on round values)
+
+  -- premise checks --
+  orf_start ~ ejc        (5' start, more downstream EJC?) median -0.501   n 4,815
+  ORF length ~ ejc       (C16 measured -0.575)         median -0.524   n 4,815
+  orf_start ~ ORF length (is length a proxy for position?) median -0.150   n 4,815
+
+  -- the null: p_select with every p_capture equal --
+  QUEUE-ONLY p_select ~ ejc          raw               median +0.501   n 4,815
+  QUEUE-ONLY p_select ~ ejc   | LENGTH HELD            median +0.696   n 4,640
+
+============================================================================
+  C16 measured, with the real model:  raw -0.050   | length held  +0.442
+  this null, with no model at all:    raw +0.501   | length held  +0.696
+
+  -> GEOMETRY SUFFICES -- the ordering alone reproduces most of C16's +0.442
+
+  reference check: length~ejc here -0.524 against C16's -0.575
