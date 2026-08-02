@@ -212,6 +212,66 @@ def load_h5(path, limit=0):
     return out
 
 
+def kmer_enrichment(recs, key, top_frac, k=5):
+    """Which k-mers sit under elevated positions, against the same transcripts'
+    own background.
+
+    WHY THIS AND NOT A POSITIONAL PROFILE. Sequence sensitivity and positional
+    sensitivity are different things and need not co-occur -- an RBP binds at
+    variable locations and is characterised by its motif, not by where it sits.
+    An offset-from-the-anchor profile can only find anchored features, so a
+    floating motif fails it by construction and its absence there is not evidence.
+
+    Background is every valid position of the SAME transcripts with full flanks,
+    not a genome-wide expectation: transcripts differ in composition, and a
+    k-mer enriched only because these transcripts are GC-rich is not a finding.
+    """
+    from collections import Counter
+    half = k // 2
+    hi_c, bg_c = Counter(), Counter()
+    for r in recs:
+        eff = per_position_effect(r[key])
+        ok = r["valid"] & np.isfinite(eff)
+        if ok.sum() < 50:
+            continue
+        n = max(1, int(round(top_frac * ok.sum())))
+        cut = np.partition(eff[ok], -n)[-n]
+        o = r["obs"]
+        idx = np.flatnonzero(ok)
+        idx = idx[(idx >= half) & (idx < len(o) - half)]
+        if not len(idx):
+            continue
+        win = np.stack([o[idx + d] for d in range(-half, half + 1)], 1)
+        good = (win >= 0).all(1)
+        idx, win = idx[good], win[good]
+        if not len(idx):
+            continue
+        code = np.zeros(len(idx), dtype=np.int64)
+        for j in range(k):
+            code = code * 4 + win[:, j]
+        is_hi = eff[idx] >= cut
+        hi_c.update(code[is_hi].tolist())
+        bg_c.update(code.tolist())
+    return hi_c, bg_c
+
+
+def kmer_table(hi_c, bg_c, k, min_count=50):
+    """log2 enrichment per k-mer, with the counts it rests on."""
+    H, B = sum(hi_c.values()), sum(bg_c.values())
+    rows = []
+    for code, nh in hi_c.items():
+        nb = bg_c.get(code, 0)
+        if nb < min_count:
+            continue
+        rows.append((code, nh, nb, np.log2((nh / H) / (nb / B))))
+    rows.sort(key=lambda t: -t[3])
+    return rows, H, B
+
+
+def decode_kmer(code, k):
+    return "".join(NT[(code >> (2 * (k - 1 - j))) & 3] for j in range(k))
+
+
 def load_bank(path, pool, limit=0):
     """A shard directory or an assembled .h5 — same records either way."""
     p = Path(path)
@@ -381,6 +441,12 @@ def main():
                          "Discriminates real clustering from the rolling-GC "
                          "window's built-in correlation between adjacent "
                          "positions.")
+    ap.add_argument("--kmer", type=int, default=5,
+                    help="k for the sequence-signature analysis. Sequence and "
+                         "positional sensitivity are separable -- an RBP binds at "
+                         "variable positions and is characterised by its motif -- "
+                         "so this asks what sits under elevated positions rather "
+                         "than where they are.")
     ap.add_argument("--seed", type=int, default=20260801)
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
@@ -438,6 +504,7 @@ def main():
         print(f"  the geometric mask and the exact zeros must agree to within the "
               f"dead-perturbation rate, or one of them is wrong\n")
 
+    K = args.kmer
     key = {"vals": "vals", "cap": "cap", "dec": "dec"}[args.column]
     name = {"vals": "the transcript logit", "cap": "the capture branch",
             "dec": "the decay branch"}[args.column]
@@ -940,6 +1007,56 @@ def main():
             print(f"    {k9[:4]} [{k9[4]}] {k9[5:]}   {n}")
         print(f"    distinct 9-mers {s.size:,} over {len(ctx):,} sites — "
               f"{'no repetition, so no motif at this sample size' if s.max() < 3 else 'some repetition, worth a larger sample'}")
+
+    _kmer_section(recs, key, args, K, paths, pool)
+
+
+def _kmer_section(recs, key, args, K, paths, pool):
+    print("\n" + "=" * 78)
+    print(f"Q4  What sequence sits under elevated positions? ({K}-mers)\n")
+    hi_c, bg_c = kmer_enrichment(recs, key, args.top_frac, K)
+    rows, H, B = kmer_table(hi_c, bg_c, K)
+    if not rows:
+        print("  no k-mer cleared the background-count floor")
+        return
+    print(f"  {H:,} elevated sites with full flanks, {B:,} background positions")
+    print(f"\n  {'kmer':<9} {'n elevated':>11} {'n background':>13} {'log2 enr':>9}")
+    for code, nh, nb, e in rows[:10]:
+        print(f"  {decode_kmer(code, K):<9} {nh:>11,} {nb:>13,} {e:>+9.3f}")
+    print(f"  {'...':<9}")
+    for code, nh, nb, e in rows[-5:]:
+        print(f"  {decode_kmer(code, K):<9} {nh:>11,} {nb:>13,} {e:>+9.3f}")
+
+    # ACROSS SEEDS, ON THE MOTIF RATHER THAN ON THE POSITIONS. This is the test
+    # that matches a motif hypothesis: five members can disagree about which
+    # instances they weight most while agreeing completely about what the pattern
+    # IS. A position-level Jaccard cannot distinguish those two states; this can.
+    if len(paths) > 1:
+        print(f"\n  ACROSS MEMBERS, on the k-mer enrichment rather than the "
+              f"positions")
+        vecs, seen = [], None
+        for pth in paths:
+            rr = load_bank(pth, pool, args.limit)
+            if args.anchor != "all":
+                rr = [x for x in rr if x["anchor_type"] == args.anchor]
+            h2, b2 = kmer_enrichment(rr, key, args.top_frac, K)
+            t2, H2, B2 = kmer_table(h2, b2, K)
+            d = {c: e for c, _, _, e in t2}
+            seen = set(d) if seen is None else (seen & set(d))
+            vecs.append(d)
+            del rr
+        codes = sorted(seen)
+        if len(codes) > 3 and len(vecs) > 1:
+            M = np.array([[v[c] for c in codes] for v in vecs])
+            rs = [np.corrcoef(M[i], M[j])[0, 1]
+                  for i in range(len(M)) for j in range(i + 1, len(M))]
+            print(f"    {len(codes):,} k-mers measured in every member")
+            print(f"    mean pairwise r of the enrichment vector  {np.mean(rs):+.4f}")
+            print(f"    range {min(rs):+.4f} to {max(rs):+.4f}")
+            print(f"\n    Compare against the position-level Jaccard above. High "
+                  f"here with low\n    there is a motif the members agree on and "
+                  f"place differently -- which is\n    what a variable-position "
+                  f"binding preference looks like.")
 
 
 if __name__ == "__main__":
