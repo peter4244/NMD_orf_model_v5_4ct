@@ -318,15 +318,33 @@ specification's own arithmetic and the error class is the one the document is or
   thinly either. It is **zero through the 80th percentile** and 0.783 at the maximum, so no mean or
   single contingency describes it. A distribution was the right thing to ask for and a representative
   value would have misled in both directions at once.
-- *The divisor was the real error.* Positions do not spread evenly across global quantile bands. At 8
-  bands **only 46.0% of cells qualify** and at least 30% hold nothing. The ~277-position cell was
+- *The divisor was a real error.* Positions do not spread evenly across global quantile bands: at 8
+  bands only 46.0% of **cells** qualify and at least 30% hold nothing, so the ~277-position cell was
   mostly hypothetical.
+- ⇒ *And "46% of cells" was itself the wrong statistic — the same error one level further up, mine.*
+  I read a count of **cells** as though it were a count of **data** and built a band recommendation on
+  it. A cell fails the floor precisely by holding fewer than 100 live positions, so failing cells
+  cannot carry much mass by construction. **Position-level retention at 8 bands is 97.9%** (4 bands
+  99.2%, 16 bands 96.1%) — job 8896584. The cell count and the position count are two quantities with
+  one name, and I proposed a parameter change on the strength of the one that was not the data.
 
-**Frozen: primary (4 bands, top 10%)** — ~62 elevated per qualifying cell, 72.7% of cells qualifying
-— swept over (8, 10%) and (16, 20%). A cell contributes only with **≥100 live positions**. Excluded
-cells are reported with their count and mass distribution, because that exclusion is differential by
-§5.5's own argument and Q1a now shows exactly how: the transcripts carrying dead positions are the
-top two deciles, which is the mechanism cell.
+**Frozen: primary (8 bands, top 10%)**, swept over 4 and 16. A cell contributes only with **≥100 live
+positions**. See the block above for the exclusion evidence and for the pre-set locale conditional
+that can still move this to 4.
+
+*Record of the decision, because the reasoning is worth keeping.* I proposed 4 bands. **Declined on
+measurement by the model window**, and correctly: my premise was that a band half the transcripts
+cannot enter controls routing on a different and unstated population. Job 8896584 tested exactly that
+— per-transcript retention across NMD label, 5′UTR-length quintile, dead-fraction stratum and
+upstream-of-reference candidate, at every combination of 4/8/16 bands and ≥50/100/200 floors —
+and **all 36 comparisons were non-differential** against a 5-point threshold fixed before the run,
+largest spread 3.3 points. The premise was refuted rather than argued down, which is the only way it
+could have been settled. 8 bands costs 1.3 points of position-level retention against 4 and buys twice
+the resolution on the axis the gate exists to hold.
+
+**What that does not license** (model window, and it belongs here): not "the floor is harmless." 54%
+of cells still leave and that bounds power everywhere. It licenses only that their departure is not
+selective on any class we can name.
 
 **Background is within-cell.** Elevated positions are compared against the non-elevated positions of
 **the same transcript in the same band** — never a global background, which collapses the test back
