@@ -105,6 +105,22 @@ def gc_neutral_effect(vals, dgc):
     return out
 
 
+def gc_changing_effect(vals, dgc, rng):
+    """The MATCHED CONTROL for gc_neutral_effect: one GC-CHANGING substitution.
+
+    Without this, comparing GC-preserving scoring against the main analysis
+    compares a max over ONE substitution with a max over THREE, and a good part of
+    any drop is that statistic rather than GC. Each position has two GC-changing
+    alternatives; one is drawn so both arms are a max over exactly one.
+    """
+    out = np.full(len(vals), np.nan, dtype=np.float64)
+    ok = (dgc != 0) & np.isfinite(vals)
+    for i in np.flatnonzero(ok.any(1)):
+        c = np.flatnonzero(ok[i])
+        out[i] = abs(vals[i, c[rng.integers(len(c))]])
+    return out
+
+
 def atg_coverage(spans, P):
     """Positions covered by ANY candidate's start-codon window.
 
@@ -435,6 +451,11 @@ def main():
                          "the job that needs it; NOT for analysis, since the bank "
                          "order is the stratified subset order and a prefix is not "
                          "a sample of it.")
+    ap.add_argument("--gc-changing-only", action="store_true",
+                    help="matched control for --gc-neutral-only: one GC-CHANGING "
+                         "substitution per position, so both arms are a max over "
+                         "exactly one and the difference between them is GC "
+                         "rather than the statistic.")
     ap.add_argument("--gc-neutral-only", action="store_true",
                     help="score each position by its ONE GC-preserving "
                          "substitution instead of the max over all three. "
@@ -512,6 +533,10 @@ def main():
         for r in recs:
             r[key] = gc_neutral_effect(r[key], r["dgc"])[:, None]
         name += ", GC-PRESERVING SUBSTITUTIONS ONLY"
+    elif args.gc_changing_only:
+        for r in recs:
+            r[key] = gc_changing_effect(r[key], r["dgc"], rng)[:, None]
+        name += ", ONE GC-CHANGING SUBSTITUTION (matched control)"
     print(f"{len(recs)} transcripts, effect column = {name}\n")
 
     if len(paths) > 1:
