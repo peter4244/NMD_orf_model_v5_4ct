@@ -54,6 +54,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import h5py
 import numpy as np
 import pandas as pd
 
@@ -88,6 +89,152 @@ def runs_of(mask):
     return np.flatnonzero(d == -1) - np.flatnonzero(d == 1)
 
 
+def load_h5(path):
+    """One record per transcript from an assembled bank, sliced row by row.
+
+    NEVER `f["vals"][:]`. The assembled arrays are padded to the longest
+    transcript in the subset -- 18,626 against a median of 2,669, a sixfold
+    padding waste -- so `vals` alone is 1.5 GB uncompressed and the five
+    per-substitution arrays together are over seven. They are stored compressed
+    and mostly NaN, and reading one transcript's row at a time keeps it that way.
+
+    The reference candidate comes from the bank's own `cand_is_ref_cds` rather
+    than from the pool table: the bank already asserted pool and tensor agree
+    candidate-for-candidate, so re-joining here would add a second chance to get
+    the ordering wrong and no chance to catch it.
+    """
+    out = []
+    with h5py.File(path, "r") as f:
+        cand_off, cand_cnt = f["cand_offset"][:], f["cand_count"][:]
+        is_ref = f["cand_is_ref_cds"][:]
+        c_start, c_end = f["cand_orf_start"][:], f["cand_orf_end"][:]
+        spans_all = f["spans"][:]
+        tx = [s.decode() for s in f["transcript_id"][:]]
+        base = f["base_logit"][:]
+        wt = (f["sampling_weight"][:] if "sampling_weight" in f
+              else np.ones(len(tx), np.float32))
+        for i in range(len(tx)):
+            lo, n_k = int(cand_off[i]), int(cand_cnt[i])
+            r = np.flatnonzero(is_ref[lo:lo + n_k] == 1)
+            if not len(r):
+                continue
+            k = int(r[0])
+            # spans rows are written per transcript in candidate order, so the
+            # row for (i, k) is at cand_offset[i] + k. Filtering on column 0
+            # instead would be O(candidates) per transcript and would silently
+            # return the wrong block if the ordering ever changed.
+            sp = spans_all[lo:lo + n_k]
+            assert (sp[:, 0] == i).all() and sp[k, 1] == k, (
+                f"spans block for transcript {i} is not where cand_offset says")
+            sp = sp[:, 2:6]
+            P = int(max(sp[:, 1].max(), sp[:, 3].max()))
+            if P < 50:
+                continue
+            out.append(dict(iso=tx[i], k=k,
+                            vals=f["vals"][i, :P], cap=f["vals_capture"][i, :P],
+                            dec=f["vals_decay"][i, :P], obs=f["obs"][i, :P],
+                            valid=f["valid"][i, :P],
+                            floor=f["chunk_offset"][i, :P],
+                            fill=f["fill_count"][i, :P], dgc=f["dgc"][i, :P],
+                            spans=sp,
+                            orf_start=int(c_start[lo + k]),
+                            orf_end=int(c_end[lo + k]),
+                            base_logit=float(base[i]), weight=float(wt[i])))
+    return out
+
+
+def load_bank(path, pool):
+    """A shard directory or an assembled .h5 — same records either way."""
+    p = Path(path)
+    return load_shards(p, pool) if p.is_dir() else load_h5(p)
+
+
+def load_effect_tracks(path, column):
+    """Just the per-position effect track per transcript, for one member.
+
+    A lean loader on purpose. The full record set is roughly 600 MB per bank and
+    the across-member check needs five of them at once; carrying obs, dgc, fill
+    and the other per-substitution arrays through that would cost gigabytes to
+    answer a question that only needs one vector per transcript.
+    """
+    key = {"vals": "vals", "cap": "vals_capture", "dec": "vals_decay"}[column]
+    out = {}
+    with h5py.File(path, "r") as f:
+        cand_off, cand_cnt = f["cand_offset"][:], f["cand_count"][:]
+        spans_all = f["spans"][:]
+        tx = [s.decode() for s in f["transcript_id"][:]]
+        for i in range(len(tx)):
+            lo, n_k = int(cand_off[i]), int(cand_cnt[i])
+            sp = spans_all[lo:lo + n_k]
+            P = int(max(sp[:, 3].max(), sp[:, 5].max()))
+            if P < 50:
+                continue
+            eff = per_position_effect(f[key][i, :P])
+            ok = f["valid"][i, :P] & np.isfinite(eff)
+            if ok.sum() >= 50:
+                out[tx[i]] = (eff, ok)
+    return out
+
+
+def across_members(paths, column, fold, rng):
+    """Check 1 of the six: does a feature survive across independently trained
+    members, or is it one member's private solution?
+
+    TWO STATISTICS, because they fail differently. The correlation of the whole
+    effect track says whether the members compute a similar function everywhere.
+    The overlap of the ELEVATED sets says whether they agree about which specific
+    positions are the strong ones -- which is the claim a region-level finding
+    actually makes, and it can be poor while the correlation is high.
+
+    The overlap needs its own null and it is not zero: two members each calling
+    5% of positions elevated overlap 5% of the time by chance, and at a stringent
+    threshold that chance rate is small but a Jaccard has no natural scale. The
+    null places each member's elevated positions at random, keeping the counts.
+    """
+    mem = [load_effect_tracks(p, column) for p in paths]
+    common = set(mem[0])
+    for m in mem[1:]:
+        common &= set(m)
+    print(f"  {len(paths)} members, {len(common):,} transcripts in all of them")
+    if not common:
+        return
+    r_p, r_s, jac, jac0 = [], [], [], []
+    for iso in sorted(common):
+        tracks, oks = zip(*[m[iso] for m in mem])
+        ok = np.logical_and.reduce(oks)
+        if ok.sum() < 50:
+            continue
+        X = np.stack([t[ok] for t in tracks])
+        rank = np.stack([np.argsort(np.argsort(x)).astype(float) for x in X])
+        pr = [np.corrcoef(X[i], X[j])[0, 1]
+              for i in range(len(X)) for j in range(i + 1, len(X))]
+        sr = [np.corrcoef(rank[i], rank[j])[0, 1]
+              for i in range(len(X)) for j in range(i + 1, len(X))]
+        r_p.append(np.mean(pr)); r_s.append(np.mean(sr))
+        hi = [x >= fold * np.median(x) for x in X]
+        n_pos = ok.sum()
+        for i in range(len(X)):
+            for j in range(i + 1, len(X)):
+                u = (hi[i] | hi[j]).sum()
+                if u:
+                    jac.append((hi[i] & hi[j]).sum() / u)
+                a = rng.choice(n_pos, hi[i].sum(), replace=False)
+                b = rng.choice(n_pos, hi[j].sum(), replace=False)
+                ua = len(set(a.tolist()) | set(b.tolist()))
+                if ua:
+                    jac0.append(len(set(a.tolist()) & set(b.tolist())) / ua)
+    if not r_p:
+        return
+    print(f"\n  effect track, mean over member pairs, median over transcripts")
+    print(f"    pearson  {np.median(r_p):+.4f}    spearman {np.median(r_s):+.4f}")
+    print(f"\n  agreement on WHICH positions are elevated (>= {fold:.0f}x), "
+          f"Jaccard")
+    print(f"    observed {np.median(jac):.4f}    random placement "
+          f"{np.median(jac0):.4f}")
+    print(f"    a feature that does not clear the random line is one member's "
+          f"private solution")
+
+
 def load_shards(shard_dir, pool):
     """One record per transcript, with the reference candidate as the anchor."""
     out = []
@@ -114,7 +261,10 @@ def load_shards(shard_dir, pool):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--shards", required=True)
+    ap.add_argument("--shards", required=True,
+                    help="a shard directory, or an assembled bank .h5, "
+                         "or several .h5 comma-separated for the "
+                         "across-member check")
     ap.add_argument("--column", default="vals",
                     choices=["vals", "cap", "dec"],
                     help="vals = the transcript logit; dec = the decay branch")
@@ -127,14 +277,22 @@ def main():
     pool = pd.read_csv(REPO / "results_pool_v6" / "orf_pool.tsv", sep="\t",
                        usecols=["isoform_id", "slot", "orf_start", "orf_end",
                                 "is_ref_cds"])
-    recs = load_shards(args.shards, pool)
+    paths = [x for x in args.shards.split(",") if x]
+    recs = load_bank(paths[0], pool)
     if not recs:
-        sys.exit(f"no usable shards in {args.shards}")
+        sys.exit(f"no usable transcripts in {paths[0]}")
 
     key = {"vals": "vals", "cap": "cap", "dec": "dec"}[args.column]
     name = {"vals": "the transcript logit", "cap": "the capture branch",
             "dec": "the decay branch"}[args.column]
     print(f"{len(recs)} transcripts, effect column = {name}\n")
+
+    if len(paths) > 1:
+        print("=" * 78)
+        print("CHECK 1 OF SIX  Does it survive across independently trained "
+              "members?\n")
+        across_members(paths, args.column, args.fold, rng)
+        print()
 
     # ================================================================== Q1
     print("=" * 78)
