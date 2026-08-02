@@ -109,15 +109,88 @@ Neither of these needs a new instrument. A2 and A3 run on the existing banks.
 
 ### A2 — **THE GATE.** Is the U-rich/keto signature routing or sequence?
 
-> **Hypothesis.** The composition signature at elevated positions holds among positions of equal
-> selection mass.
-> **Held fixed:** mass and coverage **by stratification**; positional region, stratified.
-> **Not held:** composition — it is the measurement.
-> **Licensed if positive:** the signature is a property of what the decay head reads, not of where
-> the model routes. Everything downstream then means what we have been saying it means.
-> **If negative:** our best surviving finding is routing. The composition profile, the cross-seed
-> k-mer agreement, and the PWM are all conditional on what elevation selects, so **a negative here
-> propagates to all three**.
+*Row rewritten against the thirteen-field template 2026-08-02 by the incoming interpretability
+window. The previous five-field row was the one the modeling window found fixed four lines and left a
+dozen choices open; the specification below it filled most of those, but the row itself was never
+migrated, so the gaps stayed invisible where the template exists to make them visible. Four
+substantive changes are marked ⇒ and each is argued in place.*
+
+> **1 · Hypothesis.** The keto (G+T) enrichment at elevated positions holds among positions of equal
+> selection mass, equal coverage and equal locale.
+>
+> **2 · Selection rule.** Top fraction by `max_b |vals_decay|` within each **(transcript × mass band ×
+> locale)** cell — within-stratum, never global-then-binned. ⇒ **Ties are broken at random under a
+> recorded seed, and the tie fraction is reported per cell.** This is not housekeeping: in the dead
+> band the values are exact zeros by float64 cancellation, so the elevated set is *entirely* ties, and
+> a deterministic `argsort`/`partition` returns the lowest indices — the 5′-most positions of the
+> transcript. The control band would then report 5′UTR composition and be read as an instrumental
+> keto signature, in whichever direction 5′UTR composition happens to point. **Verify first** that the
+> dead values are bit-identical rather than merely tiny; one line on one bank settles it.
+>
+> **3 · Background.** The non-elevated positions of the **same cell** — same transcript, same mass
+> band, same locale. Never a global background, which collapses the test to the confounded version.
+>
+> **4 · Held fixed, all by stratification and none by removal.** Mass (8 live quantile bands + dead).
+> Locale (⇒ **now a third cell dimension**, see below). Coverage (marginal balance check within band,
+> not a cell dimension — jointly stratifying fragments cells below the n the permutation null needs).
+>
+> **5 · Deliberately not held.** Composition — it is the measurement. Effect magnitude — it cannot be
+> held without dissolving the elevated set, and the residual circularity is bounded explicitly under
+> *What a positive does not license*.
+>
+> **6 · Null.** Within-cell permutation of the elevated label at that cell's own n. Preserves cell
+> membership, cell size, cell composition and mass band; destroys only the association between the
+> label and position.
+>
+> **7 · Reference points.** Floor and ceiling both from that cell's own permutation distribution, at
+> that cell's own n. No analytic floor, and no unstratified ratio as a denominator. The unstratified
+> keto ratio is **unresolved** (below) and is not a reference point for anything here.
+>
+> **8 · Aggregation.** Per transcript, then unweighted mean across transcripts (axis 8); interval by
+> gene-clustered bootstrap. ⇒ **The permutation null passes through byte-identical aggregation code.**
+> A floor computed per-cell and compared against a band-level statistic is two quantities with one
+> name, which is the error class this whole document is organized around.
+>
+> **9 · Sweep.** Bands × top fraction, jointly, so the elevated count stays roughly constant while
+> band resolution varies. **All parameters provisional** pending the descriptive measurement below.
+>
+> **10 · Decision rule.** Three outcomes, fixed before the run — see the table below. ⇒ **The band
+> count is evaluated under gene-clustered resampling**, not as a raw count of qualifying bands.
+>
+> **11 · Licensed.** Positive: the signature is a property of what the decay head reads, not of where
+> the model routes. Negative: our best surviving finding is routing. What a positive does *not*
+> license has its own subsection and is part of this field, not an addendum to it.
+>
+> **12 · Owner.** Interpretability window. **Second independent implementation by the modeling window,
+> written against this row** — shared specification, independent code. The one case the replication
+> rule was written for.
+>
+> **13 · Enumeration, beside every statistic.** n transcripts, n cells, n positions, n elevated, n
+> excluded and the exclusion reason, seeds, tie fraction, and the mask expression. **Never the ratio
+> alone.** This field exists because the unstratified keto ratio is currently two numbers over two
+> different sets, both of them reported without their sets.
+
+#### ⇒ Locale is a cell dimension, because the row claimed it and the specification did not deliver it
+
+The previous row said "positional region, stratified" and nothing below it stratified region: bands
+were log-mass only and locale never reappeared. The claim and the instrument disagreed, on the gate.
+
+It has to be delivered rather than dropped, and the within-cell background does not already cover it.
+Within a single transcript and a single mass band, elevated positions can still sit downstream of the
+operative stop while the non-elevated background spans both sides of it — so the comparison recovers
+the upstream/downstream composition difference and reports it as a keto effect. That difference is
+large and measured: `SEQUENCE_ENRICHMENT_APPROACH.md` §3.2.1 puts the downstream composition null at
+**0.0405 bits against 0.0064 upstream**, a factor of six.
+
+**Locale = upstream / downstream of the operative stop**, the same two-way split §3.2.1 already uses,
+so the two analyses share a definition rather than inventing a second one.
+
+**The cost, stated because it lands on parameters that are already provisional:** this doubles the
+cell count and roughly halves cell size, and it interacts directly with the dead-fraction problem
+below. Both must be resolved by the same descriptive measurement, in one pass, before anything
+freezes. **The locale-pooled version is reported beside the primary as a diagnostic** — if the two
+disagree, that disagreement is the §5.2 decoupling showing up in the gate, and it is a result rather
+than a nuisance.
 
 #### The specification, fixed 2026-08-02
 
@@ -150,10 +223,33 @@ be computed across it. Result: **9 cells per transcript** — 8 live quantile ba
 > enumerate-what-you-divided-by error, in this specification's own arithmetic, found by the window
 > implementing it.
 >
-> **Required first:** the *distribution* of the dead fraction per transcript on one bank — not a
-> representative value, because the ≥100 floor bites in the tail and §5.5 puts the tail in the
-> mechanism cell (dead positions concentrate in long-5′UTR transcripts). A descriptive count on data
-> that already exists. **Band parameters freeze after it.**
+> **Required first — one descriptive pass, three quantities, because they constrain the same
+> parameters and measuring them separately would freeze each against the others' assumptions.**
+>
+> 1. **The distribution of the dead fraction per transcript** on one bank — not a representative
+>    value, because the ≥100 floor bites in the tail and §5.5 puts the tail in the mechanism cell
+>    (dead positions concentrate in long-5′UTR transcripts).
+> 2. ⇒ **The occupancy histogram: how many of the 8 live bands each transcript actually occupies.**
+>    The arithmetic below divides mean positions by band count, which assumes a transcript's positions
+>    spread evenly across *global* quantile bands. They do not have to. Mass is per-candidate and
+>    structured, so a transcript may sit in two or three bands and be empty in the rest — in which
+>    case cells are far larger than ~277 and far fewer than 9 per transcript, and the ≥100 floor
+>    removes whole transcripts rather than trimming tails. **This is a reference point assumed rather
+>    than measured, in the power calculation of the one gate**, which is the error class named at the
+>    top of this document.
+> 3. ⇒ **Cell counts under the locale split**, since locale is now a third dimension and halves them.
+>
+> A descriptive count on data that already exists. **Band parameters freeze after it, and not before.**
+>
+> ⇒ **Consequence for the decision rule, whatever the occupancy turns out to be.** If transcripts do
+> not occupy all bands, then band 1 and band 8 are computed over **different transcript populations**,
+> and "≥2/3 of qualifying bands" aggregates over sets that are not comparable. The **conditional**
+> outcome — present in high-mass bands, absent in low — then cannot be distinguished from a change in
+> which transcripts qualify, which is exactly the reading that outcome was added to protect. So the
+> primary analysis is restricted to **transcripts qualifying in every band**, with the full set
+> reported beside it and the difference between them stated. If the occupancy measurement shows near-
+> complete occupancy, the restriction costs nothing and the two agree; if it does not, the restriction
+> is the only version of the test that means what the row says.
 
 **Cell size and the top fraction, jointly — provisional.** At mean 2,213 *valid* positions per
 transcript, 8 bands would give ~277 per cell and **top 10% within cell** ~28 positions, swept as
@@ -217,8 +313,32 @@ A gate whose reading is chosen after the run is not a gate.
 | outcome | rule | what it licenses |
 |---|---|---|
 | **positive** | within-band keto ratio above its own permutation 95th percentile, same direction, in **≥ 2/3 of qualifying bands**, direction holding in ≥4/5 seeds | the signature is a property of what the decay head reads. Everything downstream means what we have been saying |
-| **negative** | fewer than half of qualifying bands | our best surviving finding is routing. Propagates to the composition profile, the cross-seed k-mer agreement and the PWM |
-| **conditional** | present in high-mass bands, absent in low | **not the clean positive.** The sequence response is conditional on routing — an interaction, not independence. Reported as such and not rounded up |
+| **negative** | fewer than half of qualifying bands | our best surviving finding is routing. Propagates to the composition profile and the cross-seed k-mer agreement — **not to the PWM**, see below |
+| **conditional** | present in high-mass bands, absent in low | **not the clean positive.** The sequence response is conditional on routing — an interaction, not independence. Reported as such and not rounded up. **Read only against the all-bands transcript restriction**, or it is confounded with which transcripts qualify |
+
+⇒ **The band count is evaluated under gene-clustered resampling, not as a raw count.** Bands are not
+independent evidence: every transcript contributes to several of them and carries its own composition,
+so a subset of U-rich transcripts produces "positive in 8 of 8" with no per-band evidence at all. The
+gene-clustered bootstrap is already specified for the interval and is simply not used by the counting
+rule; it must be. This is toolbox axis 8 — transcript identity — re-entering through the decision rule
+after being handled in the selection rule.
+
+⇒ **A negative does not propagate to the PWM, and the previous rule said it did.** The composition
+profile and the cross-seed k-mer agreement both select positions with the elevation rule, so a
+negative reaches them. `analysis_pwm_fit.py` does not: it regresses on **every valid position** with
+no elevation threshold anywhere — *"NO FOREGROUND/BACKGROUND SPLIT ANYWHERE"* in its own docstring,
+and no elevation rule in `accumulate()`. Nothing about what elevation selects can reach a statistic
+that never selects.
+
+**The PWM is threatened by a negative A2, but by a different route, and it needs its own test rather
+than inheriting a verdict.** If composition tracks routing, a PWM can predict importance because
+sequence predicts locale and locale predicts routing — held-out on disjoint genes throughout, because
+that relationship generalizes across genes perfectly well. Held-out prediction tests generalization,
+not that the predictor is sequence rather than something sequence stands in for. **Recorded here as an
+open item, not folded into the gate.** Getting this wrong in the direction the old rule had it costs a
+real result to a verdict that does not apply to it; getting it wrong in the other direction keeps a
+result that should have died. Neither is acceptable in a rule that is read once, at the moment it
+fires.
 
 Between half and 2/3 is **ambiguous, and is not resolved by looking at it.** It is resolved by more
 seeds or a finer sweep, decided before either is examined.
@@ -417,7 +537,7 @@ positive, I would argue B2 before B1 on those grounds.
 
 ---
 
-## The stopping rule — it turns on A2 alone
+## The stopping rule — Phase A turns on A2 alone, and A2 is not the programme's only gate
 
 The method document leaves "what counts as enough to stop" open. **Rewritten 2026-08-02 because A1
 was dropped and the rule still said "if A1 and A2 are both negative."** That is not a stale word to
@@ -425,17 +545,38 @@ tidy: with A1 gone the whole programme hangs on **one** measurement, and a rule 
 non-existent analysis would be read loosely at exactly the moment it fires. The "both" was doing
 silent work that no longer exists.
 
-**There is one gate, and it is A2.**
+⇒ **First, a naming collision that has to go, because this rule is read once and at speed.** This
+document said "there is one gate, and it is A2." `SEQUENCE_ENRICHMENT_APPROACH.md` §6 says "The gate,
+and why it is the only one" and means **SpliceAI/GT-AG**. Two governing documents, each asserting
+uniqueness about a different object, neither acknowledging the other — so a rule that fires on "the
+gate" resolves differently depending on which document the reader has open. That is the same failure
+as the stopping rule naming a dropped A1, and it was rewritten for exactly that reason. **They are
+distinguished by name from here on:**
+
+| | what it gates | if it fails |
+|---|---|---|
+| **the interpretive gate — A2** | whether our own results mean sequence or routing | Phases B and C do not run |
+| **the method-validation gate — SpliceAI/GT-AG** (`SEQUENCE_ENRICHMENT_APPROACH.md` §6) | whether the seqlet pipeline can recover a known motif at all | C2 is unreadable whatever it outputs |
+
+They are independent and neither substitutes for the other: A2 could pass on a pipeline that cannot
+find a motif, and the pipeline could recover GT/AG while our own signature is routing. **Two further
+gates exist and are named as such elsewhere in this document** — the region caller's excess-over-
+surrogates criterion, which A4 is downstream of, and B2's annotation-derived PTC definition. The
+honest count is four, not one.
+
+**The interpretive gate is A2.**
 
 - **A2 negative** → the decay branch's sequence contribution is not separable from routing **by
   single-base ISM at this resolution**. Write that and stop. It is a real result: the model's
   apparent sequence sensitivity is a readout of its selection distribution. The scoping to
   single-base ISM is not a hedge — a pattern the model recognizes robustly is invisible to our
   instrument by construction, so the negative belongs to the instrument and not to the model.
-  **A negative propagates:** the composition profile, the cross-seed k-mer agreement and the PWM all
-  rest on what elevation selects, so none of them survives untouched. (The model window argued the
-  cross-seed agreement was independent of Phase A; it is not, because it uses the elevation rule
-  even though it uses no elevation null. That correction is theirs, accepted.)
+  **A negative propagates to what selects on elevation:** the composition profile and the cross-seed
+  k-mer agreement. (The model window argued the cross-seed agreement was independent of Phase A; it
+  is not, because it uses the elevation rule even though it uses no elevation null. That correction
+  is theirs, accepted.) ⇒ **It does not propagate to the PWM**, which uses no elevation rule at all;
+  the separate threat to the PWM, and why it needs its own test rather than an inherited verdict, is
+  stated with the decision rule above.
 - **A2 positive, B1 fails** → the claim is compositional, not a motif. Write it as composition. Do
   not proceed to C.
 - **Proceed to C only if B1 or B2 is positive**, since C is the expensive branch and its output is
