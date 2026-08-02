@@ -404,8 +404,13 @@ def score(cells, genes, nb, top_frac, rng, n_rep, verify):
     """Per (band x region): observed mean ratio, null 95th percentile, verdict."""
     rows = []
     checked = False
+    # ALL slots, not range(nb+1). The unresponsive sub-strata live at nb+1..
+    # and an earlier version scored only the live bands plus the exact-zero
+    # slot, so the sub-stratified control was built, censused, and never
+    # scored -- it printed nothing and looked like it had no data.
+    n_slots = max(c["band"] for c in cells) + 1 if cells else nb + 1
     for ri in range(len(REGIONS)):
-        for bi in range(nb + 1):
+        for bi in range(n_slots):
             sub = [c for c in cells if c["band"] == bi and c["region"] == ri]
             if not sub:
                 continue
