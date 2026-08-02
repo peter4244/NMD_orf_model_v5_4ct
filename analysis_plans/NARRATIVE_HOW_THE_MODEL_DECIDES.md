@@ -5,6 +5,11 @@ is `CAPTURE_HEAD_STORY.md` (C1–C22). The corrections this document went throug
 git history rather than in your way. `[unclaimed]` marks an assertion with no measurement
 behind it — deliberate, and greppable.
 
+**Every correlation quoted here is a Spearman rank correlation computed *within a
+transcript*, across that transcript's candidate frames, and the figure is the **median**
+across transcripts.** `p_capture` is the head's per-candidate score, `p_select` the same
+score after stick-breaking, and `d` the judge's output for that candidate.
+
 ---
 
 ## The question
@@ -81,24 +86,45 @@ exactly*, and fill saturation alone is a **47× marker** for the real ORF (11.1%
 0.24%). Whether the head exploits it is `[unclaimed]`, and the question is closed to tiling
 because downstream tiles already sit below the receptive field. *Retrain item 3.*
 
-**The head runs both components, and which one prevails depends on the candidate:**
+**The head runs both components, and which prevails depends on the candidate:**
 
-| | position | fill confound | dominates for |
-|---|---|---|---|
-| initiation-proximal | fixed at −13, in all four bands | **none** — 99.6% filled | **short ORFs**, 0.413 against 0.220 |
-| length-tracking | moves, +12 → +87 | unresolved | **long ORFs**, 0.590 against 0.275 |
+| band | n | median ORF | fill boundary | peak | initiation-proximal | downstream |
+|---|---|---|---|---|---|---|
+| <80 | 5,918 | 30 | 15 | −13 | **0.413** | 0.220 |
+| 80–160 | 1,907 | 111 | 56 | +12 | | |
+| 160–200 | 457 | 180 | 90 | +37 | | |
+| ≥200 | 3,718 | 687 | **100 — pinned** | +87 | 0.275 | **0.590** |
 
-**This is the same regime split §3 finds by a different route.** Where the ORF is long, the
-head reads length. Where it is short — where uORFs compete — the clean initiation-proximal
-signal is the larger of the two. Two instruments, one boundary.
+**The peak moves with length only while the fill boundary moves with length.** Below 200 nt
+fill is `length/2` and the peak tracks it. **At and above 200 nt the boundary is pinned at
+100 for every transcript in the band — median ORF 687 nt — so the head has no geometric
+channel for length there at all. It cannot distinguish a 200-nt ORF from a 3,000-nt one.**
+
+So the second component is **not** length-tracking in the long regime, and calling it that
+was wrong. What dominates for long ORFs is a large response at +87 — 13 nt inside a **fixed**
+edge — which is a response to the **first ~100 nt of ORF body**, at a location that does not
+move. Coding sequence, read at a constant offset.
+
+`[unclaimed]` **That leaves the correlation of `p_capture` with ORF length, **+0.200** above 200 nt (C12),
+unexplained.**
+It cannot be the fill geometry, because the geometry is constant there. Whether it is the
+head recognising coding-like sequence, or something else, has not been measured.
+
+**A caution that applies to the whole regime story.** The boundary §3 finds is 200 nt, and
+200 nt is exactly where `min(100, length/2)` saturates. **The split we are calling a property
+of the model sits precisely at the boundary our own encoding creates.** The behavioural
+difference is real and measured on two instruments; **where the line falls may be ours.**
 
 ## 3. What the picker is actually selecting for
 
 **In aggregate, length — and length is not what initiation biology would nominate. But the
-criterion changes with the regime, and the aggregate hides that.**
+criterion changes with the regime, and the aggregate hides that.** Note before the numbers:
+the head sees 900 nt upstream and only **100 nt into the ORF**, so above 200 nt it has no
+direct view of length at all (§2). The association below is strongest exactly where the
+encoding supplies it.
 
-`p_capture ~ ORF length` is **+0.760** (C8, job 8899132), the strongest association measured
-anywhere in this work. Among candidates under 200 nt — 69% of them, median 81 nt — it is
+**`p_capture` correlates with ORF length at +0.760** (C8, job 8899132) — the strongest
+association measured anywhere in this work. Among candidates under 200 nt — 69% of them, median 81 nt — it is
 +0.429 against **+0.061** for Kozak. **Seven to one.**
 
 The consequence lands exactly where you would predict: reference ORFs that are short are
@@ -107,7 +133,7 @@ where initiation context is the thing that decides.**
 
 **What it is not selecting for: premature stops.**
 
-| `p_select ~ junction count`, conditioning on | median |
+| correlation of `p_select` with junction count, conditioning on | median |
 |---|---|
 | nothing (marginal) | **−0.050** |
 | ORF length only | +0.447 |
@@ -131,8 +157,8 @@ within transcript):
 
 | among short candidates | |
 |---|---|
-| `p_capture ~ junction count` | **+0.100** — against **−0.453** over all candidates |
-| `p_capture ~ d` | **+0.362** |
+| `p_capture` with junction count | **+0.100** — against **−0.453** over all candidates |
+| `p_capture` with `d` | **+0.362** |
 | top-scoring candidate carries a downstream junction | **76.3%** |
 | top-scoring candidate is the 5′-most | 22.8% |
 
@@ -146,8 +172,8 @@ the uORF wins because it is decay-relevant, not because it is upstream. Position
 22.8% of these cases.
 
 `[unclaimed]` **Both regime numbers are measured on `p_capture`, the head — not on
-`p_select`, the picker.** Neither `p_select ~ length` nor `p_select ~ junction count` among
-short candidates has been run, so the step from head to picker rides on the queue's
+`p_select`, the picker.** Neither `p_select` against length nor `p_select` against junction
+count among short candidates has been run, so the step from head to picker rides on the queue's
 construction rather than on a measurement. These are the cheapest things outstanding and this
 section needs them.
 
@@ -190,9 +216,9 @@ measurements of the model at its most mechanical.
 ## 5. The judge
 
 **It is handed the answer, and is not simply repeating it.** In the `interpretable` variant
-the decay head's entire non-sequence input is one column, `n_downstream_ejc`. But `d ~ ejc`
-is only +0.445, and `capture ~ d` survives holding that column at **+0.400** — so `d` is not
-a readout of the feature it was given. *Retrain item 8.*
+the decay head's entire non-sequence input is one column, `n_downstream_ejc`. But `d`
+correlates with that column at only **+0.445**, and `p_capture` with `d` survives holding it
+fixed at **+0.400** — so `d` is not a readout of the feature it was given. *Retrain item 8.*
 
 **It never learned to read the stop codon it is anchored on.** Every candidate had one by
 construction, so there was no negative example and no gradient. *Retrain item 6.*
@@ -237,19 +263,20 @@ into.*
 
 **Forward, they are separate — verified, not assumed.** Three encoders, and an invariance
 test that scrambles the stop window and leaves `p_capture` unmoved. In aggregate the
-separation holds: `p_capture ~ d` is +0.091 and the two heads respond to **different bases**,
+separation holds: `p_capture` correlates with `d` at only **+0.091**, and the two heads
+respond to **different bases**,
 agreement ~0.02 within mass band (job 8899820).
 
 **Backward, the loss couples them.** BCE on the *product* means `∂L/∂z_p_k ∝ d_k` — the
 picker's gradient is scaled by the judge's output. That is calculus on verified code.
 
-**And the consequence is measured.** `capture ~ d` is +0.362 among short candidates and
-**+0.400** holding the junction column (C17, jobs 8900114, 8900473). **The picker became
+**And the consequence is measured.** `p_capture` correlates with `d` at **+0.362** among
+short candidates, and **+0.400** holding the junction column (C17, jobs 8900114, 8900473). **The picker became
 decay-predictive within its information limit** — and only among short candidates, which is
 exactly where it has room to choose, because that is where uORFs compete.
 
-**The alignment is something the model computes, not a description of it.** `p_select ~ d`
-is +0.399 against `p_capture ~ d` +0.091 with the queue removed, and the mixture runs
+**The alignment is something the model computes, not a description of it.** `p_select`
+correlates with `d` at **+0.399**, against **+0.091** for `p_capture` with the queue removed, and the mixture runs
 **1.29×** above independent factors (C13, job 8899905). The queue is doing the aligning.
 
 ---
@@ -281,8 +308,8 @@ GC-neutral window that is not a motif and not an ARE.
 **And the two stages do not stay separate.** Forward they are — different encoders, different
 bases, agreement ~0.02. Backward the loss couples them, because BCE on a product scales the
 picker's gradient by the judge's output. The coupling is measurable exactly where the picker
-has a real choice to make: among short candidates, `capture ~ d` is +0.400 holding the
-junction column. **The regime where the model is interesting is the regime where its two
+has a real choice to make: among short candidates, `p_capture` correlates with `d` at
++0.400 holding the junction column. **The regime where the model is interesting is the regime where its two
 halves have merged.**
 
 ---
@@ -305,9 +332,9 @@ the other regime is the better result and it is currently unbenchmarked.
 - **Whether the head reads the fill boundary or what is inside it.** Closed to tiling; needs
   a retrain varying window extent. *Retrain item 7.*
 - **Everything about the short-ORF regime that is not the head.** §1 and §3. The regime flip
-  is measured on `p_capture`; neither `p_select ~ length`, nor `p_select ~ junction count`
-  among short candidates, nor **the queue's margin over position in that regime** has been
-  run. The whole interesting half of the model is characterised through one of its two
+  is measured on `p_capture`; neither `p_select` against length, nor `p_select` against
+  junction count among short candidates, nor **the queue's margin over position in that
+  regime** has been run. The whole interesting half of the model is characterised through one of its two
   factors. **These are the cheapest things outstanding and they are the ones that matter.**
 - **Whether the posterior's −0.253 on `protein_coding` is error or the uORF mechanism
   working.** Leaving the main ORF is correct for an ATF4-like transcript and wrong for an
