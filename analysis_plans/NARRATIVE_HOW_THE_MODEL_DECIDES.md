@@ -20,7 +20,7 @@ claim→code map; `RETRAIN_ARCHITECTURE_CHANGES.md`.
 
 ## Depends on
 
-**Claims** C1–C15 (`CAPTURE_HEAD_STORY.md`); **C16 retracted**. **Decisions** D48, D50, D55, D56.
+**Claims** C1–C15, C17 (`CAPTURE_HEAD_STORY.md`); **C16 retracted**. **Decisions** D48, D50, D55, D56.
 **Findings** `FINDINGS_ORF_SCANNER_2026-08-02.md`, `FINDINGS_TILED_PERTURBATION_2026-08-02.md`,
 `FINDINGS_DECAY_SEQUENCE_2026-08-02.md`. **Retrain items** 3, 4, 6, 8.
 **Jobs** 8898926 · 8898939 · 8899132 · 8899353 · 8899766 · 8899820 · 8899905 · 8899965 ·
@@ -171,13 +171,10 @@ PWM explains 1.73% of importance variance.**
 **The forward separation is verified** — three encoders, and an invariance test that
 scrambles the stop window and leaves `p_capture` unmoved. **The coupling is derived** —
 `∂L/∂z_p_k ∝ d_k` is calculus on verified code, not an observation. **The consequence is
-measured** — `[unclaimed — jobs 8900114, 8900473]` `capture ~ d` is +0.362 among short
-candidates, +0.400 holding the junction column. *Same measurement as §5's; see the note
-there.* **The marker is restored:** it was in the handover draft, I removed it while
-rewriting, and the number is still not a claim row in `CAPTURE_HEAD_STORY.md` — it appears
-there only in prose. This is the *measured* leg of the architecture-verified /
-mechanism-derived / consequence-measured sentence, so it is the last number in the document
-that should be living unfiled.
+measured** — `capture ~ d` is +0.362 among short candidates, +0.400 holding the junction
+column (**C17**, jobs 8900114 / 8900473). *Same measurement as §5's; see the note there.*
+*Filed as a claim rather than left marked: it is the measured leg of the sentence, and a
+marker is for a gap, not for a number that simply had not been written down.*
 
 **But scoped.** In aggregate the separation *holds*: `p_capture ~ d` is +0.091 and the two
 heads read **different bases**, agreement ~0.02 within mass band (job 8899820). It is given
