@@ -289,6 +289,83 @@ reported, the ordering is reported with it.
   — tonight they corrected me and I corrected nothing of theirs, but they also
   retracted one of their own findings unprompted.
 
-## Bank QC
+## Bank QC — what the five banks actually say
 
-See `qc_ism_banks_runlog.txt`, produced by `qc_ism_banks.py`.
+All five built, job 8885690, chunk 4,096, **all on Tesla V100-SXM2-32GB** across
+five nodes (d1002, d1007, d1011, d1017, d1002). Hardware is therefore not a
+confound in the cross-seed numbers; disagreement is initialisation. The residual:
+the bank script logs GPU model but not driver version per task, so a driver
+difference between nodes is not excluded — it is not a plausible cause of the
+effect sizes below.
+
+**Completeness, clean on every bank:** 4,999 / 4,999 transcripts, 11,062,149 valid
+positions, zero transcripts with no finite response, `chunk_rows` constant at
+[4096].
+
+    bank    floor       vals median   >floor   decay median   >floor
+    s100   1.664e-06    1.326e-03     82.1%    1.018e-03      81.7%
+    s200   1.873e-06    1.488e-03     77.3%    9.651e-04      77.0%
+    s300   1.384e-06    1.205e-03     84.7%    8.747e-04      84.5%
+
+The floor is 1.4–1.9e-06, roughly double what a three-transcript build suggested.
+
+### The capture arm is readable. My first measurement of it was not.
+
+I reported 36–46% of `vals_capture` clearing the floor and was about to call the
+arm mostly floor. **That was the denominator, not the data.** A substitution in a
+stop window changes `e_stop → z_d` only and cannot touch `z_p`, so `vals_capture`
+is exactly zero there **by construction**. On 300 transcripts of s100:
+
+    covered by >=1 ATG window           66.2% of valid
+    vals_capture exactly zero           35.9% of valid
+      ...of those, inside an ATG window  5.7%
+    exact zeros outside any ATG window  33.8% of valid
+
+The last two coincide because they are the same set. Conditioned on ATG coverage,
+clearance is near 64%, and on a small local bank the conditioned median is 1.015e-05
+against 1.316e-06 unconditioned — an order of magnitude from the denominator alone.
+`qc_ism_banks.py` (df5cffa) now prints both and raises only on the conditioned one.
+
+**This is the failure this handoff warned about, made by the handoff's author, four
+hours after writing the warning.** The bank was fine. The harness was not.
+
+### What the floor does and does not threaten
+
+Corrected by the interpretability window after Larry caught it, and traced to the
+code rather than argued:
+
+- **threatened** — D3, novel motifs by ISM on the capture branch, and any
+  sequence-level *explanation* of capture's preferences.
+- **not threatened** — E4 and E5, which read `parts["p_select"]` off a
+  `return_parts=True` forward pass (`analysis2_selection_mass_full.py:126`,
+  `verify_atf4_capture_selection.py:68-69`); grepping both for `vals_capture`
+  returns zero. Likewise C1–C3 and §8.5, which are AUCs and win rates over
+  `p_capture` — also forward-pass.
+
+`vals_capture` is a *sensitivity*, ~1.3e-06: how much one substituted base moves
+the logit through the initiation branch. `p_select` is a *probability*, 0.1–0.6.
+Six orders of magnitude apart and answering different questions. **An unreadable
+sensitivity says nothing about the behaviour it fails to explain.** The diversion
+result is not at risk from these numbers and the QC must not be read that way.
+
+### Cross-seed, and the prediction I recorded was wrong
+
+    vals   33,186,447 entries   all 3 seeds same sign 44.1%   r(seed1, mean rest) 0.558
+    cap    33,186,447 entries   all 3 seeds same sign 24.7%   r 0.549
+
+Chance unanimity on three seeds is 25%. So `vals` at 44.1% is **above chance but
+not high** — I predicted high — and the `cap` figure is mostly my structural-zero
+bug, since `np.sign(0)` is 0 and such entries can never be unanimous.
+
+The interpretability window's prediction is the one that held: near-identical
+correlations (0.558, 0.549) beside very different sign agreement is exactly
+"agreement on which positions are large, with the small-magnitude bulk flipping
+sign at the floor."
+
+**Open for the morning, and the first thing worth doing:** `vals` sign agreement at
+44.1% is lower than a quantity intended for interpretation should be, and unlike
+the capture figure it is **not** explained by structural zeros. Condition it on
+entries clearing the floor before concluding anything from it. If the agreement is
+carried entirely by the above-floor minority, that is a usable result; if it stays
+near chance there too, positional claims from `vals` need the discovery/confirmation
+arm before they mean anything.
