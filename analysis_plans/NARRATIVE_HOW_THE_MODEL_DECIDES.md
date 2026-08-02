@@ -45,8 +45,22 @@ model ribosome initiation, or does it pick whichever frame best explains the lab
 being competent **and** by everything upstream being judged incompetent — which is what
 leaky scanning is.
 
-So the head's job is to be **quiet** at the wrong candidates. Three ways of choosing,
-all scored the same way, on recovering the annotated main ORF:
+So the head's job is to be **quiet** at the wrong candidates.
+
+> **⚠ THE DEMONSTRATION BELOW IS SCORED AGAINST THE WRONG TARGET. Re-score pending.**
+> These three numbers score recovery of the **annotated main ORF** — the target §4
+> establishes is wrong. Under NMD the main ORF is not necessarily the frame being picked,
+> and it is not what the model is trying to find. *Pete, 2026-08-02.* The same five arms
+> are being re-run against GENCODE's own `nonsense_mediated_decay` call, where recovery and
+> decay-causation coincide: `model_gate_vs_ranker_gencode.py`, predictions registered.
+>
+> **The mechanism is not at risk** — `p_select_k = p_capture_k × Π(1 − p_capture_j)` is
+> stick-breaking in `model_v6.py`, true whatever we score against. **The demonstration is**,
+> because it is entirely target-dependent. If the queue no longer beats the head's own
+> argmax on the right target, this table is retracted and the heading's claim survives on
+> code alone, as derived rather than measured.
+
+Three ways of choosing, all scored the same way, on recovering the annotated main ORF:
 
 | | |
 |---|---|
@@ -55,11 +69,12 @@ all scored the same way, on recovering the annotated main ORF:
 | **the queue built from the head** | **0.697** |
 
 **The head alone is worse than position; the queue built from it is far better than
-either.** That is the signature of a gate rather than a ranker — the head's *low* scores
-upstream are what let a ribosome pass through to the right frame.
+either** — the signature of a gate rather than a ranker, since the head's *low* scores
+upstream are what let a ribosome pass through to the right frame. **On the main-ORF target,
+which is why this is pending.**
 
-These three share a target and measure *mechanism*. **The model's accuracy at the question
-that matters — finding the frame that causes decay — is 0.883** (§4).
+**The model's accuracy at the question that matters — finding the frame that causes decay —
+is 0.883** (§4), and that number is unaffected: it was measured against GENCODE throughout.
 
 ## 2. What the picker reads
 
