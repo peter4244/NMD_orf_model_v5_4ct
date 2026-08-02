@@ -32,24 +32,29 @@ FILLED, neither visible to an ablation over channels:
                  ORFs are usually very short. Controlled by requiring BOTH members
                  to carry the full 100 bases of right-hand fill.
 
-GEOMETRY COMES FROM window_spans, NOT FROM A RESTATEMENT OF IT. §8.5 gives
-right-hand fill as `min(100, (orf_length // 2) + 1)`. That is a description of
-what build_tensor did; the authority is the function the tensor and the bank
-actually call. This script imports it and CHECKS the plan's formula against it,
-reporting any disagreement rather than silently preferring one.
+GEOMETRY COMES FROM window_spans, NOT FROM A RESTATEMENT OF IT. The authority is
+the function the tensor and the bank actually call, and §8.5 no longer restates it
+(amended 2026-08-01). The plan's former wording, read with the pool's INCLUSIVE
+`orf_length`, overstated right-hand fill by one on every odd span under the cap --
+36% of candidates -- which would have admitted candidates whose true fill is 99 as
+though it were 100, in the one place the midpoint-clip control is enforced. Both
+readings are still computed here and the span reading disagreeing at all is fatal.
 
-ONE PLACE THE SPEC NEEDS A READING, flagged rather than decided quietly. §8.5's
-last baseline is "the tabular gradient-boosted model of §8.3 with `is_ref_cds`
-withheld, since that column is the label of this test." §8.3's model is a
-TRANSCRIPT-level NMD classifier, and every other baseline here is a per-CANDIDATE
-score used to pick the winner within a pair, so the §8.3 model cannot be applied
-as written. The reading taken is the one that makes the sentence cohere: a
-gradient-boosted model trained to predict `is_ref_cds` from the other tabular
-columns -- which is why `is_ref_cds` must be withheld as an INPUT, being the label
-of this test -- fitted on `train` candidates and scored on the test pairs. It asks
-whether the capture head beats a tabular model built expressly to find the
-reference start. Run with --no-gbm to produce every other baseline while that
-reading is confirmed.
+WHAT p_capture READS, since it bounds what this test can conclude. enc_init sees
+the ATG window ONLY -- 900 upstream of orf_start and up to 100 into the ORF, "up
+to" because fill stops at the ORF midpoint. It does not see the stop window
+(asserted in model_v6.py's own checks) and it cannot see ORF length. That is why
+§8.5 as amended compares capture to kozak_score, which has strictly less context,
+and reports orf_length and 5' proximity as bounding context rather than as
+baselines: those use information the model was denied by design.
+
+THE TABULAR MODEL, reading confirmed by the interpretability window. §8.3's model
+is TRANSCRIPT-level and cannot pick a within-pair winner, so the clause "with
+`is_ref_cds` withheld, since that column is the label of this test" only coheres
+if the baseline PREDICTS is_ref_cds from the other tabular columns, fitted on
+`train` and scored on the test pairs. Run twice, with and without `is_sqanti_cds`:
+that column fingers the same candidate about two-thirds of the time, so with it
+the number is a ceiling on any tabular model and without it an honest baseline.
 
 Usage:
     python test85_matched_pair_initiation.py --split val          # mechanics
@@ -297,58 +302,119 @@ def main():
         return lambda ix: win_rate(a[ix], b[ix])
 
     results = {}
+    # §8.5 as AMENDED 2026-08-01 (before the test read): the claim needs capture to
+    # beat chance AND to beat kozak_score on the identical pairs, both gene-clustered.
+    # Clearing 0.5 alone does not answer "compared to what".
+    print(f"\n=== PRIMARY, two parts, both gene-clustered ===")
+    # part 1 — capture against chance
     primary = win_rate(cap[R], cap[C])
     lo_g, hi_g, _ = boot_ci(None, pair_gene, rng, args.n_boot,
                             stat_on(cap[R], cap[C]))
     lo_p, hi_p, _ = boot_ci(None, np.arange(len(R)), rng, args.n_boot,
                             stat_on(cap[R], cap[C]))
     width_g, width_p = hi_g - lo_g, hi_p - lo_p
-    print(f"\n=== PRIMARY: p_capture prefers the annotated start ===")
-    print(f"  win rate                     {primary:.4f}")
-    print(f"  95% CI, genes resampled      [{lo_g:.4f}, {hi_g:.4f}]   "
+    print(f"  [1] capture vs chance          {primary:.4f}")
+    print(f"      95% CI, genes resampled    [{lo_g:.4f}, {hi_g:.4f}]   "
           f"{'EXCLUDES' if (lo_g > 0.5 or hi_g < 0.5) else 'INCLUDES'} 0.5")
-    print(f"  95% CI, pairs resampled      [{lo_p:.4f}, {hi_p:.4f}]")
-    print(f"  design effect (width ratio)^2 {(width_g/max(width_p,1e-12))**2:.2f}")
-    print(f"  per seed: " + "  ".join(
+    print(f"      95% CI, pairs resampled    [{lo_p:.4f}, {hi_p:.4f}]")
+    print(f"      design effect (width^2)    {(width_g/max(width_p,1e-12))**2:.2f}")
+    print(f"      per seed: " + "  ".join(
         f"{win_rate(cap_seeds[R, s], cap_seeds[C, s]):.4f}"
         for s in range(cap_seeds.shape[1])))
-    supported = lo_g > 0.5 or hi_g < 0.5
-    print(f"  THE CLAIM IS {'SUPPORTED' if supported else 'NOT SUPPORTED'} "
-          f"— §8.5 requires the gene-clustered interval to exclude 0.5")
-    results["primary"] = dict(win_rate=primary, ci_gene=[lo_g, hi_g],
-                              ci_pair=[lo_p, hi_p], supported=bool(supported),
+    part1 = lo_g > 0.5 or hi_g < 0.5
+
+    # part 2 — capture against the Kozak matrix, PAIRED on the identical pairs.
+    # The statistic is the rate at which capture picks the reference and the matrix
+    # does not, against the reverse; 0.5 means the two agree as often as they differ
+    # in each direction. Ties in either score count as one half, as everywhere here.
+    cap_win = (cap[R] > cap[C]) + 0.5 * (cap[R] == cap[C])
+    koz_win = (kozak[R] > kozak[C]) + 0.5 * (kozak[R] == kozak[C])
+    disagree = cap_win != koz_win
+    def head_to_head(ix):
+        d = ix[disagree[ix]] if len(ix) else ix
+        if not len(d):
+            return 0.5
+        return float(np.mean(cap_win[d] > koz_win[d]))
+    h2h = head_to_head(np.arange(len(R)))
+    lo_h, hi_h, _ = boot_ci(None, pair_gene, rng, args.n_boot, head_to_head)
+    print(f"  [2] capture vs kozak_score     {h2h:.4f}   "
+          f"(on the {int(disagree.sum()):,} pairs where they differ)")
+    print(f"      95% CI, genes resampled    [{lo_h:.4f}, {hi_h:.4f}]   "
+          f"{'EXCLUDES' if (lo_h > 0.5 or hi_h < 0.5) else 'INCLUDES'} 0.5")
+    part2 = lo_h > 0.5 or hi_h < 0.5
+
+    supported = part1 and part2
+    print(f"\n  THE CLAIM IS {'SUPPORTED' if supported else 'NOT SUPPORTED'} — the "
+          f"amended §8.5 requires BOTH gene-clustered intervals to exclude 0.5 "
+          f"(chance {'yes' if part1 else 'no'}, kozak {'yes' if part2 else 'no'})")
+    results["primary"] = dict(vs_chance=primary, ci_gene=[lo_g, hi_g],
+                              ci_pair=[lo_p, hi_p], vs_kozak=h2h,
+                              ci_kozak=[lo_h, hi_h], n_disagree=int(disagree.sum()),
+                              supported=bool(supported),
                               n_pairs=int(len(R)), n_genes=int(n_genes))
 
     # ------------------------------------------- pre-specified direction split
     up = start[R] < start[C]        # the reference is the upstream member
     print(f"\n=== PRE-SPECIFIED SECONDARY: the direction split ===")
     print("  A monotone positional preference must push one of these below 0.5.")
+    print("  AMENDED: each arm carries its own gene-clustered interval. The")
+    print("  downstream arm was n=45 on validation; point estimates are not a claim.")
+    excl = []
     for name, mask in (("reference UPSTREAM", up), ("reference DOWNSTREAM", ~up)):
         if mask.sum() == 0:
             print(f"  {name:<24} no pairs")
+            excl.append(False)
             continue
+        m = np.flatnonzero(mask)
         w = win_rate(cap[R][mask], cap[C][mask])
-        print(f"  {name:<24} {w:.4f}   n {int(mask.sum()):,}")
-        results.setdefault("direction", {})[name] = dict(win_rate=w,
-                                                         n=int(mask.sum()))
-    both_above = all(win_rate(cap[R][m], cap[C][m]) > 0.5
-                     for m in (up, ~up) if m.sum())
-    if both_above:
-        print("  BOTH above 0.5 — evidence no positional account can produce.")
+        lo_d, hi_d, _ = boot_ci(None, pair_gene[mask], rng, args.n_boot,
+                                lambda ix, m=m: win_rate(cap[R][m[ix]], cap[C][m[ix]]))
+        e = lo_d > 0.5 or hi_d < 0.5
+        excl.append(bool(e))
+        print(f"  {name:<24} {w:.4f}   n {int(mask.sum()):,}   "
+              f"95% CI [{lo_d:.4f}, {hi_d:.4f}] {'EXCLUDES' if e else 'INCLUDES'} 0.5")
+        results.setdefault("direction", {})[name] = dict(
+            win_rate=w, n=int(mask.sum()), ci_gene=[lo_d, hi_d], excludes=bool(e))
+    if all(excl) and len(excl) == 2:
+        print("  BOTH intervals exclude 0.5 — evidence no MONOTONE positional")
+        print("  account can produce. It does not exclude a non-monotone one: a")
+        print("  preference peaked at a fixed distance from the midpoint cap is")
+        print("  positional and puts both arms above 0.5, and references sit at a")
+        print("  characteristic distance from that cap by construction.")
+    else:
+        print("  Not both intervals exclude 0.5 — the monotone-positional")
+        print("  alternative is NOT excluded by this split.")
 
     # ------------------------------------------------- pre-specified baselines
-    print(f"\n=== PRE-SPECIFIED BASELINES, on the identical pairs ===")
-    baselines = [
-        ("orf_length", pool.orf_length.to_numpy().astype(float)),
-        ("right-hand window fill", right_fill.astype(float)),
-        ("kozak_score", kozak),
-        ("5' proximity (-orf_start)", -start.astype(float)),
-        ("n_downstream_ejc", pool.n_downstream_ejc.to_numpy().astype(float)),
-    ]
-    for name, v in baselines:
+    print(f"\n=== BOUNDING CONTEXT — information p_capture CANNOT access ===")
+    print("  The ATG window carries 900 upstream and 100 into the ORF, and both")
+    print("  members carry all 100 by the filter, so ORF length is invisible to the")
+    print("  model and visible to these. A model against an oracle, not a failure.")
+    for name, v in (("orf_length", pool.orf_length.to_numpy().astype(float)),
+                    ("5' proximity (-orf_start)", -start.astype(float))):
         w = win_rate(v[R], v[C])
         print(f"  {name:<28} {w:.4f}")
-        results.setdefault("baselines", {})[name] = w
+        results.setdefault("context", {})[name] = w
+
+    print(f"\n=== ALSO REPORTED ===")
+    w_ejc = win_rate(pool.n_downstream_ejc.to_numpy().astype(float)[R],
+                     pool.n_downstream_ejc.to_numpy().astype(float)[C])
+    print(f"  n_downstream_ejc             {w_ejc:.4f}")
+    print("    Expected BELOW 0.5: reference ORFs are long, so their stops sit")
+    print("    3'-proximal and carry fewer downstream junctions than their short")
+    print("    competitors. Signal in reverse, not a failed baseline.")
+    results.setdefault("context", {})["n_downstream_ejc"] = w_ejc
+
+    print(f"\n=== DESIGN GUARD, not a baseline ===")
+    w_fill = win_rate(right_fill.astype(float)[R], right_fill.astype(float)[C])
+    print(f"  right-hand window fill       {w_fill:.4f}")
+    if w_fill != 0.5:
+        sys.exit(f"FATAL: right-hand fill is constant within every pair by "
+                 f"construction, so this must be exactly 0.5000. It is {w_fill!r}, "
+                 f"which means the full-right-fill filter did not engage and the "
+                 f"midpoint-clip control is not in force.")
+    print("    exactly 0.5000 — constant within every pair, filter engaged")
+    results["fill_guard"] = w_fill
     if not args.no_gbm:
         print("  tabular GBM, is_ref_cds withheld: see --no-gbm note in the header;")
         print("    the reading of §8.5 this implements is stated there and is")

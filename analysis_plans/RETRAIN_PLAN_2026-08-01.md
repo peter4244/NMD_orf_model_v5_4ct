@@ -770,6 +770,29 @@ found in it, each of which inflated the estimate, and the corrected residual did
 gene-clustered inference at that sample size. This section fixes the analysis so that the test-set
 run is confirmatory rather than another exploration.
 
+> **AMENDED 2026-08-01, before `test_clean` was read.** Reviewed by the interpretability window
+> against a mechanics run of `test85_matched_pair_initiation.py` on validation. Four changes, all of
+> which make the claim **harder** to support, not easier; every one is recorded here rather than
+> applied silently, because the same change made after the read would not be defensible.
+>
+> 1. **The primary is now capture against chance AND capture against `kozak_score`**, both
+>    gene-clustered, rather than against chance alone. Clearing 0.5 does not answer "compared to
+>    what", and on validation it cleared by 0.0066 while `orf_length` beat capture three to one.
+> 2. **`orf_length` and 5′ proximity move from baselines to bounding context**, and are reported
+>    with the statement that they use information `p_capture` cannot access. `p_capture` reads the
+>    ATG window only, and the full-right-fill filter guarantees both members carry all 100
+>    downstream bases, so capture *cannot see* ORF length while the baseline can. That is a model
+>    against an oracle, and is not evidence the model failed at its own task. `kozak_score` is the
+>    information-matched comparison: strictly less context than capture (~10 nt against 900).
+> 3. **The direction split requires intervals, not point estimates.** Both arms' gene-clustered
+>    intervals must exclude 0.5. The downstream arm was n=45 on validation and is expected near 110
+>    on test; "both point estimates above 0.5" is not a claim at that size.
+> 4. **The direction split's conclusion is narrowed to what it establishes.** "Both above 0.5 is
+>    evidence no positional account can produce" overclaims: it excludes a *monotone* positional
+>    preference only. A preference peaked at a particular distance from the midpoint cap puts both
+>    arms above 0.5 and is purely positional, and references sit at a characteristic distance from
+>    that cap by construction. Read "no **monotone** positional account can produce."
+
 **The question.** Does the capture head prefer the annotated start codon over a competing start codon
 in the same transcript, once every geometric property of the reading window is held fixed?
 
@@ -779,7 +802,15 @@ and neither is visible to an ablation over channels.
 | leak | mechanism | control |
 |---|---|---|
 | 5′ padding | the window reaches 900 upstream, so its left fill boundary is `max(901 − orf_start, 0)` — distance to the 5′ end, exactly | pairs matched on `orf_start` to ±50, and the direction split below |
-| midpoint clip | fill stops at the ORF midpoint, so right-hand fill is `min(100, (orf_length // 2) + 1)` — a readout of ORF length. Reference coding sequences are long and competing ORFs are usually very short | **both** candidates required to have the full 100 bases of right-hand fill |
+| midpoint clip | fill stops at the ORF midpoint, so right-hand fill is a readout of ORF length. Reference coding sequences are long and competing ORFs are usually very short | **both** candidates required to have the full 100 bases of right-hand fill |
+
+Right-hand fill is **whatever `window_spans` returns**, and this section deliberately does not restate
+it. An earlier draft gave it as `min(100, (orf_length // 2) + 1)`, which is exact when `orf_length`
+means the span but one too many when read with the pool's `orf_length`, which is inclusive
+(`orf_end - orf_start + 1`). That reading overstates fill by one on every odd span under the cap —
+36% of candidates — and would admit candidates whose true fill is 99 as though it were 100, in the
+one place the midpoint-clip control is enforced. A restatement of an authority is a thing that drifts
+from it; the authority is the function that built the tensor.
 
 **Construction.** Over `test_clean`:
 
@@ -800,18 +831,46 @@ and the design effect measured on this statistic in the exploratory run was 3.15
 the label-level ICC. The pair-resampled interval is reported alongside so that ratio is visible
 again on the test split.
 
-**The claim is supported only if the gene-clustered 95% interval excludes 0.5.** If it includes 0.5
-that is reported as the result.
+**The claim is supported only if the gene-clustered 95% interval excludes 0.5 AND the
+gene-clustered interval for capture against `kozak_score` on the identical pairs also excludes 0.5.**
+If either includes 0.5 that is reported as the result. The section is drafted to report a null before
+the split is read, not after.
 
 **Pre-specified secondary — the direction split.** Matching on `orf_start` to ±50 still leaves one
 member upstream. The statistic is reported separately for pairs where the reference is upstream and
-where it is downstream. A monotone positional preference must push one of those below 0.5; both
-above 0.5 is evidence no positional account can produce.
+where it is downstream, **each with its own gene-clustered 95% interval**. A monotone positional
+preference must push one of those below 0.5; **both intervals excluding 0.5** is evidence no
+*monotone* positional account can produce. It does not exclude a non-monotone one — a preference
+peaked at a particular distance from the midpoint cap is purely positional and puts both arms above
+0.5 — and references sit at a characteristic distance from that cap by construction.
 
-**Pre-specified baselines, on the identical pairs**, ties counted as one half throughout:
-`orf_length`, right-hand window fill, `kozak_score`, 5′ proximity (`−orf_start`), `n_downstream_ejc`,
-and the tabular gradient-boosted model of §8.3 with `is_ref_cds` withheld, since that column is the
-label of this test.
+**Pre-specified comparisons, on the identical pairs**, ties counted as one half throughout.
+
+*Information-matched, and part of the primary claim:* `kozak_score` — strictly less context than
+`p_capture`, ~10 nt against 900.
+
+*Bounding context, reported with the statement that they use information `p_capture` cannot access:*
+`orf_length` and 5′ proximity (`−orf_start`). The ATG window carries 900 upstream and 100 into the
+ORF, and both members carry all 100 by the filter above, so ORF length is not visible to the model
+and is visible to these.
+
+*Also reported:* `n_downstream_ejc`. Expect this **below** 0.5 rather than at it: reference ORFs are
+long, so their stops sit 3′-proximal and carry fewer downstream junctions than their short
+competitors. Below 0.5 here is signal in reverse, not a failed baseline.
+
+*Design guard, not a baseline:* right-hand window fill is constant within every pair by construction,
+so every comparison is a tie and the value must be **exactly 0.5000**. Anything else means the
+full-right-fill filter did not engage.
+
+*The tabular model:* a gradient-boosted model predicting `is_ref_cds` from the other tabular columns,
+fitted on `train` candidates and scored on the test pairs — §8.3's own model is transcript-level and
+cannot pick a within-pair winner, and "with `is_ref_cds` withheld, since that column is the label of
+this test" only coheres if the baseline is predicting it. Run **twice**, with and without
+`is_sqanti_cds`: that column fingers the same candidate about two-thirds of the time
+(`P(is_ref | is_sqanti)` = 0.63 over the pool), so with it the number is a ceiling on what any tabular
+model could do and without it an honest baseline, and the gap measures how much of the tabular signal
+is annotation echo. Expect the without version near `orf_length`'s rate regardless, since
+`orf_length` and `orf_start` are among its inputs.
 
 **Reported whatever it shows**, with the number of pairs, the number of genes, and the pairs-per-gene.
 
