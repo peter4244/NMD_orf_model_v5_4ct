@@ -63,6 +63,11 @@ claim that must be measured on the inputs, not inferred from the outputs.** Fail
 two is the clearest case: the confound was read off the result and controlled for
 without ever checking the positions themselves.
 
+**The structural fix is §3.2.2** — a stated functional hypothesis before each
+analysis, with adjustments and stratifications chosen to match it in advance. The
+background problem has no general solution; it has a determinate one once the claim
+is fixed.
+
 ---
 
 ## 3. What we do specifically
@@ -159,6 +164,94 @@ which is neither the upstream nor the downstream one.
 
 Not yet implemented. **The ~0.016–0.018 figure quoted so far is the global one and is
 a floor on the bar, not the bar.**
+
+### 3.2.2 The toolbox, and the rule that selects from it
+
+*Pete's proposal, 2026-08-02, and it is the governing discipline for everything
+below.*
+
+The background problem has **no context-free solution** — "unremarkable" has no
+meaning in the abstract. It has a **determinate solution relative to a stated
+hypothesis**, because a hypothesis says what is being claimed and therefore what must
+be held fixed. So:
+
+> **State a specific functional hypothesis before each analysis, then choose
+> adjustments and stratifications to match it, explicitly and in advance.**
+
+This blocks the failure mode that produced two of today's errors: notice something in
+the *output*, infer a confound from it, control for that, and discover later that the
+confound did not exist (§2) or that the control was worse than the disease (§3.3).
+**A control chosen after seeing the result is a control chosen to explain the
+result.**
+
+#### The rule for matching
+
+For a hypothesis that X drives the response:
+
+- **adjust for** anything that correlates with X, affects the response, and is **not
+  on the causal path from X**
+- **stratify by** anything that is part of the exposure or lies on the path — never
+  adjust it away (§5.2 is the worked case: PTC composition *is* what a PTC transcript
+  is)
+- **never adjust for a consequence of X**
+
+The adjust/stratify distinction is the one that keeps being got wrong. Adjusting
+removes; stratifying preserves the variable and shows whether the effect differs
+across it. When in doubt, stratify — it is recoverable and adjustment is not.
+
+#### The toolbox
+
+**Composition**
+
+| tool | holds fixed | do not use when |
+|---|---|---|
+| global composition null | transcriptome-wide base frequencies | the feature is regionally concentrated (anti-conservative — §3.2.1) |
+| regional composition null | base frequencies within 5′UTR / CDS / 3′UTR, or upstream / downstream of the operative stop | the claim *is* about a region |
+| per-transcript null | that transcript's own composition | n per transcript is small — KL bias ≈ 0.108 bits at n≈20 |
+| seqlet-matched null | composition of the positions that produced the cluster | not yet implemented; preferred for motif claims |
+| dinucleotide-preserving shuffle | local dinucleotide structure | positional claims — it destroys position |
+
+**Geometry and position**
+
+| tool | holds fixed | note |
+|---|---|---|
+| window fill extent | how much of the model's window carries sequence | encodes 5′ distance and ORF length (§5.3) — invisible to ablation |
+| distance to nearest boundary | proximity to start, stop, junction, transcript end | a boundary can *move* (§5.2) |
+| anchor choice | which ORF defines "downstream" — model-selected or annotated | tested: same k-mers either way, but that predates §5.2 |
+| offset stratification | position relative to an anchor | only finds anchored features; absence proves nothing (§6) |
+
+**Model-internal**
+
+| tool | holds fixed | note |
+|---|---|---|
+| selection-mass threshold | restrict to candidates the model can route to | differential on the mechanism cell — long 5′UTRs lose more (§5.5) |
+| magnitude matching | effect size | required before any claim that a property is enriched among *elevated* positions, since elevation is defined by magnitude (§6, directionality) |
+| substitution class | GC-preserving vs GC-changing; transition vs transversion | the GC-preserving restriction is itself compositionally biased (§3.3) |
+| branch | capture vs decay | everything here is `vals_decay` |
+
+**Replication axes** — these are not adjustments; they answer different questions
+
+| axis | varies | fixes | question |
+|---|---|---|---|
+| seed | initialization | transcripts | architecture or one initialization? |
+| gene arm | genes (disjoint) | seed | does it hold on genes it was not found on? |
+| subsample draw | which seqlets | everything | is it a sampling artifact? |
+
+**Stratifications** — region, NMD label, PTC status, magnitude band, selection-mass
+band, discovery/confirmation arm, transcript length, seed.
+
+#### Worked examples, using our own hypotheses
+
+| hypothesis | adjust for | stratify by | do NOT adjust |
+|---|---|---|---|
+| the decay branch has learned a sequence motif | composition, locally (seqlet-matched) | region; seed | position — a motif may have positional preference |
+| importance is elevated 3′ of the stop | composition, within region | PTC status (§5.2) | region — it is the exposure |
+| elevated positions are more directional | **magnitude** | magnitude band | nothing else; this claim is currently unadjusted and therefore unsupported (§6) |
+| the model reads termination context | offset from the stop | stop identity (TAA/TAG/TGA) | composition at +4 — it is the thing being read |
+| runs are not a GC-window artifact | substitution class (GC-preserving) | — | run length — it is the outcome |
+
+**Every analysis records its row before it runs.** A row that is filled in afterwards
+is not a pre-specification, and the document should say which analyses have one.
 
 ### 3.3 Controls are checked for bias of their own
 
