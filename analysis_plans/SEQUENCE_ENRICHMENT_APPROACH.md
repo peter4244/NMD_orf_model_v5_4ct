@@ -31,6 +31,78 @@ looks.
 
 ---
 
+### 1.1 What "motif" means here
+
+*Added 2026-08-02, at Pete's prompting, after two days of using the word without
+defining it. The whole apparatus below exists to establish this claim, and the ladder
+in §3.2.2 showed we had not earned it.*
+
+**The classical sense** is a short recurring sequence pattern associated with a
+function — a binding site, a structural element. Short (roughly 4–12 nt), degenerate
+rather than a fixed string, appearing at many independent locations.
+
+**We cannot observe that.** We observe a model's sensitivity. So the claim available
+to us is about the model, not about biology, and the two are **separately
+checkable** — the stop-codon result in §6 is a case where a compositional bias is
+real in the data and absent from what the model reads.
+
+#### The formal core: composition is the marginal, a motif is the joint
+
+This is the distinction the ladder turns on:
+
+- **composition** is a statement about the *marginal* distribution of bases — "U is
+  over-represented here"
+- **a motif** is a statement about the *joint* distribution over adjacent positions —
+  "UUUGU occurs more often than P(U)·P(U)·P(U)·P(G)·P(U) predicts"
+
+**"AU-rich" is a composition claim however strong the enrichment.** It becomes a
+motif claim only when the *arrangement* carries information the base frequencies do
+not — which is exactly what the bit floor of §3.2.1 measures, and why a purely
+compositional cluster carries zero information against a per-cluster null.
+
+#### The working definition
+
+> **The model has learned a motif if there is a short, position-independent sequence
+> pattern such that the model's output depends on the *arrangement* of bases in it —
+> over and above the base composition of the surrounding region, where the pattern
+> sits, and how much routable mass reaches that location.**
+
+| clause | what it excludes |
+|---|---|
+| **short** | "this particular transcript sequence" — a motif is a *reusable* unit and unbounded length has no generalization |
+| **position-independent** | landmarks. A start codon at the start is not a motif; AUG mattering *wherever it occurs* is |
+| **arrangement over composition** | AU-richness, GC-richness, the keto skew |
+| **over and above routing** | the selection-mass envelope, which is architecture and not a sequence fact |
+
+#### What this instrument can and cannot see
+
+**Single-base ISM detects a motif only to the extent that it is fragile to single
+substitutions.** A degenerate pattern the model recognizes robustly — where
+disrupting any one position still leaves a match — is functional and **invisible to
+us**: we would measure near-zero importance at every position of a real, working
+motif.
+
+This is a limitation rather than a caveat, and three things follow:
+
+- **absence of ISM signal is not absence of a motif.** Any negative we report says so.
+- the motifs we *can* find are biased toward the brittle ones
+- a multi-base perturbation, or the PWM regression across all positions, can see what
+  single-base ISM cannot
+
+#### What each rung of the ladder earns, under this definition
+
+- *"these positions move the output most"* — routing. No clause satisfied.
+- *"among equally-routed positions, these bases are preferred"* — the routing clause
+  only. **A composition claim.** This is what we currently have.
+- *"...and beyond base frequencies, sensitivity clusters into short arrangements"* —
+  arrangement and routing. Approaching a motif; still missing position-independence.
+- **the full claim** additionally requires the pattern to recur at non-homologous
+  locations. Cross-seed agreement on *sequence* (r = 0.75) against *position*
+  (Jaccard 0.125) is evidence for exactly that — and note it was obtained **with no
+  elevation null at all**, so it does not depend on the machinery retracted in §7.1.
+
+---
+
 ## 2. The core difficulty: the background *is* the claim
 
 The obvious method is to take high-importance positions, count the sequences under
