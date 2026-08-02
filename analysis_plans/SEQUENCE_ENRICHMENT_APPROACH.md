@@ -3,6 +3,13 @@
 *Living document. Started 2026-08-02. Owner: model window. Reviewed by the
 interpretability window.*
 
+> **CANONICAL COPY:** `NMD_orf_model_v5_4ct/analysis_plans/` on branch `master`.
+> The worktree split means this file also exists in
+> `NMD_orf_model_v5_4ct_interp/` on `interp`, where it is a **read-only mirror that
+> goes stale between merges**. Edit only the master copy. If you are reading this in
+> the `_interp` tree, check `git log -1 --format=%cd -- <this file>` against master
+> before trusting it.
+
 Answers three questions: **what we do specifically, how it relates to prior work in
 sequence analysis, and what we have changed for our situation.** Written to be read
 by someone who has not followed the day-to-day.
