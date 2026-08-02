@@ -141,6 +141,23 @@ effects. *Additive* means single-base ISM sees everything and this caveat comes 
 under-detect it, and the caveat stands **with a number attached**. It needs only
 forward passes on pairs within a window.
 
+**DEFERRED, deliberately (Pete, 2026-08-02).** The question is real and it widens the
+programme considerably — non-additivity is a large literature and there is prior work
+from Pete's colleagues that should be read before we re-derive anything. Parked, not
+overlooked.
+
+**Parking it is cheap, and here is why.** A4 would attach a *number* to how much
+single-base ISM under-detects. Without it we still know the *direction* — the
+architecture can represent m-of-n recognition, so single substitutions can under-read
+a real motif — and **both cases demand exactly the same discipline on wording**:
+
+> **Every negative result in this programme reads "not detected by single-base ISM,"
+> never "not present."**
+
+A4 sharpens a caveat we have to carry either way; it does not create one. So
+deferring it costs precision on the magnitude and nothing on the validity of what we
+report, provided the wording holds.
+
 #### What each rung of the ladder earns, under this definition
 
 - *"these positions move the output most"* — routing. No clause satisfied.
