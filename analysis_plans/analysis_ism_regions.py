@@ -228,9 +228,8 @@ def load_h5(path, limit=0):
     return out
 
 
-def kmer_enrichment(recs, key, top_frac, k=5):
-    """Which k-mers sit under elevated positions, against the same transcripts'
-    own background.
+def kmer_enrichment(recs, key, top_frac, k=5, by_region=False):
+    """Which k-mers sit under elevated positions, against a background.
 
     WHY THIS AND NOT A POSITIONAL PROFILE. Sequence sensitivity and positional
     sensitivity are different things and need not co-occur -- an RBP binds at
@@ -238,13 +237,26 @@ def kmer_enrichment(recs, key, top_frac, k=5):
     An offset-from-the-anchor profile can only find anchored features, so a
     floating motif fails it by construction and its absence there is not evidence.
 
-    Background is every valid position of the SAME transcripts with full flanks,
-    not a genome-wide expectation: transcripts differ in composition, and a
-    k-mer enriched only because these transcripts are GC-rich is not a finding.
+    THE BACKGROUND IS THE WHOLE CONFOUND, AND `by_region` IS THE CONTROL.
+
+    Elevated positions concentrate 3' of the stop codon. Scored against every valid
+    position of the transcript -- 5'UTR and CDS included -- an AU-rich result is
+    exactly what a 3'UTR-biased set produces with no motif in it, because 3'UTRs are
+    AU-rich as a class. Holding the GC channel constant does NOT fix this: it does
+    not move where the elevated positions are.
+
+    With `by_region`, counts are kept separately for positions upstream of the
+    anchor's start codon, inside its ORF, and downstream of its stop -- so the
+    comparison becomes elevated-3'UTR against other-3'UTR, and regional composition
+    is held by construction rather than argued about.
+
+    Region is defined by the ANCHOR candidate, which for transcripts without a
+    reference is the model's own highest-mass choice. Say so wherever it is used.
     """
     from collections import Counter
     half = k // 2
-    hi_c, bg_c = Counter(), Counter()
+    hi_c = {r_: Counter() for r_ in ("upstream", "orf", "downstream", "all")}
+    bg_c = {r_: Counter() for r_ in ("upstream", "orf", "downstream", "all")}
     for r in recs:
         eff = per_position_effect(r[key])
         ok = r["valid"] & np.isfinite(eff)
@@ -266,9 +278,19 @@ def kmer_enrichment(recs, key, top_frac, k=5):
         for j in range(k):
             code = code * 4 + win[:, j]
         is_hi = eff[idx] >= cut
-        hi_c.update(code[is_hi].tolist())
-        bg_c.update(code.tolist())
-    return hi_c, bg_c
+        pos1 = idx + 1                       # 1-based transcript coordinate
+        reg = np.where(pos1 < r["orf_start"], 0,
+                       np.where(pos1 <= r["orf_end"], 1, 2))
+        names = ("upstream", "orf", "downstream")
+        hi_c["all"].update(code[is_hi].tolist())
+        bg_c["all"].update(code.tolist())
+        if by_region:
+            for ri, nm in enumerate(names):
+                m = reg == ri
+                if m.any():
+                    hi_c[nm].update(code[m & is_hi].tolist())
+                    bg_c[nm].update(code[m].tolist())
+    return (hi_c, bg_c) if by_region else (hi_c["all"], bg_c["all"])
 
 
 def kmer_table(hi_c, bg_c, k, min_count=50):
@@ -940,56 +962,69 @@ def main():
     # is worth it.
     print("=" * 78)
     print("Q3a Is the signal base identity, or local GC?\n")
-    stat = {k2: {"neutral": [], "changing": []} for k2 in ("elevated", "all")}
-    ratio_tx = []
-    for r in recs:
-        eff = per_position_effect(r[key])
-        ok = r["valid"] & np.isfinite(eff)
-        if ok.sum() < 50:
-            continue
-        med = np.median(eff[ok])
-        if med <= 0:
-            continue
-        if args.top_frac > 0:
-            k = max(1, int(round(args.top_frac * ok.sum())))
-            cut = np.partition(eff[ok], -k)[-k]
-            hi = ok & (eff >= cut)
-        else:
-            hi = ok & (eff >= args.fold * med)
-        v, g = np.abs(r[key]), r["dgc"]
-        neutral = (g == 0) & np.isfinite(v)
-        changing = (g != 0) & np.isfinite(v)
-        for grp, rows in (("elevated", hi), ("all", ok)):
-            n_ = v[rows & neutral.any(1)][neutral[rows & neutral.any(1)]]
-            c_ = v[rows & changing.any(1)][changing[rows & changing.any(1)]]
-            if len(n_):
-                stat[grp]["neutral"].append(n_)
-            if len(c_):
-                stat[grp]["changing"].append(c_)
-        if hi.sum() >= 5:
-            n_ = v[hi & neutral.any(1)][neutral[hi & neutral.any(1)]]
-            c_ = v[hi & changing.any(1)][changing[hi & changing.any(1)]]
-            if len(n_) and len(c_) and np.median(c_) > 0:
-                ratio_tx.append(np.median(n_) / np.median(c_))
-    print(f"  {'positions':<12} {'GC-neutral':>13} {'GC-changing':>13} "
-          f"{'neutral/changing':>18}")
-    for grp in ("all", "elevated"):
-        if not stat[grp]["neutral"] or not stat[grp]["changing"]:
-            continue
-        n_ = np.concatenate(stat[grp]["neutral"])
-        c_ = np.concatenate(stat[grp]["changing"])
-        print(f"  {grp:<12} {np.median(n_):>13.3e} {np.median(c_):>13.3e} "
-              f"{np.median(n_)/np.median(c_):>18.2f}")
-    if ratio_tx:
-        ratio_tx = np.array(ratio_tx)
-        print(f"\n  per transcript, at elevated positions only "
-              f"({len(ratio_tx)} transcripts):")
-        print(f"    median ratio {np.median(ratio_tx):.2f}   "
-              f"quartiles {np.percentile(ratio_tx, 25):.2f} to "
-              f"{np.percentile(ratio_tx, 75):.2f}")
-        print(f"    transcripts where the GC-neutral substitution is at least "
-              f"half the GC-changing one: "
-              f"{100*(ratio_tx >= 0.5).mean():.0f}%")
+    # SKIPPED, NOT CRASHED, when the column has already been reduced to one
+    # substitution per position. --gc-neutral-only and --gc-changing-only replace
+    # the (P,4) column with a (P,1) selection, and indexing that with the (P,4)
+    # `dgc` raised IndexError -- which killed four jobs LAST NIGHT after they had
+    # printed Q1, so their numbers were read and quoted from runs that then failed.
+    # The screen is also meaningless here: the arm was selected BY GC status, so
+    # asking what fraction of its effect is GC-driven has a known answer.
+    if recs and recs[0][key].shape[1] != 4:
+        print("  SKIPPED: the effect column was reduced to one substitution per\n"
+              "  position by --gc-neutral-only / --gc-changing-only, so this screen\n"
+              "  has no second arm to compare against and its question is already\n"
+              "  answered by the selection.\n")
+    else:
+        stat = {k2: {"neutral": [], "changing": []} for k2 in ("elevated", "all")}
+        ratio_tx = []
+        for r in recs:
+            eff = per_position_effect(r[key])
+            ok = r["valid"] & np.isfinite(eff)
+            if ok.sum() < 50:
+                continue
+            med = np.median(eff[ok])
+            if med <= 0:
+                continue
+            if args.top_frac > 0:
+                k = max(1, int(round(args.top_frac * ok.sum())))
+                cut = np.partition(eff[ok], -k)[-k]
+                hi = ok & (eff >= cut)
+            else:
+                hi = ok & (eff >= args.fold * med)
+            v, g = np.abs(r[key]), r["dgc"]
+            neutral = (g == 0) & np.isfinite(v)
+            changing = (g != 0) & np.isfinite(v)
+            for grp, rows in (("elevated", hi), ("all", ok)):
+                n_ = v[rows & neutral.any(1)][neutral[rows & neutral.any(1)]]
+                c_ = v[rows & changing.any(1)][changing[rows & changing.any(1)]]
+                if len(n_):
+                    stat[grp]["neutral"].append(n_)
+                if len(c_):
+                    stat[grp]["changing"].append(c_)
+            if hi.sum() >= 5:
+                n_ = v[hi & neutral.any(1)][neutral[hi & neutral.any(1)]]
+                c_ = v[hi & changing.any(1)][changing[hi & changing.any(1)]]
+                if len(n_) and len(c_) and np.median(c_) > 0:
+                    ratio_tx.append(np.median(n_) / np.median(c_))
+        print(f"  {'positions':<12} {'GC-neutral':>13} {'GC-changing':>13} "
+              f"{'neutral/changing':>18}")
+        for grp in ("all", "elevated"):
+            if not stat[grp]["neutral"] or not stat[grp]["changing"]:
+                continue
+            n_ = np.concatenate(stat[grp]["neutral"])
+            c_ = np.concatenate(stat[grp]["changing"])
+            print(f"  {grp:<12} {np.median(n_):>13.3e} {np.median(c_):>13.3e} "
+                  f"{np.median(n_)/np.median(c_):>18.2f}")
+        if ratio_tx:
+            ratio_tx = np.array(ratio_tx)
+            print(f"\n  per transcript, at elevated positions only "
+                  f"({len(ratio_tx)} transcripts):")
+            print(f"    median ratio {np.median(ratio_tx):.2f}   "
+                  f"quartiles {np.percentile(ratio_tx, 25):.2f} to "
+                  f"{np.percentile(ratio_tx, 75):.2f}")
+            print(f"    transcripts where the GC-neutral substitution is at least "
+                  f"half the GC-changing one: "
+                  f"{100*(ratio_tx >= 0.5).mean():.0f}%")
 
     # ================================================================== Q3
     print("\n" + "=" * 78)
@@ -1039,7 +1074,8 @@ def main():
 def _kmer_section(recs, key, args, K, paths, pool):
     print("\n" + "=" * 78)
     print(f"Q4  What sequence sits under elevated positions? ({K}-mers)\n")
-    hi_c, bg_c = kmer_enrichment(recs, key, args.top_frac, K)
+    hi_r, bg_r = kmer_enrichment(recs, key, args.top_frac, K, by_region=True)
+    hi_c, bg_c = hi_r["all"], bg_r["all"]
     rows, H, B = kmer_table(hi_c, bg_c, K)
     if not rows:
         print("  no k-mer cleared the background-count floor")
@@ -1051,6 +1087,30 @@ def _kmer_section(recs, key, args, K, paths, pool):
     print(f"  {'...':<9}")
     for code, nh, nb, e in rows[-5:]:
         print(f"  {decode_kmer(code, K):<9} {nh:>11,} {nb:>13,} {e:>+9.3f}")
+
+    # THE REGION-MATCHED BACKGROUND. Elevated positions sit 3' of the stop codon
+    # and the pooled background spans the whole transcript, so an AU-rich result is
+    # what a 3'UTR-biased set produces with no motif in it -- 3'UTRs are AU-rich as
+    # a class. Comparing elevated-3'UTR against other-3'UTR holds regional
+    # composition by construction. The GC control cannot do this: holding channel 5
+    # fixed does not move where the elevated positions are.
+    print(f"\n  REGION-MATCHED — elevated against the SAME region's own background")
+    print(f"    region defined by the anchor ORF; for transcripts with no reference "
+          f"candidate that\n    anchor is the model's own highest-mass choice")
+    pooled_top = [decode_kmer(c, K) for c, _, _, _ in rows[:10]]
+    for reg in ("upstream", "orf", "downstream"):
+        rw, H2, B2 = kmer_table(hi_r[reg], bg_r[reg], K)
+        if not rw:
+            print(f"\n    {reg}: nothing cleared the background floor")
+            continue
+        top = [decode_kmer(c, K) for c, _, _, _ in rw[:10]]
+        keep = len(set(top) & set(pooled_top))
+        print(f"\n    {reg:<11} {H2:>9,} elevated  {B2:>11,} background")
+        print(f"      top: {' '.join(top[:6])}")
+        print(f"      enr: {' '.join(f'{e:+.2f}' for _, _, _, e in rw[:6])}")
+        print(f"      {keep} of the pooled top-10 k-mers survive here")
+    print(f"\n    If the pooled AU-rich hits vanish inside `downstream`, the pooled "
+          f"result was\n    regional composition. If they persist, it is sequence.")
 
     # ACROSS SEEDS, ON THE MOTIF RATHER THAN ON THE POSITIONS. This is the test
     # that matches a motif hypothesis: five members can disagree about which

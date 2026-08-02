@@ -1,0 +1,206 @@
+script sha256: 1070a33b4c6d8616946fdf20d6f6943daa1c3489d178b914f28a4915041bf29a  analysis_plans/analysis_ism_regions.py
+### k=5, decay, GC-PRESERVING SUBSTITUTIONS ONLY
+anchors: 3,422 reference, 1,577 model-selected (no annotated ORF in the pool)
+  --anchor reference: 3,422 kept
+3422 transcripts, effect column = the decay branch, GC-PRESERVING SUBSTITUTIONS ONLY
+
+==============================================================================
+CHECK 1 OF SIX  Does it survive across independently trained members?
+
+  5 members, 4,999 transcripts in all of them
+
+  effect track, mean over member pairs, median over transcripts
+    pearson  +0.6116    spearman +0.7782
+
+  agreement on WHICH positions are elevated (top 1%), Jaccard
+    observed 0.1250    random placement 0.0000
+    a feature that does not clear the random line is one member's private solution
+
+==============================================================================
+Q1  Are there regions where the signal is clearly above baseline?
+
+  per-transcript effect distribution, 3422 transcripts
+    median position          9.918e-04
+    99th percentile          4.269e-02
+    largest position         1.009e-01
+    largest / median         87.3x   (range 9.0 to 489938697060352.0)
+    positions above floor    89.4%
+
+  So the answer to 'is anything elevated' is a fold, not a yes/no:
+  the strongest single position of a transcript runs 87x its own median.
+
+
+  EXCESS ACROSS THRESHOLDS — runs of >= 4, observed against the same count placed at random
+     top frac   elevated     runs  mean len   obs >=4  null >=4    ratio
+        0.001      7,879    7,685      1.03         0         0      n/a
+        0.002     15,644   14,761      1.06        11         0      inf
+        0.005     39,106   34,569      1.13       145         0      inf
+        0.010     78,273   64,431      1.21       783         0      inf
+        0.020    156,502  117,229      1.34     3,049         0      inf
+        0.050    391,325  247,260      1.58    15,349        50  306.98x
+    a ratio that holds across the sweep is an effect; one that appears at a single
+    threshold is that threshold
+  ARE THEY REGIONS OR SCATTERED BASES?  elevated = top 1% of each transcript's own positions,
+  against the same count placed at random in the same transcripts:
+
+    run length     observed     random
+    1                54,072     76,735
+    2                 8,250        763
+    3                 1,326          4
+    4                   464          0
+    5                   189          0
+    6                    68          0
+    7                    31          0
+    8                    13          0
+    9                     8          0
+    10                    3          0
+    >= 11                 7          0
+
+    total elevated positions 78,273  in 64,431 runs (random: 77,502 runs)
+    mean run length  observed 1.21   random 1.01
+
+  ACROSS DISJOINT GENES — run structure by arm, each against its own null
+    arm              tx  elevated   runs  mean len   null  runs>=4   null
+    confirmation   1716    38,871 32,105      1.21   1.01      374      0
+    discovery      1706    39,402 32,326      1.22   1.01      409      0
+    a structure that holds in BOTH arms is a statement about transcripts;
+    one that holds only in discovery is a statement about the genes it was found on
+
+==============================================================================
+Q2  Where are they, relative to the start codon and the stop codon?
+
+  relative to the start codon, FILL-CONDITIONED — one transcript set across every offset
+    1413 transcripts cover -300 to +99
+     offset  mean fold   shifted   n tx   note
+        -20 2424836240.92 129393043.45   1413   FINAL POOLING BIN — flagged
+        -19 2285300240.40 483343532.44   1413   FINAL POOLING BIN — flagged
+        -27 1977001955.05 215021911.52   1413   
+        -15 1866088915.74 239025523.96   1413   FINAL POOLING BIN — flagged
+         -5 1846672074.86 177812405.28   1413   FINAL POOLING BIN — flagged
+       -171 1438292762.99 418168989.84   1413   
+        -22 1314217421.91 451257656.39   1413   FINAL POOLING BIN — flagged
+       -153 1256683221.94 441872762.63   1413   
+    best unflagged offset -27: 1977001955.05 against shifted 215021911.52 (+1761980043.53)
+
+  relative to the start codon, raw — the transcript set varies with offset
+    3416 transcripts cover -300 to +99
+     offset  mean fold   shifted   n tx   note
+       -106 19188115670.81 8012047053.61   2586   
+       -142 18164245409.36 2345545779.44   2300   
+       -105 16625170491.90 3839747402.79   2593   
+       -114 16552383448.45 7307968131.94   2521   
+       -140 15829535468.45 1842254407.27   2314   
+       -138 15804745760.06 1453634114.40   2328   
+        +79 15795652915.89 8051663643.45   3416   FINAL POOLING BIN — flagged
+        +67 15709856139.98 4148825818.05   3416   FINAL POOLING BIN — flagged
+    best unflagged offset -106: 19188115670.81 against shifted 8012047053.61 (+11176068617.20)
+
+  relative to the stop codon, FILL-CONDITIONED — one transcript set across every offset
+    2833 transcripts cover -300 to +300
+     offset  mean fold   shifted   n tx   note
+       +110 293047367425.14 67615232245.91   2833   
+       +171 256062548497.36 51150220036.19   2833   
+       +249 231913890724.16 47379604589.63   2833   
+       +239 219497885473.67 52126493119.59   2833   
+       +168 218690543303.63 69548072073.25   2833   
+        +75 206703685840.29 74105905878.40   2833   
+       +255 199781551742.60 42241263621.33   2833   
+        +84 190306409340.01 42403973615.81   2833   
+    best unflagged offset +110: 293047367425.14 against shifted 67615232245.91 (+225432135179.23)
+
+  relative to the stop codon, raw — the transcript set varies with offset
+    3416 transcripts cover -300 to +300
+     offset  mean fold   shifted   n tx   note
+       +110 284958295278.72 39536465535.89   3302   
+       +255 247619087986.43 57898198630.02   3102   
+       +249 240334013817.41 57138864964.20   3108   
+       +239 236485113786.42 59006417156.65   3117   
+       +171 228007706941.65 51892634696.47   3216   
+       +252 220561897220.80 55416267749.78   3106   
+       +168 196417850381.48 74466364065.47   3219   
+       +231 189524028817.99 70278108658.16   3129   
+    best unflagged offset +110: 284958295278.72 against shifted 39536465535.89 (+245421829742.83)
+
+
+==============================================================================
+Q2b Is the elevation a fill-boundary artifact?
+
+  ATG window: fold-elevation by distance from the nearest fill boundary,
+  excluding positions within 30 nt of the anchor so the two are not confounded
+      distance  mean fold         n
+          0-19 11836542133.31   129,626
+         20-39 8611106362.67   125,806
+         40-59 6752873753.07   121,534
+         60-79 6125608961.89    80,068
+         80-99 2901354278.64    50,351
+       100-119 876457972.31    47,959
+       120-139 855280422.22    64,658
+       140-159 993453219.09    75,765
+       160-179 380142745.40    66,956
+       180-199 534211870.55   530,376
+
+  ATG window: fold-elevation by distance from the ANCHOR, reported separately
+      distance  mean fold         n
+          0-19 5472296858.41   131,939
+         20-39 5468562727.81   131,951
+         40-59 6328031940.66   127,890
+         60-79 7887498248.76   123,154
+         80-99 7744868104.67   117,869
+       100-119 10669794186.21    51,142
+       120-139 5576434951.83    47,926
+       140-159 3175750066.11    44,719
+       160-179 336000557.34    42,059
+       180-199 861348119.60   679,491
+
+  stop window: fold-elevation by distance from the nearest fill boundary,
+  excluding positions within 30 nt of the anchor so the two are not confounded
+      distance  mean fold         n
+          0-19 59397475069.60   135,003
+         20-39 31398599606.40   133,486
+         40-59 24748822753.34   131,662
+         60-79 22937279381.95   130,015
+         80-99 29182860293.11   129,159
+       100-119 42765568529.80   128,779
+       120-139 53868671490.59   127,097
+       140-159 31505364609.20   125,803
+       160-179 30667102417.16   124,474
+       180-199 72710672227.99 1,292,454
+
+  stop window: fold-elevation by distance from the ANCHOR, reported separately
+      distance  mean fold         n
+          0-19 36722541280.98   132,817
+         20-39 27432288758.62   135,556
+         40-59 37014902862.73   134,429
+         60-79 62008052561.61   132,227
+         80-99 50494723818.05   129,835
+       100-119 68135438498.64   127,337
+       120-139 81050213648.67   125,011
+       140-159 66435404765.16   121,817
+       160-179 66971704899.99   118,428
+       180-199 53119098765.13 1,507,938
+
+
+==============================================================================
+Q2c Does the downstream peak track the stop codon or the 3' fill edge?
+
+  3395 transcripts; downstream fill ends at offset 33 to 499 (median 499)
+
+  common search range +1..+499: 2736 of 3395 transcripts reach it (659 dropped, and they are the short ones)
+    every eligible transcript ends at 499 — no length contrast left to stratify on
+
+  common search range +1..+499: 2736 of 3395 transcripts reach it (659 dropped, and they are the short ones)
+    every eligible transcript ends at 499 — no length contrast left to stratify on
+
+  Both strata now search the same offsets. A peak at the same offset
+  in both is anchored on the stop codon; a peak that shifts with the
+  stratum's own fill extent is 3' UTR length.
+==============================================================================
+Q3a Is the signal base identity, or local GC?
+
+Traceback (most recent call last):
+  File "/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_plans/analysis_ism_regions.py", line 1088, in <module>
+    main()
+  File "/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_plans/analysis_ism_regions.py", line 963, in main
+    n_ = v[rows & neutral.any(1)][neutral[rows & neutral.any(1)]]
+         ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+IndexError: boolean index did not match indexed array along axis 1; size of axis is 1 but size of corresponding boolean axis is 4
