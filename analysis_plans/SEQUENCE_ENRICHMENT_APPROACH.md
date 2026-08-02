@@ -62,17 +62,28 @@ compositional cluster carries zero information against a per-cluster null.
 
 #### The working definition
 
-> **The model has learned a motif if there is a short, position-independent sequence
-> pattern such that the model's output depends on the *arrangement* of bases in it —
-> over and above the base composition of the surrounding region, where the pattern
-> sits, and how much routable mass reaches that location.**
+> **The model has learned a motif if there is a short sequence pattern such that the
+> model's output depends on the *arrangement* of bases in it — over and above the base
+> composition of the surrounding region and how much routable mass reaches that
+> location.**
 
 | clause | what it excludes |
 |---|---|
 | **short** | "this particular transcript sequence" — a motif is a *reusable* unit and unbounded length has no generalization |
-| **position-independent** | landmarks. A start codon at the start is not a motif; AUG mattering *wherever it occurs* is |
 | **arrangement over composition** | AU-richness, GC-richness, the keto skew |
 | **over and above routing** | the selection-mass envelope, which is architecture and not a sequence fact |
+
+**A scoping clause, which is NOT part of the definition.** An earlier draft required
+the pattern to be *position-independent*. That is wrong: **a Kozak sequence is a
+motif and is positionally anchored; so is a splice donor.** Position-independence is
+not part of what a motif is, and requiring it would rule out the two
+best-characterized motifs in the field.
+
+What it was actually doing is specific to our design: **our landmarks are handed to
+the model by construction** — every candidate window has an AUG at its anchor and a
+stop at the other end — so a signal at a landmark here may be an artifact of the
+windowing rather than a learned feature. That is a scoping condition on *our*
+evidence, not a clause of the definition, and it is stated as one.
 
 #### What this instrument can and cannot see
 
@@ -82,12 +93,29 @@ disrupting any one position still leaves a match — is functional and **invisib
 us**: we would measure near-zero importance at every position of a real, working
 motif.
 
+**This is mechanistic, not hypothetical, and our architecture can represent it
+directly.** Consider recognition of the form "at least 6 of these 8 positions match."
+Any single substitution leaves 7 of 8, still above threshold, so single-base ISM
+measures ≈0 everywhere while the pattern is high-information *collectively*. A
+convolution is a weighted sum and a ReLU is a threshold, so **conv→ReLU is an m-of-n
+detector** when the weights are near-uniform and the bias is set for it. Degenerate
+m-of-n recognition is also what RBP binding usually looks like, so this is the
+expected case rather than a contrived one.
+
 This is a limitation rather than a caveat, and three things follow:
 
 - **absence of ISM signal is not absence of a motif.** Any negative we report says so.
 - the motifs we *can* find are biased toward the brittle ones
-- a multi-base perturbation, or the PWM regression across all positions, can see what
-  single-base ISM cannot
+- a multi-base perturbation can see what single-base ISM cannot
+
+**The test, and the one that does not work.** Asking whether ISM importance tracks
+the fitted PWM is **circular** — the PWM was regressed on ISM importance, so its
+fitted values track it by construction. The direct test is **superadditivity**:
+substitute two positions at once and compare against the sum of their single-base
+effects. *Additive* means single-base ISM sees everything and this caveat comes out.
+*Strongly superadditive* means recognition is non-additive, single substitutions
+under-detect it, and the caveat stands **with a number attached**. It needs only
+forward passes on pairs within a window.
 
 #### What each rung of the ladder earns, under this definition
 
@@ -95,11 +123,22 @@ This is a limitation rather than a caveat, and three things follow:
 - *"among equally-routed positions, these bases are preferred"* — the routing clause
   only. **A composition claim.** This is what we currently have.
 - *"...and beyond base frequencies, sensitivity clusters into short arrangements"* —
-  arrangement and routing. Approaching a motif; still missing position-independence.
-- **the full claim** additionally requires the pattern to recur at non-homologous
-  locations. Cross-seed agreement on *sequence* (r = 0.75) against *position*
-  (Jaccard 0.125) is evidence for exactly that — and note it was obtained **with no
-  elevation null at all**, so it does not depend on the machinery retracted in §7.1.
+  arrangement and routing satisfied. **This is the motif claim under the definition
+  above**, subject to the scoping clause on landmarks.
+
+**On the cross-seed evidence, corrected.** Agreement on *sequence* (r = 0.75) against
+*position* (Jaccard 0.125) is evidence that the model has **no fixed positional
+anchor** for whatever it responds to. It used no elevation *null*, so §7.1's
+retraction does not touch it — **but it does use the elevation *rule***, so it is not
+independent of Phase A: if A2 finds that elevation selects for routing rather than
+sequence, five members agreeing on k-mers may be five members agreeing about what
+sequence happens to sit at high-mass positions. It survives A1 clean and does not
+survive A2 untouched.
+
+*The direct test of positional variability*, worth recording though not worth running
+first: whether the same pattern shows elevated importance at **multiple distinct
+offsets within one transcript**. Seeds disagreeing on position is also consistent with
+a rare pattern where each seed latches onto different instances.
 
 ---
 
