@@ -166,10 +166,63 @@ Both ATF4 transcripts in the bank are NMD-labelled. For `ENST00000674920.3`:
 of the NMD signal lands there. That is the textbook ATF4 mechanism, recovered.
 
 The *reasons* are genuine — an upstream ORF terminating with a junction behind it
-is why ATF4 is a substrate. **The mechanism is not initiation modelling.** That
-uORF is 179 nt, squarely in the class the head suppresses. It survives because it
-is **upstream**, so stick-breaking hands it queue priority before any sequence
-quality is assessed, and the decay term then re-weights it.
+is why ATF4 is a substrate. **The mechanism is not initiation modelling.**
+
+> **CORRECTED.** This section first said the uORF survives because it is *upstream*
+> and stick-breaking hands it queue priority. **Measured, that explains 22.8% of
+> cases.** Among short candidates the head's top-scoring one is the 5′-most only
+> 22.8% of the time — but carries a downstream junction **76.3%** of the time, and
+> `capture ~ p_decay` among short candidates is **+0.362**. The uORF carries its
+> weight because it is **decay-relevant**, and the *initiation* head has learned to
+> detect that from the start window alone.
+
+### The head reasons backwards, and it is visible in the weights
+
+*Pete's framing: the model is searching for a reason ATF4 decays. That cannot
+happen at inference — the label is not available — but it is exactly what the loss
+does during training, since `∂L/∂z_p_k` is scaled by `d_k`. The search happened in
+gradient descent and is frozen into the weights.*
+
+    among SHORT candidates, within transcript          (job 8900229 producer)
+      capture ~ p_decay                       +0.362
+      capture ~ downstream junction count     +0.100    (vs -0.46 in aggregate)
+      top-capture short candidate has an EJC   76.3%
+      top-capture short candidate is 5'-most   22.8%
+
+**The aggregate sign was masking this.** `capture ~ junction count` is −0.46 over
+all candidates, mediated by length; within the class where the head must actually
+choose among uORFs it is **+0.100**, and it predicts `d` at +0.362.
+
+**This sharpens the branch-agreement result rather than contradicting it.** The two
+heads *do* read different bases (+0.093 within mass band) **and** they compute the
+same thing among short candidates. Different windows, converged outputs — the
+architecture separated the inputs and the loss re-converged them.
+
+### Is it one detector? UNRESOLVED, and stopped by its own power floor
+
+If both heads are junction detectors, the model should have no channel for NMD that
+is not junction-dependent. Registered before the run: ONE-TRACK if the NMD-vs-control
+AUC falls below 0.60 among transcripts with no junction-bearing candidate,
+UNDERPOWERED below 50 such transcripts.
+
+    has junction-bearing candidate   NMD n=2,438  median P(NMD) 0.662   AUC 0.887
+                                 control n=2,357                 0.071
+    NO junction-bearing candidate    NMD n=   49  median P(NMD) 0.081   AUC 0.787
+                                 control n=  155                 0.033
+
+**n = 49. The floor was 50. Under the registered rule nothing is drawn from this**,
+though the eight-fold collapse in what the model would actually *call* points the
+way Pete's hypothesis predicts.
+
+*Cross-check passed:* `Σ p_select·d` against `sigmoid(base_logit)` agree at
+r = 1.0000, max difference 3.35e-07 — so `Σ p·d` is the model's output and every
+framing built on it holds.
+
+*Powering it is not a re-read.* The five banks are five **seeds** over the same
+4,999 transcripts, so pooling them adds model replicates and not transcripts.
+Resolving this needs forward passes over the full 42,043-transcript pool.
+
+
 
 *Caveat against overstating it:* `P(NMD)` is 0.107 and 0.104 for the two
 transcripts. The model attributes correctly and predicts weakly.
