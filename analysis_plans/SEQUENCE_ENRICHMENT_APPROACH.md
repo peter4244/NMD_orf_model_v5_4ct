@@ -79,11 +79,35 @@ motif and is positionally anchored; so is a splice donor.** Position-independenc
 not part of what a motif is, and requiring it would rule out the two
 best-characterized motifs in the field.
 
-What it was actually doing is specific to our design: **our landmarks are handed to
-the model by construction** — every candidate window has an AUG at its anchor and a
-stop at the other end — so a signal at a landmark here may be an artifact of the
-windowing rather than a learned feature. That is a scoping condition on *our*
-evidence, not a clause of the definition, and it is stated as one.
+What it was actually doing is specific to our design, and the earlier statement of it
+was wrong about the geometry. **There are two windows, not one, and each is
+overwhelmingly flanking sequence:**
+
+    ATG window    900 positions UPSTREAM of the start codon  +  100 into the ORF
+                  anchor at index 900 of 1000; mean 742 filled
+    STOP window   500 positions BEFORE the stop  +  500 AFTER it
+                  anchor at index 500 of 1000; mean 613 filled
+
+**The landmark is a single position; the window is context.** So the scoping concern
+is narrow: a signal at *exactly* the anchor index could be an artifact of the
+anchoring rather than a learned feature. It says nothing about the other ~740 or ~610
+positions, which is where a motif claim would live anyway.
+
+**And what those positions mostly are matters, favorably.** 900 bases upstream of a
+reference start codon is **5′UTR** — where uORFs and 5′ regulatory elements sit. 500
+bases downstream of a stop is **3′UTR** — where exon-junction complexes, AU-rich
+elements and RBP sites sit. **The model's input is UTR-dominated**, which is where
+post-transcriptional regulatory sequence actually lives, so the search space is the
+right one rather than an incidental one.
+
+Three consequences worth carrying:
+
+- the "downstream of the stop" analyses are, for most transcripts, **3′UTR
+  analyses** — which is why regional composition (§5.2) bites as hard as it does
+- a motif found here would be a **UTR motif**, and should be described as one
+- the §5.2 decoupling is sharper than it first looks: in a PTC transcript the
+  positions 3′ of the operative stop are *coding sequence occupying a UTR-like
+  position within a UTR-shaped window*
 
 #### What this instrument can and cannot see
 
