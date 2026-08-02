@@ -111,9 +111,21 @@ slots carry more downstream junctions. Measured in-bank, a **queue with no model
 scores +0.334 raw and **+0.568** holding length, against the model's −0.050 and +0.442. So
 zero was the wrong reference, and against the right one the model routes toward
 junction-bearing candidates *less* than pure ordering does — a deficit of 0.125.
-*Interpretability window's argument, run in-bank; job committed at f523f72.* **Bound:** the
-degenerate null maximises queue influence, so 0.125 is an upper bound on head aversion and
-may be generic dilution.
+*Interpretability window's argument, run in-bank; producer `model_queue_null_inbank.py`,
+f523f72.* **Bound:** the degenerate null maximises queue influence, so 0.125 is an upper
+bound on head aversion and may be generic dilution.
+
+*Why holding length does not hold position, measured rather than argued:*
+`orf_start ~ orf_length` within transcript is only **−0.150** (n 4,815, |r| < 0.30 in 54.8%
+of transcripts). The two covariates are nearly free of each other, which is why holding
+either one alone leaves the other's channel fully intact.
+
+> **⚠ STANDING HAZARD — in this model, any candidate-level correlation is position until
+> proven otherwise.** Four instances in one day: C7 (holding position *strengthened* the
+> capture–junction partial), the ATF4 uORF (queue position explains 22.8%, not the 100% we
+> assumed), C16 (a length partial that unmasked position), and the queue-geometry null
+> (`p_select ~ ejc` positive with no model in it). Pair this with the null rule: **for a
+> rank product, a monotone ordering or a normalised share, zero is not the null.**
 
 *This paragraph asserted the opposite for forty minutes.* C16 claimed routing was
 junction-seeking at matched length (+0.442); it held length and not position, and is
