@@ -58,34 +58,49 @@ survives its own row and is load-bearing for a Phase B or C claim earns a second
 
 ## Phase A — repair. Cheap, existing code, and a go/no-go on the rest
 
-Each of these can invalidate a current claim. None needs a new instrument. All run on the existing
+**Order: A2 first, then A1 and A3 in parallel, then A4.** Pete asked whether ORF weighting should be
+accounted for at all, and the model window independently concluded the same thing from the other
+direction: **every surviving claim is downstream of A2**, while A1 can only retire something already
+retracted. A4 runs last because it is the only item needing new forward passes, and a negative A2 is
+what makes it urgent.
+
+**A correction to how these were first written, and it is the error the toolbox exists to prevent.**
+A1's row said *stratification* in one line and *residualized track* in the next. Those are different
+operations. Residualizing removes routing from the data and describes a model that weights every ORF
+equally, which is neither our model nor ribosomes. **Both A1 and A2 hold mass by stratification** —
+within bands of similar routing — never by removal.
+
+Each of these can invalidate a current claim. None needs a new instrument. A1–A3 run on the existing
 banks.
 
-### A1 — does the clustering survive removal of the architectural component?
-
-> **Hypothesis.** Among positions the model routes to equally, sensitivity clusters into short
-> arrangements beyond the track's own smoothness.
-> **Held fixed:** selection mass and coverage, by stratification; transcript identity, per-transcript.
-> **Not held:** base composition — it is the candidate feature.
-> **Null:** placement on the **mass-residualized** track, so the architectural autocorrelation is
-> removed from the data rather than from the null.
-> **Licensed if positive:** "among equally-routed positions, these bases are preferred" — the
-> *second* row of the combinations table. Composition is still free, so this is not yet a motif.
-> **If negative:** the clustering result is architecture, and the run-length line of work ends.
-
-Cost: one array job. **This is the single most informative measurement available.**
-
-### A2 — is the U-rich/keto signature routing or sequence?
+### A2 — **THE GATE.** Is the U-rich/keto signature routing or sequence?
 
 > **Hypothesis.** The composition signature at elevated positions holds among positions of equal
 > selection mass.
-> **Held fixed:** mass and coverage by stratification; positional region, stratified.
+> **Held fixed:** mass and coverage **by stratification**; positional region, stratified.
 > **Not held:** composition — it is the measurement.
 > **Licensed if positive:** the signature is a property of what the decay head reads, not of where
-> the model routes.
-> **If negative:** our best surviving finding is routing, and Phase B has nothing to work on.
+> the model routes. Everything downstream then means what we have been saying it means.
+> **If negative:** our best surviving finding is routing. The composition profile, the cross-seed
+> k-mer agreement, and the PWM are all conditional on what elevation selects, so **a negative here
+> propagates to all three**.
 
-Cost: one job. The composition profile machinery exists.
+Cost: one job. **This is the load-bearing measurement of Phase A.**
+
+### A1 — does the clustering survive holding routing fixed? *(secondary, weak instrument)*
+
+> **Hypothesis.** Within bands of similar selection mass, sensitivity clusters into short
+> arrangements beyond chance placement.
+> **Held fixed:** mass and coverage **by stratification, not residualization**; transcript identity.
+> **Not held:** base composition.
+> **Licensed if positive:** the *second* combinations row — "among equally-routed positions these
+> bases are preferred" — not a motif.
+> **If negative:** the run-length line ends, retiring a claim already retracted.
+
+**Labelled a weak instrument deliberately.** Run length was always a proxy for "a motif spans several
+bases," and it is weak in both directions: mass-driven smoothness produces it without sequence, and
+per A4 a *robust* motif would produce none at all, since no single substitution disturbs it. It is
+kept because it is nearly free, not because it is informative.
 
 ### A3 — is directionality anything but magnitude?
 
@@ -142,6 +157,16 @@ Conditional on Phase A. Each requires the top row of the combinations table.
 **This is the only analysis in the programme that no artificial background can construct**, and it
 is the one most specific to our data rather than to sequence models in general. If Phase A is
 positive, I would argue B2 before B1 on those grounds.
+
+### B3 — is the pattern position-independent *within* a transcript?
+
+> **Hypothesis.** The same pattern shows elevated importance at multiple distinct offsets in one
+> transcript.
+> **Why it is not the cross-seed statistic.** Cross-seed agreement on sequence with disagreement on
+> position is evidence about the *model's representation*, and it depends on the elevation rule that
+> A2 is testing. This is the direct version and does not.
+> **Licensed if positive:** the pattern is recognized wherever it occurs rather than at a landmark —
+> which is what separates a motif from windowing in a design where the landmarks are given.
 
 ---
 
