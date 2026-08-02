@@ -237,9 +237,35 @@ exist. Our data contains it because NMD substrates are what they are.
 
 **Every positional result must say which of these it is.** Not adjusted for — stated.
 
-*Practical caveat:* the PTC interval exists only in transcripts with a premature stop,
-so the cell is smaller than the others and the comparison may be underpowered. That
-is a limit on what can be concluded, not a reason to adjust.
+**Sample size, measured (bank_interp_s100, 2026-08-02):**
+
+    transcripts in bank                             4,999
+    with an annotated reference candidate           3,422   (weighted 28,739)
+    operative stop BEFORE annotated stop              550   (weighted  3,914)
+      ...NMD 282     ...control 268
+
+    PTC-interval positions           696,340   median 1,068/tx   max 4,561
+    comparison cell (true 3'UTR)   3,320,350   across 3,413 transcripts
+    elevated positions in the interval at top 1%:  ~6,963
+
+**Power: adequate for composition, thin for 5-mers.** ~7,000 elevated positions
+supports a base-composition comparison comfortably, but spread over 1,024 possible
+5-mers that is ~7 each — too thin for individual k-mer enrichments. 4-mers (~27
+each) or 3-mers (~109 each) are sound. The comparison is runnable at reduced
+resolution.
+
+**The definition above is not yet the right one, and the split says so.** The cell
+was expected to be predominantly NMD. It is **282 NMD against 268 control** —
+essentially balanced. "Operative stop before annotated stop" therefore conflates two
+populations: transcripts with a genuine premature termination codon, and transcripts
+where the model simply commits to a shorter ORF than the annotation. A control
+transcript does not have NMD-triggering premature termination, so those 268 are
+largely the second — a fact about model behaviour, not about the transcript.
+
+**The interval must be defined from an annotation-derived PTC call**, not from the
+model's selection, so that the cell does not depend on what the model chose. The
+subset table carries `main_orf_stop` for this. Until that is done, the counts above
+describe a mixed population and the three-cell comparison should not be run on it.
 
 *Also noted:* we currently define "downstream" by the stop of the ORF the model
 commits to. Defining it by the annotation gives the same enrichment (tested: identical
