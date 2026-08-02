@@ -126,12 +126,13 @@ factors, so the alignment is part of what the model computes rather than a descr
 
 ## 4. The benchmark was wrong; fixed, the number is 0.883
 
-Recovery scored against the annotated CDS is the wrong target. **ATF4 proves it:** the prior
-picks the 1055-nt main ORF, the posterior flips **18×** onto a 179-nt uORF and puts **93%**
-of the signal there — the textbook mechanism — and it scores as a **miss**.
+**The right target is the frame that causes decay, not the annotated CDS** — for an NMD
+substrate those are close to disjoint. **ATF4 is the case:** the prior picks the 1055-nt
+main ORF, the posterior flips **18×** onto a 179-nt uORF and puts **93%** of the signal
+there. That is the textbook mechanism, and against the annotated CDS it scores as a miss.
 
-Against GENCODE's curated `nonsense_mediated_decay` biotype, with our EJC rule nowhere in
-the target (job 8900631):
+Scored against GENCODE's curated `nonsense_mediated_decay` biotype — a call made
+independently of anything we compute (job 8900631):
 
 | GENCODE biotype | n | prior | posterior |
 |---|---|---|---|
@@ -149,7 +150,7 @@ belongs to main-ORF recovery. This number currently has no floor under it.
 **It is handed the answer.** In the `interpretable` variant the decay head's entire
 non-sequence input is one column: `n_downstream_ejc`. *Retrain item 8.* But `d ~ ejc` is only
 +0.445 and `capture ~ d` survives holding that column at **+0.400**, so `d` is not a readout
-of it. *Also used in §6; one measurement, two readings.*
+of it.
 
 **It does not read the stop codon it is anchored on** — every candidate had one by
 construction, so no negative example and no gradient. *Retrain item 6.*
@@ -164,9 +165,8 @@ PWM explains 1.73% of importance variance.**
 scrambles the stop window and leaves `p_capture` unmoved. **The coupling is derived** —
 `∂L/∂z_p_k ∝ d_k` is calculus on verified code, not an observation. **The consequence is
 measured** — `capture ~ d` is +0.362 among short candidates, +0.400 holding the junction
-column (**C17**, jobs 8900114 / 8900473). *The same measurement appears in §5, where it shows `d` is more than the
-supplied column; here it shows the head became decay-predictive. One number, two
-readings.*
+column (**C17**, jobs 8900114 / 8900473). *Same measurement as §5's, read there
+against the supplied column and here against the head.*
 
 **But scoped.** In aggregate the separation *holds*: `p_capture ~ d` is +0.091 and the two
 heads read **different bases**, agreement ~0.02 within mass band (job 8899820). It is given
@@ -176,11 +176,12 @@ back **only among short candidates**, where the head must choose among uORFs.
 
 ## How to read this
 
-Sections 1–6 are the science. **Every number in them is measured**, with its producer and
-job in the appendix. Two `[unclaimed]` markers flag assertions with no measurement behind
-them — they are deliberate and greppable. The appendix carries provenance and the record of
-what this document got wrong before it got it right; it is there because a narrative that
-only lists what survived cannot be checked.
+**Sections 1–6 are the science**, and every number in them is measured. Two `[unclaimed]`
+markers flag assertions that are not — they are deliberate and greppable.
+
+**The appendix carries provenance, retractions and the predictions this work lost.** It is
+separate so the story reads, and it is not optional: a narrative that lists only what
+survived cannot be checked.
 
 ---
 
@@ -197,26 +198,6 @@ only lists what survived cannot be checked.
 - **Anything about motifs.** The region caller's criterion points the wrong way.
 - **Any biology claim. Zero.** The +4 stop-context bias is real in the data and absent from
   what the model reads — the only candidate, unworked.
-
-## Retracted, with reasons kept
-
-| | why |
-|---|---|
-| keto ratio **1.148×** | no reproducible producer; the cited script cannot emit that row |
-| recovery **0.941** | `astype(bool)` on a −1 sentinel → 0.885 → 0.883 against GENCODE |
-| "selects premature-stop frames" | never held: −0.050 marginal, −0.070 holding length and position |
-| "separation given back by the objective" as a **global** claim | true only among short candidates |
-| capture sensitivity is **sparse** upstream | diffuse — 32 tiles within ~6% (job 8900420) |
-| **C16 — routing junction-seeking at matched length** | held length, not position; holding both gives −0.070, and the figure is below a no-model queue null. **C14 stands.** |
-
-**Six entries. Of those, four were caught by a reader outside the derivation asking what
-a sentence rested on** — 0.941 by an arithmetic ceiling, the marginal routing claim by a
-demand for the direct measurement, the objective sentence by "measured or argued?", the
-sparsity prediction by someone else's tiling. **One (C16) was caught by the author, using
-a rule a reader had proposed an hour earlier. One (1.148) surfaced from a cross-window
-discrepancy.** **None was caught by a check.**
-
----
 
 # Appendix — provenance and corrections
 
@@ -274,6 +255,24 @@ Two of its four instances are cases where position was *refuted* rather than con
 in C7 position was *suppressing* a real association rather than manufacturing one — so the
 operative half is the guardian's clause: **use a partial to explain why, never to state
 behaviour.**
+
+## Retracted, with reasons kept
+
+| | why |
+|---|---|
+| keto ratio **1.148×** | no reproducible producer; the cited script cannot emit that row |
+| recovery **0.941** | `astype(bool)` on a −1 sentinel → 0.885 → 0.883 against GENCODE |
+| "selects premature-stop frames" | never held: −0.050 marginal, −0.070 holding length and position |
+| "separation given back by the objective" as a **global** claim | true only among short candidates |
+| capture sensitivity is **sparse** upstream | diffuse — 32 tiles within ~6% (job 8900420) |
+| **C16 — routing junction-seeking at matched length** | held length, not position; holding both gives −0.070, and the figure is below a no-model queue null. **C14 stands.** |
+
+**Six entries. Of those, four were caught by a reader outside the derivation asking what
+a sentence rested on** — 0.941 by an arithmetic ceiling, the marginal routing claim by a
+demand for the direct measurement, the objective sentence by "measured or argued?", the
+sparsity prediction by someone else's tiling. **One (C16) was caught by the author, using
+a rule a reader had proposed an hour earlier. One (1.148) surfaced from a cross-window
+discrepancy.** **None was caught by a check.**
 
 ## Predictions this document made and lost
 
