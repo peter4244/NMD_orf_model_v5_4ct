@@ -1,0 +1,70 @@
+       State    Elapsed ExitCode 
+------------ ---------- -------- 
+   COMPLETED   00:06:06      0:0 
+=== code actually running (sha256, first 16) ===
+  a4975a3b2f3c76d5 analysis_runlength_replicate.py
+
+########## subset = all ##########
+run-length replication on bank_interp_s100.h5, column vals_decay
+  substitutions: all three substitutions per position
+  elevation: top K fraction of each transcript's valid positions; K = 0.01; runs of >= 4; null redraws the same COUNT, 20 draws
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_runlength_replicate.py:143: RuntimeWarning: All-NaN slice encountered
+  eff = np.nanmax(np.where(np.isfinite(x), x, np.nan), axis=1)
+
+  transcripts used 4,993
+
+      K    elevated      runs  mean len    runs>=4      null    ratio
+  0.005      55,088    44,957      1.23        605       0.0      infx
+   0.01     110,263    80,459      1.37      2,539       0.2 16926.67x
+   0.02     220,503   141,714      1.56      7,553       1.7  4442.94x
+   0.05     551,321   285,593      1.93     26,318      59.7   440.47x
+
+  === by arm, K = 0.01 — genes are DISJOINT between arms ===
+  arm                tx   genes   elevated     runs  mean len    runs>=4     null
+  confirmation    2,500   1,913     55,099   40,194      1.37      1,253      0.1
+  discovery       2,493   1,913     55,164   40,265      1.37      1,286      0.1
+  genes in BOTH arms: 0  (must be 0 — §9 step 1 assigns each gene once)
+
+########## subset = neutral ##########
+run-length replication on bank_interp_s100.h5, column vals_decay
+  substitutions: ONLY the GC-preserving substitution (A<->T, C<->G)
+  elevation: top K fraction of each transcript's valid positions; K = 0.01; runs of >= 4; null redraws the same COUNT, 20 draws
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_runlength_replicate.py:143: RuntimeWarning: All-NaN slice encountered
+  eff = np.nanmax(np.where(np.isfinite(x), x, np.nan), axis=1)
+
+  transcripts used 4,992
+
+      K    elevated      runs  mean len    runs>=4      null    ratio
+  0.005      55,059    48,781      1.13        189       0.0      infx
+   0.01     110,204    91,042      1.21      1,063       0.2  5315.00x
+   0.02     220,386   166,101      1.33      4,219       1.7  2556.97x
+   0.05     551,028   352,003      1.57     21,034      60.5   347.38x
+
+  === by arm, K = 0.01 — genes are DISJOINT between arms ===
+  arm                tx   genes   elevated     runs  mean len    runs>=4     null
+  confirmation    2,500   1,913     55,099   45,607      1.21        517      0.2
+  discovery       2,492   1,913     55,105   45,435      1.21        546      0.1
+  genes in BOTH arms: 0  (must be 0 — §9 step 1 assigns each gene once)
+
+########## subset = changing ##########
+run-length replication on bank_interp_s100.h5, column vals_decay
+  substitutions: ONLY substitutions that shift GC by +/-1
+  elevation: top K fraction of each transcript's valid positions; K = 0.01; runs of >= 4; null redraws the same COUNT, 20 draws
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_runlength_replicate.py:143: RuntimeWarning: All-NaN slice encountered
+  eff = np.nanmax(np.where(np.isfinite(x), x, np.nan), axis=1)
+
+  transcripts used 4,993
+
+      K    elevated      runs  mean len    runs>=4      null    ratio
+  0.005      55,088    45,136      1.22        595       0.0      infx
+   0.01     110,263    81,526      1.35      2,442       0.2 16280.00x
+   0.02     220,503   145,071      1.52      7,075       1.7  4161.76x
+   0.05     551,321   299,357      1.84     25,572      59.7   427.98x
+
+  === by arm, K = 0.01 — genes are DISJOINT between arms ===
+  arm                tx   genes   elevated     runs  mean len    runs>=4     null
+  confirmation    2,500   1,913     55,099   40,752      1.35      1,213      0.1
+  discovery       2,493   1,913     55,164   40,774      1.35      1,229      0.1
+  genes in BOTH arms: 0  (must be 0 — §9 step 1 assigns each gene once)
+
+=== exit: 0 ===
