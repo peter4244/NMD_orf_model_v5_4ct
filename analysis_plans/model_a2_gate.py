@@ -4,6 +4,31 @@ model_a2_gate.py — SEQ-A2, the second implementation.
 THE GATE. Is the keto composition signature at elevated positions a property of
 what the decay head reads, or of where the model routes?
 
+BOTH ANSWERS LOCATE THE SIGNAL; NEITHER DISSOLVES IT. Corrected 2026-08-02 on
+Pete's call, because the framing this file inherited was wrong and the wrongness
+would have propagated into how the result is written.
+
+Routing is a mechanism, not a nuisance. `P(NMD) = sum_k P(select k) * d_k`, so a
+substitution that matters because the model routes mass to that candidate
+genuinely matters -- the routing says WHERE the importance lives, not that it is
+illusory. The method document already forbids adjusting mass away on exactly this
+ground: it "asks what would matter if ribosomes distributed uniformly, which the
+model never computes."
+
+And routing is itself sequence-driven -- selection mass comes from start-codon
+context, Kozak strength and ORF structure. So sequence -> initiation -> routing ->
+importance is a sequence mechanism end to end. (Architectural reasoning, not
+measured here, and labelled as such.)
+
+  positive  TWO SEPARABLE CHANNELS. Routing locates importance, and within
+            equally-routed positions the decay head carries its own composition
+            preference on top of that.
+  negative  ONE CHANNEL, UPSTREAM. The sequence dependence acts through selection
+            rather than through decay-head reading. That is a localization result
+            and a more mechanistically specific one than a weak composition
+            preference would have been. It is NOT a null and must not be written
+            as one.
+
 This is the SECOND of two independent implementations. It is written against the
 interpretability window's row in `ANALYSIS_SEQUENCING_PROPOSAL.md` ("The
 specification, fixed 2026-08-02"), NOT against an independent reading of the
@@ -110,6 +135,15 @@ NT = "ACGT"
 KETO = (2, 3)          # G, T -- i.e. G+U on RNA
 AMINO = (0, 1)         # A, C
 DEAD_CUT = 1e-8
+# The unresponsive positions are SUB-STRATIFIED by order of magnitude rather than
+# pooled into one group. Pooling was the defect: every live band is a narrow mass
+# quantile, while a single unresponsive band spans six or more orders of magnitude,
+# so elevation inside it selects the highest-mass members and the composition
+# gradient across that range reappears as a fake signal. That is the gate's own
+# confound, in the one cell the stratification never touched.
+# Index nb+0 is exact zeros (which cannot be log-transformed and are also the
+# tie-degenerate ones); nb+1.. are 1e-9, 1e-10, ... ; the last absorbs the rest.
+UNRESP_EDGES = [-9, -10, -11, -12, -13, -14]
 # max-over-cells of a KS statistic inflates with the number of cells tested;
 # 1.5 is roughly the Bonferroni-adjusted critical multiplier at n_cells = 40.
 KS_PASS = 1.5
@@ -203,7 +237,8 @@ def build_cells(f, N, edges, nb, floor, spans, cand_off, cand_cnt, p_select,
     # POSITION-level retention and the first version of this census reported a
     # CELL-level fraction under the same word "retained" -- so the criterion
     # could not be evaluated from the output that was supposed to decide it.
-    census = np.zeros((nb + 1, len(REGIONS), 4), dtype=np.int64)
+    n_slots = nb + len(UNRESP_EDGES) + 2
+    census = np.zeros((n_slots, len(REGIONS), 4), dtype=np.int64)
     for i in range(N):
         t = transcript_slice(f, i, spans, cand_off, cand_cnt, p_select,
                              orf_start, orf_end)
@@ -213,8 +248,19 @@ def build_cells(f, N, edges, nb, floor, spans, cand_off, cand_cnt, p_select,
         band = np.full(len(t["mass"]), nb, dtype=np.int16)
         if live.any():
             band[live] = np.digitize(np.log10(t["mass"][live]), edges[1:-1])
+        # unresponsive sub-strata, so the control is stratified like everything else
+        unresp = ~live
+        if unresp.any():
+            mm = t["mass"][unresp]
+            sub = np.full(mm.shape, nb + len(UNRESP_EDGES) + 1, dtype=np.int16)
+            sub[mm == 0.0] = nb
+            with np.errstate(divide="ignore"):
+                lg = np.floor(np.log10(np.where(mm > 0, mm, 1e-300)))
+            for j, e in enumerate(UNRESP_EDGES):
+                sub[(mm > 0) & (lg == e)] = nb + 1 + j
+            band[unresp] = sub
         kmask = keto_mask(t["obs"])
-        for bi in range(nb + 1):
+        for bi in range(n_slots):
             for ri in range(len(REGIONS)):
                 sel = (band == bi) & (t["region"] == ri)
                 n = int(sel.sum())
@@ -254,13 +300,15 @@ def cell_ratio(cell, top_frac):
     k = int(elev.sum())
     if k == 0 or k >= n:
         return None
+    tie_frac = float((cell["e"] == cut).sum()) / n
     K = int(cell["keto"].sum())
     kk = int(cell["keto"][elev].sum())
     bg_keto = K - kk
     bg_n = n - k
     if bg_n == 0 or bg_keto == 0:
         return None
-    return dict(ratio=(kk / k) / (bg_keto / bg_n), n=n, k=k, K=K, kk=kk)
+    return dict(ratio=(kk / k) / (bg_keto / bg_n), n=n, k=k, K=K, kk=kk,
+                tie_frac=tie_frac)
 
 
 def null_draws(stats, rng, n_rep):
@@ -356,19 +404,27 @@ def score(cells, genes, nb, top_frac, rng, n_rep, verify):
     """Per (band x region): observed mean ratio, null 95th percentile, verdict."""
     rows = []
     checked = False
+    # ALL slots, not range(nb+1). The unresponsive sub-strata live at nb+1..
+    # and an earlier version scored only the live bands plus the exact-zero
+    # slot, so the sub-stratified control was built, censused, and never
+    # scored -- it printed nothing and looked like it had no data.
+    n_slots = max(c["band"] for c in cells) + 1 if cells else nb + 1
     for ri in range(len(REGIONS)):
-        for bi in range(nb + 1):
+        for bi in range(n_slots):
             sub = [c for c in cells if c["band"] == bi and c["region"] == ri]
             if not sub:
                 continue
-            stats, tx = [], []
+            stats, tx, n_drop = [], [], 0
             for c in sub:
                 s = cell_ratio(c, top_frac)
-                if s is not None:
+                if s is None:
+                    n_drop += 1
+                else:
                     stats.append(s)
                     tx.append(c["tx"])
             if len(stats) < 20:
                 rows.append(dict(band=bi, region=ri, n_tx=len(stats),
+                                 n_drop=n_drop, tie=np.nan,
                                  obs=np.nan, p95=np.nan, verdict="thin"))
                 continue
             if verify and not checked:
@@ -383,6 +439,8 @@ def score(cells, genes, nb, top_frac, rng, n_rep, verify):
             p95 = float(np.percentile(null_means, 95))
             lo, hi = gene_bootstrap(obs_v, np.array(genes)[tx], rng)
             rows.append(dict(band=bi, region=ri, n_tx=len(stats), obs=obs,
+                             n_drop=n_drop,
+                             tie=float(np.median([s["tie_frac"] for s in stats])),
                              p95=p95, ci=(lo, hi),
                              mean_fill=float(np.mean([c["fill"] for c in sub])),
                              verdict="above" if obs > p95 else "not above"))
@@ -439,18 +497,30 @@ def run_seed(path, nb, top_frac, floor, n_rep, seed_rng, verify,
     return rows, census, n_live, N
 
 
+def band_tag(bi, nb):
+    """Human-readable band label. Unresponsive strata say what they are."""
+    if bi < nb:
+        return str(bi)
+    if bi == nb:
+        return "unresp:0"                       # exactly zero, the degenerate ones
+    j = bi - nb - 1
+    if j < len(UNRESP_EDGES):
+        return f"unresp:1e{UNRESP_EDGES[j]}"
+    return "unresp:<<"
+
+
 def print_census(census, nb, n_live, N):
     print("\n  THE THREE-WAY CENSUS -- emitted before any composition statistic")
-    print(f"  {'band':>6} {'region':>13} {'cells':>8} {'qualifying':>11}"
+    print(f"  {'band':>12} {'region':>13} {'cells':>8} {'qualifying':>11}"
           f" {'live pos':>12} {'pos kept':>8} {'cells kept':>8}")
     tot_pos = tot_keep = 0
-    for bi in range(nb + 1):
+    for bi in range(census.shape[0]):
         for ri, rname in enumerate(REGIONS):
             c, q, p, pq = census[bi, ri]
             if c == 0:
                 continue
-            tag = "DEAD" if bi == nb else str(bi)
-            print(f"  {tag:>6} {rname:>13} {c:>8,} {q:>11,} {p:>12,}"
+            tag = band_tag(bi, nb)
+            print(f"  {tag:>12} {rname:>13} {c:>8,} {q:>11,} {p:>12,}"
                   f" {pq/p:>8.1%} {q/c:>8.1%}")
     live_cells = census[:nb]
     kept = live_cells[:, :, 1].sum()
@@ -505,22 +575,30 @@ def main():
         if args.census_only:
             continue
 
-        print(f"\n  {'band':>6} {'region':>13} {'n_tx':>6} {'keto':>8}"
-              f" {'null p95':>9} {'95% CI':>18} {'mean fill':>10} {'verdict':>10}")
+        print(f"\n  {'band':>12} {'locale':>13} {'n_tx':>6} {'drop':>5}"
+              f" {'tie':>6} {'keto':>8} {'null p95':>9} {'95% CI':>18}"
+              f" {'verdict':>10}")
         for r in sorted(rows, key=lambda x: (x["region"], x["band"])):
-            tag = "DEAD" if r["band"] == args.bands else str(r["band"])
+            tag = band_tag(r["band"], args.bands)
             if r["verdict"] == "thin":
-                print(f"  {tag:>6} {REGIONS[r['region']]:>13} {r['n_tx']:>6}"
-                      f" {'--':>8} {'--':>9} {'--':>18} {'--':>10} {'thin':>10}")
+                print(f"  {tag:>12} {REGIONS[r['region']]:>13} {r['n_tx']:>6}"
+                      f" {r['n_drop']:>5} {'--':>6} {'--':>8} {'--':>9}"
+                      f" {'--':>18} {'thin':>10}")
                 continue
             ci = f"[{r['ci'][0]:.3f}, {r['ci'][1]:.3f}]"
-            print(f"  {tag:>6} {REGIONS[r['region']]:>13} {r['n_tx']:>6}"
-                  f" {r['obs']:>8.3f} {r['p95']:>9.3f} {ci:>18}"
-                  f" {r['mean_fill']:>10.0f} {r['verdict']:>10}")
+            print(f"  {tag:>12} {REGIONS[r['region']]:>13} {r['n_tx']:>6}"
+                  f" {r['n_drop']:>5} {r['tie']:>6.3f} {r['obs']:>8.3f}"
+                  f" {r['p95']:>9.3f} {ci:>18} {r['verdict']:>10}")
 
-        print("\n  DEAD BAND is the instrumental control and counts toward nothing.")
-        print("  A keto signature there means magnitude and composition correlate")
-        print("  through the encoder, which would invalidate the live bands.")
+        print("\n  UNRESPONSIVE STRATA are the instrumental control and count")
+        print("  toward nothing. They are now SUB-STRATIFIED by order of magnitude:")
+        print("  pooling them spanned six orders, so elevation inside the pool")
+        print("  selected its highest-mass members and the composition gradient")
+        print("  across that range reappeared as a fake signal -- the gate's own")
+        print("  confound in the one cell the stratification never touched.")
+        print("  Read each sub-stratum on its own. A signal at MATCHED mass is an")
+        print("  instrumental artifact and would impeach the live bands; a signal")
+        print("  only in the pooled version is the gradient and impeaches nothing.")
 
         for rname, (v, ok, tot) in verdict_by_region(rows, args.bands).items():
             print(f"  {rname:>13}: {ok}/{tot} bands above null  ->  {v}")

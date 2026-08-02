@@ -283,7 +283,30 @@ wrong that the document had no entry for. Expect a third.
 
 We spent two days building instruments and the most valuable output was learning that
 the word "motif" was doing work our adjustments had not earned. **If A2 comes back
-negative, the honest finding is that the decay branch's sequence sensitivity is a
-readout of its selection distribution** — a real result about this architecture, and
-a more interesting one than a weak motif would have been. Write that rather than
-reaching for a fourth instrument.
+negative, the honest finding is that the sequence dependence is located in the
+selection branch rather than in decay-head reading** — a real result about this
+architecture, and a more interesting one than a weak motif would have been. Write
+that rather than reaching for a fourth instrument.
+
+> **CORRECTED 2026-08-02, Pete's call, and the earlier wording was mine.** This
+> paragraph read "the decay branch's sequence sensitivity is a readout of its
+> selection distribution," which frames routing as the deflationary outcome — what is
+> left over when the interesting finding fails. **Routing is a mechanism, not a
+> nuisance:** `P(NMD) = Σ P(select k)·d_k`, so a substitution that matters because the
+> model routes mass there genuinely matters. Routing *locates* importance rather than
+> invalidating it, and §3.2.2 of the method document already says as much — it forbids
+> adjusting mass away because that "asks what would matter if ribosomes distributed
+> uniformly, which the model never computes." The documents stated the principle and
+> then let the outcome language contradict it.
+>
+> **And routing is itself sequence-driven** — selection mass comes from start-codon
+> context, Kozak strength and ORF structure. So sequence → initiation → routing →
+> importance is a sequence mechanism end to end, and a negative A2 says the dependence
+> acts through the initiation branch rather than through decay-head recognition. That
+> is architectural reasoning rather than something measured here, and it is flagged as
+> such.
+>
+> **Neither outcome is a null.** Positive: two separable channels. Negative: one
+> channel, upstream. The stopping rule in `ANALYSIS_SEQUENCING_PROPOSAL.md` still
+> carries the old framing in three places (:170, :529, :962) and is the coordinating
+> window's to correct, since B1 is being built on it.
