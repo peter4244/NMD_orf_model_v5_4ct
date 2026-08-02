@@ -16,6 +16,37 @@ by someone who has not followed the day-to-day.
 
 ---
 
+## 0. Defined terms
+
+*Added 2026-08-02 on Pete's instruction: key terms must be defined and commonly
+understood across the team. Every term below was in active use across three windows
+and defined in none of them. **A term not in this list should not appear in a
+document, a legend or a commit message** — add it here first, or use ordinary
+words.*
+
+| term | what it means | note |
+|---|---|---|
+| **selection mass** | the probability weight the model assigns to a candidate reading frame, `P(select k)`. The model picks among candidates by a stick-breaking competition, so a losing candidate carries almost none | not jargon we invented; it is the architecture. `P(NMD) = Σ P(select k)·d_k` |
+| **importance** | the change in the model's output when one base is substituted. Measured directly, one forward pass per substitution | this is in-silico mutagenesis (ISM), the standard term |
+| **unresponsive position** | a position where a substitution **cannot** change the output, because the candidate window containing it carries essentially no selection mass. Measured: all sit below mass ≈ 1e-8 | **preferred over "dead"**, which reads as a broken measurement. §5.5: a zero here is a true statement, not a failed one |
+| **mass band** | a group of positions with similar selection mass, so the analysis compares like with like. Bands are quantiles of log selection mass | "band" alone always means this |
+| **unresponsive stratum** | the band holding positions below the 1e-8 cutoff. Used as a **control**: nothing there can move the output, so any signal in it is an artifact of the instrument | was called "the dead band" |
+| **order of magnitude** | a factor of ten. Selection mass spans many, so it is sometimes grouped by powers of ten | **preferred over "decade"**, which is standard in engineering and opaque here |
+| **locale** | where a position sits relative to the reading frame the model committed to: 5′ of the start, inside the ORF, or 3′ of the stop | **one name only.** Previously also written "region" and "positional region"; `ADJUSTMENT_TOOLBOX.md` axis 3 is the governing definition |
+| **cell** | one (transcript × mass band × locale) group. The unit the analysis is computed in | |
+| **elevation** | the top fraction of positions **within a cell**, ranked by importance. Never a fold-change over a median, and never pooled across transcripts | §3.1 |
+| **qualifying cell** | a cell with enough positions to analyse (≥100). Cells below the floor are excluded and the exclusion is reported | job 8896584: the floor removes cells, not transcript classes |
+| **the gate** | the one measurement the programme turns on, `SEQ-A2` | renamed from "A2" because that collides with the claim-list A2 |
+
+**On what routing does and does not mean** (Pete, 2026-08-02): selection mass
+*locates* importance rather than invalidating it. A substitution that matters because
+the model routes weight to that candidate genuinely matters. And selection mass is
+itself sequence-driven — start-codon context, Kozak strength, ORF structure — so
+sequence → initiation → routing → importance is a sequence mechanism end to end.
+Neither outcome of the gate is a null result.
+
+---
+
 ## 1. What we are measuring, and what we want from it
 
 We change one base at a time and record what happens to the model's output. That is
