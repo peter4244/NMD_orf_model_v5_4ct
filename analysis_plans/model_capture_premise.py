@@ -86,6 +86,8 @@ def main():
 
     r_part, r_cp, r_ep = [], [], []
     r_len, r_part_len, r_short, r_long = [], [], [], []
+    hit_longest = 0
+    rl_lt200, rl_gt200, re_lt200, re_gt200 = [], [], [], []
     cv_dec, dec_at_sel, dec_max = [], [], []
     hit_sel = hit_cap = hit_5p = 0
     n_used = n_cand_used = 0
@@ -151,6 +153,20 @@ def main():
             if band.sum() >= 3:
                 acc.append(spearman(pc[band], e_[band]))
 
+        # C10, the interpretability window's prediction, recorded before this ran.
+        # The ATG window's downstream fill stops at the ORF MIDPOINT
+        # (data_prep.py:270, limit_hi=mid), and the window runs 100 nt past the
+        # AUG, so downstream fill = min(100, length/2). Below 200 nt the fill
+        # boundary ENCODES length exactly; at or above 200 it is pinned at 100
+        # and length is invisible through that channel. If C8 runs through fill
+        # geometry the length association must be carried below 200 and collapse
+        # above it.
+        for band, acc_l, acc_e in ((len_ < 200, rl_lt200, re_lt200),
+                                   (len_ >= 200, rl_gt200, re_gt200)):
+            if band.sum() >= 3:
+                acc_l.append(spearman(pc[band], len_[band]))
+                acc_e.append(spearman(pc[band], e_[band]))
+
         # DOES DECAY DISCRIMINATE AMONG CANDIDATES AT ALL? If d_k is flat, decay
         # cannot be carrying selection; if it is sharp and low off the chosen
         # candidate, it can. Raised by the interpretability window.
@@ -168,6 +184,8 @@ def main():
         sel_i = int(np.argmax(ps))
         cap_i = int(np.argmax(pc))
         p5_i = int(np.argmin(o_start[lo:lo + k]))
+        lng_i = int(np.argmax(o_end[lo:lo + k] - o_start[lo:lo + k]))
+        hit_longest += ref[lng_i]
         hs, hc, h5 = ref[sel_i], ref[cap_i], ref[p5_i]
         hit_sel += hs
         hit_cap += hc
@@ -194,6 +212,7 @@ def main():
     print(f"    argmax p_select  (model)          {hit_sel/n_used:.3f}")
     print(f"    argmax p_capture (head alone)     {hit_cap/n_used:.3f}")
     print(f"    most 5' candidate (prior alone)   {hit_5p/n_used:.3f}")
+    print(f"    LONGEST candidate (naive gene-finder) {hit_longest/n_used:.3f}")
     print(f"    chance                            {n_used/n_cand_used:.3f}")
     for lab, name in ((1, "NMD"), (0, "control")):
         h, n = per_label[lab]
@@ -248,6 +267,18 @@ def main():
     print(f"    capture ~ EJC, ORFs >  100 nt        median {m4:+.3f}  n {n4:,}")
     print("      the ATG window carries 100 nt into the ORF, so a coding-likeness")
     print("      account predicts strong in the first band and weak in the second")
+
+    a1, b1 = med(rl_lt200); a2, b2 = med(rl_gt200)
+    a3, b3 = med(re_lt200); a4, b4 = med(re_gt200)
+    print("\n  C10 -- IS THE LENGTH ASSOCIATION FILL GEOMETRY?")
+    print("    downstream fill = min(100, length/2); below 200 nt the fill")
+    print("    boundary encodes length exactly, at/above 200 it is pinned.")
+    print(f"    capture ~ length, ORFs <  200 nt     median {a1:+.3f}  n {b1:,}")
+    print(f"    capture ~ length, ORFs >= 200 nt     median {a2:+.3f}  n {b2:,}")
+    print(f"    capture ~ EJC,    ORFs <  200 nt     median {a3:+.3f}  n {b3:,}")
+    print(f"    capture ~ EJC,    ORFs >= 200 nt     median {a4:+.3f}  n {b4:,}")
+    print("    collapse above 200 => geometry, and a third leak of the 5.3 class")
+    print("    persistence above 200 => geometry is a contributor, not the account")
 
     print("\n" + "=" * 70)
     print("Q4  DOES DECAY DISCRIMINATE AMONG CANDIDATES?")

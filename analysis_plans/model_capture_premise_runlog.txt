@@ -1,5 +1,5 @@
 === code (sha256) ===
-84b08051ae8bfe02d54a2bd5a192a5187b11c982de5314c684004f47dc912578  analysis_plans/model_capture_premise.py
+d89ad4caa96c00241f1f8d14ff62fb18511b2bb2f93e9f773d9db2cb7458404c  analysis_plans/model_capture_premise.py
 
 BANK results_ism_v6/bank_interp_s100.h5
 checkpoint runs/interp_c32_b8_s100/best.pt
@@ -14,6 +14,7 @@ Q1  DOES THE SCANNER BEAT POSITION ALONE?
     argmax p_select  (model)          0.697
     argmax p_capture (head alone)     0.305
     most 5' candidate (prior alone)   0.424
+    LONGEST candidate (naive gene-finder) 0.678
     chance                            0.055
     model, NMD      transcripts        0.658  (n=1,504)
     model, control  transcripts        0.729  (n=1,908)
@@ -54,6 +55,16 @@ Q3  IS CAPTURE BLIND TO THE STRUCTURAL BLOCK, ON REAL DATA?
     capture ~ EJC, ORFs >  100 nt        median -0.490  n 4,477
       the ATG window carries 100 nt into the ORF, so a coding-likeness
       account predicts strong in the first band and weak in the second
+
+  C10 -- IS THE LENGTH ASSOCIATION FILL GEOMETRY?
+    downstream fill = min(100, length/2); below 200 nt the fill
+    boundary encodes length exactly, at/above 200 it is pinned.
+    capture ~ length, ORFs <  200 nt     median +0.442  n 4,548
+    capture ~ length, ORFs >= 200 nt     median +0.200  n 3,777
+    capture ~ EJC,    ORFs <  200 nt     median +0.100  n 4,548
+    capture ~ EJC,    ORFs >= 200 nt     median -0.179  n 3,777
+    collapse above 200 => geometry, and a third leak of the 5.3 class
+    persistence above 200 => geometry is a contributor, not the account
 
 ======================================================================
 Q4  DOES DECAY DISCRIMINATE AMONG CANDIDATES?

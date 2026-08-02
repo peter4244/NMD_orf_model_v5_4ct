@@ -40,6 +40,32 @@ biology the head is named for.
 | C9 | The reading-frame channels (6–8) are written across the **entire** window, including all 900 upstream UTR positions — phase relative to a downstream AUG. So a periodic 3-cycle grid is supplied throughout the 5′UTR. | model / instrument | `data_prep.py:207-211`: `genomic_positions = arange(w_start, w_end)`, written to every filled position | code read |
 | C10 | **The capture window's downstream fill extent is a deterministic function of ORF length, so C8's +0.760 has a geometric channel that is not gene-finding.** The ATG window is filled with `limit_hi = mid` where `mid = (atg_pos + stop_pos) // 2`, and the window runs 100 nt past the AUG. So downstream fill = **min(100, ORF_length / 2)**: for any ORF shorter than **200 nt**, where the fill stops encodes ORF length exactly. | model / instrument | `data_prep.py:262-274` and the clip in `encode_window_v5:141-144`; §5.3 of `SEQUENCE_ENRICHMENT_APPROACH.md` already names this leak class — *"where the downstream fill stops encodes ORF length"* — and records that two of its kind were **invisible to ablation** | code read, interpretability window |
 
+| C11 | **The model beats "pick the longest ORF" by 1.9 points.** Longest-candidate baseline recovers the annotated start **0.678** of the time against the model's **0.697** (most-5′ 0.424, chance 0.055). A one-line heuristic reaches 97% of the model's selection accuracy. | model | 3,412 transcripts | job 8899353 |
+| C12 | **C10 is a contributor, not the account.** The length association is **+0.442** among ORFs < 200 nt, where fill encodes length exactly, and **+0.200** at or above 200 nt, where fill is pinned. It weakens by more than half but does not collapse. | model / instrument | n = 4,548 / 3,777 | job 8899353 |
+
+### C11 is the headline and it is deflating
+
+The capture head is handed 900 bases of upstream context, 100 into the ORF, codon
+phase, junction positions and rolling GC — and its contribution over *"take the
+longest candidate"* is **1.9 percentage points**. Whatever it has learned, a
+one-line heuristic captures nearly all of it. That is the strongest support yet for
+the gene-finder account, in its most naive form.
+
+**Stated as a limit, not a dismissal:** 0.697 against 0.678 is a real gap and
+selection accuracy against the *annotated* ORF is not the only thing the head could
+be for. Its low scores upstream are what let the queue work (C3), and that behaviour
+is invisible to this baseline.
+
+### The caveat on C12, which is mine and applies to both band splits
+
+Comparing correlations between an under-200 band and an over-200 band shares the
+weakness that broke my own band split: the two bands differ in tie structure and in
+how much length variation survives inside them, so a difference in correlation is
+not purely a difference in mechanism. **The direction rescues it here** — range
+restriction would predict a *weaker* association in the narrow low band, and we see a
+*stronger* one — so C12 survives the objection that killed my version. Recorded
+because the next person will hit the same shape.
+
 ## C10's falsifiable prediction, recorded before the measurement
 
 *Written by the interpretability window before anyone splits the data, so it cannot be fitted after.*
@@ -86,11 +112,10 @@ against 0.729 of controls, so NMD ORFs are not invisible to it. **Not establishe
 
 ## What is NOT established, stated so it cannot be quietly assumed
 
-- **Whether "gene-finding" is as simple as "prefer the longest ORF."** C8 is within
-  transcript, and the longest candidate is usually the real one, so +0.76 may be
-  that heuristic and nothing subtler. **The immediate next check is a longest-ORF
-  baseline against C2's 0.697.** Until that runs, "gene-finding" is a family of
-  accounts rather than one.
+- ~~Whether "gene-finding" is as simple as "prefer the longest ORF."~~ **ANSWERED
+  by C11: very nearly yes.** 0.678 against 0.697. What remains open is what the
+  residual 1.9 points consists of, and whether the head's *upstream silence* (C3)
+  is doing work this baseline cannot see.
 - **Whether the head reads UTR sequence or ORF sequence.** Pete's framing of the key
   determination. `vals_capture` exists in the banks and would answer it directly:
   is capture's sensitivity concentrated in the 900 upstream positions or the 100
