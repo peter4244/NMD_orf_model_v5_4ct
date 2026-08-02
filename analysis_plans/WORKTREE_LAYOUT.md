@@ -1,7 +1,8 @@
-# Two worktrees, one repository
+# Three worktrees, one repository
 
 Set up 2026-08-01 on Pete's call, after three of the interpretability window's files landed under
-the model window's commit messages in a single day.
+the model window's commit messages in a single day. A third worktree was added 2026-08-02 for the
+results and figures window.
 
 ## The problem it solves
 
@@ -10,6 +11,17 @@ whatever the *other* window has in flight, so the other's work is committed unde
 does not describe it. It happened three times on 2026-08-01 — `probe_bank_floor_chunk_invariance.py`
 into `04629e2`, `probe_decay_head_beyond_ejc.py` into `4702c50`, `analysis_ism_regions.py` into
 `7971931` — and once the anchor fix was split across two commits with half inside someone else's.
+
+**The three incidents took 17 files between them, and the counts matter more than the incident
+count does.** `04629e2` alone swept **11 files from at least three windows**, including all six
+producer scripts and runlogs behind the §5 headline metrics and the ATF4 case study; `4702c50` and
+`7971931` took 3 each. The line above names one file per incident because that was the file the
+committing window noticed — which is the whole failure, restated: `git add -A` stages what you are
+not looking at, so the count you record afterwards is the count you happened to see.
+
+Consequence for anyone tracing a number: **cite the producer's file path, not the commit that
+carries it.** For the claims in `04629e2` the commit message is about a chunk-invariance
+measurement and describes none of them.
 
 So far that has only cost provenance, which matters here because the project's discipline is that
 every value traces to its producer. The reason to fix it now is the failure it has *not* caused
@@ -22,6 +34,7 @@ still runs, the tests still pass, and nobody notices.
 |---|---|---|---|
 | model window | `NMD_orf_model_v5_4ct` | `master` | the data — tensor, checkpoints, pool, ISM outputs |
 | interpretability | `NMD_orf_model_v5_4ct_interp` | `interp` | tracked files only, data by symlink |
+| results and figures | `NMD_orf_model_v5_4ct_results` | `results` | tracked files only, data by symlink |
 
 The model window did not move, deliberately: it has cluster jobs running and sync paths that name
 the main checkout, and all 1.5 GB of untracked data lives there.
@@ -43,8 +56,8 @@ individually instead:
     results_ism_v6/{discovery_confirmation_split,gencode_candidate_flags,ism_subset}.tsv
     results_pool_v6/{orf_pool,orf_pool_record}.tsv
 
-**Both windows therefore read and write the same data.** The worktree separates *code and index*,
-not results. Two builds writing one shard directory would still collide.
+**All three windows therefore read and write the same data.** The worktree separates *code and
+index*, not results. Two builds writing one shard directory would still collide.
 
 ## The exclude entry
 
