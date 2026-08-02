@@ -477,11 +477,25 @@ So the results are one story rather than three: the decay branch has learned sho
 contiguous sequence features, they recur across transcripts, they replicate on genes
 the model never saw, and they are not an artifact of the GC encoding.
 
-**A prediction recorded before the k-mer job reports**, so its outcome is
-interpretable either way: k-mer agreement across members should be **high** while
-positional Jaccard stays at 0.125. Both low would falsify the motif reading and
-point at something transcript-specific. Both high would mean the positional Jaccard
-was underpowered rather than negative.
+**A prediction recorded before the k-mer job reports** (8886733, k = 5 and 6,
+five banks), so its outcome is interpretable either way:
+
+    k-mer HIGH, positional 0.125  -> a motif the members share and place differently
+    both HIGH                     -> the positional Jaccard was underpowered, not negative
+    both LOW                      -> see below; NOT cleanly diagnostic
+
+**AMENDED before the job reported.** My first statement of the third branch —
+"both low falsifies the motif reading and points at something transcript-specific" —
+was too strong, and the interpretability window was right to catch it. A **degenerate**
+motif would also give low exact-k-mer agreement while still being a motif: fixed-k
+exact counting is a blunt instrument for a variable one, and the method document
+already ranks direct PWM fitting above k-mer enrichment for that reason.
+
+So "both low" does not distinguish *no shared motif* from *a shared motif that
+exact 5-mers cannot see*, and the next step from there is **PWM fitting, not the
+conclusion that the runs are transcript-specific.** The amendment is recorded before
+the result for the same reason §8.5's was: the same change afterwards would not be
+defensible.
 
 ### The arity-matched GC decomposition
 
