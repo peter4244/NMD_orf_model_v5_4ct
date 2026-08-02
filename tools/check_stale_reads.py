@@ -38,7 +38,32 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+def _toplevel():
+    """The CALLER's worktree, never the script's own.
+
+    THIS LINE WAS THE BUG. It read Path(__file__).resolve().parent.parent, which
+    is the worktree the script LIVES in, so every invocation reported on that one
+    regardless of where it was run. Run from a stale worktree it printed "nothing
+    differs from the reference" while four files, including both documents that
+    window had been reading all session, were behind.
+
+    A stale-read checker that passes while the reader is stale is the failure it
+    exists to prevent, and the same shape as the sync command in this file's own
+    docstring: a check that cannot fail is worse than no check, because it turns
+    an unmonitored risk into a monitored one reporting all-clear.
+
+    Found by the interpretability window running it from their tree — which is
+    also the point of the cross-worktree test below: a self-test living beside
+    the thing it tests shares its assumptions and would have passed forever.
+    """
+    r = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                       capture_output=True, text=True)
+    if r.returncode or not r.stdout.strip():
+        sys.exit("FATAL: not inside a git worktree")
+    return Path(r.stdout.strip())
+
+
+ROOT = _toplevel()
 
 
 def git(*args, check=False):
@@ -68,7 +93,7 @@ def main():
     tip = git("rev-parse", "--short", ref)
     behind = git("rev-list", "--count", f"HEAD..{ref}")
     ahead = git("rev-list", "--count", f"{ref}..HEAD")
-    print(f"  HEAD {head}   {ref} {tip}   behind {behind}, ahead {ahead}")
+    print(f"  worktree {ROOT.name}   HEAD {head}   {ref} {tip}   behind {behind}, ahead {ahead}")
     if not args.fetch:
         print(f"  (reference is the LOCAL {ref}; run with --fetch if nobody has fetched recently)")
 
