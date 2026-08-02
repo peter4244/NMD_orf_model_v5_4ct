@@ -65,6 +65,7 @@ from build_ism_bank import ATG_LEFT, STOP_LEFT      # noqa: E402
 NT = "ACGT"
 FLOOR_ABS = 3e-6          # measured; see probe_bank_floor_chunk_invariance.py
 LAST_BIN_LO = -25         # ATG-window offsets inside the final pooling bin
+N_SHIFT = 5               # circular-shift draws averaged into the null
 
 
 def per_position_effect(vals):
@@ -104,7 +105,7 @@ def load_shards(shard_dir, pool):
                         vals=z["vals"], cap=z["vals_capture"],
                         dec=z["vals_decay"], obs=z["obs"], valid=z["valid"],
                         floor=z["chunk_offset"], fill=z["fill_count"],
-                        spans=spans,
+                        dgc=z["dgc"], spans=spans,
                         orf_start=int(g.orf_start.to_numpy()[k]),
                         orf_end=int(g.orf_end.to_numpy()[k]),
                         base_logit=float(z["base_logit"])))
@@ -189,13 +190,123 @@ def main():
           f"random {rn.mean() if len(rn) else 0:.2f}")
 
     # ================================================================== Q2
+    # FILL-CONDITIONED IS THE HEADLINE, RAW IS THE SECONDARY. In the raw profile
+    # the set of transcripts contributing changes with offset -- a transcript
+    # appears at +150 only if its window is filled that far -- so a rise with
+    # offset can be produced entirely by which isoforms are still present. The
+    # conditioned profile fixes ONE transcript set that is filled across the whole
+    # reported range, so every offset is an average over the same isoforms and a
+    # difference between offsets is a difference in position.
     print("\n" + "=" * 78)
     print("Q2  Where are they, relative to the start codon and the stop codon?\n")
-    for anchor, lo, hi_, left in (("start codon", -900, 99, ATG_LEFT),
-                                  ("stop codon", -500, 499, STOP_LEFT)):
-        prof = np.zeros(hi_ - lo + 1)
-        prof_n = np.zeros(hi_ - lo + 1)
-        shuf = np.zeros(hi_ - lo + 1)
+    for anchor, lo, hi_ in (("start codon", -300, 99), ("stop codon", -300, 300)):
+        width = hi_ - lo + 1
+        for conditioned in (True, False):
+            prof = np.zeros(width); prof_n = np.zeros(width); shuf = np.zeros(width)
+            n_tx = 0
+            for r in recs:
+                eff = per_position_effect(r[key])
+                ok = r["valid"] & np.isfinite(eff)
+                if ok.sum() < 50:
+                    continue
+                med = np.median(eff[ok])
+                if med <= 0:
+                    continue
+                a = r["orf_start"] if anchor == "start codon" else r["orf_end"] - 1
+                pos = np.flatnonzero(ok) + 1             # 1-based transcript pos
+                off = pos - a
+                keep = (off >= lo) & (off <= hi_)
+                if not keep.any():
+                    continue
+                # the condition: this transcript must cover the WHOLE range
+                if conditioned and len(np.unique(off[keep])) < width:
+                    continue
+                n_tx += 1
+                np.add.at(prof, off[keep] - lo, eff[ok][keep] / med)
+                np.add.at(prof_n, off[keep] - lo, 1)
+                # THE SHIFT ROTATES WITHIN THE REPORTED RANGE, NOT ACROSS THE
+                # TRANSCRIPT. Rotating the whole transcript moves ATG-window
+                # values into stop-window offsets, and the two windows differ in
+                # overall responsiveness by 1.5-2x here -- so the null sat at the
+                # transcript-wide average instead of at the level of the region
+                # being profiled, and every positional excess came out about
+                # twice its true size. Rotating inside the range preserves the
+                # multiset of effects there and destroys only their arrangement,
+                # which is exactly what a positional claim needs tested.
+                #
+                # A ROTATION, not a permutation: positions are autocorrelated
+                # (far-field lag-1 0.60), and a permutation would destroy that
+                # too, making the null easy to beat for a reason unrelated to
+                # position.
+                sel = np.flatnonzero(keep)
+                v_in = eff[ok][sel]
+                if len(v_in) > 2:
+                    # several draws, because one rotation is one draw from a
+                    # distribution and the top-of-table is chosen on the null's
+                    # noise as much as on its level
+                    acc_s = np.zeros(len(v_in))
+                    for _ in range(N_SHIFT):
+                        acc_s += np.roll(v_in, int(rng.integers(1, len(v_in))))
+                    np.add.at(shuf, off[sel] - lo, acc_s / (N_SHIFT * med))
+            m = prof_n > 0
+            if not m.any():
+                continue
+            mean_fold = np.where(m, prof / np.maximum(prof_n, 1), np.nan)
+            mean_shuf = np.where(m, shuf / np.maximum(prof_n, 1), np.nan)
+            tag = ("FILL-CONDITIONED — one transcript set across every offset"
+                   if conditioned else "raw — the transcript set varies with offset")
+            print(f"  relative to the {anchor}, {tag}")
+            print(f"    {n_tx} transcripts cover {lo:+} to {hi_:+}")
+            order = np.argsort(-np.nan_to_num(mean_fold))
+            print(f"    {'offset':>7} {'mean fold':>10} {'shifted':>9} "
+                  f"{'n tx':>6}   note")
+            for i in order[:8]:
+                o = i + lo
+                note = ""
+                if anchor == "start codon" and o >= LAST_BIN_LO:
+                    note = "FINAL POOLING BIN — flagged"
+                if abs(o) <= 2:
+                    note = "the codon itself"
+                print(f"    {o:>+7} {mean_fold[i]:>10.2f} {mean_shuf[i]:>9.2f} "
+                      f"{int(prof_n[i]):>6}   {note}")
+            good = m.copy()
+            if anchor == "start codon":
+                good &= (np.arange(width) + lo) < LAST_BIN_LO
+            if good.any():
+                b = int(np.nanargmax(np.where(good, mean_fold, -np.inf)))
+                print(f"    best unflagged offset {b + lo:+}: {mean_fold[b]:.2f} "
+                      f"against shifted {mean_shuf[b]:.2f} "
+                      f"({mean_fold[b] - mean_shuf[b]:+.2f})")
+            print()
+
+    # ============================================= Q2b, the fill-boundary check
+    # THE CHECK THE LAST POSITIONAL FINDING DIED FOR. A window's filled region
+    # ends somewhere, and near that edge two things change that have nothing to do
+    # with sequence: channel 5 averages GC over a clipped span, and the
+    # convolutions see padding. So an elevation that sits at the fill boundary is
+    # the encoding, not a motif.
+    #
+    # This is decisive because it does not depend on knowing where the boundary
+    # falls: plot effect against DISTANCE TO THE NEAREST BOUNDARY of the window
+    # the position sits in. A boundary artifact spikes at small distances. A motif
+    # has no reason to care.
+    #
+    # DISTANCE TO THE BOUNDARY AND DISTANCE TO THE ANCHOR ARE NOT INDEPENDENT and
+    # the first version of this table conflated them. min(p - w_lo, w_hi - p) is
+    # maximised at the window's centre -- which IS the anchor -- so "far from any
+    # boundary" and "at the stop codon" were the same bin, and the deep bin read
+    # high for a reason that had nothing to do with edges. They are separated
+    # here: the boundary profile excludes the anchor neighbourhood outright, and
+    # the anchor profile is reported on its own.
+    print("\n" + "=" * 78)
+    print("Q2b Is the elevation a fill-boundary artifact?\n")
+    ANCHOR_EXCL = 30
+    for wname, (lo_i, hi_i), anch in (("ATG window", (0, 1), "orf_start"),
+                                      ("stop window", (2, 3), "orf_end")):
+        d_bins = np.arange(0, 200, 20)
+        acc = np.zeros(len(d_bins) + 1); cnt = np.zeros(len(d_bins) + 1)
+        a_bins = np.arange(0, 200, 20)
+        aacc = np.zeros(len(a_bins) + 1); acnt = np.zeros(len(a_bins) + 1)
         for r in recs:
             eff = per_position_effect(r[key])
             ok = r["valid"] & np.isfinite(eff)
@@ -204,44 +315,194 @@ def main():
             med = np.median(eff[ok])
             if med <= 0:
                 continue
-            a = r["orf_start"] if anchor == "start codon" else r["orf_end"] - 1
-            pos = np.flatnonzero(ok) + 1                 # 1-based transcript pos
-            off = pos - a
-            keep = (off >= lo) & (off <= hi_)
-            if not keep.any():
+            w_lo, w_hi = int(r["spans"][r["k"]][lo_i]), int(r["spans"][r["k"]][hi_i])
+            if w_hi < w_lo:
                 continue
-            fold = eff[ok][keep] / med
-            np.add.at(prof, off[keep] - lo, fold)
-            np.add.at(prof_n, off[keep] - lo, 1)
-            # circular-shift null: rotate the track against its own anchor
-            roll = rng.integers(1, ok.sum())
-            fold_s = np.roll(eff[ok], roll)[keep] / med
-            np.add.at(shuf, off[keep] - lo, fold_s)
-        m = prof_n > 0
-        mean_fold = np.where(m, prof / np.maximum(prof_n, 1), np.nan)
-        mean_shuf = np.where(m, shuf / np.maximum(prof_n, 1), np.nan)
-        order = np.argsort(-np.nan_to_num(mean_fold))
-        print(f"  relative to the {anchor} — top 12 offsets by mean fold-elevation")
-        print(f"    {'offset':>7} {'mean fold':>10} {'shifted':>9} "
-              f"{'n tx':>6}   note")
-        for i in order[:12]:
-            o = i + lo
-            note = ""
-            if anchor == "start codon" and o >= LAST_BIN_LO:
-                note = "FINAL POOLING BIN — flagged, not reported"
-            if abs(o) <= 2:
-                note = "the codon itself"
-            print(f"    {o:>+7} {mean_fold[i]:>10.2f} {mean_shuf[i]:>9.2f} "
-                  f"{int(prof_n[i]):>6}   {note}")
-        good = m & ~((np.arange(len(m)) + lo >= LAST_BIN_LO)
-                     if anchor == "start codon" else np.zeros(len(m), bool))
-        if good.any():
-            ex = np.nanmax(mean_fold[good]) - np.nanmax(mean_shuf[good])
-            print(f"    best offset outside the flagged bin exceeds the shifted "
-                  f"null by {ex:+.2f} fold\n")
+            a = r["orf_start"] if anch == "orf_start" else r["orf_end"] - 1
+            pos = np.flatnonzero(ok) + 1
+            inw = (pos >= w_lo) & (pos <= w_hi)
+            if not inw.any():
+                continue
+            p, f = pos[inw], eff[ok][inw] / med
+            d_edge = np.minimum(p - w_lo, w_hi - p)
+            d_anch = np.abs(p - a)
+            far = d_anch > ANCHOR_EXCL                   # boundary profile only
+            b = np.clip(np.digitize(d_edge[far], d_bins) - 1, 0, len(d_bins))
+            np.add.at(acc, b, f[far]); np.add.at(cnt, b, 1)
+            ab = np.clip(np.digitize(d_anch, a_bins) - 1, 0, len(a_bins))
+            np.add.at(aacc, ab, f); np.add.at(acnt, ab, 1)
+        lab = [f"{d}-{d+19}" for d in d_bins] + [f">= {d_bins[-1]+20}"]
+        print(f"  {wname}: fold-elevation by distance from the nearest fill "
+              f"boundary,\n  excluding positions within {ANCHOR_EXCL} nt of the "
+              f"anchor so the two are not confounded")
+        print(f"    {'distance':>10} {'mean fold':>10} {'n':>9}")
+        for i in range(len(acc)):
+            if cnt[i]:
+                print(f"    {lab[i]:>10} {acc[i]/cnt[i]:>10.2f} {int(cnt[i]):>9,}")
+        alab = [f"{d}-{d+19}" for d in a_bins] + [f">= {a_bins[-1]+20}"]
+        print(f"\n  {wname}: fold-elevation by distance from the ANCHOR, reported "
+              f"separately")
+        print(f"    {'distance':>10} {'mean fold':>10} {'n':>9}")
+        for i in range(len(aacc)):
+            if acnt[i]:
+                print(f"    {alab[i]:>10} {aacc[i]/acnt[i]:>10.2f} {int(acnt[i]):>9,}")
+        print()
+
+    # ========================================== Q2c, does the peak track the
+    # stop codon or the 3' fill edge?
+    #
+    # PETE'S QUESTION: could the downstream signal just be 3' UTR length? Two
+    # mechanisms, one test. A transcript contributes at offset +150 only if its
+    # window is filled that far, so large offsets are computed on a LENGTH-SELECTED
+    # subset; and near the fill edge channel 5 divides its GC count by a clipped
+    # denominator, so each substitution has more leverage there. Both would put
+    # apparent signal at large offsets without anything being at a position.
+    #
+    # THE TEST. Split transcripts by where their stop window's fill actually ends,
+    # and find the peak offset within each stratum.
+    #
+    #   peak at a fixed OFFSET across strata      -> anchored on the stop codon
+    #   peak tracking each stratum's own EDGE     -> it is the edge, i.e. length
+    #
+    # This is the same logic that killed the period-3 explanation: a real local
+    # feature does not move when you change something it should not depend on.
+    print("\n" + "=" * 78)
+    print("Q2c Does the downstream peak track the stop codon or the 3' fill edge?\n")
+    per_tx = []
+    for r in recs:
+        eff = per_position_effect(r[key])
+        ok = r["valid"] & np.isfinite(eff)
+        if ok.sum() < 50:
+            continue
+        med = np.median(eff[ok])
+        s_lo, s_hi = int(r["spans"][r["k"]][2]), int(r["spans"][r["k"]][3])
+        if med <= 0 or s_hi < s_lo:
+            continue
+        a = r["orf_end"] - 1
+        pos = np.flatnonzero(ok) + 1
+        m = (pos >= s_lo) & (pos <= s_hi) & (pos > a)      # downstream of the stop
+        if m.sum() < 30:
+            continue
+        per_tx.append((s_hi - a, pos[m] - a, eff[ok][m] / med))
+    edges = np.array([e for e, _, _ in per_tx])
+    print(f"  {len(per_tx)} transcripts; downstream fill ends at offset "
+          f"{edges.min()} to {edges.max()} (median {int(np.median(edges))})")
+
+    # EVERY STRATUM IS SEARCHED OVER THE SAME OFFSETS. The first version stratified
+    # first and searched each stratum as far as its own shortest member reached,
+    # so the short arm was searched over +1..+34 and the long arm over +1..+334 --
+    # and their peaks were printed side by side as though that were a comparison.
+    # It was not: the short arm never looked where the long arm peaked. Fixing the
+    # range first and dropping the transcripts that cannot cover it costs sample
+    # size and buys the only thing that makes the strata comparable.
+    for COMMON in (int(np.quantile(edges, 0.5)), int(np.quantile(edges, 0.25))):
+        elig = [t for t in per_tx if t[0] >= COMMON]
+        if len(elig) < 12:
+            continue
+        el_edges = np.array([e for e, _, _ in elig])
+        print(f"\n  common search range +1..+{COMMON}: {len(elig)} of "
+              f"{len(per_tx)} transcripts reach it "
+              f"({len(per_tx) - len(elig)} dropped, and they are the short ones)")
+        if el_edges.max() == el_edges.min():
+            print(f"    every eligible transcript ends at {el_edges.max()} — "
+                  f"no length contrast left to stratify on")
+            continue
+        cuts = np.quantile(el_edges, [1 / 2])
+        print(f"    {'stratum':<20} {'n':>4} {'fill ends at':>13} "
+              f"{'peak offset':>12} {'peak fold':>10} {'dist to edge':>13}")
+        for b, lab in enumerate(["shorter 3' fill", "longer 3' fill"]):
+            sel = [t for t in elig if np.searchsorted(cuts, t[0]) == b]
+            if len(sel) < 5:
+                continue
+            acc = np.zeros(COMMON + 1); cnt = np.zeros(COMMON + 1)
+            for _, off, fold in sel:
+                k_ = off <= COMMON
+                np.add.at(acc, off[k_], fold[k_])
+                np.add.at(cnt, off[k_], 1)
+            prof = np.where(cnt >= len(sel), acc / np.maximum(cnt, 1), -np.inf)
+            if not np.isfinite(prof).any():
+                continue
+            pk = int(np.argmax(prof))
+            med_edge = int(np.median([e for e, _, _ in sel]))
+            print(f"    {lab:<20} {len(sel):>4} {med_edge:>13} {pk:>+12} "
+                  f"{prof[pk]:>10.2f} {med_edge - pk:>13}")
+    print("\n  Both strata now search the same offsets. A peak at the same offset")
+    print("  in both is anchored on the stop codon; a peak that shifts with the")
+    print("  stratum's own fill extent is 3' UTR length.")
+
+    # =========================================== Q3a, motif or composition
+    #
+    # THE SCREEN THAT DECIDES WHAT KIND OF THING THIS IS. Channel 5 is a rolling
+    # GC fraction derived from the bases, so a substitution that changes GC status
+    # moves it as well as the one-hot -- on about two thirds of substitutions. Base
+    # identity and local composition are therefore confounded in the discovery pass
+    # itself, and an "important position" can be important only because
+    # substituting there moved the GC channel.
+    #
+    # The bank ships `dgc` per substitution: +1 for non-GC -> GC, -1 for the
+    # reverse, 0 when GC status is unchanged. Every position has exactly ONE
+    # GC-neutral alternative (A<->T or C<->G) and two GC-changing ones, so the
+    # comparison is available at every position without matching anything.
+    #
+    #   GC-neutral effect ~ GC-changing effect   the model reads base IDENTITY,
+    #                                            which is what a motif is
+    #   GC-neutral effect << GC-changing         the model reads COMPOSITION and
+    #                                            the position is incidental
+    #
+    # This is not the anagram control and does not replace it -- anagrams hold
+    # composition exactly while reordering, and they need forward passes the bank
+    # does not contain. This is the cheap screen that says whether spending them
+    # is worth it.
+    print("=" * 78)
+    print("Q3a Is the signal base identity, or local GC?\n")
+    stat = {k2: {"neutral": [], "changing": []} for k2 in ("elevated", "all")}
+    ratio_tx = []
+    for r in recs:
+        eff = per_position_effect(r[key])
+        ok = r["valid"] & np.isfinite(eff)
+        if ok.sum() < 50:
+            continue
+        med = np.median(eff[ok])
+        if med <= 0:
+            continue
+        hi = ok & (eff >= args.fold * med)
+        v, g = np.abs(r[key]), r["dgc"]
+        neutral = (g == 0) & np.isfinite(v)
+        changing = (g != 0) & np.isfinite(v)
+        for grp, rows in (("elevated", hi), ("all", ok)):
+            n_ = v[rows & neutral.any(1)][neutral[rows & neutral.any(1)]]
+            c_ = v[rows & changing.any(1)][changing[rows & changing.any(1)]]
+            if len(n_):
+                stat[grp]["neutral"].append(n_)
+            if len(c_):
+                stat[grp]["changing"].append(c_)
+        if hi.sum() >= 5:
+            n_ = v[hi & neutral.any(1)][neutral[hi & neutral.any(1)]]
+            c_ = v[hi & changing.any(1)][changing[hi & changing.any(1)]]
+            if len(n_) and len(c_) and np.median(c_) > 0:
+                ratio_tx.append(np.median(n_) / np.median(c_))
+    print(f"  {'positions':<12} {'GC-neutral':>13} {'GC-changing':>13} "
+          f"{'neutral/changing':>18}")
+    for grp in ("all", "elevated"):
+        if not stat[grp]["neutral"] or not stat[grp]["changing"]:
+            continue
+        n_ = np.concatenate(stat[grp]["neutral"])
+        c_ = np.concatenate(stat[grp]["changing"])
+        print(f"  {grp:<12} {np.median(n_):>13.3e} {np.median(c_):>13.3e} "
+              f"{np.median(n_)/np.median(c_):>18.2f}")
+    if ratio_tx:
+        ratio_tx = np.array(ratio_tx)
+        print(f"\n  per transcript, at elevated positions only "
+              f"({len(ratio_tx)} transcripts):")
+        print(f"    median ratio {np.median(ratio_tx):.2f}   "
+              f"quartiles {np.percentile(ratio_tx, 25):.2f} to "
+              f"{np.percentile(ratio_tx, 75):.2f}")
+        print(f"    transcripts where the GC-neutral substitution is at least "
+              f"half the GC-changing one: "
+              f"{100*(ratio_tx >= 0.5).mean():.0f}%")
 
     # ================================================================== Q3
-    print("=" * 78)
+    print("\n" + "=" * 78)
     print("Q3  Do the elevated positions carry a sequence signature?\n")
     base_hi = np.zeros(4)
     base_all = np.zeros(4)

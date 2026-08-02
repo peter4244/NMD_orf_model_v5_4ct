@@ -787,6 +787,27 @@ run is confirmatory rather than another exploration.
 > 3. **The direction split requires intervals, not point estimates.** Both arms' gene-clustered
 >    intervals must exclude 0.5. The downstream arm was n=45 on validation and is expected near 110
 >    on test; "both point estimates above 0.5" is not a claim at that size.
+> **HELD 2026-08-01, unread.** Written, amended and dry-run on validation, then deliberately NOT
+> run on `test_clean` — the ISM bank of §9 measures the capture arm directly (`vals_capture`) where
+> this asks the same question through a pairwise proxy, so §8.5 is held until the bank is processed
+> and may not be needed. **The test split is unspent and the design is frozen, so the
+> pre-registration still stands if it is revived.**
+>
+> Recorded because it bears on that: the ISM subset spans every split, test included, per the
+> project's standing convention that only AUC and AUPRC are test-only while interpretability uses
+> all data. So a later decision to run or skip §8.5 will have been made with test-derived model
+> behaviour already in view. That does not touch the frozen design — nothing about §8.5 may be
+> tuned to what the bank shows — but if §8.5 is ever reported, this ordering is reported with it.
+>
+> Two questions left open at the hold, both to settle **before** any test read:
+> - **The Kozak arm is underpowered by construction.** It is computed only on pairs where capture
+>   and the matrix disagree — 270 on validation, perhaps 650 on test. A wide interval failing to
+>   exclude 0.5 is absence of evidence, not equivalence, and "inconclusive" should be pre-committed
+>   as a legitimate outcome rather than written around afterwards.
+> - **The ATG window carries exon junction marks (channel 4).** Two candidates 50 bases apart hold
+>   different junction patterns, so a residual preference may be annotation rather than nucleotides.
+>   §8.5 controls window fill and position; it does not separate sequence from junction placement.
+>
 > 4. **The direction split's conclusion is narrowed to what it establishes.** "Both above 0.5 is
 >    evidence no positional account can produce" overclaims: it excludes a *monotone* positional
 >    preference only. A preference peaked at a particular distance from the midpoint cap puts both
