@@ -497,6 +497,44 @@ conclusion that the runs are transcript-specific.** The amendment is recorded be
 the result for the same reason §8.5's was: the same change afterwards would not be
 defensible.
 
+### The k-mer result: the motif branch, with one confound the GC control cannot touch
+
+k = 5, five members, decay (interpretability window, job 8886733):
+
+    positional Jaccard   0.1250  (~22% overlap of top-1% sets)   LOW
+    k-mer enrichment     r = 0.7501, range 0.714-0.809           HIGH
+
+    enriched   TTTTT +2.34, TTGTT, TTTAT, TATAT, TTGAT
+    depleted   GCACG, ATCCG, GCTCG, TACGC -2.75
+    -> U/A-rich up, GC-rich down
+
+**This is the first branch of the prediction recorded in advance**: members agree on
+*what the sequence is* and not on *where it sits*, which is what a variable-position
+binding preference produces. It is distinguishable from "the positional Jaccard was
+underpowered" only because the three outcomes were written down before the job ran.
+
+**Do not call this an AU-rich element yet. Two confounds, and they need different
+controls:**
+
+1. **Compositional / GC.** The enriched-depleted axis *is* a GC axis, which is what
+   a GC-driven signal looks like. Job 8886938 rescores using only the GC-preserving
+   substitution, so channel 5 is bitwise fixed.
+2. **Regional composition, uncontrolled and the more serious one.** Elevated
+   positions concentrate 3′ of the stop codon; the background is every valid
+   position of the same transcripts, 5′UTR and CDS included. **3′UTRs are AU-rich as
+   a class**, so a positional bias toward the 3′UTR reproduces this enrichment with
+   no motif in it at all. A region-matched background does not exist yet.
+
+**THE TWO CONTROLS ARE NOT SUBSTITUTES, and this is the thing to not get wrong in
+the morning.** Job 8886938 answers (1) and does **nothing** for (2). Holding GC
+bitwise constant does not change *where* the elevated positions are, so a 3′UTR-biased
+set compared against a whole-transcript background still recovers 3′UTR composition
+whether or not the substitution moved GC. **A clean GC control must not be read as
+resolving the AU question.** Only a region-matched background does that.
+
+Confound 2 is also the same shape as every error caught tonight: a comparison whose
+two sides are drawn from different sets.
+
 ### The arity-matched GC decomposition
 
 Two implementations, independently and simultaneously. Raw counts are **not**
