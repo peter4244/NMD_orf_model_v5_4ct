@@ -132,8 +132,26 @@ transcripts.** So part of the 0.305 may be the head working, and the comparison 
 produced the gating reading penalises the behaviour we have separately measured it to
 have.
 
-**What is required.** All three claims reported **split by NMD label**, with the
-interpretation scoped to controls, where the annotated CDS is the right target.
+**AND IT IS WORSE THAN A SPLIT CAN FIX** (Pete, sharpening the above). The reference ORF
+and the NMD-causing ORF are not noisy versions of one another. For a substrate they are
+**close to disjoint**, because the whole mechanism is that a non-canonical frame carries
+the premature stop. So reporting by label does not rescue the benchmark; it only shows
+where it stops applying.
+
+**C2, C3 and C11 are therefore claims about MAIN-ORF RECOVERY and should be relabelled as
+such rather than caveated.** "A one-line length heuristic reproduces 97% of the model's
+accuracy" is a statement about finding the annotated CDS. It says **nothing** about
+whether the model finds the ORF that causes decay, and we have never measured that.
+
+**What is required.** Relabel the three claims to their actual target, report split by NMD
+label so the boundary is visible, and state plainly that **no measurement of
+NMD-causing-ORF recovery exists, because no target for it exists.**
+
+**One constructive route, untested and needing a GTF we do not have locally.** GENCODE
+marks some transcripts with a nonsense-mediated-decay biotype, and for those the
+**annotated CDS IS the PTC-bearing frame** — so reference-ORF would be a valid target for
+exactly that subset. If a workable share of our NMD-labelled transcripts are that biotype,
+a real benchmark exists for them. Worth checking before anyone builds a surrogate.
 
 **And for NMD transcripts there may be no gold standard available at all.** We have no
 ribosome profiling. Defining the target as "the frame whose stop has a downstream

@@ -185,6 +185,30 @@ answerable without a rebuild.
 
 ---
 
+## 8. The decay head's only non-sequence input is the PTC indicator itself
+
+**What it is.** In the `interpretable` variant the structural block reaching the decay
+head is a **single column** — `build_tensor.py:57`, `INTERPRETABLE_COLS =
+["n_downstream_ejc"]`, with `INTERPRETABLE = [0]` selecting it. The other four structural
+columns go to the predictor variant only.
+
+**How we know.** Code read, and the checkpoint the banks use reports
+`variant=interpretable` (job 8900209).
+
+**Why it matters.** The downstream exon-junction count *is* the premature-stop indicator.
+The head that is supposed to **judge** whether a frame triggers decay is handed the answer
+as its only non-sequence feature — and the ORF-selection head is then trained through a
+gradient scaled by that head's output (item 4). **The two-stage structure is thinner than
+it appears:** one head reads a supplied PTC flag, the other is trained to predict that
+flag from upstream context.
+
+**What a retrain should do.** Decide deliberately whether the decay head should be given
+the answer. If the goal is to learn decay determinants from sequence, `n_downstream_ejc`
+is the one feature that short-circuits it and withholding it is the experiment. If the
+goal is prediction, keep it and drop the claim that the head is judging anything.
+
+---
+
 ## What is NOT on this list, and why
 
 **Junction positions being supplied (channel 4) is not a defect.** It is a design choice
