@@ -19,6 +19,7 @@ central results from an independent implementation; agreements are stated where 
 
 Take the top 1% of positions **within each transcript** by `max_b |vals_decay|`, and read the
 base composition at and around them.
+(`analysis_plans/probe_elevated_composition_profile.py`)
 
     base composition at the elevated position, against all valid positions of the same transcripts
 
@@ -92,7 +93,8 @@ Recorded because the final numbers are only interpretable with them.
   under an elevated position were absent — exactly the most depleted end.
 - **Directionality was quoted three times before it was right**: 62% of an attainable ceiling →
   ~15% above an analytic null that does not describe this noise → **20.5% above the measured
-  in-sample null**, 22% of the range 0.387–0.75. Each correction made it smaller.
+  in-sample null**, 22% of the range 0.387–0.75
+  (`analysis_plans/probe_directionality_insample_null.py`). Each correction made it smaller.
 
 ---
 
