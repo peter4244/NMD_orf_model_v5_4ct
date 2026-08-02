@@ -85,7 +85,17 @@ banks.
 > k-mer agreement, and the PWM are all conditional on what elevation selects, so **a negative here
 > propagates to all three**.
 
-Cost: one job. **This is the load-bearing measurement of Phase A.**
+Cost: one job. **This is the load-bearing measurement of Phase A, and the only one.**
+
+**A2 gets two independent implementations — the one case the replication rule was written for.**
+The rule reserves replication for results that survive their own row and are load-bearing
+downstream. A2 is the most load-bearing measurement in the plan, a negative propagates to three
+other results, and with A1 dropped **nothing else in Phase A could catch an error in it**.
+
+Crucially, the second implementation is written **against this row**, not against an independent
+reading of the question — so the specification is shared and only the code is independent. That is
+the version of replication that catches what replication can catch, and it is what we did *not* have
+when both windows implemented the run-length statistic from a premise neither had stated.
 
 ### A1 — DROPPED
 
@@ -207,6 +217,16 @@ Conditional on Phase A. Each requires the top row of the combinations table.
 > **Not adjusted:** composition. The position/composition decoupling *is* the exposure.
 > **Licensed:** one of three readings, stated, never pooled.
 > **Limit:** power. The PTC-interval cell is the small one, and that bounds the conclusion.
+>
+> **BLOCKING PREREQUISITE — an annotation-derived PTC definition.** As currently specified the cell
+> is defined by the *model's own* selection: operative stop before annotated stop. Measured on the
+> banks, that cell is **550 transcripts, 282 NMD against 268 control — 51.3% NMD against a 44.0%
+> background.** It is barely enriched for the thing it is supposed to select, because "model
+> committed to a shorter ORF" and "genuine premature termination" are conflated and roughly half the
+> cell is the former. Worse, the crossed table shows the annotation flag runs the *opposite* way
+> inside it. **Run as written, B2 compares a mixed population against itself.** `main_orf_stop` is
+> already in the subset table; the redefinition is small and must precede B2 rather than accompany
+> it.
 
 **This is the only analysis in the programme that no artificial background can construct**, and it
 is the one most specific to our data rather than to sequence models in general. If Phase A is
@@ -245,16 +265,27 @@ positive, I would argue B2 before B1 on those grounds.
 
 ---
 
-## The stopping rule, proposed rather than assumed
+## The stopping rule — it turns on A2 alone
 
-The method document leaves "what counts as enough to stop" open. Proposed:
+The method document leaves "what counts as enough to stop" open. **Rewritten 2026-08-02 because A1
+was dropped and the rule still said "if A1 and A2 are both negative."** That is not a stale word to
+tidy: with A1 gone the whole programme hangs on **one** measurement, and a rule naming a
+non-existent analysis would be read loosely at exactly the moment it fires. The "both" was doing
+silent work that no longer exists.
 
-- **If A1 and A2 are both negative**, the honest conclusion is that the decay branch's sequence
-  contribution is not separable from routing at this resolution. Write that, and stop. It is a real
-  result — it says the model's sequence sensitivity is a readout of its selection distribution — and
-  it is more useful than a fourth instrument.
-- **If A1 or A2 is positive but B1 fails**, the claim is compositional, not a motif. Write it as
-  composition. Do not proceed to C.
+**There is one gate, and it is A2.**
+
+- **A2 negative** → the decay branch's sequence contribution is not separable from routing **by
+  single-base ISM at this resolution**. Write that and stop. It is a real result: the model's
+  apparent sequence sensitivity is a readout of its selection distribution. The scoping to
+  single-base ISM is not a hedge — a pattern the model recognizes robustly is invisible to our
+  instrument by construction, so the negative belongs to the instrument and not to the model.
+  **A negative propagates:** the composition profile, the cross-seed k-mer agreement and the PWM all
+  rest on what elevation selects, so none of them survives untouched. (The model window argued the
+  cross-seed agreement was independent of Phase A; it is not, because it uses the elevation rule
+  even though it uses no elevation null. That correction is theirs, accepted.)
+- **A2 positive, B1 fails** → the claim is compositional, not a motif. Write it as composition. Do
+  not proceed to C.
 - **Proceed to C only if B1 or B2 is positive**, since C is the expensive branch and its output is
   uninterpretable without C1.
 
