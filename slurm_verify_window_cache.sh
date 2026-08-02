@@ -77,13 +77,23 @@ if [ $rc -ne 0 ]; then echo "STOP: the cached build failed"; exit $rc; fi
 echo ""
 
 echo "=== STEP 3b: the same bank, pre-change decode path ==="
-# The reference builder is the commit before the cache, taken from git rather than
-# kept as a file in the tree. A frozen copy of a superseded script drifts from the
-# one it is supposed to be the reference for, and nothing says when it did.
-PRE=0199a82bdf08abfdadbcf6ce8cd19e2ad6c59d1f
-echo "  reference builder from $PRE"
-git show $PRE:build_ism_bank.py > $SC/build_ism_bank_ref.py || exit 1
-PYTHONPATH=$PWD $PY $SC/build_ism_bank_ref.py --tensor results_tensor_v6 \
+# The reference builder is commit 0199a82's build_ism_bank.py -- the state just
+# before the cache. It is COPIED UP rather than taken from git here, because this
+# clone is not guaranteed to hold that commit and `git show` would then fail late,
+# after step 1 and the profile had already spent their time. It is not kept in the
+# tree either: a frozen copy of a superseded script drifts, with nothing to say when.
+#
+# Its sha256 goes in the log, so which reference produced the comparison is a fact
+# in the artifact rather than an assumption about what was copied.
+REF=$SC/build_ism_bank_ref.py
+if [ ! -f "$REF" ]; then
+  echo "FATAL: $REF is missing. Generate it locally with" >&2
+  echo "  git show 0199a82:build_ism_bank.py > build_ism_bank_ref.py" >&2
+  echo "and copy it to $REF before submitting." >&2
+  exit 1
+fi
+echo "  reference builder sha256: $(sha256sum $REF | cut -d' ' -f1)"
+PYTHONPATH=$PWD $PY $REF --tensor results_tensor_v6 \
     --checkpoint results_interp_all/v6_checkpoints/b8_s100.pt \
     --split results_ism_v6/ism_subset.tsv \
     --only "$ONLY" --out $SC/bank_decoded.h5 --device cuda
