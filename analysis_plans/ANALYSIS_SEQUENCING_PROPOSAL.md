@@ -41,6 +41,16 @@ error rather than the coding error.
 - Replication is expensive and should be **reserved for load-bearing results**. Two implementations
   of an unspecified analysis agree on the wrong thing and cost twice as much doing it.
 
+**The cheapest replication, and it is aimed at the error class that actually got us** (model
+window's proposal): whichever window runs an analysis, **the other reads its hypothesis row before
+the job is submitted** — not the result after. A row review costs minutes and catches the shared
+design assumption; a result review costs a second implementation and cannot.
+
+**Cluster scratch scripts need a namespace too.** We agreed `interp_*` and `model_*` for outputs and
+`hi_*` / `md_*` for job names, but not for scripts in the shared working directory. Two windows
+wrote `autocorr.py` there and the second silently replaced the first — no conflict, no warning, and
+the numbers from the first now have no producer. Same prefixes should apply to scripts.
+
 Under this ordering, Phase A gets rows first and single implementations. Only a result that
 survives its own row and is load-bearing for a Phase B or C claim earns a second implementation.
 
@@ -84,6 +94,25 @@ Cost: one job. The composition profile machinery exists.
 > **Owner:** model window (`probe_directionality_null.py`, written, unrun).
 > **Licensed if positive:** directionality returns from §6 to §7. **If negative:** it is deleted,
 > not softened.
+
+### A4 — can single-base ISM see a motif at all?
+
+> **Hypothesis.** The model's sequence recognition is additive across positions, so single-base
+> substitution measures it fully.
+> **Test.** Substitute two positions at once within a window; compare against the sum of the two
+> single-base effects.
+> **Why it bounds everything else.** Single-base ISM detects a pattern only insofar as it is
+> **fragile** to single substitutions. A model recognizing "at least 6 of these 8 match" is
+> unaffected by any one substitution and would show ≈0 importance at every position of a real,
+> working motif — and conv→ReLU *is* an m-of-n detector when the weights are near-uniform, so this
+> is representable here rather than hypothetical.
+> **Licensed if additive:** single-base ISM sees everything; the fragility caveat comes out of the
+> documents and every negative in the programme strengthens.
+> **Licensed if superadditive:** the caveat stands with a number attached, and every negative —
+> including this morning's stop-codon nulls — is scoped to "not visible to single-base ISM."
+
+Cost: one job. **It bounds the interpretation of every other result here**, which is why it belongs
+in Phase A rather than after it.
 
 ---
 
