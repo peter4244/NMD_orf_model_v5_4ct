@@ -15,6 +15,33 @@ retrain should fix.
 
 ---
 
+## Depends on
+
+*Per Larry's design, 2026-08-02. A retraction or supersession of anything below forces a re-read
+of this document.*
+
+**Claims:** C1–C12 (`CAPTURE_HEAD_STORY.md`), plus its gold-standard caveat block and its
+retracted-ordering block. **Decisions:** D48 (A4 resurrected), D50 (dispositions), D55 (routing
+locates importance), D56 (selection predictability, posed not run).
+**Findings documents:** `FINDINGS_TILED_PERTURBATION_2026-08-02.md`,
+`FINDINGS_DECAY_SEQUENCE_2026-08-02.md`. **Retrain items:** 3, 4, 6, 8.
+
+### ⚠ THE CLAIMS TABLE HAS STALLED AT C12, AND THIS DOCUMENT DEPENDS ON WHAT IS PAST IT
+
+Auditing this narrative against the table found that **four numbers it uses have a job and a
+runlog but no claim row**: `capture ~ p_decay` +0.362, its tie-proof +0.400, the ~47× fill-odds
+marker, and `p_select ~ d` +0.399 / `p_capture ~ d` +0.091. Essentially every measurement from
+this afternoon — the ATF4 work, the alignment pair, the tiling runs, the corrected GENCODE
+recovery — is unfiled.
+
+**`[unclaimed]` below therefore carries its backing, because "no claim row" and "no evidence" are
+different failures and one marker for both would be noise.**
+
+    [unclaimed]                 nothing measured behind it. The failure that reached Pete.
+    [unclaimed — job NNNNNNN]   measured, producer and runlog exist, never filed as a claim.
+
+---
+
 ## The question
 
 The model predicts NMD in two stages: **pick** which of ~19 candidate reading frames matters, then
@@ -50,7 +77,7 @@ tiles are already below the ~42-position receptive field.
 
 **And the length signal has a route that is ours, not the model's.** The ATG window's fill stops at
 the ORF midpoint, so fill extent = `min(100, length/2)`; fill saturation alone is a **~47× odds
-marker** for "this is the real ORF." *Retrain item 3.*
+marker** for "this is the real ORF" *[unclaimed — local measurement, `orf_pool.tsv`]*. *Retrain item 3.*
 
 ## What the judge is
 
@@ -68,11 +95,20 @@ there was no negative example and no gradient. *Retrain item 6.*
 
 **The forward separation is real and the loss gives it back.** Three encoders, an invariance test,
 and a comment saying the separation is what licenses reading `p_k` as initiation — and then
-`P(NMD) = Σ p_k·d_k` with the loss on the product, so `∂L/∂p_k ∝ d_k`. **The head cannot observe
-termination and is trained to predict it.** *Retrain item 4.*
+`P(NMD) = Σ p_k·d_k` with the loss on the product, so `∂L/∂p_k ∝ d_k`. **The head cannot observe termination
+and is trained to predict it.**
+
+⇒ **Larry asked whether this sentence is measured or argued. It is both, in separable parts, and
+the distinction matters.** The forward **separation** is verified — three encoders and an
+invariance test that scrambles the stop window and asserts `p` is unchanged, `model_v6.py:122-165`,
+`:279-289`. The **coupling** is *argued*: `∂L/∂p_k ∝ d_k` is calculus on the stated architecture
+(`model_v6.py:199-200`, `train_v6.py:358`, `:194` exclusive cumsum), verified as code but not
+measured. That the head **actually became decay-predictive** is *measured* — +0.400 tie-proof.
+So: architecture verified, mechanism derived, consequence measured. **It is not a bare argument,
+and it is not a single measurement.** *Retrain item 4.*
 
 **And it does.** `capture ~ p_decay` is **+0.362** among short candidates and **+0.400** holding the
-EJC column constant — tie-proof, so not a re-derivation of the junction correlation.
+EJC column constant *[unclaimed — jobs 8900114, 8900473]* — tie-proof, so not a re-derivation of the junction correlation.
 
 **The heads do not read the same bases**: agreement ~0.02 within mass band. *Job 8899820.*
 
@@ -99,10 +135,10 @@ from what the model reads — the only candidate, and unworked.
 ## The one biological case that runs end to end
 
 **ATF4.** The prior picks the 1055-nt main ORF; the posterior flips **18×** onto a 179-nt uORF and
-puts **93%** of the NMD signal there. The textbook mechanism, recovered. *Job 8900114.*
+puts **93%** of the NMD signal there *[unclaimed — job 8900114]*. The textbook mechanism, recovered. *Job 8900114.*
 
 ## Where the model fails, diagnostically
 
-Reference-ORF accuracy is **0.735 when the real ORF is long and 0.276 when it is short**, and in
+Reference-ORF accuracy is **0.735 when the real ORF is long and 0.276 when it is short** *[unclaimed — job 8900114]*, and in
 that short class length beats Kozak **7×**. **The head fails precisely where initiation biology says
 context should decide.**
