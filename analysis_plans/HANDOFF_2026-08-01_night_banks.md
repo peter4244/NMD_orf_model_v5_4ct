@@ -497,6 +497,56 @@ conclusion that the runs are transcript-specific.** The amendment is recorded be
 the result for the same reason §8.5's was: the same change afterwards would not be
 defensible.
 
+### 2026-08-02: directionality has a null of 0.37, not 0
+
+The two extraction criteria overlap at Jaccard 0.524 (median, quartiles 0.455–0.589),
+so a third of each set is criterion-specific and both must be run. Directionality
+`|mean_b vals| / max_b |vals|` was then reported as 0.466 at elevated positions
+against 0.391 at all positions, on a **ceiling of 0.75** — with `vals[obs] = 0` and
+three substitutions agreeing, `mean = 3v/4` against `max = v`. The ceiling
+correction was right.
+
+**But the floor was assumed to be 0, and it is not reachable.** Three substitutions
+with random signs give
+
+    |sum| = 3  with probability 2/8,   |sum| = 1  with probability 6/8
+    E[ |mean| / max ] = (2/8)(3/4) + (6/8)(1/4) = 0.375
+
+so **0.375 is the random-sign null**, and 0 requires perfect opposition, which noise
+never produces. Simulated: 0.3750 at equal magnitudes, 0.255–0.263 for heavy-tailed
+magnitude distributions.
+
+**The data supplies its own null and it lands on the analytic value.** Measured on
+s100, 500 transcripts, 1,036,981 positions:
+
+    |effect| band              n         median      directionality   % of ceiling
+    2.2e-16 - 1.4e-05    207,396      7.37e-08          0.370           49.4%
+    1.4e-05 - 1.1e-03    207,396      2.33e-04          0.364           48.5%
+    1.1e-03 - 5.1e-03    207,396      2.78e-03          0.359           47.9%
+    5.1e-03 - 1.4e-02    207,396      8.60e-03          0.375           50.0%
+    1.4e-02 - 4.3e-02    155,547      2.25e-02          0.392           52.3%
+    4.3e-02 - 9.5e-02     41,480      5.73e-02          0.409           54.5%
+    9.5e-02 - 6.7e-01     10,370      1.25e-01          0.427           56.9%
+
+    all positions      0.373    indistinguishable from the null
+    sub-floor band     0.370    pure noise (median 7.4e-08 against a floor of 1.7e-06)
+    top 1%             0.427    above the null by 14%
+
+**So directional structure is real but modest.** "62% of the maximum attainable"
+becomes "14% above the random-sign null". The conclusion that the branch has learned
+both directional and non-directional features stands — it is the size of the
+directional part that shrinks, and it should be quoted against 0.37 rather than
+against 0.
+
+**The error class, again, and from the other end.** The ceiling was checked and
+corrected; the floor was never checked because 0 *looks* like a null. A ratio
+statistic has two reference points and both need enumerating. That is the same
+lesson as the denominators, arriving through the numerator.
+
+`probe_directionality_null.py`. Note it also caught one of mine: `np.isfinite(x).all(1)`
+is never true, because `vals` is NaN at the observed base by construction. It failed
+loudly rather than returning an empty comparison, which is the good version.
+
 ### 2026-08-02: the seqlet plan, and the four things that decide whether it works
 
 Agreed with the interpretability window. The reason to move off k-mer enrichment is
