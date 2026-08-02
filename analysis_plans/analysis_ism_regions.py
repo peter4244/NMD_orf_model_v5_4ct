@@ -81,6 +81,66 @@ def per_position_effect(vals):
         return np.nanmax(np.abs(vals), axis=1)
 
 
+def gc_neutral_effect(vals, dgc):
+    """|effect| of the ONE substitution at each position that preserves GC status.
+
+    MAUDE'S DISCRIMINATING TEST FOR THE CLUSTERING RESULT. Channel 5 is a rolling
+    GC fraction over +/-25 bases, so adjacent positions share nearly all of their
+    GC window and their effects are correlated BY CONSTRUCTION. Run-length
+    clustering could therefore be an encoding artifact containing no biology.
+
+    Every position has exactly one GC-neutral alternative -- A<->T if the observed
+    base is A or T, C<->G if it is C or G -- so this needs no matching and drops
+    no positions. If the clustering survives when only those substitutions are
+    scored, the GC smoothing is not what produces it.
+
+    `dgc` is +1 for non-GC -> GC, -1 for the reverse, 0 when unchanged. The
+    observed base itself is NaN in `vals`, so it cannot be selected even though its
+    dgc is also 0.
+    """
+    out = np.full(len(vals), np.nan, dtype=np.float64)
+    ok = (dgc == 0) & np.isfinite(vals)
+    r, c = np.nonzero(ok)
+    out[r] = np.abs(vals[r, c])
+    return out
+
+
+def gc_changing_effect(vals, dgc, rng):
+    """The MATCHED CONTROL for gc_neutral_effect: one GC-CHANGING substitution.
+
+    Without this, comparing GC-preserving scoring against the main analysis
+    compares a max over ONE substitution with a max over THREE, and a good part of
+    any drop is that statistic rather than GC. Each position has two GC-changing
+    alternatives; one is drawn so both arms are a max over exactly one.
+    """
+    out = np.full(len(vals), np.nan, dtype=np.float64)
+    ok = (dgc != 0) & np.isfinite(vals)
+    for i in np.flatnonzero(ok.any(1)):
+        c = np.flatnonzero(ok[i])
+        out[i] = abs(vals[i, c[rng.integers(len(c))]])
+    return out
+
+
+def atg_coverage(spans, P):
+    """Positions covered by ANY candidate's start-codon window.
+
+    WHY THIS GATES THE CAPTURE COLUMN. A substitution in a stop window reaches
+    z_d only -- build_ism_bank.py writes z_p just for the ATG branch -- so
+    out_cap equals its own no-op reference there and `vals_capture` is EXACTLY
+    zero by construction, not measured as zero. Scoring capture over all valid
+    positions therefore measures window geometry: roughly a third of every track
+    is structural zero, the transcript median is dragged down, the elevated
+    threshold with it, and an elevated-set overlap gets computed against a
+    background that cannot be elevated. `vals` and `vals_decay` are unaffected,
+    because a stop substitution does move z_d.
+    """
+    cov = np.zeros(P, dtype=bool)
+    for a_lo, a_hi, _, _ in spans:
+        if a_hi >= a_lo:
+            cov[max(int(a_lo), 1) - 1:int(a_hi)] = True
+    return cov
+
+
 def runs_of(mask):
     """Lengths of contiguous True runs."""
     if not mask.any():
@@ -89,7 +149,7 @@ def runs_of(mask):
     return np.flatnonzero(d == -1) - np.flatnonzero(d == 1)
 
 
-def load_h5(path):
+def load_h5(path, limit=0):
     """One record per transcript from an assembled bank, sliced row by row.
 
     NEVER `f["vals"][:]`. The assembled arrays are padded to the longest
@@ -114,9 +174,11 @@ def load_h5(path):
         base = f["base_logit"][:]
         cell = ([s.decode() for s in f["cell"][:]] if "cell" in f
                 else [""] * len(tx))
+        arm = ([s.decode() for s in f["arm"][:]] if "arm" in f
+               else [""] * len(tx))
         wt = (f["sampling_weight"][:] if "sampling_weight" in f
               else np.ones(len(tx), np.float32))
-        for i in range(len(tx)):
+        for i in range(len(tx) if not limit else min(limit, len(tx))):
             lo, n_k = int(cand_off[i]), int(cand_cnt[i])
             r = np.flatnonzero(is_ref[lo:lo + n_k] == 1)
             # ANCHORING ON THE REFERENCE CANDIDATE ALONE IS A DIFFERENTIAL
@@ -160,14 +222,76 @@ def load_h5(path):
                             orf_start=int(c_start[lo + k]),
                             orf_end=int(c_end[lo + k]),
                             anchor_type=anchor_type, cell=cell[i],
+                            arm=arm[i],
+                            atg_cov=atg_coverage(sp, P),
                             base_logit=float(base[i]), weight=float(wt[i])))
     return out
 
 
-def load_bank(path, pool):
+def kmer_enrichment(recs, key, top_frac, k=5):
+    """Which k-mers sit under elevated positions, against the same transcripts'
+    own background.
+
+    WHY THIS AND NOT A POSITIONAL PROFILE. Sequence sensitivity and positional
+    sensitivity are different things and need not co-occur -- an RBP binds at
+    variable locations and is characterised by its motif, not by where it sits.
+    An offset-from-the-anchor profile can only find anchored features, so a
+    floating motif fails it by construction and its absence there is not evidence.
+
+    Background is every valid position of the SAME transcripts with full flanks,
+    not a genome-wide expectation: transcripts differ in composition, and a
+    k-mer enriched only because these transcripts are GC-rich is not a finding.
+    """
+    from collections import Counter
+    half = k // 2
+    hi_c, bg_c = Counter(), Counter()
+    for r in recs:
+        eff = per_position_effect(r[key])
+        ok = r["valid"] & np.isfinite(eff)
+        if ok.sum() < 50:
+            continue
+        n = max(1, int(round(top_frac * ok.sum())))
+        cut = np.partition(eff[ok], -n)[-n]
+        o = r["obs"]
+        idx = np.flatnonzero(ok)
+        idx = idx[(idx >= half) & (idx < len(o) - half)]
+        if not len(idx):
+            continue
+        win = np.stack([o[idx + d] for d in range(-half, half + 1)], 1)
+        good = (win >= 0).all(1)
+        idx, win = idx[good], win[good]
+        if not len(idx):
+            continue
+        code = np.zeros(len(idx), dtype=np.int64)
+        for j in range(k):
+            code = code * 4 + win[:, j]
+        is_hi = eff[idx] >= cut
+        hi_c.update(code[is_hi].tolist())
+        bg_c.update(code.tolist())
+    return hi_c, bg_c
+
+
+def kmer_table(hi_c, bg_c, k, min_count=50):
+    """log2 enrichment per k-mer, with the counts it rests on."""
+    H, B = sum(hi_c.values()), sum(bg_c.values())
+    rows = []
+    for code, nh in hi_c.items():
+        nb = bg_c.get(code, 0)
+        if nb < min_count:
+            continue
+        rows.append((code, nh, nb, np.log2((nh / H) / (nb / B))))
+    rows.sort(key=lambda t: -t[3])
+    return rows, H, B
+
+
+def decode_kmer(code, k):
+    return "".join(NT[(code >> (2 * (k - 1 - j))) & 3] for j in range(k))
+
+
+def load_bank(path, pool, limit=0):
     """A shard directory or an assembled .h5 — same records either way."""
     p = Path(path)
-    return load_shards(p, pool) if p.is_dir() else load_h5(p)
+    return load_shards(p, pool) if p.is_dir() else load_h5(p, limit)
 
 
 def load_effect_tracks(path, column):
@@ -197,7 +321,7 @@ def load_effect_tracks(path, column):
     return out
 
 
-def across_members(paths, column, fold, rng):
+def across_members(paths, column, fold, rng, top_frac=0.01):
     """Check 1 of the six: does a feature survive across independently trained
     members, or is it one member's private solution?
 
@@ -232,7 +356,16 @@ def across_members(paths, column, fold, rng):
         sr = [np.corrcoef(rank[i], rank[j])[0, 1]
               for i in range(len(X)) for j in range(i + 1, len(X))]
         r_p.append(np.mean(pr)); r_s.append(np.mean(sr))
-        hi = [x >= fold * np.median(x) for x in X]
+        # SAME TOP-FRACTION RULE as Q1, and for the same reason: a fold-over-median
+        # cut selects a different fraction of positions in every transcript, so a
+        # Jaccard built on it compares sets of unequal and uncontrolled size across
+        # members. Fixing the fraction makes the overlap a statement about WHICH
+        # positions rather than about how many each member happened to flag.
+        if top_frac > 0:
+            k = max(1, int(round(top_frac * X.shape[1])))
+            hi = [x >= np.partition(x, -k)[-k] for x in X]
+        else:
+            hi = [x >= fold * np.median(x) for x in X]
         n_pos = ok.sum()
         for i in range(len(X)):
             for j in range(i + 1, len(X)):
@@ -248,8 +381,8 @@ def across_members(paths, column, fold, rng):
         return
     print(f"\n  effect track, mean over member pairs, median over transcripts")
     print(f"    pearson  {np.median(r_p):+.4f}    spearman {np.median(r_s):+.4f}")
-    print(f"\n  agreement on WHICH positions are elevated (>= {fold:.0f}x), "
-          f"Jaccard")
+    lab = (f"top {100*top_frac:g}%" if top_frac > 0 else f">= {fold:.0f}x median")
+    print(f"\n  agreement on WHICH positions are elevated ({lab}), Jaccard")
     print(f"    observed {np.median(jac):.4f}    random placement "
           f"{np.median(jac0):.4f}")
     print(f"    a feature that does not clear the random line is one member's "
@@ -269,7 +402,9 @@ def load_shards(shard_dir, pool):
         spans = z["spans"]
         if k >= len(spans):
             continue
-        out.append(dict(iso=iso, k=k, anchor_type="reference", cell="",
+        out.append(dict(iso=iso, k=k, anchor_type="reference", cell="", arm="",
+                        atg_cov=atg_coverage(spans[:, :4] if spans.shape[1] == 4
+                                             else spans[:, 2:6], len(z["valid"])),
                         vals=z["vals"], cap=z["vals_capture"],
                         dec=z["vals_decay"], obs=z["obs"], valid=z["valid"],
                         floor=z["chunk_offset"], fill=z["fill_count"],
@@ -290,7 +425,18 @@ def main():
                     choices=["vals", "cap", "dec"],
                     help="vals = the transcript logit; dec = the decay branch")
     ap.add_argument("--fold", type=float, default=10.0,
-                    help="elevation threshold, as a fold over the transcript median")
+                    help="elevation threshold as a fold over the transcript median. "
+                         "DEPRECATED as a headline: it is self-normalising for "
+                         "magnitude but NOT for tail shape, so it selected 1.7%% of "
+                         "positions on a short-transcript pilot and 10.7%% on real "
+                         "full-length banks. Kept only to reproduce older runs.")
+    ap.add_argument("--top-frac", type=float, default=0.01,
+                    help="elevation as the top FRACTION of each transcript's own "
+                         "valid positions. Fixes the elevated count by construction, "
+                         "so the random-placement null is matched exactly and the "
+                         "run-length comparison measures clustering rather than the "
+                         "interaction of tail shape with a fold rule. This is the "
+                         "headline; set 0 to fall back to --fold.")
     ap.add_argument("--anchor", default="reference",
                     choices=["reference", "model", "all"],
                     help="which transcripts to use. 'reference' is the primary: "
@@ -299,15 +445,55 @@ def main():
                          "which keeps the mechanism cell whole but makes the "
                          "coordinate system the model's own choice. Never pool "
                          "them without saying so.")
+    ap.add_argument("--limit", type=int, default=0,
+                    help="read only the first N transcripts. For smoke-testing a "
+                         "copied-up script against a real bank before submitting "
+                         "the job that needs it; NOT for analysis, since the bank "
+                         "order is the stratified subset order and a prefix is not "
+                         "a sample of it.")
+    ap.add_argument("--gc-changing-only", action="store_true",
+                    help="matched control for --gc-neutral-only: one GC-CHANGING "
+                         "substitution per position, so both arms are a max over "
+                         "exactly one and the difference between them is GC "
+                         "rather than the statistic.")
+    ap.add_argument("--gc-neutral-only", action="store_true",
+                    help="score each position by its ONE GC-preserving "
+                         "substitution instead of the max over all three. "
+                         "Discriminates real clustering from the rolling-GC "
+                         "window's built-in correlation between adjacent "
+                         "positions.")
+    ap.add_argument("--kmer", type=int, default=5,
+                    help="k for the sequence-signature analysis. Sequence and "
+                         "positional sensitivity are separable -- an RBP binds at "
+                         "variable positions and is characterised by its motif -- "
+                         "so this asks what sits under elevated positions rather "
+                         "than where they are.")
     ap.add_argument("--seed", type=int, default=20260801)
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
 
-    pool = pd.read_csv(REPO / "results_pool_v6" / "orf_pool.tsv", sep="\t",
-                       usecols=["isoform_id", "slot", "orf_start", "orf_end",
-                                "is_ref_cds"])
+    # THE POOL TABLE IS READ ONLY IF A SHARD DIRECTORY NEEDS IT. `load_h5` takes
+    # the reference candidate from the bank's own `cand_is_ref_cds`, so an
+    # assembled-bank run needs nothing outside the .h5 -- and on the cluster the
+    # pool table sits at a path derived from __file__, which is exactly the
+    # dependency that turns "copied the script up" into "job died on a file it
+    # never opens". Loading it unconditionally cost nothing locally and would have
+    # cost a submission remotely.
     paths = [x for x in args.shards.split(",") if x]
-    recs = load_bank(paths[0], pool)
+    pool = None
+    if Path(paths[0]).is_dir():
+        pool_tsv = REPO / "results_pool_v6" / "orf_pool.tsv"
+        if not pool_tsv.exists():
+            sys.exit(f"shard input needs {pool_tsv}, which is not there. An "
+                     f"assembled .h5 needs no pool table; pass one of those, or "
+                     f"run from a tree where the pool exists.")
+        pool = pd.read_csv(pool_tsv, sep="\t",
+                           usecols=["isoform_id", "slot", "orf_start", "orf_end",
+                                    "is_ref_cds"])
+    recs = load_bank(paths[0], pool, args.limit)
+    if args.limit:
+        print(f"*** --limit {args.limit}: a PREFIX of the stratified subset order, "
+              f"not a sample. Smoke test only. ***")
     if not recs:
         sys.exit(f"no usable transcripts in {paths[0]}")
 
@@ -320,22 +506,50 @@ def main():
     if not recs:
         sys.exit("no transcripts under this anchor choice")
 
+    if args.column == "cap":
+        z_in = z_out = n_val = 0
+        for r in recs:
+            e = per_position_effect(r["cap"])
+            v = r["valid"] & np.isfinite(e)
+            n_val += int(v.sum())
+            z_in += int((v & r["atg_cov"] & (e == 0)).sum())
+            z_out += int((v & ~r["atg_cov"] & (e == 0)).sum())
+            r["valid"] = r["valid"] & r["atg_cov"]
+        cov = sum(int((r["valid"]).sum()) for r in recs)
+        print(f"CAPTURE COLUMN GATED to positions inside some ATG window: "
+              f"{cov:,} of {n_val:,} valid ({100*cov/max(n_val,1):.1f}%)")
+        print(f"  exact zeros OUTSIDE an ATG window {z_out:,} "
+              f"({100*z_out/max(n_val,1):.1f}%) — structural, now excluded")
+        print(f"  exact zeros INSIDE  an ATG window {z_in:,} "
+              f"({100*z_in/max(n_val,1):.1f}%) — dead perturbations, kept")
+        print(f"  the geometric mask and the exact zeros must agree to within the "
+              f"dead-perturbation rate, or one of them is wrong\n")
+
+    K = args.kmer
     key = {"vals": "vals", "cap": "cap", "dec": "dec"}[args.column]
     name = {"vals": "the transcript logit", "cap": "the capture branch",
             "dec": "the decay branch"}[args.column]
+    if args.gc_neutral_only:
+        for r in recs:
+            r[key] = gc_neutral_effect(r[key], r["dgc"])[:, None]
+        name += ", GC-PRESERVING SUBSTITUTIONS ONLY"
+    elif args.gc_changing_only:
+        for r in recs:
+            r[key] = gc_changing_effect(r[key], r["dgc"], rng)[:, None]
+        name += ", ONE GC-CHANGING SUBSTITUTION (matched control)"
     print(f"{len(recs)} transcripts, effect column = {name}\n")
 
     if len(paths) > 1:
         print("=" * 78)
         print("CHECK 1 OF SIX  Does it survive across independently trained "
               "members?\n")
-        across_members(paths, args.column, args.fold, rng)
+        across_members(paths, args.column, args.fold, rng, args.top_frac)
         print()
 
     # ================================================================== Q1
     print("=" * 78)
     print("Q1  Are there regions where the signal is clearly above baseline?\n")
-    rows, run_real, run_null = [], [], []
+    rows, run_real, run_null, run_arm, eff_cache = [], [], [], [], []
     for r in recs:
         eff = per_position_effect(r[key])
         ok = r["valid"] & np.isfinite(eff)
@@ -344,8 +558,17 @@ def main():
         e = eff[ok]
         med = np.median(e)
         above_floor = (e > np.maximum(r["floor"][ok] * 2, FLOOR_ABS)).mean()
-        hi = eff >= args.fold * med
-        hi &= ok
+        # TOP-FRACTION, NOT FOLD-OVER-MEDIAN. See --top-frac: the fold rule's
+        # selectivity depends on the tail shape of each transcript's effect
+        # distribution, which differs between short and full-length transcripts by
+        # sixfold. Fixing the fraction makes "elevated" mean the same thing in
+        # every transcript and makes the null exactly matched.
+        if args.top_frac > 0:
+            k = max(1, int(round(args.top_frac * ok.sum())))
+            cut = np.partition(e, -k)[-k]
+            hi = (eff >= cut) & ok
+        else:
+            hi = (eff >= args.fold * med) & ok
         run_real.append(runs_of(hi))
         # NULL for "is it a region": same COUNT of elevated positions, placed at
         # random among the valid ones. Preserves how many, destroys where.
@@ -354,6 +577,8 @@ def main():
         nm = np.zeros_like(hi)
         nm[pick] = True
         run_null.append(runs_of(nm))
+        run_arm.append(r["arm"])
+        eff_cache.append((eff, ok))
         rows.append((r["iso"], int(ok.sum()), med, np.percentile(e, 99), e.max(),
                      e.max() / med if med > 0 else np.nan,
                      100 * above_floor, int(hi.sum())))
@@ -371,10 +596,44 @@ def main():
     print(f"  the strongest single position of a transcript runs "
           f"{df['max_fold'].median():.0f}x its own median.\n")
 
+    # THE EXCESS IS A FUNCTION OF A THRESHOLD WE CHOSE, so report it across the
+    # threshold rather than at a point (Maude's suggestion, and her toy-bank sweep
+    # showed the ratio moving 1.7x to 11.2x across K=5..20 on identical data).
+    # A single number would let a reader mistake the choice for the result.
+    #
+    # Recomputed from the cached effect tracks, so a sweep costs re-thresholding
+    # and not a re-read of the bank.
+    print(f"\n  EXCESS ACROSS THRESHOLDS — runs of >= 4, observed against the same "
+          f"count placed at random")
+    print(f"    {'top frac':>9} {'elevated':>10} {'runs':>8} {'mean len':>9} "
+          f"{'obs >=4':>9} {'null >=4':>9} {'ratio':>8}")
+    for tf in (0.001, 0.002, 0.005, 0.01, 0.02, 0.05):
+        ro, rn_ = [], []
+        for eff, ok in eff_cache:
+            k = max(1, int(round(tf * ok.sum())))
+            cut = np.partition(eff[ok], -k)[-k]
+            h = (eff >= cut) & ok
+            ro.append(runs_of(h))
+            idx = np.flatnonzero(ok)
+            nm = np.zeros_like(h)
+            nm[rng.choice(idx, min(int(h.sum()), len(idx)), replace=False)] = True
+            rn_.append(runs_of(nm))
+        a = np.concatenate(ro) if ro else np.zeros(0)
+        b = np.concatenate(rn_) if rn_ else np.zeros(0)
+        if not len(a):
+            continue
+        o4, n4 = int((a >= 4).sum()), int((b >= 4).sum())
+        ratio = f"{o4/n4:.2f}x" if n4 else ("inf" if o4 else "n/a")
+        print(f"    {tf:>9.3f} {int(a.sum()):>10,} {len(a):>8,} {a.mean():>9.2f} "
+              f"{o4:>9,} {n4:>9,} {ratio:>8}")
+    print(f"    a ratio that holds across the sweep is an effect; one that appears "
+          f"at a single\n    threshold is that threshold")
+
     rr = np.concatenate(run_real) if run_real else np.zeros(0)
     rn = np.concatenate(run_null) if run_null else np.zeros(0)
-    print(f"  ARE THEY REGIONS OR SCATTERED BASES?  positions at >= "
-          f"{args.fold:.0f}x the transcript median,")
+    rule = (f"top {100*args.top_frac:g}% of each transcript's own positions"
+            if args.top_frac > 0 else f">= {args.fold:.0f}x the transcript median")
+    print(f"  ARE THEY REGIONS OR SCATTERED BASES?  elevated = {rule},")
     print(f"  against the same count placed at random in the same transcripts:\n")
     print(f"    {'run length':<12} {'observed':>10} {'random':>10}")
     for L in range(1, 11):
@@ -384,6 +643,36 @@ def main():
           f"(random: {len(rn):,} runs)")
     print(f"    mean run length  observed {rr.mean() if len(rr) else 0:.2f}   "
           f"random {rn.mean() if len(rn) else 0:.2f}")
+
+    # THE AXIS NEITHER CHECK ABOVE REACHES. Across-seed agreement asks whether a
+    # result is a property of the architecture or of one initialisation. It cannot
+    # ask whether the result holds on genes it was not found on -- and that is the
+    # question a reviewer asks first. The discovery/confirmation split is by GENE
+    # and no gene appears in both arms, so the confirmation arm is genes this
+    # analysis has never seen.
+    #
+    # Reported as two independent measurements, never as a test of one against the
+    # other: each arm carries its own random-placement null, because the arms
+    # differ in size and the null's yield depends on how many elevated positions
+    # there are to place.
+    arms = sorted({a for a in run_arm if a})
+    if len(arms) > 1:
+        print(f"\n  ACROSS DISJOINT GENES — run structure by arm, each against its "
+              f"own null")
+        print(f"    {'arm':<14} {'tx':>4} {'elevated':>9} {'runs':>6} "
+              f"{'mean len':>9} {'null':>6} {'runs>=4':>8} {'null':>6}")
+        for a in arms:
+            idx = [i for i, x in enumerate(run_arm) if x == a]
+            ra = np.concatenate([run_real[i] for i in idx]) if idx else np.zeros(0)
+            na = np.concatenate([run_null[i] for i in idx]) if idx else np.zeros(0)
+            if not len(ra):
+                continue
+            print(f"    {a:<14} {len(idx):>4} {int(ra.sum()):>9,} {len(ra):>6,} "
+                  f"{ra.mean():>9.2f} {na.mean() if len(na) else 0:>6.2f} "
+                  f"{int((ra >= 4).sum()):>8,} {int((na >= 4).sum()):>6,}")
+        print(f"    a structure that holds in BOTH arms is a statement about "
+              f"transcripts;\n    one that holds only in discovery is a statement "
+              f"about the genes it was found on")
 
     # ================================================================== Q2
     # FILL-CONDITIONED IS THE HEADLINE, RAW IS THE SECONDARY. In the raw profile
@@ -661,7 +950,12 @@ def main():
         med = np.median(eff[ok])
         if med <= 0:
             continue
-        hi = ok & (eff >= args.fold * med)
+        if args.top_frac > 0:
+            k = max(1, int(round(args.top_frac * ok.sum())))
+            cut = np.partition(eff[ok], -k)[-k]
+            hi = ok & (eff >= cut)
+        else:
+            hi = ok & (eff >= args.fold * med)
         v, g = np.abs(r[key]), r["dgc"]
         neutral = (g == 0) & np.isfinite(v)
         changing = (g != 0) & np.isfinite(v)
@@ -709,7 +1003,12 @@ def main():
         if ok.sum() < 50:
             continue
         med = np.median(eff[ok])
-        hi = ok & (eff >= args.fold * med)
+        if args.top_frac > 0:
+            k = max(1, int(round(args.top_frac * ok.sum())))
+            cut = np.partition(eff[ok], -k)[-k]
+            hi = ok & (eff >= cut)
+        else:
+            hi = ok & (eff >= args.fold * med)
         o = r["obs"]
         for b in range(4):
             base_hi[b] += int(((o == b) & hi).sum())
@@ -733,6 +1032,56 @@ def main():
             print(f"    {k9[:4]} [{k9[4]}] {k9[5:]}   {n}")
         print(f"    distinct 9-mers {s.size:,} over {len(ctx):,} sites — "
               f"{'no repetition, so no motif at this sample size' if s.max() < 3 else 'some repetition, worth a larger sample'}")
+
+    _kmer_section(recs, key, args, K, paths, pool)
+
+
+def _kmer_section(recs, key, args, K, paths, pool):
+    print("\n" + "=" * 78)
+    print(f"Q4  What sequence sits under elevated positions? ({K}-mers)\n")
+    hi_c, bg_c = kmer_enrichment(recs, key, args.top_frac, K)
+    rows, H, B = kmer_table(hi_c, bg_c, K)
+    if not rows:
+        print("  no k-mer cleared the background-count floor")
+        return
+    print(f"  {H:,} elevated sites with full flanks, {B:,} background positions")
+    print(f"\n  {'kmer':<9} {'n elevated':>11} {'n background':>13} {'log2 enr':>9}")
+    for code, nh, nb, e in rows[:10]:
+        print(f"  {decode_kmer(code, K):<9} {nh:>11,} {nb:>13,} {e:>+9.3f}")
+    print(f"  {'...':<9}")
+    for code, nh, nb, e in rows[-5:]:
+        print(f"  {decode_kmer(code, K):<9} {nh:>11,} {nb:>13,} {e:>+9.3f}")
+
+    # ACROSS SEEDS, ON THE MOTIF RATHER THAN ON THE POSITIONS. This is the test
+    # that matches a motif hypothesis: five members can disagree about which
+    # instances they weight most while agreeing completely about what the pattern
+    # IS. A position-level Jaccard cannot distinguish those two states; this can.
+    if len(paths) > 1:
+        print(f"\n  ACROSS MEMBERS, on the k-mer enrichment rather than the "
+              f"positions")
+        vecs, seen = [], None
+        for pth in paths:
+            rr = load_bank(pth, pool, args.limit)
+            if args.anchor != "all":
+                rr = [x for x in rr if x["anchor_type"] == args.anchor]
+            h2, b2 = kmer_enrichment(rr, key, args.top_frac, K)
+            t2, H2, B2 = kmer_table(h2, b2, K)
+            d = {c: e for c, _, _, e in t2}
+            seen = set(d) if seen is None else (seen & set(d))
+            vecs.append(d)
+            del rr
+        codes = sorted(seen)
+        if len(codes) > 3 and len(vecs) > 1:
+            M = np.array([[v[c] for c in codes] for v in vecs])
+            rs = [np.corrcoef(M[i], M[j])[0, 1]
+                  for i in range(len(M)) for j in range(i + 1, len(M))]
+            print(f"    {len(codes):,} k-mers measured in every member")
+            print(f"    mean pairwise r of the enrichment vector  {np.mean(rs):+.4f}")
+            print(f"    range {min(rs):+.4f} to {max(rs):+.4f}")
+            print(f"\n    Compare against the position-level Jaccard above. High "
+                  f"here with low\n    there is a motif the members agree on and "
+                  f"place differently -- which is\n    what a variable-position "
+                  f"binding preference looks like.")
 
 
 if __name__ == "__main__":
