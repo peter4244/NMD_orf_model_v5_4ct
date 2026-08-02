@@ -38,6 +38,31 @@ biology the head is named for.
 | C7 | **Position does not mediate C6.** Holding candidate start position fixed, the partial correlation is **−0.582**, stronger than the raw −0.460. Position was suppressing the association. | model | n=4,526 | job 8898939 |
 | C8 | **ORF length fully mediates C6.** `capture ~ ORF length` is **+0.760**; holding length collapses the junction association to **−0.009**. | model | n=4,917 / 4,695 | job 8899132 |
 | C9 | The reading-frame channels (6–8) are written across the **entire** window, including all 900 upstream UTR positions — phase relative to a downstream AUG. So a periodic 3-cycle grid is supplied throughout the 5′UTR. | model / instrument | `data_prep.py:207-211`: `genomic_positions = arange(w_start, w_end)`, written to every filled position | code read |
+| C10 | **The capture window's downstream fill extent is a deterministic function of ORF length, so C8's +0.760 has a geometric channel that is not gene-finding.** The ATG window is filled with `limit_hi = mid` where `mid = (atg_pos + stop_pos) // 2`, and the window runs 100 nt past the AUG. So downstream fill = **min(100, ORF_length / 2)**: for any ORF shorter than **200 nt**, where the fill stops encodes ORF length exactly. | model / instrument | `data_prep.py:262-274` and the clip in `encode_window_v5:141-144`; §5.3 of `SEQUENCE_ENRICHMENT_APPROACH.md` already names this leak class — *"where the downstream fill stops encodes ORF length"* — and records that two of its kind were **invisible to ablation** | code read, interpretability window |
+
+## C10's falsifiable prediction, recorded before the measurement
+
+*Written by the interpretability window before anyone splits the data, so it cannot be fitted after.*
+
+If C8's `capture ~ ORF length = +0.760` runs through fill geometry, the association must be **carried
+by ORFs shorter than ~200 nt** and must **weaken sharply above** that, because fill saturates at 100
+and stops varying with length. Concretely:
+
+- **below 200 nt** — fill boundary moves with length, so the correlation should be strong
+- **above 200 nt** — fill is pinned at 100 for every candidate, so length is invisible through this
+  channel and the correlation should collapse toward the level that genuine coding-likeness supports
+
+**If it collapses:** C8 is a window-geometry artifact, "prefer the longest ORF" is not gene-finding,
+and the third leak of the §5.3 class has been found. **If it persists above 200:** the geometric
+channel is not the explanation, coding-likeness or another route survives, and C10 is a contributor
+rather than the account.
+
+**This also bears on the band-split error recorded below.** A split that "tested where ORF length
+still has range" is the same boundary from the other side — above 200 nt, length has range in the
+data and none in the fill, which would produce exactly a backwards-looking result. Worth re-reading
+that failure against this prediction rather than treating it as a bad test.
+
+**Cost: none.** It needs no new job — capture and ORF length are already in hand from job 8899132.
 
 ## What follows from C9, and it matters for a prior observation
 
