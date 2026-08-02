@@ -31,9 +31,21 @@ them makes it legible to a reader who was not in the conversation.*
 
 ### The question
 
-The model predicts NMD in two steps: it spreads weight across up to five candidate reading frames,
-then asks how likely each one is to trigger decay. We want to know whether the **second** step has
-learned real biology.
+The model predicts NMD in two steps: it spreads weight across the candidate reading frames in a
+transcript, then asks how likely each one is to trigger decay. We want to know whether the **second**
+step has learned real biology.
+
+> ⇒ **Corrected 2026-08-02, Pete's catch.** This paragraph first said "up to five candidate reading
+> frames." That is the old v5 design and it is wrong for the current model. **Measured from the
+> tensor itself** (`results_tensor_v6/nmd_tensor.h5`, built 2026-08-01): 41,765 transcripts carrying
+> **796,584 candidates**, stored ragged via `offset`/`count` rather than in a fixed 5-slot array —
+> **median 17 per transcript, mean 19.1, maximum 565**, and 91% of transcripts carry more than five.
+> `data_prep.py`'s `MAX_ORFS = 5` and `select_priority_orfs` belong to the superseded pipeline;
+> `build_tensor.py` built this one.
+>
+> **This makes the competition a more interesting object, not a footnote.** A weighting that resolves
+> onto premature-stop-encoding ORFs is a far stronger claim across ~19 candidates than across 5, and
+> it means the selection arm has substantially more to explain than either of us assumed.
 
 There is a textbook rule for this. A stop codon triggers decay when it sits **more than about 50–55
 bases before the last splice junction** in the transcript. That rule is the core of how NMD works,
