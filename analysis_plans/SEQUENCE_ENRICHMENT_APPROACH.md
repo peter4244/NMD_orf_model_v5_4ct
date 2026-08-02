@@ -200,30 +200,52 @@ sequence. The interval between that PTC and the annotated stop is:
   exon-junction complexes that trigger decay
 
 **So positional region and compositional region decouple, and they decouple exactly
-where the biology is.** The consequences:
+where the biology is.**
 
-- conditioning on **position** compares that interval against true 3′UTRs — wrong
-  composition
-- conditioning on **annotation** compares it against CDS — wrong position and
-  function
-- **the discrepancy tracks the NMD label**, because PTC-containing transcripts are
-  the mechanism cell. So a comparison between NMD and control transcripts on
-  "downstream of the stop" sequence is confounded by composition in a way that
-  correlates with the outcome
+**This is NOT something to correct for.** That framing was wrong in the first draft
+of this document and Pete corrected it. The composition of the sequence downstream of
+a PTC is not a nuisance variable sitting beside the exposure — **it is part of what a
+PTC transcript is.** Conditioning it away would remove the thing we are trying to
+measure, in the same way that adjusting for a variable on the causal path removes the
+effect. There is no version of this analysis in which we want a PTC transcript's
+downstream region to look compositionally like a normal 3′UTR.
 
-**Neither conditioning is sufficient alone. The two definitions must be crossed** —
-annotated region × position relative to the operative stop — and the cell that
-matters most (annotated-CDS, positionally-downstream) exists only in the PTC
-transcripts. Any enrichment reported for that cell needs a background drawn from the
-same cell, which for control transcripts barely exists.
+**Framed correctly it is an asset, not a liability — a natural experiment the data
+provides for free.** The two properties are ordinarily confounded across the
+transcriptome, and here they are pulled apart:
 
-This is not a problem the DNA motif literature faces, and we have not solved it. It
-is stated here so that no positional result is reported without it.
+| | positionally downstream of the operative stop | composition |
+|---|---|---|
+| normal transcript | yes | 3′UTR-like, AU-rich |
+| PTC transcript, PTC-to-annotated-stop interval | yes | CDS-like, codon-structured, GC-rich |
 
-*Also unresolved and related:* we currently define "downstream" by the stop of the
-ORF the model commits to. Defining it by the annotation gives the same answer for the
-enrichment (tested: identical k-mers, r = 0.842/0.779 against 0.806/0.774), but that
-test was run before this issue was articulated and does not address it.
+**No artificial background can construct that cell.** A dinucleotide shuffle, a
+GC-matched set, a region-matched set — none of them produce "downstream position with
+coding composition," because in a normal transcriptome that combination does not
+exist. Our data contains it because NMD substrates are what they are.
+
+**What follows is an interpretive obligation rather than a statistical adjustment:**
+
+- if an enrichment holds in the normal-transcript downstream region **and** in the
+  PTC interval, it tracks **position**, not composition — and it did not need a
+  background to establish that
+- if it holds only in the normal downstream region, it tracks **3′UTR composition**
+  and is not about the model's response to position
+- if it holds only in the PTC interval, it is about **coding sequence in a
+  post-termination position**, which is the most mechanistically interesting outcome
+  and the one this design is uniquely able to see
+
+**Every positional result must say which of these it is.** Not adjusted for — stated.
+
+*Practical caveat:* the PTC interval exists only in transcripts with a premature stop,
+so the cell is smaller than the others and the comparison may be underpowered. That
+is a limit on what can be concluded, not a reason to adjust.
+
+*Also noted:* we currently define "downstream" by the stop of the ORF the model
+commits to. Defining it by the annotation gives the same enrichment (tested: identical
+k-mers, r = 0.842/0.779 against 0.806/0.774) — but that test was run before this was
+articulated and answers a different question. It shows the k-mer result is robust to
+the anchor; it says nothing about the position/composition decoupling above.
 
 ### 5.3 Edge effects, from windows and from biology
 
@@ -285,7 +307,10 @@ must state whether it counts unreachable candidates.**
 
 - **The sequence enrichment is not yet a claim.** It survives the regional control;
   the k-mer instrument is the wrong one and we are switching.
-- **§5.2 is open.** The crossed region definition is stated, not implemented.
+- **§5.2 is an interpretive requirement, not an open technical problem.** The
+  position/composition decoupling is not corrected for; every positional result states
+  which of the three readings it supports. The three-cell comparison that would settle
+  it has not been run.
 - **Seqlet calling has two defensible criteria** — signed and unsigned — selecting
   sets that overlap at Jaccard 0.52. Both will be run and the overlap reported.
 - **The gate before any of this counts:** run the pipeline on a model known to encode
