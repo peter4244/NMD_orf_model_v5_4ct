@@ -255,6 +255,30 @@ Batch messages. Send one when something changes what the other window would do.
 
 ---
 
+## How to read the method document — this matters more than the credit
+
+**It was not designed. It is a record of what we ran into.**
+
+The ladder in §3.2.2 exists because a GC control had to be thrown away. The
+autocorrelation-preserving null exists because the run-length null was invalid. The
+magnitude clause exists because the directionality claim was circular. The definition
+in §1.1 exists because we used the word "motif" for two days without one. **Every
+piece of structure in that document is the scar of a specific failure**, and it is
+worth knowing which, because:
+
+**You will hit failures it does not anticipate.** It is not a standard handed down
+finished — it is the current state of what two windows learned by getting things
+wrong, and it stops exactly where our errors stopped. When you find a class it does
+not cover, the correct response is to add a row, not to work around the gap or
+assume the omission was considered.
+
+The two limits of the arrangement that are already known and written down — that
+**independent replication misses shared design errors**, and that **we cross-checked
+numbers and never prose** — were both discovered the same way, by something going
+wrong that the document had no entry for. Expect a third.
+
+---
+
 ## The sentence to keep
 
 We spent two days building instruments and the most valuable output was learning that
