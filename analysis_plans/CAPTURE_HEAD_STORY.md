@@ -103,6 +103,44 @@ that failure against this prediction rather than treating it as a bad test.
 
 **Cost: none.** It needs no new job — capture and ORF length are already in hand from job 8899132.
 
+## ⇒ THE GOLD STANDARD IS WRONG FOR HALF THE DATA — caveat on C2, C3 and C11
+
+*Pete, 2026-08-02. Registered against all three rather than restated in each.*
+
+**C2, C3 and C11 all score the model on recovering the ANNOTATED REFERENCE CDS. For an
+NMD substrate that is frequently the wrong ORF.** The mechanism of NMD is that a
+non-canonical frame — a uORF, or a PTC-bearing frame — is the one that matters. Scoring
+the model on how often it returns the annotated main ORF asks it to do the opposite of
+its job on exactly the transcripts the model exists for.
+
+**The proof is our own ATF4 result.** The posterior flips **18×** onto a 179-nt uORF and
+puts **93%** of the NMD signal there — the textbook mechanism, recovered. On this
+benchmark that flip counts as a **miss**, because the uORF is not the annotated CDS.
+**The gold standard penalises the model for being right.**
+
+**And the split we already have is consistent with it, filed under a different claim:**
+reference-ORF recovery is **0.658 in NMD transcripts against 0.729 in controls**. The
+model looks worse precisely where the annotation is least likely to be the operative
+frame.
+
+**What this does to C3 specifically, and it is the load-bearing one.** The gating
+interpretation rests on the head's argmax (0.305) being *worse* than position (0.424).
+But the head is measured to weight decay-relevant candidates — `capture ~ p_decay`
+**+0.362** among short candidates, its top pick carrying a downstream junction 76.3% of
+the time. **A head doing that will systematically diverge from the annotation on NMD
+transcripts.** So part of the 0.305 may be the head working, and the comparison that
+produced the gating reading penalises the behaviour we have separately measured it to
+have.
+
+**What is required.** All three claims reported **split by NMD label**, with the
+interpretation scoped to controls, where the annotated CDS is the right target.
+
+**And for NMD transcripts there may be no gold standard available at all.** We have no
+ribosome profiling. Defining the target as "the frame whose stop has a downstream
+junction" is close to circular, since that is the property under test. **Until that is
+resolved, accuracy on NMD transcripts is uninterpretable rather than merely lower**, and
+no claim should rest on it.
+
 ## What follows from C9, and it matters for a prior observation
 
 "ORF periodicity bleeding into the 5′UTR" is most likely **the encoding, not the
