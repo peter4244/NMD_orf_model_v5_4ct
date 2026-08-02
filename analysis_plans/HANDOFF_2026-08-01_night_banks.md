@@ -137,6 +137,259 @@ signal-to-noise, not a demonstration of it. Measure before relying on it.
 be high for `vals` and low for `vals_capture`. If it is low, capture-arm findings
 need cross-seed replication as a gate, not as a robustness check.
 
+### "Is it robust" hides three different questions
+
+Do not collapse them. Collapsing them is the same error as carrying one design
+effect across statistics.
+
+| what varies | what is fixed | instrument | question it answers |
+|---|---|---|---|
+| initialisation | the transcripts | cross-seed **sign** agreement (`qc_ism_banks.py`) | do the seeds agree which *direction* each substitution pushes? |
+| initialisation | the transcripts | cross-seed **magnitude rank** and elevated-set overlap (`analysis_ism_regions.py`) | do the seeds agree which *positions* are extreme? |
+| the genes | the seed | the `arm` column — discovery vs confirmation, disjoint genes | does a finding **generalise** to genes it was not found on? |
+
+The first two are the same axis and different comparisons, and they can disagree
+without contradiction. Seeds can agree on direction everywhere while disagreeing
+about which positions are extreme, because sign agreement is insensitive to
+magnitude. The reverse is also possible: agreement about which positions are large,
+with the small-magnitude bulk flipping sign at the floor. **Given that roughly half
+the capture arm may sit near the noise, expect exactly that pattern in
+`vals_capture`.**
+
+**The third axis is shipped and unused.** §9 step 1 assigned every gene to
+`discovery` or `confirmation` by a fair draw seeded at 20260801, no gene spans both
+arms, and the bank carries `arm` per transcript. Nothing tonight touched it. It is
+the only one of the three that answers whether a finding holds on genes it was not
+discovered on, which is the question a reviewer asks. Use it before claiming
+generality from the other two.
+
+I had this wrong in a message to the interpretability window — I described their
+check as varying transcripts. It does not; it varies the seed, as mine does. They
+corrected it from their code.
+
+## Anchoring on the reference candidate is a differential exclusion
+
+From the interpretability window, and it is the sharpest trap waiting for tomorrow.
+**3,422 of the 4,999 subset transcripts have a reference candidate; the 1,577
+without are not evenly spread.** The NMD / no-main-ORF-stop cell — the mechanism
+cell this section is about — retains 49.9%, while its matched control, control /
+no-main-ORF-stop, retains 93.1%.
+
+So any analysis that filters on `cand_is_ref_cds`, or anchors a positional profile
+on the reference start, drops half the mechanism cell and almost none of its
+control. A difference between them would then be partly the filter. This is the
+same shape as the geometric leaks in §8.5: the control that looks like it holds
+something fixed is itself correlated with the comparison.
+
+`qc_ism_banks.py` is **not** exposed — checked, not assumed: it reads only `valid`,
+`vals`, `vals_capture`, `vals_decay`, `mass` and `chunk_rows`, and never touches
+`cand_is_ref_cds`. Anything built tomorrow needs the same check made explicitly.
+
+## Two worktrees, and the merge that now has to be deliberate
+
+Both windows were committing from one checkout and `git add -A` swept up whatever
+the other had in flight. It cost provenance in both directions — several of the
+interpretability window's files landed under my commit messages, including the
+chunk-invariance probe that stopped five banks shipping at the wrong chunk size,
+and half of their anchor fix sits inside my `e7da9b2`. Nothing was lost, but the
+history is wrong about who did what.
+
+    ~/claude_projects/NMD_orf_model_v5_4ct          master   this window
+    ~/claude_projects/NMD_orf_model_v5_4ct_interp   interp   interpretability
+
+Layout is in `analysis_plans/WORKTREE_LAYOUT.md` (aedf42a).
+
+**The new obligation is merging, in both directions, often:**
+
+    git -C ~/claude_projects/NMD_orf_model_v5_4ct merge interp
+
+Neither window now sees the other's new files until a merge, and today each of us
+used the other's code within minutes of it being written. Infrequent merges trade
+one failure mode for a worse one.
+
+**Two things worktrees do not fix.** The results directories are shared by symlink,
+so two builds writing one shard directory would still collide — the bank build is
+unaffected and unprotected in equal measure. And both windows `scp` to the same
+cluster directory, which is a second clobbering channel entirely outside git.
+
+Also adopted: **stage explicit paths, never `git add -A`.** That is the fix for the
+thing that actually happened.
+
+## The dead-perturbation rate is not hardware-dependent — tested, not argued
+
+The interpretability window's pilot found **0** exact zeros inside ATG windows; my
+300-transcript random draw off the GPU banks found **5.7%** of zeros inside. Their
+leading hypothesis was CPU against GPU: an exact zero in `vals_capture` needs the
+encoder output bitwise unchanged, so accumulation order could plausibly change the
+rate. If true, a liveness gate specified per (isoform, position, operator) would not
+be reproducible off this cluster.
+
+**Controlled test, same three transcripts, same seed, CPU build against GPU build:**
+
+    transcript                    exact zeros CPU/GPU   inside-ATG zeros CPU/GPU
+    ENSG00000000457.15.novel6         501 / 501                 0 / 0
+    ENSG00000000457.15.novel8         501 / 501                 0 / 0
+    ENSG00000001497.19.novel1         592 / 592                 0 / 0
+
+Identical. `base_logit` agrees to 1.2e-07 across machines, confirming the same
+weights and that inter-machine float noise is far too small to flip a dead
+perturbation. **The hypothesis is refuted and the gate is reproducible.**
+
+The variable is the **transcript**, not the machine: 5.7% on a random draw, 0 on a
+deliberately short draw, 0 on these three. Which transcripts carry inside-ATG dead
+perturbations, and why, is open — but it is a property of the data, and any gate
+built on it must be characterised across transcripts rather than assumed uniform.
+
+## A liveness gate would be a third differential filter — measured, not predicted
+
+The interpretability window predicted the inside-ATG dead-perturbation rate rises
+with upstream fill extent, and that if so, a liveness gate would be the anchor
+exclusion one level down. Tested on `bank_interp_s100`, 400 transcripts, positions
+covered by **exactly one** ATG window so the covariate is well defined:
+
+    upstream fill extent          n        dead rate
+    100-200                     450          0.00%
+    200-400                   2,293          0.00%
+    400-600                   3,552          0.51%
+    600-900                   4,901          0.00%
+    900 (saturated)          26,996         10.78%
+    point-biserial r = +0.1457
+
+**RESOLVED — the driver is selection mass, and the interpretation flips.** Tested
+the interpretability window's third hypothesis on the same positions:
+
+    dead rate by SELECTION MASS
+      p_select < 1e-8            n  9,044       32.38%
+      p_select >= 1e-8   every remaining stratum, n 29,148      0.00%
+
+    fill extent, HOLDING mass
+      p_select < 1e-8      saturated 34.74%   truncated 2.70%
+      every other stratum  saturated  0.00%   truncated 0.00%
+
+    r(extent, dead)          = +0.1457
+    r(log10 p_select, dead)  = -0.7294
+
+Every dead perturbation is in the near-zero-mass stratum, and it is a **threshold,
+not a gradient** — 0.00% in all five strata above 1e-8. Fill extent's association
+disappears once mass is held, except *within* the dead-mass stratum where it still
+modulates 34.7% against 2.7%, so extent is a partial proxy rather than a pure one.
+Saturated upstream extent means `orf_start >= 901`, so many AUGs precede the
+candidate and its stick-breaking mass is a product over a long prefix.
+
+**FULLY RESOLVED: the deaths are float64 underflow in the aggregation.** The
+interpretability window argued the zeros could not be the mass annihilating a real
+change — float64 resolves a `Δz_p` of 1e-3 at mass 2e-8 by ~90,000 ulps — and so
+must be `enc_init` returning a bitwise-identical embedding. That is true **above a
+boundary they did not state**: unresolvable needs `mass × Δz_p < 2.2e-16`, so with
+`Δz_p` ~1e-3 the boundary is mass ~2.2e-13, and stick-breaking mass reaches 1e-15
+by slot 50. Splitting the dead stratum by magnitude:
+
+    p_select band            n      dead rate   regime
+    [0, 1e-30)              97       100.00%    underflow possible
+    [1e-30, 1e-20)       1,022       100.00%    underflow possible
+    [1e-20, 1e-16)         590       100.00%    underflow possible
+    [1e-16, 1e-13)       1,626        69.31%    underflow possible
+    [1e-13, 1e-11)       1,540         5.97%    encoder must be bitwise-equal
+    [1e-11, 1e-8)        4,169         0.00%    encoder must be bitwise-equal
+    p_select exactly 0      84       100.00%
+
+The rate collapses **exactly at the derived boundary**. So the deaths are
+aggregation underflow, and the question does not relocate to `enc_init` except for
+the 5.97% residual just above the boundary, where underflow should not reach.
+
+**That also closes the fill-extent puzzle.** Saturated windows mean 3′-proximal
+candidates, which means deeper ordinal position, which means lower mass, which
+means more underflow. The twelvefold modulation inside the dead stratum was further
+mass stratification, not a separate effect. Everything here is arithmetic and none
+of it is about the encoder.
+
+**This changes what a liveness gate means.** It is not a geometric artifact
+corrupting the measurement. At `p_select` < 1e-8 a dead perturbation is a *true
+statement*: nothing done to that window moves the output, because no mass reaches
+it. The gate is correctly identifying candidates the model cannot route to.
+
+**The differential exclusion is still real, but it is biological rather than
+encoding.** The mechanism cell has long 5′UTRs, therefore more upstream candidates,
+therefore more deep low-mass ones. The honest framing is not "the gate is broken"
+but *"the mechanism arm contains more unreachable candidates, and any comparison
+must say whether it is counting them."* Those two readings imply different fixes,
+which is why this was worth testing before the sentence was written.
+
+**The superseded reading, kept because the shape is still unexplained on its own
+terms:**
+
+**The direction holds; the shape does not.** This is a step at saturation, not a
+gradient. The proposed mechanism — more filled positions competing to be a bin's
+pooled maximum — predicts a smooth rise with extent, and there is none: every
+truncated bin is at or near zero and the fully-filled bin jumps to 10.78%. What is
+special about a *completely* filled upstream window is not explained and is worth
+one look before anyone relies on liveness.
+
+**The consequence is confirmed and larger than predicted.** A liveness gate drops
+~11% of positions where the upstream window is saturated and ~0% elsewhere.
+Saturated upstream means ≥900 bases 5′ of the start, i.e. a long 5′UTR — which is
+the NMD / no-main-ORF-stop cell. So gating on liveness silently removes an order of
+magnitude more positions from the mechanism arm than from its comparator.
+
+That is the **third** filter today that looks neutral and correlates with the
+comparison, after the reference anchor (49.9% vs 93.1% retention) and the
+structural zeros. Any liveness-gated comparison between mechanism groups needs this
+characterised first.
+
+Caveats: one seed, 400 transcripts, singly-covered positions only.
+
+## Two checks, not a taxonomy
+
+Both windows kept making errors today. Sorted by what would have caught them, not
+by what they looked like — and counted rather than impressioned, across both
+windows:
+
+**Untraced mechanism — 2 instances.** A plausible cause asserted without opening
+the code that would exhibit it. My right-fill diagnosis blamed a transcript-length
+clip that is never active. The other window's "capture near the floor ⇒ capture
+claims at risk" was stated without checking which quantity those claims are
+computed from — they read `p_select` off a forward pass and never touch
+`vals_capture`.
+
+> **The check:** grep for the quantity before asserting anything about what
+> depends on it.
+
+**Uncharacterized denominator or comparison set — 4 instances, and this is the one
+that dominated.** My structural zeros in `vals_capture`. My zeros-based mask, which
+fixed that error by introducing another. The other window's reference-anchor
+exclusion, 31.5 points differential on the grouping variable. Their circular-shift
+null drawn from the whole transcript when the comparison lived inside one window.
+The dense-array padding, where 78% of every array is not a position at all.
+
+> **The check:** before reading any proportion or any null, enumerate what is in
+> the denominator **and** what is in the comparison set. Both halves. Most of
+> today's errors were the second half.
+>
+> **Sharpened, after a fifth instance:** enumerate the **distribution** of the set,
+> not a representative value from it. The fifth error was characterising a stratum
+> spanning `p_select` from 1e-30 to 1e-8 by a single value of 2e-8, computing
+> float64 resolvability there, and generalising to the whole stratum — which spanned
+> the boundary being tested for. A representative value is not a denominator.
+
+**Naming the failure mode did not prevent it.** That fifth instance was committed by
+the window that had proposed the category, two hours after we agreed on it, in a
+piece of arithmetic done carefully and correctly at one point of a five-decade
+range. The lesson is not that the categories are wrong — it is that they do not
+work as things to remember. Only running the check works, which is why both are
+phrased as an operation on a set rather than as a principle.
+
+Deliberately not a framework. A third pattern showed up today — a control coarser
+than the confound it is controlling — that fits neither cleanly, and three named
+categories would not survive contact with tomorrow. Two checks that have each
+caught something real are worth more than a taxonomy that hasn't.
+
+**One process note that generalises past this project.** A wrong framing sent
+between windows reaches artifacts faster than a correction travels: the other
+window's overbroad claim about §5's mechanism arm was in this handoff before they
+retracted it. The mitigation is not slower messaging. It is that a claim sent
+sideways carries the same provenance mark as one written down — traced, or
+explicitly not traced.
+
 ## Traps that still apply
 
 1. **The subset is stratified, not random.** 4,999 transcripts, weights summing to
@@ -211,6 +464,160 @@ reported, the ordering is reported with it.
   — tonight they corrected me and I corrected nothing of theirs, but they also
   retracted one of their own findings unprompted.
 
-## Bank QC
+## Bank QC — what the five banks actually say
 
-See `qc_ism_banks_runlog.txt`, produced by `qc_ism_banks.py`.
+All five built, job 8885690, chunk 4,096, **all on Tesla V100-SXM2-32GB** across
+five nodes (d1002, d1007, d1011, d1017, d1002). Hardware is therefore not a
+confound in the cross-seed numbers; disagreement is initialisation. The residual:
+the bank script logs GPU model but not driver version per task, so a driver
+difference between nodes is not excluded — it is not a plausible cause of the
+effect sizes below.
+
+**Completeness, clean on every bank:** 4,999 / 4,999 transcripts, 11,062,149 valid
+positions, zero transcripts with no finite response, `chunk_rows` constant at
+[4096], ATG coverage 67.3% identical across seeds as the geometry assertion
+requires. Job 8886153, **exit 0, no problems found**; full output in
+`qc_ism_banks_runlog.txt`.
+
+                floor      vals med    capture med (ATG-covered)   >floor
+      s100   1.664e-06    1.326e-03         2.770e-05              63.1%
+      s200   1.873e-06    1.488e-03         6.281e-06              53.4%
+      s300   1.384e-06    1.205e-03         8.515e-05              68.9%
+      s400   1.869e-06    3.249e-03         2.941e-04              71.6%
+      s500   1.258e-06    1.453e-03         1.574e-04              78.3%
+
+      cross-seed   vals  26.8% unanimous sign   r 0.617
+                   cap   20.4% unanimous sign   r 0.610
+
+**The capture arm is usable** — 53–78% clears the floor on the honest denominator.
+The near-miss conclusion that it was mostly noise came from the wrong denominator
+and is retracted.
+
+### START HERE TOMORROW: capture magnitude is 47× seed-dependent
+
+The ATG-covered capture median runs **6.281e-06 (s200) to 2.941e-04 (s400)**, a
+factor of **47** across initialisations. Over the same five seeds `vals` spans a
+factor of 2.7 and `vals_decay` 2.1.
+
+So the capture arm's *magnitude* is strongly initialisation-dependent in a way the
+other two arms are not. It was invisible at three seeds. **Any elevation cut-off on
+the capture branch must be defined relative to that seed's own distribution, not in
+absolute effect size, and nothing from the capture branch should be pooled across
+seeds until this is handled.** An absolute threshold means something different in
+s200 than in s400 by a factor of 47.
+
+### Cross-seed at five seeds
+
+Raw unanimity is not comparable to the three-seed numbers — chance falls from 25% to
+6.25%. Against chance, `vals` is 4.3× and `cap` is 3.3×. Both real, both modest, and
+closer to each other than either window expected.
+
+**My recorded prediction — high for `vals`, low for `vals_capture` — is wrong on
+both halves.** They behave similarly and neither is high. At r = 0.62 for `vals` the
+caution about the run-length result stands, and splitting it into run *structure*
+versus run *locations* is the first thing to test.
+
+    bank    floor       vals median   >floor   decay median   >floor
+    s100   1.664e-06    1.326e-03     82.1%    1.018e-03      81.7%
+    s200   1.873e-06    1.488e-03     77.3%    9.651e-04      77.0%
+    s300   1.384e-06    1.205e-03     84.7%    8.747e-04      84.5%
+
+The floor is 1.4–1.9e-06, roughly double what a three-transcript build suggested.
+
+### The capture arm is readable. My first measurement of it was not.
+
+I reported 36–46% of `vals_capture` clearing the floor and was about to call the
+arm mostly floor. **That was the denominator, not the data.** A substitution in a
+stop window changes `e_stop → z_d` only and cannot touch `z_p`, so `vals_capture`
+is exactly zero there **by construction**. On 300 transcripts of s100:
+
+    covered by >=1 ATG window           66.2% of valid
+    vals_capture exactly zero           35.9% of valid
+      ...of those, inside an ATG window  5.7%
+    exact zeros outside any ATG window  33.8% of valid
+
+The last two coincide because they are the same set. Conditioned on ATG coverage,
+clearance is near 64%, and on a small local bank the conditioned median is 1.015e-05
+against 1.316e-06 unconditioned — an order of magnitude from the denominator alone.
+`qc_ism_banks.py` (df5cffa) now prints both and raises only on the conditioned one.
+
+**This is the failure this handoff warned about, made by the handoff's author, four
+hours after writing the warning.** The bank was fine. The harness was not.
+
+### What the floor does and does not threaten
+
+Corrected by the interpretability window after Larry caught it, and traced to the
+code rather than argued:
+
+- **threatened** — D3, novel motifs by ISM on the capture branch, and any
+  sequence-level *explanation* of capture's preferences.
+- **not threatened** — E4 and E5, which read `parts["p_select"]` off a
+  `return_parts=True` forward pass (`analysis2_selection_mass_full.py:126`,
+  `verify_atf4_capture_selection.py:68-69`); grepping both for `vals_capture`
+  returns zero. Likewise C1–C3 and §8.5, which are AUCs and win rates over
+  `p_capture` — also forward-pass.
+
+`vals_capture` is a *sensitivity*, ~1.3e-06: how much one substituted base moves
+the logit through the initiation branch. `p_select` is a *probability*, 0.1–0.6.
+Six orders of magnitude apart and answering different questions. **An unreadable
+sensitivity says nothing about the behaviour it fails to explain.** The diversion
+result is not at risk from these numbers and the QC must not be read that way.
+
+### Cross-seed, and the prediction I recorded was wrong
+
+    vals   33,186,447 entries   all 3 seeds same sign 44.1%   r(seed1, mean rest) 0.558
+    cap    33,186,447 entries   all 3 seeds same sign 24.7%   r 0.549
+
+Chance unanimity on three seeds is 25%. So `vals` at 44.1% is **above chance but
+not high** — I predicted high — and the `cap` figure is mostly my structural-zero
+bug, since `np.sign(0)` is 0 and such entries can never be unanimous.
+
+The interpretability window's prediction is the one that held: near-identical
+correlations (0.558, 0.549) beside very different sign agreement is exactly
+"agreement on which positions are large, with the small-magnitude bulk flipping
+sign at the floor."
+
+### The run-length result splits into two findings, and they can come apart
+
+From the interpretability window, and it is the most important thing to carry into
+tomorrow. The one positive that survived today is that elevated positions form runs
+of four or more bases, 34 times against 0 for random placement. **At a cross-seed
+track correlation of 0.558, the specific positions may not replicate even though
+the run structure does.**
+
+These are separable and must be reported separately:
+
+- **run-length distribution, per seed** — does each seed independently concentrate
+  sensitivity into short blocks?
+- **elevated-set overlap, between seeds** — do they agree on *which* blocks?
+
+The first can hold while the second fails, and that outcome is not a weaker version
+of the finding — it is a different finding: *"the model concentrates sensitivity
+into short blocks"* would be a property of the architecture, while *"these
+particular blocks"* would be a property of an initialisation. Only the first is
+claimable from five seeds; the second would need the discovery/confirmation arm.
+
+Reporting a single "the runs replicate" number would conflate them.
+
+### Two masks that are not interchangeable
+
+A dead perturbation **inside** an ATG window is a real measurement of zero. A
+stop-only position is not a measurement at all. Masking on "where `vals_capture` is
+nonzero" deletes both; masking on ATG geometry deletes only the second. The
+dead-perturbation rate is about 21% on this model, so the choice is not cosmetic —
+and I had this wrong in the first correction to `qc_ism_banks.py`, using the
+zeros-based mask for cross-seed agreement before the interpretability window
+pointed out the distinction.
+
+The geometric mask also buys a check that can fail, now asserted: every bank must
+agree on ATG coverage, because geometry does not depend on the seed. Disagreement
+would mean the banks were built over different candidate sets and nothing
+comparing them is valid.
+
+**Open for the morning, and the first thing worth doing:** `vals` sign agreement at
+44.1% is lower than a quantity intended for interpretation should be, and unlike
+the capture figure it is **not** explained by structural zeros. Condition it on
+entries clearing the floor before concluding anything from it. If the agreement is
+carried entirely by the above-floor minority, that is a usable result; if it stays
+near chance there too, positional claims from `vals` need the discovery/confirmation
+arm before they mean anything.
