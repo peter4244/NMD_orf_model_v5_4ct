@@ -423,7 +423,7 @@ def main():
     # ================================================================== Q1
     print("=" * 78)
     print("Q1  Are there regions where the signal is clearly above baseline?\n")
-    rows, run_real, run_null, run_arm = [], [], [], []
+    rows, run_real, run_null, run_arm, eff_cache = [], [], [], [], []
     for r in recs:
         eff = per_position_effect(r[key])
         ok = r["valid"] & np.isfinite(eff)
@@ -452,6 +452,7 @@ def main():
         nm[pick] = True
         run_null.append(runs_of(nm))
         run_arm.append(r["arm"])
+        eff_cache.append((eff, ok))
         rows.append((r["iso"], int(ok.sum()), med, np.percentile(e, 99), e.max(),
                      e.max() / med if med > 0 else np.nan,
                      100 * above_floor, int(hi.sum())))
@@ -468,6 +469,39 @@ def main():
     print(f"\n  So the answer to 'is anything elevated' is a fold, not a yes/no:")
     print(f"  the strongest single position of a transcript runs "
           f"{df['max_fold'].median():.0f}x its own median.\n")
+
+    # THE EXCESS IS A FUNCTION OF A THRESHOLD WE CHOSE, so report it across the
+    # threshold rather than at a point (Maude's suggestion, and her toy-bank sweep
+    # showed the ratio moving 1.7x to 11.2x across K=5..20 on identical data).
+    # A single number would let a reader mistake the choice for the result.
+    #
+    # Recomputed from the cached effect tracks, so a sweep costs re-thresholding
+    # and not a re-read of the bank.
+    print(f"\n  EXCESS ACROSS THRESHOLDS — runs of >= 4, observed against the same "
+          f"count placed at random")
+    print(f"    {'top frac':>9} {'elevated':>10} {'runs':>8} {'mean len':>9} "
+          f"{'obs >=4':>9} {'null >=4':>9} {'ratio':>8}")
+    for tf in (0.001, 0.002, 0.005, 0.01, 0.02, 0.05):
+        ro, rn_ = [], []
+        for eff, ok in eff_cache:
+            k = max(1, int(round(tf * ok.sum())))
+            cut = np.partition(eff[ok], -k)[-k]
+            h = (eff >= cut) & ok
+            ro.append(runs_of(h))
+            idx = np.flatnonzero(ok)
+            nm = np.zeros_like(h)
+            nm[rng.choice(idx, min(int(h.sum()), len(idx)), replace=False)] = True
+            rn_.append(runs_of(nm))
+        a = np.concatenate(ro) if ro else np.zeros(0)
+        b = np.concatenate(rn_) if rn_ else np.zeros(0)
+        if not len(a):
+            continue
+        o4, n4 = int((a >= 4).sum()), int((b >= 4).sum())
+        ratio = f"{o4/n4:.2f}x" if n4 else ("inf" if o4 else "n/a")
+        print(f"    {tf:>9.3f} {int(a.sum()):>10,} {len(a):>8,} {a.mean():>9.2f} "
+              f"{o4:>9,} {n4:>9,} {ratio:>8}")
+    print(f"    a ratio that holds across the sweep is an effect; one that appears "
+          f"at a single\n    threshold is that threshold")
 
     rr = np.concatenate(run_real) if run_real else np.zeros(0)
     rn = np.concatenate(run_null) if run_null else np.zeros(0)
