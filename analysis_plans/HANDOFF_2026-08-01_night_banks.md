@@ -566,9 +566,36 @@ both statistics agree:**
       all positions                          +0.6%     +0.6%
       top 1% by |effect|                    +15.2%    +15.3%
 
-**So: elevated positions are ~15% above the noise null; all positions are
-indistinguishable from it.** Robust to the summary statistic. "62% of the attainable
-ceiling" overstates it and "14% above the analytic null" was right by accident.
+**FULLY RECONCILED. Two gaps, both "same name, different set", and the settled
+number is 20.5%.**
+
+    set                                median     mean         n
+    sub-floor null (measured)          0.3872   0.3700   158,036
+    top 1% GLOBAL quantile             0.4469   0.4270    10,370
+    top 1% PER-TRANSCRIPT              0.4668   0.4519    10,369
+
+    per-transcript:  +20.5% above null,  21.9% of the range 0.387-0.75
+    global:          +15.4% above null,  16.4% of the range
+    the two definitions overlap at Jaccard 0.240
+
+Gap one was **mean versus median**. Gap two was **global versus per-transcript top
+1%** — and those two definitions share only 24% of their positions, because the
+global quantile over-weights transcripts whose effects are large overall.
+Per-transcript is what every other elevation analysis here uses, including the
+run-length and k-mer work, so it is the right one and the global version was the
+outlier.
+
+Independent implementations then agree to four decimals: 0.4668 here against 0.4664
+there, 21.9% of range against 22%.
+
+**The settled statement: elevated positions are 20.5% above the measured noise
+floor, which is 22% of the available range.** All positions are indistinguishable
+from the floor.
+
+**That number was corrected three times in one morning and shrank every time:** 62%
+of an attainable ceiling → ~14-15% above a wrong analytic null → 20.5% above the
+measured in-sample null. Worth stating plainly wherever it is written, because the
+first figure travelled between windows before any of the corrections did.
 
 The conclusion that the branch learned both directional and non-directional features
 stands. The size of the directional part is ~15% over noise, and it should be quoted
