@@ -90,6 +90,13 @@ because each one was learned by hitting it — see `analysis_plans/HANDOFF_INTER
   default. **Communication reverts to baseline once the topic is deemed addressed** —
   and someone has to say so, or the conference never ends.
 
+  **For a conference about a SCIENTIFIC STORY the bar is higher** (Pete,
+  2026-08-02): it ends only when the **storyteller says it should end** *and*
+  **every member has read the story** and either agrees with it or agrees to stop
+  critiquing it. Settling the *process* for documenting a story is not settling
+  the story. The first declaration under the weaker rule was made while the
+  guardian had explicitly not yet read the narrative, and was withdrawn.
+
   *Why it exists, from 2026-08-02:* the results window sent a narrative-process
   design to the interpretability window without copying the model window, which
   owned the work; and the interpretability window summarised state for Pete using a

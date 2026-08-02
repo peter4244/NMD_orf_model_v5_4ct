@@ -20,7 +20,7 @@ claim→code map; `RETRAIN_ARCHITECTURE_CHANGES.md`.
 
 ## Depends on
 
-**Claims** C1–C16 (`CAPTURE_HEAD_STORY.md`). **Decisions** D48, D50, D55, D56.
+**Claims** C1–C15 (`CAPTURE_HEAD_STORY.md`); **C16 retracted**. **Decisions** D48, D50, D55, D56.
 **Findings** `FINDINGS_ORF_SCANNER_2026-08-02.md`, `FINDINGS_TILED_PERTURBATION_2026-08-02.md`,
 `FINDINGS_DECAY_SEQUENCE_2026-08-02.md`. **Retrain items** 3, 4, 6, 8.
 **Jobs** 8898926 · 8898939 · 8899132 · 8899353 · 8899766 · 8899820 · 8899905 · 8899965 ·
@@ -82,21 +82,27 @@ ones. **The head fails precisely where initiation biology says context should de
 
 ## 3. What the picker is actually selecting for
 
-| | raw | holding ORF length |
-|---|---|---|
-| `p_capture ~ junction count` | −0.453 | **−0.009** |
-| `p_select ~ junction count` | −0.050 | **+0.442** |
+| `p_select ~ junction count`, conditioning on | median |
+|---|---|
+| nothing (marginal) | **−0.050** |
+| ORF length only | +0.452 |
+| position only | −0.543 |
+| **length and position together** | **−0.067** |
 
-*C16, job 8900685.*
+*C14 (jobs 8900643, 8900685). The head's own aversion, `p_capture ~ junction count`
+−0.453, collapses to −0.009 holding length — that arm is entirely length.*
 
-**Marginally the picker looks indifferent to junction structure. At matched length it is
-not** — it routes strongly toward junction-bearing frames, and the marginal −0.050 is length
-*masking* that. The head's own aversion is entirely length and collapses to −0.009.
+**Routing is indifferent to junction structure.** Length and position each mask the
+other in opposite directions, so holding either alone manufactures a signal that is
+not there; holding both returns −0.067, agreeing with the marginal −0.050.
 
-⇒ **Pete's founding hypothesis failed as a marginal claim (C14) and holds as a within-length
-one (C16).** Only the second describes a comparison the model makes: same length, different
-junction structure. This was asserted by both windows for hours before the direct
-measurement existed, and the direct measurement reversed twice.
+⇒ **Pete's founding hypothesis does not hold at the routing step, under any
+conditioning.** The junction preference enters at the decay multiplication.
+
+*This paragraph asserted the opposite for forty minutes.* C16 claimed routing was
+junction-seeking at matched length (+0.442); it held length and not position, and is
+retracted. Kept visible because the retraction table alone would not have shown that
+the body of this document once said it.
 
 **The two stages are aligned, and the queue does it.** `p_select ~ d` +0.399 against
 `p_capture ~ d` +0.091 with the queue removed; the mixture runs **1.29×** above independent
@@ -170,9 +176,10 @@ back **only among short candidates**, where the head must choose among uORFs.
 |---|---|
 | keto ratio **1.148×** | no reproducible producer; the cited script cannot emit that row |
 | recovery **0.941** | `astype(bool)` on a −1 sentinel → 0.885 → 0.883 against GENCODE |
-| "selects premature-stop frames" as a **marginal** claim | −0.050 (C14); reinstated within-length at +0.442 (C16) |
+| "selects premature-stop frames" | never held: −0.050 marginal, −0.067 holding length and position |
 | "separation given back by the objective" as a **global** claim | true only among short candidates |
 | capture sensitivity is **sparse** upstream | diffuse — 32 tiles within ~6% (job 8900420) |
+| **C16 — routing junction-seeking at matched length (+0.442)** | held length, not position; holding both gives −0.067. **C14 stands.** |
 
 **Four of the five were caught by a reader outside the derivation asking what a sentence
 rested on. None was caught by a check.**
