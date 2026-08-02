@@ -374,7 +374,7 @@ def score(cells, genes, nb, top_frac, rng, n_rep, verify):
             if verify and not checked:
                 d = verify_null(stats, rng)
                 print(f"  null verification: KS vs shuffle = {d:.2f}x critical"
-                      f"  ({'PASS' if d < 1.0 else 'FAIL'})")
+                      f"  ({'PASS' if d < KS_PASS else 'FAIL'} at {KS_PASS})")
                 checked = True
             obs_v = np.array([s["ratio"] for s in stats])
             obs = float(obs_v.mean())
