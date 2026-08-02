@@ -311,6 +311,17 @@ must state whether it counts unreachable candidates.**
   position/composition decoupling is not corrected for; every positional result states
   which of the three readings it supports. The three-cell comparison that would settle
   it has not been run.
+- **Directionality is NOT established and has been moved here from §7** (Pete,
+  2026-08-02). Elevated positions run ~21% above the measured in-sample noise floor
+  on the ratio `|mean_b vals| / max_b |vals|`. But elevated positions are *defined*
+  as the largest effects, and small effects sit near the floor where the three
+  substitutions have near-random signs and the signed mean cancels — so the gap may
+  be a signal-to-noise property of magnitude rather than learned directional
+  structure. The banded profile already rises monotonically with |effect| across all
+  positions, which is what the magnitude explanation predicts. **If directionality is
+  a function of effect size, "elevated positions are more directional" is
+  tautological.** `probe_directionality_null.py` tests it and has not been run.
+
 - **Seqlet calling has two defensible criteria** — signed and unsigned — selecting
   sets that overlap at Jaccard 0.52. Both will be run and the overlap reported.
 - **The gate before any of this counts:** run the pipeline on a model known to encode
@@ -325,19 +336,29 @@ must state whether it counts unreachable candidates.**
 
 For completeness, what currently survives:
 
-- decay-branch importance clusters into short runs, at every threshold from 0.2% to
-  5%, at hundreds of times a count-matched null
+- decay-branch importance clusters into short runs at every threshold from 0.2% to
+  5%. The count-matched null is **exactly 0** below the 5% threshold, so the ratio is
+  undefined there rather than large; at 5% it is 19,039 against 50. **A zero null is
+  correct rather than suspicious here, and that is checkable:** random placement
+  predicts 0.08 runs of ≥4 at p=0.01 and 45 at p=0.05, against 0 and 50 observed. The
+  null implementation reproducing closed-form binomial arithmetic is a stronger
+  statement about it than any ratio
 - it replicates on **disjoint gene sets** — the discovery/confirmation split, which is
   the only axis that answers "does this hold on genes it was not found on"
 - it survives with the GC channel held **bitwise constant**, at 57% of its
   arity-matched level
-- the run lengths are **4–6 bases**, which is motif scale and *wrong* for the ±25
-  averaging window of the GC channel — so the encoding cannot be producing them
+- the **excess** sits at runs of **4 or more bases** — which is motif scale and
+  *wrong* for the ±25 averaging window of the GC channel, so the encoding cannot be
+  producing it. The *typical* run is 1.38 bases and runs of ≥4 are 3.3% of runs
+  (1,865 of 56,675, seed 100, top 1%). The distinction matters: a reader takes
+  "run lengths are 4–6" as typical when it is the tail
 - the five model seeds agree on the *sequence* far better than on the *positions*,
   which is what a binding preference at variable locations produces
-- directionality at elevated positions is **~21% above the measured noise floor**,
-  under per-transcript elevation, with the rule stated
 
-That number was corrected three times in one morning and shrank each time. The first
-figure travelled between windows before any of the corrections did, which is the part
-worth remembering.
+**Everything in §7 is `vals_decay`.** The capture branch is out of scope here, not
+merely unreported.
+
+The directionality figure that used to sit in this section was corrected three times
+in one morning, shrank each time, and has now moved to §6 as not established. The
+first version travelled between windows before any of the corrections did, which is
+the part worth remembering about all of these.
