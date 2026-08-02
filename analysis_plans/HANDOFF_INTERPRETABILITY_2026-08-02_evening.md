@@ -137,6 +137,18 @@ quoted the result as solid anyway. It was wrong by half. **Flagging a caveat is 
 as propagating it.** Identifying the reason your number might be wrong and then using it
 regardless is worse than not having noticed.
 
+**And one failure class from the model window's own record, because it is invisible and you
+will hit it.** A scripted edit — `str.replace` on a document — **missed on a leading-space
+mismatch and returned its input unchanged**, while a *second* replacement in the same script
+did match. So the commit was non-empty, the diff showed `1 insertion, 1 deletion`, the
+message described the fix, and **the fix had not happened**. Nothing looked wrong at any
+point. They caught it by grepping for the phrase itself.
+
+⇒ **Verify a documented change by grepping for its content, never by the commit message, the
+diff size, or the fact that the commit was non-empty.** `CLAUDE.md` already says a commit
+message is not evidence of its diff; this is the sharper version — *a non-empty diff is not
+evidence that the intended edit landed.*
+
 ---
 
 ## THE STANDARD, WHICH IS THE POINT OF ALL OF IT
@@ -150,3 +162,25 @@ predictions registered before the run.
 with **no model in it**. For anything built from a rank product, a monotone ordering or a
 normalised share, **zero is not the null**. That is what killed C16, and it is the most
 reusable thing this window produced.
+
+---
+
+## THE LAST THING, AND IT IS THE ONE I AM LEAST SURE WE WILL ACT ON
+
+**Nothing was caught by a check on 2026-08-02.** Not one thing. Two dead sentences in prose,
+four stale reads, a retraction adopted without a producer, and a silent no-op edit — every
+one caught by a person reading. Even the tool built specifically to catch stale reads was
+itself broken in a way its own self-test could not see, because a test that lives beside the
+thing it tests inherits its assumptions.
+
+A great deal of machinery was built today: decisions D59–D62, a conference protocol, a marker
+system, three narrative rules. **The entire catch record belongs to people reading carefully.**
+
+The one piece of process that did fire — the storyteller naming her own most-retractable
+sentence and then testing it instead of hedging — worked because **it is not a check. It is a
+prompt to think, aimed at the author, at the moment they are least inclined to look.**
+
+The model window's sharpening of this is better than mine and is the sentence to keep:
+**both of the things that caught errors required someone reading with the expectation of
+finding something wrong, and that is not automatable.** Weight accordingly before building
+the next gate. More prompts of that kind; fewer gates.
