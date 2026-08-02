@@ -107,18 +107,38 @@ def load_h5(path):
     with h5py.File(path, "r") as f:
         cand_off, cand_cnt = f["cand_offset"][:], f["cand_count"][:]
         is_ref = f["cand_is_ref_cds"][:]
+        p_sel = f["p_select"][:]
         c_start, c_end = f["cand_orf_start"][:], f["cand_orf_end"][:]
         spans_all = f["spans"][:]
         tx = [s.decode() for s in f["transcript_id"][:]]
         base = f["base_logit"][:]
+        cell = ([s.decode() for s in f["cell"][:]] if "cell" in f
+                else [""] * len(tx))
         wt = (f["sampling_weight"][:] if "sampling_weight" in f
               else np.ones(len(tx), np.float32))
         for i in range(len(tx)):
             lo, n_k = int(cand_off[i]), int(cand_cnt[i])
             r = np.flatnonzero(is_ref[lo:lo + n_k] == 1)
-            if not len(r):
-                continue
-            k = int(r[0])
+            # ANCHORING ON THE REFERENCE CANDIDATE ALONE IS A DIFFERENTIAL
+            # EXCLUSION, not a neutral filter. Measured on the production subset:
+            # 3,422 of 4,999 transcripts have a reference candidate, and the
+            # 1,577 without are not spread evenly --
+            #
+            #   NMD / NO main-ORF stop        49.9% have one
+            #   control / NO main-ORF stop    93.1%
+            #
+            # so the mechanism cell section 5 rests on would lose half its
+            # transcripts while its matched control kept almost all of its own,
+            # and any comparison between the two would carry that difference
+            # whatever the sequence did. Falling back to the highest-selection-mass
+            # candidate keeps them, at the cost of a coordinate system that is the
+            # MODEL'S choice rather than the annotation's. That is a real
+            # difference in what an offset means, so it is recorded per transcript
+            # as anchor_type and reported split, never silently pooled.
+            if len(r):
+                k, anchor_type = int(r[0]), "reference"
+            else:
+                k, anchor_type = int(np.argmax(p_sel[lo:lo + n_k])), "model"
             # spans rows are written per transcript in candidate order, so the
             # row for (i, k) is at cand_offset[i] + k. Filtering on column 0
             # instead would be O(candidates) per transcript and would silently
