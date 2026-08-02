@@ -69,40 +69,54 @@ biotype column exists in our tables; the set is identified structurally. Job 890
 
 | stratum | n | prior | posterior |
 |---|---|---|---|
-| **PTC-bearing anchor, NMD** | 1,995 | **0.908** | **0.941** |
-| non-PTC anchor, NMD | 453 | 0.722 | 0.483 |
-| PTC-bearing anchor, control | 1,254 | 0.849 | 0.892 |
-| non-PTC anchor, control | 1,193 | 0.900 | 0.661 |
+| **PTC-bearing anchor, NMD** | 1,020 | **0.821** | **0.885** |
+| non-PTC anchor, NMD | 435 | 0.710 | 0.462 |
+| PTC-bearing anchor, control | 458 | 0.587 | 0.703 |
+| non-PTC anchor, control | 1,022 | 0.884 | 0.604 |
 
-**When recovery means decay-causation the model is right 94% of the time**, against
+> **⚠ CORRECTED. The first version of this table read 0.908 / 0.941 and was wrong.**
+> `cand_is_gencode_start` is int8 with values `[-1, 0, 1]`, where **−1 is a sentinel
+> meaning "no GENCODE CDS" — and `astype(bool)` returns True for −1.** The anchor
+> therefore selected 40,024 candidates instead of 2,949 and 4,916 transcripts
+> instead of 2,935, so most "GENCODE anchors" were an arbitrary sentinel candidate.
+> Caught by the interpretability window, who gave an arithmetic ceiling I could not
+> reconcile — only 16,655 transcripts have a GENCODE CDS at all — and an independent
+> cross-check (2,949 equals the count of annotated bank transcripts). **I had told
+> them their numbers were wrong. Mine were, by the mechanism they suspected.**
+>
+> **`cand_is_ref_cds` carries no sentinel** — values `[0, 1]` — so every claim
+> anchored on it is unaffected, and the pool-reference rows are identical across
+> both runs. The contamination was confined to the GENCODE arm.
+
+**When recovery means decay-causation the model is right 89% of the time**, against
 the 0.697 headline. That headline was averaging two populations the model handles
 completely differently.
 
 **And the posterior is a decay-seeking correction, visible in its sign.** It
-*improves* recovery where the answer is decay-causing (+0.033) and *degrades* it
-where it is not (−0.239 in NMD, −0.239 in control). The decay term pulls weight
+*improves* recovery where the answer is decay-causing (+0.064) and *degrades* it
+where it is not (−0.248 in NMD, −0.280 in control). The decay term pulls weight
 toward junction-bearing candidates — right when that is the answer, wrong
 otherwise. **This is the backwards-reasoning account showing up in the benchmark
 itself**, which is the BETTER outcome registered before the run.
 
 **The anchor choice was the largest lever in the measurement**: 0.753 on the pool
-reference against 0.908 on the GENCODE annotation. Both were run because an
+reference against 0.821 on the GENCODE annotation. Both were run because an
 unexamined choice between them is this project's error class — and measured, the
 two anchors agree on only **40.2%** of candidates. "The reference ORF" and "the
 GENCODE CDS" are different objects in six cases out of ten.
 
-**Population, verified against two independent routes** (the bank's h5 and
-`gencode_candidate_flags.tsv` joined to `orf_pool.tsv`, which agree exactly at
-4,916 bank transcripts): **40,914** transcripts pool-wide carry a GENCODE-start
-candidate and **25,982** of those have it PTC-bearing. The stratum is well-powered,
-not marginal.
+**Population, CORRECTED.** My earlier figures of 40,914 and 25,982 came from the
+same `astype(bool)` defect applied to the TSV, where `is_gencode_start` is float
+with `NaN` — and **`NaN` also casts to True**. The true counts: **16,655**
+transcripts have a GENCODE CDS at all, **15,526** have a candidate sitting at it,
+and in the bank **2,949** do. Both of my population claims were wrong and the
+interpretability window's were right.
 
-*A definitional exposure of my own, recorded rather than resolved by preference:*
-for the same bank transcripts the h5 route gives 3,260 PTC-bearing GENCODE anchors
-and the pool route gives 3,391 — a 4% gap, because my loop takes the **first**
-GENCODE-start candidate per transcript while the pool version asks whether **any**
-carries an EJC. The rebuilt benchmark used the first-candidate rule. One name, two
-sets, in my own code.
+*The lesson, recorded because it recurred twice in one hour:* **`astype(bool)` is
+never the right cast on a flag column here.** These columns use `-1` (h5) and `NaN`
+(TSV) as "not applicable", and both are truthy. Use `== 1`. The same defect produced
+a wrong benchmark and two wrong population figures, and neither was caught by any
+check I ran — it was caught by an arithmetic ceiling someone else supplied.
 
 *Circularity bound, per field 5:* defining the target as "annotated frame with a
 downstream EJC" uses the EJC rule to build a benchmark that partly tests whether
