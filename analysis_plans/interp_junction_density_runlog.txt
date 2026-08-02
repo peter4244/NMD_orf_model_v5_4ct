@@ -1,0 +1,30 @@
+ISM subset            4,999 transcripts
+junctions.tsv         94,669 transcripts with >=1 junction
+cutoff                500 nt downstream of the stop (stop window half-width)
+
+  with an annotation-derived stop (main_orf_stop)   4,999  (100.0%)
+  ...of those, with no junction record                 15
+  downstream junctions total                       41,307   over 4,984 transcripts
+
+  RD SAMPLE — transcripts whose 3' end extends past stop+500,
+  so the 500 boundary is architectural rather than fill-limited:
+    reaches stop+500   4,986  (99.7% of annotated)
+    NMD fraction, reaching 0.498   against not-reaching 0.231
+    downstream junctions in the RD sample  41,274
+
+  JUNCTIONS BY DISTANCE FROM THE STOP (RD sample, n=41,274)
+        band  below 500  above 500    total
+         ±25        630        637    1,267
+         ±50      1,266      1,277    2,543
+        ±100      2,583      2,536    5,119
+        ±200      5,032      5,113   10,145
+
+  DENSITY SMOOTHNESS AT THE CUTOFF (the design's own assumption)
+    counts in 50-nt bins from 250 to 750:
+      1,152  1,196  1,253  1,317  1,266  1,277  1,259  1,326  1,251  1,224
+    bin just below 500: 1,266   just above: 1,277   ratio 1.009
+    (a ratio far from 1.0 means the running variable is itself
+     discontinuous at the cutoff and the design is not usable)
+
+  VERDICT INPUTS — decide the design against these, not against a
+  hoped-for number. Reported before any outcome is looked at.
