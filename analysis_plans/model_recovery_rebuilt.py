@@ -62,7 +62,11 @@ def run(anchor, name):
         lo, k = int(off[i]), int(cnt[i])
         if k < 2:
             continue
-        a = anchor[lo:lo + k].astype(bool)
+        # == 1, NEVER astype(bool). These columns are int8 with a -1 SENTINEL
+        # meaning "no GENCODE CDS", and -1 casts to True. The first version of
+        # this script used astype(bool) and scored 4,916 bank transcripts as
+        # having a GENCODE anchor when only 2,949 do.
+        a = anchor[lo:lo + k] == 1
         if not a.any():
             continue
         ai = int(np.flatnonzero(a)[0])
@@ -74,6 +78,8 @@ def run(anchor, name):
         r[1] += bool(a[int(np.argmax(ps * pd))])        # posterior recovery
         r[2] += 1
     print(f"\n{'='*74}\nANCHOR = {name}\n{'='*74}")
+    print(f"  transcripts carrying this anchor: "
+          f"{sum(v[2] for v in rows.values()):,} of {N:,}")
     print(f"  {'stratum':<44} {'n':>6} {'prior':>7} {'post':>7}")
     for ptc in (True, False):
         for lv in (1, 0):
