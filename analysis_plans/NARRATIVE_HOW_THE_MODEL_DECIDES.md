@@ -45,14 +45,23 @@ model ribosome initiation, or does it pick whichever frame best explains the lab
 being competent **and** by everything upstream being judged incompetent — which is what
 leaky scanning is.
 
-So the head's job is to be *quiet* at the wrong candidates. Its own argmax scores **0.305**,
-worse than "take the most 5′ candidate" at 0.424, while the queue reaches 0.697 (C2, C3).
-We misread it for most of a day by looking at where it was loudest.
+So the head's job is to be **quiet** at the wrong candidates. Three ways of choosing,
+all scored the same way, on recovering the annotated main ORF:
 
-⚠ **Those numbers are scored on main-ORF recovery**, which for an NMD substrate is close to
-a disjoint concept from the decay-causing frame. **On the question that matters — finding
-the frame that causes decay — the figure is 0.883**, and §4 derives it. If you read no
-further, carry 0.883 and not 0.697.
+| | |
+|---|---|
+| the head's own argmax | 0.305 |
+| the most 5′ candidate | 0.424 |
+| **the queue built from the head** | **0.697** |
+
+**The head alone is worse than position; the queue built from it is far better than
+either.** That is the signature of a gate rather than a ranker — the head's *low* scores
+upstream are what let a ribosome pass through to the right frame, and we misread it for
+most of a day by looking at where it was loudest.
+
+**Those three are an internal comparison establishing mechanism, not a performance
+figure.** The model's accuracy at the question that matters — finding the frame that
+*causes decay* — is **0.883** (§4).
 
 ## 2. What the picker reads
 
@@ -265,6 +274,18 @@ k ≥ 4. Both are now reported by the producer; the conclusion is identical unde
 
     k >= 4   marginal -0.050   length +0.447   position -0.553   both -0.070
     k >= 6   marginal -0.023   length +0.452   position -0.546   both -0.067
+
+## Why §1's three numbers are not the headline
+
+They are scored on **main-ORF recovery**, which for an NMD substrate is close to a
+*disjoint* concept from the decay-causing frame — ATF4 does the textbook-correct thing and
+scores as a miss (§4). That does not invalidate the comparison in §1, because all three
+share the target and the claim there is about mechanism, not accuracy.
+
+It does mean **0.697 is not this model's accuracy**, and for most of a day this document
+and both windows quoted it as though it were. The benchmark was rebuilt against GENCODE's
+curated `nonsense_mediated_decay` biotype, and the figure is 0.883. The earlier framing is
+recorded in the retraction table.
 
 ## The same defect, four times, inside this document
 
