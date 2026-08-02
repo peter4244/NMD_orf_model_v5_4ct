@@ -79,6 +79,22 @@ restriction would predict a *weaker* association in the narrow low band, and we 
 *stronger* one — so C12 survives the objection that killed my version. Recorded
 because the next person will hit the same shape.
 
+| C13 | **The two factors of the product align, and the QUEUE does it, not the head.** `p_select ~ p_decay` **+0.399** (74.4% of transcripts positive) against `p_capture ~ p_decay` **+0.091** with the queue removed. Alignment gain — actual mixture ÷ independent-factor baseline — **1.292**, so the prediction runs ~29% above independence *because* the factors align. NMD +0.549, control +0.170. | model | within transcript, n = 4,917 | job 8899905 |
+| C14 | **Routing itself is INDIFFERENT to junction structure.** `p_select ~ n_downstream_ejc` is **−0.050**. The head *avoids* junction-bearing candidates at **−0.453**; the 5′→3′ queue contributes **+0.403** and the two nearly cancel. The junction preference in the product comes from `d` (posterior ~ ejc **+0.101**), not from selection. | model | within transcript, n = 4,815 | job 8900643 |
+| C15 | **But routing is label-split**: `p_select ~ ejc` is **+0.119** in NMD transcripts and **−0.189** in controls, a 0.31 gap. The model cannot see labels, so this is carried by sequence and is **unexplained**. | model | n = 2,415 / 2,400 | job 8900643 |
+
+### C14 retires a sentence both windows were using
+
+**"The model selects premature-stop-bearing frames" is FALSE at the routing step.**
+Both of us had been saying it, on a two-step chain — `p_capture ~ d`, `p_select ~ d`
+— whose direct link had never been measured. The interpretability window demanded
+the direct measurement; it came back −0.050 and my registered prediction (positive)
+was wrong.
+
+What survives is narrower and more specific: **the model ends up weighting
+PTC-bearing frames, and the weighting happens at the decay multiplication rather
+than in selection.**
+
 ## C10's falsifiable prediction, recorded before the measurement
 
 *Written by the interpretability window before anyone splits the data, so it cannot be fitted after.*
