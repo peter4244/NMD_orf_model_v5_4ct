@@ -166,11 +166,22 @@ substantive changes are marked ⇒ and each is argued in place.*
 > **10 · Decision rule.** Three outcomes, fixed before the run — see the table below. ⇒ **The band
 > count is evaluated under gene-clustered resampling**, not as a raw count of qualifying bands.
 >
-> **11 · Licensed — per D55, neither outcome is a null.** **Positive:** two separable channels —
-> routing locates importance, *and* within equally-routed positions the decay head has its own
-> composition preference. **Negative:** one channel — the sequence dependence is **upstream, in
-> selection rather than in decay-head reading**. That is a localization, not a failure. What a
-> positive does *not* license has its own subsection and is part of this field, not an addendum.
+> **11 · Licensed. THE SINGLE STATEMENT OF A2's OUTCOMES IS THIS FIELD — everywhere else in this
+> document cites it rather than repeating it.** Applying D55:
+>
+> - **Positive** — two separable channels: routing locates importance, *and* within equally-routed
+>   positions the decay head has its own composition preference.
+> - **Negative** — one channel: the sequence dependence is **upstream, in selection rather than in
+>   decay-head reading**. A localization, not a failure.
+> - **Conditional** — an interaction between the two channels, reported as such.
+> - **Flat strata are not absences.** Where stratified composition comes out flat (in-ORF, 5′), that
+>   is importance located in routing alone, and is worth saying rather than omitting.
+>
+> Why, in one line, so no other site needs to carry it: `P(NMD) = Σ P(select k)·d_k`, so a
+> substitution that matters because the model routes mass to that candidate genuinely matters — and
+> selection is itself sequence-driven through start-codon context, Kozak strength and ORF structure,
+> which is **architectural reasoning, not measured**. What a positive does *not* license has its own
+> subsection and is part of this field, not an addendum.
 >
 > **12 · Owner.** Interpretability window. **Second independent implementation by the modeling window,
 > written against this row** — shared specification, independent code. The one case the replication
@@ -528,7 +539,7 @@ A gate whose reading is chosen after the run is not a gate.
 | outcome | rule | what it licenses |
 |---|---|---|
 | **positive** | within-band keto ratio above its own permutation 95th percentile, same direction, in **≥ 2/3 of qualifying bands**, direction holding in ≥4/5 seeds | the signature is a property of what the decay head reads. Everything downstream means what we have been saying |
-| **negative** | fewer than half of qualifying bands | **the sequence dependence is upstream, in selection rather than in decay-head reading (D55)** — a localization, not a null. Propagates to the composition profile and the cross-seed k-mer agreement — **not to the PWM**, see below |
+| **negative** | fewer than half of qualifying bands | **field 11**, negative branch. Propagates to the composition profile and the cross-seed k-mer agreement — **not to the PWM**, see below |
 | **conditional** | present in high-mass bands, absent in low | **not the clean positive.** The sequence response is conditional on routing — an interaction, not independence. Reported as such and not rounded up. **Read only against the all-bands transcript restriction**, or it is confounded with which transcripts qualify |
 
 ⇒ **The band count is evaluated under gene-clustered resampling, not as a raw count.** Bands are not
@@ -652,11 +663,9 @@ contrast, is running now.
 
 **So the ordering turns on when A4's result changes a decision, and the answer is narrow: it changes
 how a *negative* A2 is written up.** ⇒ **D55 changes what that write-up says without changing the
-ordering.** A negative is a localization — the sequence dependence is upstream, in selection — so the
-bound A4 supplies now scopes a *localization* claim rather than a failure. That makes A4 more
-load-bearing on this branch, not less: without it, "the decay head has no composition preference" and
-"single-base ISM cannot see the decay head's composition preference" are indistinguishable, and only
-the first supports the localization. The stopping rule already scopes a negative to "not separable
+ordering**, and A4 becomes *more* load-bearing on this branch rather than less: whatever field 11's
+negative branch licenses, it is indistinguishable from "single-base ISM cannot see a decay-head
+composition preference" until A4 separates them, and only the former supports it. The stopping rule already scopes a negative to "not separable
 from routing **by single-base ISM at this resolution**." A4 supplies the magnitude of that scoping. A
 positive A2 needs it far less — a positive is a positive, and A4 then bounds what we *missed*, which
 is worth knowing and is not urgent.
@@ -1003,20 +1012,10 @@ honest count is four, not one.
 **The interpretive gate is A2.**
 
 - **A2 negative** → the decay branch's sequence contribution is not separable from routing **by
-  single-base ISM at this resolution**. ⇒ **Per D55 this is a localization, not a failure, and this
-  bullet used to call it one.** It says the sequence dependence sits **upstream, in selection rather
-  than in decay-head reading** — and selection is itself sequence-driven, through start-codon context,
-  Kozak strength and ORF structure, so a negative moves *where* sequence acts rather than removing it.
-  `P(NMD) = Σ P(select k)·d_k`: if a substitution matters because the model routes mass to that
-  candidate, it genuinely matters. **This document stated that principle in the toolbox and then let
-  its outcome language contradict it** — the corpus's dominant error class, in its most consequential
-  instance so far, since it would have written a real finding up as a null. Write it as a
-  localization and stop *that line*. The scoping to single-base ISM is not a hedge — a pattern the
-  model recognizes robustly is invisible to our instrument by construction, so the negative belongs
-  to the instrument and not to the model.
-  ⇒ **Also per D55: where stratified composition comes out flat — in-ORF and 5′ — that is not an
-  absence either.** It is importance located in routing alone, and is worth saying rather than
-  omitting.
+  single-base ISM at this resolution**. **Read it as A2's field 11 states it** — a localization, not
+  a failure. Write that and stop *that line*. The scoping to single-base ISM is not a hedge: a
+  pattern the model recognizes robustly is invisible to our instrument by construction, so the
+  negative belongs to the instrument and not to the model.
   **A negative propagates to what selects on elevation:** the composition profile and the cross-seed
   k-mer agreement. (The model window argued the cross-seed agreement was independent of Phase A; it
   is not, because it uses the elevation rule even though it uses no elevation null. That correction
