@@ -443,8 +443,38 @@ imbalanced gets a coverage-stratified re-run rather than fragmenting the whole a
 **Dead positions get their own band and are the control, not an exclusion.** Every dead perturbation
 sits below mass ~1e-8 (§5.5), and §5.5 shows dropping them is differential on the mechanism cell —
 long 5′UTRs lose more — so exclusion would build a differential-selection error into the one gate.
-As a band they are free and they are the answer to the magnitude flag below: **nothing is read there,
-so any keto signature appearing in the dead band is instrumental rather than biological.**
+
+> ⇒ **The clause that used to end this paragraph is FALSE and is struck.** It read: *"nothing is read
+> there, so any keto signature appearing in the dead band is instrumental rather than biological."*
+> Measured — `model_a2_deadband_diag.py`, job 8896744 — and a keto signature can appear in the dead
+> band for a third reason that is neither instrumental nor biological.
+>
+> **The dead band is not a stratum, and that is the whole of it.** Every live band is a mass
+> *quantile* and therefore narrow. The dead band is everything below a *threshold*, spanning six or
+> more decades. Elevation inside it selects the highest-mass dead positions, and the keto background
+> **rises with mass across those decades** — 0.477 at 1e-14 against 0.492–0.495 at 1e-9/1e-10. So the
+> gate's own confound, mass correlating with composition, **reappears inside the control**, because
+> the control is the one cell the stratification was never applied to. The observed 1.081 has that
+> available to it before anything instrumental is invoked.
+>
+> **What the diagnostic did settle, and it cuts the other way from where I pointed.** Within each mass
+> decade below the cut the keto ratio is 1.011, 1.025, 1.003, 1.055, 0.963, 0.998 — scattered about
+> 1.0 with no trend. **At equal mass, elevated dead positions are not keto-enriched**, so there is no
+> base-dependent numerical sensitivity and the live downstream positive is *not* impeached by an
+> encoder artifact. Not established: whether the 1.8-point background gradient fully accounts for
+> 1.081. It is the mechanism the data supports and the magnitude is not reconciled.
+>
+> **Consequence for this specification: the dead band must be sub-stratified by mass decade and
+> re-scored before it can serve as a control at all.** Until it is, it is a cell that behaves
+> differently from every other cell in the design and must not be read as the instrumental check.
+>
+> *Also measured, and it corrects a claim of mine in the other direction:* **30.12%** of dead values
+> are exactly 0.0, not all of them, so the degeneracy I predicted is partial. But it is real and it
+> was silent — **9.9% of qualifying dead cells are degenerate (13.8% downstream against 2.1% in-ORF)**,
+> median tie fraction 0.002–0.004 with a top decile of 1.000, and those cells vanished through the
+> `k >= n` guard without being counted. The cells that vanish are the most tie-degenerate, so the
+> survivors are selected toward cells with *more* distinct values — selection on precisely the
+> quantity the control exists to measure. Tie fraction is now reported per cell (field 13).
 
 **Seeds.** All five. Cross-seed agreement is reported *beside* the gate, not folded into it — seed is
 a replication axis and folding it in conflates "the effect exists" with "the effect is stable across
@@ -529,9 +559,19 @@ so a positive licenses *"among equally-routed positions, the more sensitive ones
 and **not** *"composition is enriched independent of effect magnitude."* This is a weaker circularity
 than the directionality claim — directionality mechanically rises with magnitude, composition does
 not — but it is not zero: if the instrument's numerical sensitivity is base-dependent, magnitude and
-composition correlate through the encoder rather than through what the head reads. **The dead band
-tests exactly that**, and A3 owns the general magnitude question. The bound belongs in the row rather
-than being discovered when someone asks.
+composition correlate through the encoder rather than through what the head reads. A3 owns the general
+magnitude question. The bound belongs in the row rather than being discovered when someone asks.
+
+⇒ **This paragraph used to say "the dead band tests exactly that," and the dead band has now tested
+it — with the qualification that the band itself needs repair first.** Job 8896744: within each mass
+decade below the cut, the keto ratio scatters about 1.0 with no trend (1.011, 1.025, 1.003, 1.055,
+0.963, 0.998). **At equal mass, elevated dead positions are not keto-enriched**, so the encoder
+reading is not supported and this particular circularity is measured rather than merely bounded. The
+qualification: the dead band's own aggregate ratio of 1.081 is confounded by the band spanning six
+mass decades while every live band is a narrow quantile — see the dead-band block above — so the
+control is only readable **within** decade, which is exactly the form the answer above came in. Until
+the band is sub-stratified and re-scored, "the dead band tests it" is true per decade and false in
+aggregate, and only the per-decade version may be cited.
 
 Cost: one job. **This is the load-bearing measurement of Phase A, and the only one.**
 
