@@ -260,13 +260,28 @@ be computed across it. Result: **9 cells per transcript** — 8 live quantile ba
 >       8    39,992   18,395  (46.0%)                  ~45
 >      16    79,984   21,588  (27.0%)                  ~36
 >
-> ⇒ **So the primary freezes at 4 bands, not 8**, sweeping 8 and 16 as before. This is a real
-> trade — 4 bands is a coarser control on routing, which is the axis the gate exists to hold — and it
-> is taken because a finer band that half the transcripts cannot enter does not control routing better,
-> it controls routing on a different and unstated population. **Recorded as a proposal rather than
-> executed unilaterally**, since the enumeration is the modeling window's and the trade is a judgement
-> call: if they prefer 8 with the exclusion profile carried explicitly, that is defensible and I would
-> not argue it hard.
+> ⇒ **FROZEN AT 8 BANDS, top 10%, ≥100 live. The 4-band proposal above is declined, on measurement
+> rather than on preference** (model window, `model_a2_exclusion_check.py`, Explorer job 8896584,
+> runlog beside it).
+>
+> The proposal rested on one premise — that a band half the transcripts cannot enter "controls
+> routing on a different and unstated population." **That premise was testable and is false.** The
+> exclusion check compared per-transcript retention across NMD label, 5′UTR-length quintile,
+> dead-fraction stratum, and presence of an upstream-of-reference candidate, at every combination of
+> 4/8/16 bands and ≥50/100/200 floors. **All 36 comparisons return NOT DIFFERENTIAL against a
+> 5-point threshold fixed before the run; the largest spread is 3.3 points.** The floor removes
+> cells, not classes.
+>
+> **And the 46% figure was the wrong statistic, which is the enumerate-your-denominator error one
+> level up.** A cell fails the floor by holding fewer than 100 live positions, so failing cells
+> cannot carry much mass by construction. At 8 bands with ≥100, **97.9% of live positions are
+> retained** (4 bands: 99.2%; 16 bands: 96.1%). We were reading a count of cells as though it were a
+> count of data. 8 bands costs 1.3 points of position-level retention against 4 and buys twice the
+> resolution on the axis the gate exists to hold.
+>
+> **What this does NOT license**, per field 11: not "the floor is harmless." 54% of cells still leave
+> the analysis and that bounds power everywhere. It licenses only that their departure is not
+> selective on any class we can name.
 >
 > ⇒ **And the restriction I wrote before the measurement has to be withdrawn.** I specified that the
 > primary analysis be restricted to transcripts qualifying in *every* band. At 8 bands that set is
@@ -278,9 +293,19 @@ be computed across it. Result: **9 cells per transcript** — 8 live quantile ba
 > from substantially the same transcripts. That is the same guarantee, obtained by measurement rather
 > than by exclusion, and it costs no power.
 >
-> **Still open from this block:** (3), cell counts under the locale split, which halves everything
-> above. At 4 bands and 72.7% qualifying there is room for it; at 8 there is not, which is a second
-> argument for 4.
+> **Still open from this block, and it is the last one:** (3), cell counts under the locale split.
+> Region is stratified too, so a cell is (transcript × band × region) and every count above divides
+> again. **Not measured, and deliberately not measured by a fourth standalone job.** The second
+> implementation has to build exactly those cells to run at all, so it emits the three-way census —
+> cells, qualifying cells, live retention, and the per-band qualifying-transcript overlap matrix —
+> **as its first output, before any composition statistic is computed.** The measurement then comes
+> out of the instrument that uses it rather than from a separate script whose agreement with it
+> nobody checks.
+>
+> **The freeze above is conditional on that census in one specific way, stated now so it cannot be
+> decided after seeing it:** if three-way position-level retention at 8 bands falls below **90%**,
+> the primary drops to 4 bands and the sweep becomes 8 and 16. Above 90%, 8 stands. That threshold is
+> set here, before the census runs, and not revisited afterwards.
 
 **Cell size and the top fraction, jointly — no longer provisional. Measured, job 8896445.** The
 earlier arithmetic here read: mean 2,213 *valid* positions per transcript, 8 bands giving ~277 per

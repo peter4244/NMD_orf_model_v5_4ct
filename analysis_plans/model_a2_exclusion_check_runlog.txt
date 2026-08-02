@@ -1,0 +1,300 @@
+=== code (sha256) ===
+8d3cb48b42ddf558da47f55e0f975c5de1bd1724c6fb888de599e58a384db4e1  analysis_plans/model_a2_exclusion_check.py
+
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_plans/model_a2_exclusion_check.py:109: RuntimeWarning: All-NaN slice encountered
+  e = np.nanmax(np.abs(v), axis=1)
+BANK results_ism_v6/bank_interp_s100.h5   transcripts 4999   dead cut 1e-08
+finite mask: (np.isfinite(vals_decay).sum(1) == 3)
+
+transcripts contributing 4999   live positions 10,455,375
+NMD 2487   control 2512
+5'UTR length (model-selected ORF start), quintile edges: 1 82 157 265 470 6864
+
+==============================================================================
+4 bands, floor >=50   cells 19,996   qualifying 15,390   live retained 99.8%
+==============================================================================
+
+  BY NMD LABEL
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    NMD                      2487    4,901,478       1.000 0.896 1.000 1.000 1.000 1.000             0
+    control                  2512    5,553,897       1.000 0.832 1.000 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+  BY 5'UTR LENGTH QUINTILE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    Q1                       1007    1,787,809       1.000 0.896 1.000 1.000 1.000 1.000             0
+    Q2                        995    1,911,488       1.000 0.832 1.000 1.000 1.000 1.000             0
+    Q3                        998    2,030,324       1.000 0.929 1.000 1.000 1.000 1.000             0
+    Q4                        999    2,127,475       1.000 0.932 1.000 1.000 1.000 1.000             0
+    Q5                       1000    2,598,279       1.000 0.941 1.000 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+  BY DEAD FRACTION
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    none                     4074    8,265,216       1.000 0.832 1.000 1.000 1.000 1.000             0
+    0-10%                     292      767,616       1.000 0.967 1.000 1.000 1.000 1.000             0
+    >10%                      633    1,422,543       1.000 0.953 1.000 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+  BY UPSTREAM-OF-REF CANDIDATE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    has upstream             1965    4,536,045       1.000 0.933 1.000 1.000 1.000 1.000             0
+    none                     3034    5,919,330       1.000 0.832 1.000 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+==============================================================================
+4 bands, floor >=100   cells 19,996   qualifying 14,542   live retained 99.2%
+==============================================================================
+
+  BY NMD LABEL
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    NMD                      2487    4,901,478       1.000 0.791 0.983 1.000 1.000 1.000             0
+    control                  2512    5,553,897       1.000 0.707 0.995 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+  BY 5'UTR LENGTH QUINTILE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    Q1                       1007    1,787,809       1.000 0.778 0.973 1.000 1.000 1.000             0
+    Q2                        995    1,911,488       1.000 0.707 0.978 1.000 1.000 1.000             0
+    Q3                        998    2,030,324       1.000 0.809 0.993 1.000 1.000 1.000             0
+    Q4                        999    2,127,475       1.000 0.847 0.993 1.000 1.000 1.000             0
+    Q5                       1000    2,598,279       1.000 0.890 1.000 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+  BY DEAD FRACTION
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    none                     4074    8,265,216       1.000 0.707 0.986 1.000 1.000 1.000             0
+    0-10%                     292      767,616       1.000 0.888 1.000 1.000 1.000 1.000             0
+    >10%                      633    1,422,543       1.000 0.878 0.993 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+  BY UPSTREAM-OF-REF CANDIDATE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    has upstream             1965    4,536,045       1.000 0.807 1.000 1.000 1.000 1.000             0
+    none                     3034    5,919,330       1.000 0.707 0.981 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+==============================================================================
+4 bands, floor >=200   cells 19,996   qualifying 13,017   live retained 97.0%
+==============================================================================
+
+  BY NMD LABEL
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    NMD                      2487    4,901,478       0.987 0.587 0.932 0.987 1.000 1.000             0
+    control                  2512    5,553,897       1.000 0.567 0.944 1.000 1.000 1.000             0
+    -> median retention spread 1.3 points : NOT DIFFERENTIAL
+
+  BY 5'UTR LENGTH QUINTILE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    Q1                       1007    1,787,809       0.967 0.567 0.915 0.967 1.000 1.000             0
+    Q2                        995    1,911,488       0.984 0.645 0.930 0.984 1.000 1.000             0
+    Q3                        998    2,030,324       1.000 0.603 0.943 1.000 1.000 1.000             0
+    Q4                        999    2,127,475       1.000 0.587 0.943 1.000 1.000 1.000             0
+    Q5                       1000    2,598,279       1.000 0.782 0.961 1.000 1.000 1.000             0
+    -> median retention spread 3.3 points : NOT DIFFERENTIAL
+
+  BY DEAD FRACTION
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    none                     4074    8,265,216       0.993 0.567 0.937 0.993 1.000 1.000             0
+    0-10%                     292      767,616       1.000 0.755 0.957 1.000 1.000 1.000             0
+    >10%                      633    1,422,543       0.998 0.708 0.945 0.998 1.000 1.000             0
+    -> median retention spread 0.7 points : NOT DIFFERENTIAL
+
+  BY UPSTREAM-OF-REF CANDIDATE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    has upstream             1965    4,536,045       1.000 0.567 0.948 1.000 1.000 1.000             0
+    none                     3034    5,919,330       0.987 0.576 0.931 0.987 1.000 1.000             0
+    -> median retention spread 1.3 points : NOT DIFFERENTIAL
+
+==============================================================================
+8 bands, floor >=50   cells 39,992   qualifying 20,508   live retained 99.3%
+==============================================================================
+
+  BY NMD LABEL
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    NMD                      2487    4,901,478       1.000 0.847 0.985 1.000 1.000 1.000             0
+    control                  2512    5,553,897       1.000 0.774 0.990 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+  BY 5'UTR LENGTH QUINTILE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    Q1                       1007    1,787,809       1.000 0.774 0.984 1.000 1.000 1.000             0
+    Q2                        995    1,911,488       1.000 0.792 0.984 1.000 1.000 1.000             0
+    Q3                        998    2,030,324       1.000 0.916 0.987 1.000 1.000 1.000             0
+    Q4                        999    2,127,475       1.000 0.923 0.990 1.000 1.000 1.000             0
+    Q5                       1000    2,598,279       1.000 0.935 0.992 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+  BY DEAD FRACTION
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    none                     4074    8,265,216       1.000 0.774 0.987 1.000 1.000 1.000             0
+    0-10%                     292      767,616       1.000 0.957 0.990 1.000 1.000 1.000             0
+    >10%                      633    1,422,543       1.000 0.917 0.989 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+  BY UPSTREAM-OF-REF CANDIDATE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    has upstream             1965    4,536,045       1.000 0.807 0.990 1.000 1.000 1.000             0
+    none                     3034    5,919,330       1.000 0.774 0.985 1.000 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+==============================================================================
+8 bands, floor >=100   cells 39,992   qualifying 18,395   live retained 97.9%
+==============================================================================
+
+  BY NMD LABEL
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    NMD                      2487    4,901,478       0.983 0.704 0.957 0.983 1.000 1.000             0
+    control                  2512    5,553,897       0.990 0.630 0.963 0.990 1.000 1.000             0
+    -> median retention spread 0.6 points : NOT DIFFERENTIAL
+
+  BY 5'UTR LENGTH QUINTILE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    Q1                       1007    1,787,809       0.981 0.630 0.950 0.981 1.000 1.000             0
+    Q2                        995    1,911,488       0.981 0.707 0.954 0.981 1.000 1.000             0
+    Q3                        998    2,030,324       0.984 0.794 0.960 0.984 1.000 1.000             0
+    Q4                        999    2,127,475       0.988 0.796 0.963 0.988 1.000 1.000             0
+    Q5                       1000    2,598,279       0.995 0.871 0.974 0.995 1.000 1.000             0
+    -> median retention spread 1.4 points : NOT DIFFERENTIAL
+
+  BY DEAD FRACTION
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    none                     4074    8,265,216       0.985 0.630 0.959 0.985 1.000 1.000             0
+    0-10%                     292      767,616       0.987 0.861 0.971 0.987 1.000 1.000             0
+    >10%                      633    1,422,543       0.989 0.803 0.963 0.989 1.000 1.000             0
+    -> median retention spread 0.4 points : NOT DIFFERENTIAL
+
+  BY UPSTREAM-OF-REF CANDIDATE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    has upstream             1965    4,536,045       0.988 0.794 0.965 0.988 1.000 1.000             0
+    none                     3034    5,919,330       0.985 0.630 0.956 0.985 1.000 1.000             0
+    -> median retention spread 0.3 points : NOT DIFFERENTIAL
+
+==============================================================================
+8 bands, floor >=200   cells 39,992   qualifying 15,063   live retained 93.2%
+==============================================================================
+
+  BY NMD LABEL
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    NMD                      2487    4,901,478       0.933 0.521 0.877 0.933 0.979 1.000             0
+    control                  2512    5,553,897       0.944 0.488 0.886 0.944 0.988 1.000             0
+    -> median retention spread 1.1 points : NOT DIFFERENTIAL
+
+  BY 5'UTR LENGTH QUINTILE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    Q1                       1007    1,787,809       0.922 0.488 0.849 0.922 0.970 1.000             0
+    Q2                        995    1,911,488       0.933 0.489 0.868 0.933 0.979 1.000             0
+    Q3                        998    2,030,324       0.941 0.521 0.883 0.941 0.985 1.000             0
+    Q4                        999    2,127,475       0.942 0.587 0.895 0.942 0.984 1.000             0
+    Q5                       1000    2,598,279       0.951 0.682 0.909 0.951 0.995 1.000             0
+    -> median retention spread 2.9 points : NOT DIFFERENTIAL
+
+  BY DEAD FRACTION
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    none                     4074    8,265,216       0.938 0.488 0.878 0.938 0.984 1.000             0
+    0-10%                     292      767,616       0.949 0.645 0.906 0.949 0.984 1.000             0
+    >10%                      633    1,422,543       0.938 0.573 0.892 0.938 0.982 1.000             0
+    -> median retention spread 1.1 points : NOT DIFFERENTIAL
+
+  BY UPSTREAM-OF-REF CANDIDATE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    has upstream             1965    4,536,045       0.943 0.488 0.894 0.943 0.983 1.000             0
+    none                     3034    5,919,330       0.936 0.489 0.874 0.936 0.983 1.000             0
+    -> median retention spread 0.7 points : NOT DIFFERENTIAL
+
+==============================================================================
+16 bands, floor >=50   cells 79,984   qualifying 25,399   live retained 98.7%
+==============================================================================
+
+  BY NMD LABEL
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    NMD                      2487    4,901,478       0.990 0.819 0.975 0.990 1.000 1.000             0
+    control                  2512    5,553,897       0.993 0.774 0.981 0.993 1.000 1.000             0
+    -> median retention spread 0.4 points : NOT DIFFERENTIAL
+
+  BY 5'UTR LENGTH QUINTILE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    Q1                       1007    1,787,809       0.990 0.774 0.974 0.990 1.000 1.000             0
+    Q2                        995    1,911,488       0.989 0.792 0.974 0.989 1.000 1.000             0
+    Q3                        998    2,030,324       0.991 0.872 0.978 0.991 1.000 1.000             0
+    Q4                        999    2,127,475       0.992 0.837 0.979 0.992 1.000 1.000             0
+    Q5                       1000    2,598,279       0.994 0.929 0.983 0.994 1.000 1.000             0
+    -> median retention spread 0.4 points : NOT DIFFERENTIAL
+
+  BY DEAD FRACTION
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    none                     4074    8,265,216       0.991 0.774 0.977 0.991 1.000 1.000             0
+    0-10%                     292      767,616       0.991 0.922 0.982 0.991 1.000 1.000             0
+    >10%                      633    1,422,543       0.992 0.890 0.980 0.992 1.000 1.000             0
+    -> median retention spread 0.1 points : NOT DIFFERENTIAL
+
+  BY UPSTREAM-OF-REF CANDIDATE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    has upstream             1965    4,536,045       0.992 0.807 0.980 0.992 1.000 1.000             0
+    none                     3034    5,919,330       0.992 0.774 0.976 0.992 1.000 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+==============================================================================
+16 bands, floor >=100   cells 79,984   qualifying 21,588   live retained 96.1%
+==============================================================================
+
+  BY NMD LABEL
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    NMD                      2487    4,901,478       0.962 0.703 0.931 0.962 0.988 1.000             0
+    control                  2512    5,553,897       0.968 0.630 0.940 0.968 0.992 1.000             0
+    -> median retention spread 0.6 points : NOT DIFFERENTIAL
+
+  BY 5'UTR LENGTH QUINTILE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    Q1                       1007    1,787,809       0.962 0.630 0.925 0.962 0.990 1.000             0
+    Q2                        995    1,911,488       0.962 0.651 0.927 0.962 0.988 1.000             0
+    Q3                        998    2,030,324       0.963 0.753 0.937 0.963 0.990 1.000             0
+    Q4                        999    2,127,475       0.965 0.742 0.936 0.965 0.990 1.000             0
+    Q5                       1000    2,598,279       0.972 0.799 0.947 0.972 0.992 1.000             0
+    -> median retention spread 1.0 points : NOT DIFFERENTIAL
+
+  BY DEAD FRACTION
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    none                     4074    8,265,216       0.966 0.630 0.935 0.966 0.991 1.000             0
+    0-10%                     292      767,616       0.968 0.816 0.945 0.968 0.988 1.000             0
+    >10%                      633    1,422,543       0.963 0.703 0.932 0.963 0.988 1.000             0
+    -> median retention spread 0.5 points : NOT DIFFERENTIAL
+
+  BY UPSTREAM-OF-REF CANDIDATE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    has upstream             1965    4,536,045       0.966 0.661 0.939 0.966 0.989 1.000             0
+    none                     3034    5,919,330       0.965 0.630 0.932 0.965 0.992 1.000             0
+    -> median retention spread 0.0 points : NOT DIFFERENTIAL
+
+==============================================================================
+16 bands, floor >=200   cells 79,984   qualifying 16,232   live retained 88.6%
+==============================================================================
+
+  BY NMD LABEL
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    NMD                      2487    4,901,478       0.886 0.496 0.823 0.886 0.940 1.000             0
+    control                  2512    5,553,897       0.895 0.417 0.828 0.895 0.953 1.000             0
+    -> median retention spread 0.9 points : NOT DIFFERENTIAL
+
+  BY 5'UTR LENGTH QUINTILE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    Q1                       1007    1,787,809       0.876 0.417 0.802 0.876 0.937 1.000             0
+    Q2                        995    1,911,488       0.884 0.485 0.818 0.884 0.944 1.000             0
+    Q3                        998    2,030,324       0.888 0.517 0.829 0.888 0.947 1.000             0
+    Q4                        999    2,127,475       0.897 0.496 0.833 0.897 0.949 1.000             0
+    Q5                       1000    2,598,279       0.900 0.581 0.848 0.900 0.953 1.000             0
+    -> median retention spread 2.4 points : NOT DIFFERENTIAL
+
+  BY DEAD FRACTION
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    none                     4074    8,265,216       0.890 0.417 0.824 0.890 0.949 1.000             0
+    0-10%                     292      767,616       0.901 0.514 0.849 0.901 0.950 1.000             0
+    >10%                      633    1,422,543       0.884 0.539 0.824 0.884 0.930 1.000             0
+    -> median retention spread 1.7 points : NOT DIFFERENTIAL
+
+  BY UPSTREAM-OF-REF CANDIDATE
+    group                    n_tx       n_live  median ret           ret 0/25/50/75/100  zero-cell tx
+    has upstream             1965    4,536,045       0.891 0.488 0.830 0.891 0.946 1.000             0
+    none                     3034    5,919,330       0.889 0.417 0.823 0.889 0.947 1.000             0
+    -> median retention spread 0.2 points : NOT DIFFERENTIAL
+=== exit: 0 ===
