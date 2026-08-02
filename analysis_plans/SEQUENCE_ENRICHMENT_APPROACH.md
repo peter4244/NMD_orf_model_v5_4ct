@@ -250,8 +250,49 @@ band, discovery/confirmation arm, transcript length, seed.
 | the model reads termination context | offset from the stop | stop identity (TAA/TAG/TGA) | composition at +4 — it is the thing being read |
 | runs are not a GC-window artifact | substitution class (GC-preserving) | — | run length — it is the outcome |
 
-**Every analysis records its row before it runs.** A row that is filled in afterwards
-is not a pre-specification, and the document should say which analyses have one.
+#### What each adjustment licenses you to say
+
+*Pete's addition, 2026-08-02.* An adjustment is only worth making if you know what it
+buys, so each one carries the sentence you may write if the effect survives it — and,
+where it matters, the sentence you may **not**.
+
+| if the effect survives... | you may say | you may NOT say |
+|---|---|---|
+| **global composition null** | "the sequence here differs from the transcriptome average" | that it is a motif — a regional preference passes this |
+| **regional composition null** | "the sequence differs from other sequence in the same region" | that it holds within a transcript |
+| **seqlet-matched null** | "the pattern differs from the places it was found in" | — this is the strongest composition claim available |
+| **dinucleotide-preserving shuffle** | "not explained by local dinucleotide structure" | anything positional — the shuffle destroyed position |
+| **window-fill adjustment** | "not an artifact of how much sequence the model can see" | that it is independent of ORF length, which fill also encodes |
+| **boundary-distance adjustment** | "not simply proximity to a landmark" | that the landmark is irrelevant — a moving boundary (§5.2) is not held by this |
+| **anchor swapped, same answer** | "does not depend on which stop defines position" | that position and composition have been separated (§5.2) |
+| **selection mass STRATIFIED** | "holds at each level of routable mass" | "independent of mass" — mass is the architecture and cannot be adjusted away |
+| **magnitude matched** | "not explained by effect size" | — required before *any* claim about elevated positions, since elevation is defined by magnitude |
+| **GC-preserving substitutions** | "not driven by the GC channel" | that composition is controlled — the restriction is itself compositionally biased (§3.3) |
+| **autocorrelation-preserving null** | "clumps more than the track's own smoothness explains" | — random placement licenses **nothing** here (§7) |
+| **across seeds** | "a property of the architecture, not one initialization" | that it generalizes to other genes |
+| **across gene arms** | "generalizes to genes it was not found on" | that it is seed-independent |
+| **across subsample draws** | "not a sampling artifact" | anything about the population, if the draw was not stratified |
+
+**Combinations are where the useful sentences live:**
+
+| combination | the claim it earns |
+|---|---|
+| local composition + geometry | "a sequence pattern, not where it sits or what surrounds it" |
+| magnitude + local composition | "elevated positions carry distinctive sequence beyond simply being large" |
+| seeds + gene arms | "a property of the architecture that holds on genes it was not found on" — the strongest available, and the only one a reviewer will not immediately question |
+| mass-stratified + local composition | "a sequence pattern among candidates the model can actually route to" |
+| autocorrelation-preserving null + local composition | "a *local* feature, not the smooth envelope" — the claim §7's run-length result was thought to have and does not |
+
+**Every analysis records its row before it runs.** A row filled in afterwards is not a
+pre-specification, and this document should say which analyses have one.
+
+**Worked failure, today.** The run-length analysis had no row. Written afterwards it
+would read: hypothesis "elevated positions cluster into short sequence features";
+adjustments required — local composition, **autocorrelation-preserving null**,
+selection mass stratified. It had none of the three. Its null was random placement,
+which licenses only "these positions clump more than if they were scattered
+independently" — and that was never in doubt, because the effect track is
+autocorrelated at 0.74 across 80 bases by construction.
 
 ### 3.3 Controls are checked for bias of their own
 
