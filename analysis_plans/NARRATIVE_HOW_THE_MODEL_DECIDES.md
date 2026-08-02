@@ -58,9 +58,8 @@ all scored the same way, on recovering the annotated main ORF:
 either.** That is the signature of a gate rather than a ranker — the head's *low* scores
 upstream are what let a ribosome pass through to the right frame.
 
-**Those three are an internal comparison establishing mechanism, not a performance
-figure.** The model's accuracy at the question that matters — finding the frame that
-*causes decay* — is **0.883** (§4).
+These three share a target and measure *mechanism*. **The model's accuracy at the question
+that matters — finding the frame that causes decay — is 0.883** (§4).
 
 ## 2. What the picker reads
 
@@ -82,10 +81,8 @@ codon, not a scatter of isolated hot positions. *Job 8900420.*
 
 **And that length route is partly ours.** The ATG window's fill stops at the ORF midpoint,
 so fill extent = `min(100, length/2)`, and fill saturation alone is a **47× marker** for
-"this is the real ORF" — `P(reference | saturated)` 11.1% against 0.24%. *Verified on
-`orf_pool.tsv`; retrain item 3.* `[unclaimed]` **Whether the head uses it is not
-established** — the information is present and discriminative; that the head reads it has
-no measurement behind it.
+"this is the real ORF" — `P(reference | saturated)` 11.1% against 0.24%. *Retrain item 3.*
+`[unclaimed]` **Whether the head uses it is not established.**
 
 **What it does not read is the thing biology says decides.** Among ORFs under 200 nt — 69%
 of candidates, median 81 nt — `capture ~ kozak` is +0.061 against `capture ~ length` +0.429.
@@ -101,9 +98,8 @@ ones. **The head fails precisely where initiation biology says context should de
 | position only | −0.553 |
 | **length and position together** | **−0.070** |
 
-*`model_c16_retraction.py`, job 8900746. The head's own aversion, −0.453, collapses to
-−0.009 holding length — that arm is entirely length. Provenance and the corrections behind
-this table are in the appendix.*
+*Job 8900746. The head's own aversion, −0.453, collapses to −0.009 holding length — that
+arm is entirely length.*
 
 **Routing is indifferent to junction structure.** Length and position each mask the
 other in opposite directions, so holding either alone manufactures a signal that is
@@ -120,16 +116,8 @@ slots carry more downstream junctions. Measured in-bank, a **queue with no model
 scores +0.334 raw and **+0.568** holding length, against the model's −0.050 and +0.447. So
 zero was the wrong reference, and against the right one the model routes toward
 junction-bearing candidates *less* than pure ordering does — a deficit of 0.125.
-*Interpretability window's argument, run in-bank; producer `model_queue_null_inbank.py`,
-f523f72.* **Bound:** the degenerate null maximises queue influence, so 0.125 is an upper
-bound on head aversion and may be generic dilution.
-
-> **⚠ STANDING HAZARD — in this model, any candidate-level correlation is position until
-> proven otherwise.** Four instances in one day: C7 (holding position *strengthened* the
-> capture–junction partial), the ATF4 uORF (queue position explains 22.8%, not the 100% we
-> assumed), C16 (a length partial that unmasked position), and the queue-geometry null
-> (`p_select ~ ejc` positive with no model in it). Pair this with the null rule: **for a
-> rank product, a monotone ordering or a normalised share, zero is not the null.**
+*Job f523f72.* **Bound:** the degenerate null maximises queue influence, so 0.125 is an
+upper bound on head aversion and may be generic dilution.
 
 **The two stages are aligned, and the queue does it.** `p_select ~ d` +0.399 against
 `p_capture ~ d` +0.091 with the queue removed; the mixture runs **1.29×** above independent
@@ -269,6 +257,23 @@ k ≥ 4. Both are now reported by the producer; the conclusion is identical unde
 
     k >= 4   marginal -0.050   length +0.447   position -0.553   both -0.070
     k >= 6   marginal -0.023   length +0.452   position -0.546   both -0.067
+
+## The standing hazard this work generated
+
+Adopted project-wide and now in the model repo's `CLAUDE.md` (D62), so it is recorded here
+as provenance rather than as part of the story:
+
+> **⚠ STANDING HAZARD — in this model, any candidate-level correlation is position until
+> proven otherwise.** Four instances in one day: C7 (holding position *strengthened* the
+> capture–junction partial), the ATF4 uORF (queue position explains 22.8%, not the 100% we
+> assumed), C16 (a length partial that unmasked position), and the queue-geometry null
+> (`p_select ~ ejc` positive with no model in it). Pair this with the null rule: **for a
+> rank product, a monotone ordering or a normalised share, zero is not the null.**
+
+Two of its four instances are cases where position was *refuted* rather than confirmed, and
+in C7 position was *suppressing* a real association rather than manufacturing one — so the
+operative half is the guardian's clause: **use a partial to explain why, never to state
+behaviour.**
 
 ## Predictions this document made and lost
 
