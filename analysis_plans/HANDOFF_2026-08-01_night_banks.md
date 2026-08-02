@@ -364,6 +364,19 @@ The dense-array padding, where 78% of every array is not a position at all.
 > **The check:** before reading any proportion or any null, enumerate what is in
 > the denominator **and** what is in the comparison set. Both halves. Most of
 > today's errors were the second half.
+>
+> **Sharpened, after a fifth instance:** enumerate the **distribution** of the set,
+> not a representative value from it. The fifth error was characterising a stratum
+> spanning `p_select` from 1e-30 to 1e-8 by a single value of 2e-8, computing
+> float64 resolvability there, and generalising to the whole stratum — which spanned
+> the boundary being tested for. A representative value is not a denominator.
+
+**Naming the failure mode did not prevent it.** That fifth instance was committed by
+the window that had proposed the category, two hours after we agreed on it, in a
+piece of arithmetic done carefully and correctly at one point of a five-decade
+range. The lesson is not that the categories are wrong — it is that they do not
+work as things to remember. Only running the check works, which is why both are
+phrased as an operation on a set rather than as a principle.
 
 Deliberately not a framework. A third pattern showed up today — a control coarser
 than the confound it is controlling — that fits neither cleanly, and three named
