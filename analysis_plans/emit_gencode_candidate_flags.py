@@ -1,5 +1,24 @@
 #!/usr/bin/env python
 """
+!!  READING THIS SCRIPT'S OUTPUT: USE `== 1`, NEVER `astype(bool)`.  !!
+
+    Three of the four flag columns are float with NaN wherever the transcript has no
+    GENCODE CDS -- 61.2% of rows. NaN is TRUTHY, so astype(bool) selects exactly the
+    rows that mean "not applicable". The same information in the h5 is int8 with a -1
+    sentinel, which is also truthy.
+
+    This cost the model window three wrong numbers on 2026-08-02 and no check caught
+    any of them. It was found by an arithmetic ceiling: 40,914 transcripts claimed
+    against 16,655 that have a GENCODE CDS at all. Job 8900473 supersedes the
+    contaminated run.
+
+    SECOND TRAP, and this one is mine for not disclosing it: has_gencode_cds is a
+    TRANSCRIPT-level flag repeated on EVERY candidate row -- 311,581 rows against
+    16,655 transcripts. Counting rows is not counting transcripts. Group and take max.
+
+    Cross-check counts: results_ism_v6/gencode_candidate_flags_provenance.json
+"""
+"""
 emit_gencode_candidate_flags.py — the per-candidate GENCODE flags the ISM bank reads.
 
 WHAT AND WHY. The bank ships `cand_upstream_of_ref`, which uses the
