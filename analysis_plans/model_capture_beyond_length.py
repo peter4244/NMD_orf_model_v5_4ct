@@ -76,6 +76,42 @@ positionally-asymmetric discrepancy:
   reading does not survive. Stated so it can fail.
 
 --------------------------------------------------------------------------------
+SECOND ARM -- DOES CAPTURE TRACK DECAY, OR ANNOTATION? Added before the run, after
+the interpretability window found that the forward-pass separation is given back by
+the loss.
+
+  P(NMD) = sum_k p_k * d_k, and the loss is BCE on that product
+  (model_v6.py:199-200, train_v6.py:8,358). So dL/dz_p_k is scaled by d_k: the
+  capture head cannot OBSERVE termination and is TRAINED TO PREDICT IT from the
+  start window. And log_pass = cumsum(log_q) - log_q is EXCLUSIVE (:194), so
+  candidate j's logit carries d_k for every downstream k -- the head is trained to
+  suppress an upstream candidate when downstream candidates carry decay structure.
+
+  CONSEQUENCE FOR THE PRIMARY, and it is asymmetric rather than fatal:
+    POSITIVE branch INTACT -- recovering the reference above the most-5' bar where
+      length cannot holds whatever objective the head was trained on.
+    NEGATIVE branch COMPROMISED -- failing to recover it is now ambiguous between
+      "only length" and "correctly optimising something else."
+  This arm disambiguates that branch and nothing else.
+
+  THE MEASUREMENT: within transcript, rank correlation of p_capture against d_k,
+  and against reference status. PARTIALLED ON ORF LENGTH, raw reported beside it.
+  The partial is not optional: d_k is higher for early-stopping candidates, which
+  are SHORT ORFs, and C8 has capture tracking length at +0.760 with length fully
+  mediating the junction association. Without the partial this arm re-derives C8
+  and reports it as new -- caught by the model window before the run.
+
+  DECISION, fixed here so it cannot be chosen after the numbers:
+    DECAY-PREDICTOR   median |partial with d_k| > median |partial with reference|
+                      AND the per-transcript comparison favours d_k in > 60% of
+                      transcripts
+    INITIATION-LIKE   the reverse on both
+    LENGTH AGAIN      both partials collapse toward zero, as the junction partial
+                      did (-0.009), meaning neither target survives length
+    SPLIT             the two criteria disagree -> unresolved, and it is resolved
+                      by more seeds rather than by looking
+
+--------------------------------------------------------------------------------
 Run from the repo root.
 """
 
@@ -100,6 +136,7 @@ def main():
         pcap, psel = f["p_capture"][:], f["p_select"][:]
         is_ref = f["cand_is_ref_cds"][:]
         o_s, o_e = f["cand_orf_start"][:], f["cand_orf_end"][:]
+        pdec = f["p_decay"][:]
         N = len(cnt)
         ck = f.attrs.get("checkpoint", "?")
 
@@ -108,6 +145,7 @@ def main():
     sub_n = sub_model = sub_5p = sub_long = sub_cand = 0
     ref_rank_cap, ref_rank_len = [], []
     disc_up, disc_down = [], []
+    rd_raw, rd_par, rr_raw, rr_par, favours_d = [], [], [], [], []
 
     for i in range(N):
         lo, k = int(off[i]), int(cnt[i])
@@ -140,6 +178,28 @@ def main():
             disc_up.append(float(d[up].mean()))
         if dn.any():
             disc_down.append(float(d[dn].mean()))
+
+        # SECOND ARM: capture against decay, and against annotation, both
+        # partialled on ORF length so neither is C8 in disguise.
+        d_ = pdec[lo:lo + k].astype(float)
+        rf = ref.astype(float)
+        def sp(a, b):
+            ra, rb = rank_desc(a), rank_desc(b)
+            if ra.std() == 0 or rb.std() == 0:
+                return np.nan
+            return float(np.corrcoef(ra, rb)[0, 1])
+        def partial(a, b, c):
+            rab, rac, rbc = sp(a, b), sp(a, c), sp(b, c)
+            if not all(np.isfinite([rab, rac, rbc])):
+                return np.nan
+            den = np.sqrt((1 - rac ** 2) * (1 - rbc ** 2))
+            return float((rab - rac * rbc) / den) if den > 1e-9 else np.nan
+        pd_ = partial(pc, d_, length)
+        pr_ = partial(pc, rf, length)
+        rd_raw.append(sp(pc, d_)); rr_raw.append(sp(pc, rf))
+        rd_par.append(pd_); rr_par.append(pr_)
+        if np.isfinite(pd_) and np.isfinite(pr_):
+            favours_d.append(abs(pd_) > abs(pr_))
 
         # PRIMARY: transcripts where the reference is NOT the longest
         if ref[lng_i]:
@@ -206,6 +266,28 @@ def main():
           f"   median {np.median(dd):+.3f}   n {len(dd):,}")
     print(f"  asymmetry (up - down) {du.mean() - dd.mean():+.3f}")
     print("  C3 survives only if upstream is positive AND larger than downstream.")
+
+    print("\n" + "=" * 70)
+    print("SECOND ARM -- does capture track DECAY or ANNOTATION, beyond length?")
+    print("=" * 70)
+    def m(x):
+        x = np.array(x, float); x = x[np.isfinite(x)]
+        return (np.median(x), len(x)) if len(x) else (np.nan, 0)
+    a, na = m(rd_raw); b, nb = m(rd_par)
+    c, nc = m(rr_raw); d, nd = m(rr_par)
+    fav = float(np.mean(favours_d)) if favours_d else np.nan
+    print(f"  capture ~ d_k          raw {a:+.3f}   partial on length {b:+.3f}  n {nb:,}")
+    print(f"  capture ~ reference    raw {c:+.3f}   partial on length {d:+.3f}  n {nd:,}")
+    print(f"  transcripts where |partial d_k| > |partial reference|: {fav:.3f}")
+    if abs(b) < 0.05 and abs(d) < 0.05:
+        v = "LENGTH AGAIN -- neither target survives length"
+    elif abs(b) > abs(d) and fav > 0.60:
+        v = "DECAY-PREDICTOR -- the head predicts decay from the start window"
+    elif abs(d) > abs(b) and fav < 0.40:
+        v = "INITIATION-LIKE -- training coupling did not dominate"
+    else:
+        v = "SPLIT -- unresolved; resolve by more seeds, not by looking"
+    print(f"  -> {v}")
 
 
 if __name__ == "__main__":
