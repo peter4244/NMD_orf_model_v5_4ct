@@ -1,0 +1,24 @@
+       State    Elapsed ExitCode 
+------------ ---------- -------- 
+   COMPLETED   00:01:14      0:0 
+=== code actually running (sha256, first 16) ===
+  05a0b3960a6da724 analysis_crossseed_floor.py
+
+cross-seed agreement over 5 seeds; chance unanimity 6.25%
+  bank_interp_s100.h5
+  bank_interp_s200.h5
+  bank_interp_s300.h5
+  bank_interp_s400.h5
+  bank_interp_s500.h5
+
+per-seed batch-shape offset: 1.664e-06  1.873e-06  1.384e-06  1.869e-06  1.258e-06
+ATG coverage identical across seeds: 7,444,167 positions
+
+  arm            condition                              n   unanimous  x chance       r
+  vals           all finite                    33,186,447       26.8%      4.3x   0.617
+  vals           all seeds clear floor         25,050,638       29.1%      4.6x   0.618
+  vals_decay     all finite                    33,186,447       27.8%      4.5x   0.608
+  vals_decay     all seeds clear floor         24,923,255       30.2%      4.8x   0.608
+  vals_capture   all finite                    22,332,501       20.4%      3.3x   0.610
+  vals_capture   all seeds clear floor         11,380,608       24.3%      3.9x   0.611
+=== exit: 0 ===

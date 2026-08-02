@@ -448,7 +448,47 @@ reported, the ordering is reported with it.
   "up to 100" matters: fill stops at the ORF midpoint, so short candidates get
   fewer, and that clip is the geometric leak §8.5 exists to control.
 
-## Who runs what — proposed to the interpretability window, awaiting their reply
+## RUN AND ANSWERED: floor conditioning does not rescue cross-seed agreement
+
+`analysis_crossseed_floor.py`, job 8886461, all five banks, exit 0. Full output in
+`model_crossseed_floor_runlog.txt`.
+
+    arm            condition                       n    unanimous  x chance      r
+    vals           all finite             33,186,447      26.8%      4.3x     0.617
+    vals           all seeds clear floor  25,050,638      29.1%      4.6x     0.618
+    vals_decay     all finite             33,186,447      27.8%      4.5x     0.608
+    vals_decay     all seeds clear floor  24,923,255      30.2%      4.8x     0.608
+    vals_capture   all finite             22,332,501      20.4%      3.3x     0.610
+    vals_capture   all seeds clear floor  11,380,608      24.3%      3.9x     0.611
+
+Each seed is conditioned on **its own** batch-shape offset (1.258e-06 to 1.873e-06);
+an entry is kept only when every seed clears its own, which is the conservative
+choice among the three available.
+
+**The hypothesis was that the sub-floor bulk was doing the disagreeing. It is not.**
+Removing 8.1 million unreadable entries moves unanimity by 2–3 points and moves the
+correlation not at all — r is 0.61–0.62 in every row, conditioned or not. The seeds
+disagree where they can resolve perfectly well.
+
+**What follows, and it is a constraint rather than a defeat:**
+
+- **Positional claims from these banks — *which* positions are elevated — need the
+  discovery/confirmation arm before they mean anything.** Five seeds at 4.6× chance
+  with r = 0.62 is real and modest, and it does not improve on the readable subset.
+- It makes the run-length split **more** likely to matter, not less: run *structure*
+  may well replicate while run *locations* do not, which is precisely the two-outcome
+  design already agreed.
+- The ordering across arms is consistent and mild: `vals_decay` (30.2%) > `vals`
+  (29.1%) > `vals_capture` (24.3%). The decay branch is the best-behaved on this
+  axis as on the other two, which is a third independent reason the run-length
+  finding landed on the right arm.
+
+**Not concluded from this:** that the model is unstable. Sign agreement over five
+independent initialisations is a demanding statistic, and r = 0.62 across seeds is
+a moderate positive. What it forbids is treating a position list from one seed, or
+from a pool across seeds, as a finding on its own.
+
+## Who runs what — agreed with the interpretability window
 
 Pete asked for this to be coordinated rather than left to converge. Split by what
 each window already has working:
