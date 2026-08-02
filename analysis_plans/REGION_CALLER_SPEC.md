@@ -110,7 +110,11 @@ carried into any claim about the model.
 - width and height distributions, real against surrogate
 - cross-seed reproduction rate against the circular-shift null
 - **the fraction of called regions falling in each locale** — 5′ of the start, within the ORF, 3′ of
-  the stop — as a description, not a test
+  the stop — as a description, not a test. **Report the locale composition alongside it.** The
+  windows are UTR-dominated, so "3′ of the stop" is for most transcripts a statement about 3′UTR
+  sequence, and the locale fraction will be read as a positional finding unless the composition is
+  on the same table (model window, 2026-08-02). The same ambiguity is on toolbox axis 4: locale and
+  composition decouple exactly at PTC transcripts, which is where the biology is
 - the per-transcript variation in call count, since a caller that puts every region in a handful of
   transcripts is describing those transcripts
 
