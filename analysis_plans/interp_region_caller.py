@@ -43,12 +43,31 @@ structurally cannot have them and concentrate less than it does. Criterion 1 wou
 then pass BECAUSE THE TRACK HAS AN ENVELOPE, which is the retracted error wearing a
 different costume.
 
-So the default null divides by a smoothed envelope, surrogates the residual, and
-multiplies the envelope back. Envelope preserved exactly, residual phase destroyed.
+>>> CORRECTION 2 IS WITHDRAWN. MEASURED, 15 realizations, and it was mine. <<<
 
-Both nulls are implemented and both are reported. `--null naive` is kept precisely
-so the difference is visible rather than argued, and --self-test below demonstrates
-on synthetic data that the naive one fires on envelope alone.
+The proposed remedy -- divide by a smoothed envelope, surrogate the residual,
+multiply back -- DOES NOT WORK, and the fear that motivated it is unsupported on the
+one case we can construct.
+
+  max-width ratio real/surrogate     median   frac > 1
+    A  no features        naive        0.97      47%     <- unbiased
+    B  envelope, no feat. naive        0.83      33%     <- does NOT falsely fire
+    C  40 real features   naive        1.17      60%
+    A  no features        envelope     1.17      73%     <- BIASED
+    B  envelope, no feat. envelope     1.15      80%     <- BIASED
+    C  40 real features   envelope     1.50      87%
+
+The naive null does not fire on an envelope alone, which is what correction 2
+predicted it would do. And the envelope-preserving null inflates the statistic on
+tracks with NO features at all -- dividing out the envelope removes the slow
+spectral component, so the residual is rougher than the track and re-multiplying
+restores the amplitude modulation without the smoothness. The remedy manufactures
+the excess it was written to prevent.
+
+DEFAULT IS THEREFORE PLAIN iAAFT. `--null envelope` is retained only so the finding
+stays reproducible. The QUESTION -- iAAFT is a stationary null and this track is not
+stationary -- remains open, and this tests it only against a synthetic sinusoidal
+envelope, which need not resemble the real mass envelope.
 
 CORRECTION 3 -- SERIES FLOOR 800, not 200. Autocorrelation is 0.64 at lag 80, so a
 200-point series holds ~2.5 correlation lengths and phase randomization has almost
@@ -134,7 +153,7 @@ def iaaft(x, rng, n_iter=100, terminate="rank"):
     return y if terminate == "rank" else y_spec
 
 
-def surrogate(x, rng, mode="envelope", env_window=ENV_WINDOW):
+def surrogate(x, rng, mode="naive", env_window=ENV_WINDOW):
     """A null series for x.
 
     mode="envelope"  divide by the smoothed envelope, iAAFT the residual, multiply
@@ -322,7 +341,7 @@ def self_test(rng):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bank")
-    ap.add_argument("--null", choices=("envelope", "naive"), default="envelope")
+    ap.add_argument("--null", choices=("naive", "envelope"), default="naive")
     ap.add_argument("--env-window", type=int, default=ENV_WINDOW)
     ap.add_argument("--surrogates", type=int, default=N_SURROGATE)
     ap.add_argument("--seed", type=int, default=0)

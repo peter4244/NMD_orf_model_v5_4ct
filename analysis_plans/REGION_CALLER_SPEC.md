@@ -96,7 +96,41 @@ name.
 > by construction the check is free and passes; if it is not, criterion 1 is uninterpretable and no
 > amount of surrogate count fixes it.
 
-**Correction 2, and it is the load-bearing one — the null repairs the retracted error on one axis and
+> ### ⇒⇒ CORRECTION 2 IS WITHDRAWN — measured 2026-08-02, and it was mine
+>
+> **The argument below is retained because it is still the right question; its conclusion is refuted
+> and its proposed remedy is worse than the thing it replaced.** Measured on 15 synthetic
+> realizations, 12 surrogates each, `interp_region_caller.py --self-test`:
+>
+>     max-region-width ratio, real / surrogate      median      IQR        frac > 1
+>       A  autocorrelated, NO features   naive        0.97   [0.81, 1.15]      47%
+>       B  A + strong envelope, NO feat. naive        0.83   [0.77, 1.28]      33%
+>       C  B + 40 real features          naive        1.17   [0.90, 1.65]      60%
+>       A                                envelope     1.17   [1.03, 1.41]      73%
+>       B                                envelope     1.15   [1.06, 1.26]      80%
+>       C                                envelope     1.50   [1.23, 1.81]      87%
+>
+> **The naive iAAFT null does not falsely fire on an envelope alone.** Case B — envelope, no features
+> — comes out at 0.83 under it, *below* 1. The prediction that motivated this correction was that it
+> would fire there. It does not.
+>
+> **And the envelope-preserving null I proposed is biased toward false positives.** It inflates the
+> width ratio above 1 on tracks with **no features at all** — A at 1.17 with 73% of realizations
+> above 1, B at 1.15 with 80%. Dividing by a smoothed envelope removes the slow spectral component,
+> so the residual is rougher than the track and re-multiplying restores the amplitude modulation
+> without the smoothness. The remedy manufactures exactly the excess it was written to prevent.
+>
+> **What survives.** The *question* — iAAFT is a null for a stationary process and this track is not
+> stationary — is still a real question, and this test answers it only for a synthetic sinusoidal
+> envelope, which need not resemble the real mass envelope. So: not "non-stationarity is harmless",
+> but "the specific remedy is refuted and the specific fear is unsupported on the one case we can
+> construct". **The default null reverts to plain iAAFT** and the envelope variant is retained under
+> `--null envelope` solely so this finding stays reproducible.
+>
+> Corrections 1, 3 and 4 are untouched: correction 1 is a mathematical property of the algorithm,
+> and 3 and 4 follow from the measured autocorrelation and from arithmetic.
+
+**~~Correction 2~~ — WITHDRAWN, see above. The original argument, kept for the record: the null repairs the retracted error on one axis and
 repeats it on another.** The run-length result died because random placement destroyed autocorrelation
 the track has architecturally. iAAFT preserves autocorrelation. But autocorrelation is not the only
 architectural structure in this track: the other is **non-stationarity**. The selection-mass envelope
@@ -149,9 +183,23 @@ that no per-transcript claim is available at this surrogate count.
 
 The caller is **reliable** only if all three hold, across the parameter sweep:
 
-1. **Excess over surrogates.** The real track yields more regions per kilobase than its own iAAFT
-   surrogates, with the empirical p-value per transcript computed from the 20 surrogates and
-   aggregated by gene-clustered bootstrap.
+1. ⇒ **Concentration against surrogates — DIRECTION CORRECTED 2026-08-02, this criterion was
+   backwards.** It read: "the real track yields **more** regions per kilobase than its own iAAFT
+   surrogates." Measured across 15 synthetic realizations, a track carrying 40 genuine features
+   yields **fewer** — count ratio 0.73–0.78 against 0.84–0.90 for featureless tracks.
+
+   The reason is structural and applies to the real data identically. **The threshold is a
+   per-transcript quantile, so the number of hot positions is fixed by construction** — measured,
+   total hot positions inside regions is within 1% of surrogate in every case. Only the *arrangement*
+   can vary. Genuine features concentrate a fixed hot mass into **fewer, wider, taller** runs; phase
+   randomization scatters the same mass into more, narrower ones. A criterion on region **count in
+   the stated direction fails on real signal and passes marginally on noise.**
+
+   The criterion is therefore on **concentration**: fewer and wider regions than surrogates, with
+   width the primary statistic and count reported beside it. **Power is weak even so** — the best
+   separation measured is C at 1.17 (60% of realizations above 1) against A at 0.97 (47%) under the
+   default null — so this criterion needs strengthening before it can gate anything, and that work is
+   open. Empirical p per transcript from the 20 surrogates, aggregated by gene-clustered bootstrap.
 2. **Cross-seed reproducibility of *regions*.** Call independently on all five seeds. A region in one
    seed counts as reproduced if it overlaps a region in another by ≥ 50% of the shorter one. Compare
    against a **circular-shift null** — shift one seed's calls within the transcript and recount —
