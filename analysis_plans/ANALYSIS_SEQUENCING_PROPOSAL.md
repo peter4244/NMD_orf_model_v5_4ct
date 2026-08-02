@@ -134,6 +134,57 @@ in Phase A rather than after it.
 
 ---
 
+## A4 — RESURRECTED, scoped to regions. Decided 2026-08-02 after reading Torop et al.
+
+**Decision: A4 returns, restricted to called regions, and decoupled from SmoothHess.**
+
+Once a region is called, exhaustive pairwise substitution inside it is 28 position-pairs for an
+eight-base region. The quadratic cost that deferred A4 was only ever the genome-wide version, so it
+is affordable exactly where we want it **whatever any screening method shows**. That decouples two
+decisions that were tangled together.
+
+> **Hypothesis (A4).** Substitutions at two positions within a called region produce a joint effect
+> exceeding the sum of their individual effects.
+> **Held fixed:** the region, hence locale and routing; pairs are drawn within a candidate.
+> **Licensed if superadditive:** the model integrates across positions, and single-base ISM
+> under-detects whatever it integrates.
+> **Licensed if additive — and this is narrower than I first wrote it:** *these pairs did not jointly
+> cross a ReLU threshold.* A ReLU network is **exactly additive within a linear region**, so
+> additivity is the default rather than evidence. It does not license "single-base ISM sees
+> everything."
+> **And the positive is sharper than the caveat suggests** (model window): an m-of-n detector built
+> from conv→ReLU has its threshold *at* a ReLU boundary, so boundary-crossing is precisely the
+> signature being sought.
+
+### SmoothHess as an optional genome-wide screen — a separate, smaller bet
+
+Torop et al. estimate the Hessian of the Gaussian-convolved network via Stein's Lemma, using *n*
+gradient calls instead of O(d²) forward passes. Two objections resolved and one live:
+
+- **"The structural channels cannot be perturbed"** — answered. Σ is ours to choose; set zero
+  variance on channels 4–8 and only the bases move.
+- **"One-hot input is off-simplex"** — answered by projection. A substitution is a direction in
+  one-hot space, so the pairwise interaction is a quadratic form `uᵀHv` and the off-simplex entries
+  are never interpreted.
+- **Live: scale mismatch.** The Hessian is infinitesimal; a substitution is a *finite* move of norm
+  √2. `uᵀHv` is curvature at a point, double-ISM is a finite difference across the whole
+  displacement. They agree only if the second-order Taylor holds over a unit-scale step, which is
+  empirical — and is why the validation is necessary rather than a formality.
+
+> **Validation row, pre-registered.** Correlate `uᵀHv` against exact double-ISM **within candidate**,
+> then aggregate the within-candidate correlations. Σ pre-specified over a small declared sweep, all
+> of it reported — tuning Σ to maximize agreement is fitting the validation.
+>
+> **Predicted in advance, so it cannot be believed later:** the *between*-candidate correlation will
+> be **high and largely meaningless**, because both quantities carry the selection-mass envelope
+> (log-mass correlation 0.93). It is reported beside the within-candidate figure to show exactly how
+> much a naive validation would have been routing.
+
+**That prediction is the point.** The mass confound retracted the run-length result, and it would
+have passed this validation too. It is not four mistakes; it is one, in four costumes.
+
+---
+
 ## Phase B — the claims that could earn the word
 
 Conditional on Phase A. Each requires the top row of the combinations table.
