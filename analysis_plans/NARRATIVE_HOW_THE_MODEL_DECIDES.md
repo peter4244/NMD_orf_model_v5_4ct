@@ -72,7 +72,8 @@ because downstream tiles already sit below the receptive field. *Retrain item 3.
 
 ## 3. What the picker is actually selecting for
 
-**Length, dominantly — and length is not what initiation biology would nominate.**
+**In aggregate, length — and length is not what initiation biology would nominate. But the
+criterion changes with the regime, and the aggregate hides that.**
 
 `p_capture ~ ORF length` is **+0.760** (C8, job 8899132), the strongest association measured
 anywhere in this work. Among candidates under 200 nt — 69% of them, median 81 nt — it is
@@ -107,7 +108,33 @@ toward junction-bearing frames *less* than pure ordering does. Zero was never th
 reference. *Commit f523f72. Bound: the degenerate null maximises queue influence, so the
 0.125 deficit is an upper bound and may be generic dilution.*
 
-**The junction preference enters at the decay multiplication, not at selection.**
+**But that is the aggregate, and the aggregate is hiding a sign flip.**
+
+Among candidates under 200 nt — the regime where uORFs compete, and where uORF-driven NMD
+actually arises — the head's criterion inverts (job 8900229, within transcript):
+
+| among short candidates | |
+|---|---|
+| `p_capture ~ junction count` | **+0.100** — against **−0.453** over all candidates |
+| `p_capture ~ d` | **+0.362** |
+| top-scoring candidate carries a downstream junction | **76.3%** |
+| top-scoring candidate is the 5′-most | 22.8% |
+
+**Over all candidates the head appears to avoid junction-bearing frames, and that arm is
+entirely length** (−0.453 → −0.009 holding it). **Within the class where it has a real
+choice to make, it prefers them**, and predicts decay at +0.362.
+
+**So the selection criterion is regime-dependent.** Length where the contest is between a
+main ORF and background; **decay-relevance where the contest is among uORFs.** That also
+settles ATF4: the uORF wins because it is decay-relevant, not because it is upstream —
+position accounts for only 22.8% of these cases.
+
+`[unclaimed]` **The flip is measured on the head, not on the picker.** `p_select ~ junction
+count` among short candidates has not been run; the table above it is `p_select` in
+aggregate. The two are not interchangeable and the section needs both.
+
+**In aggregate, the junction preference enters at the decay multiplication rather than at
+selection. Among short ORFs it is already in the head.**
 
 ## 4. The benchmark was wrong; fixed, the number is 0.883
 
@@ -178,9 +205,15 @@ is +0.399 against `p_capture ~ d` +0.091 with the queue removed, and the mixture
 
 It was built to pick a frame and judge it. What it does is **gate**: its own preference is
 nearly worthless (0.304) and becomes strong (0.793) only through a product that turns
-vetoes into a choice. It keys that gate on **ORF length**, seven times more than on
-initiation context, and part of that length signal is **our own window boundary** rather
-than sequence. Over simply taking the first candidate, it is worth **+0.091**.
+vetoes into a choice. Over simply taking the first candidate, it is worth **+0.091**.
+
+**What it gates on depends on the contest.** Against background it uses **ORF length**,
+seven times more than initiation context — and part of that length signal is **our own
+window boundary** rather than sequence. Among short ORFs, where uORFs compete and where the
+head has a real choice, the criterion flips to **decay-relevance**: its junction association
+goes from −0.453 to +0.100 and it predicts the judge at +0.362. The aggregate reads as a
+length detector because the short-ORF regime is a minority of the variance, not because the
+head has one rule.
 
 The decay judge, handed the EJC count outright, is not a readout of it, never learned stop
 codons because we gave it no negative examples, and carries a real but diffuse composition
@@ -202,7 +235,9 @@ in that benchmark at all.
   field ~42 nt against a ~10 nt motif. **The most promising open item.**
 - **Whether the head reads the fill boundary or what is inside it.** Closed to tiling; needs
   a retrain varying window extent. *Retrain item 7.*
-- **`p_select ~ length`** — the picker's own selection criterion, inferred and not measured.
+- **`p_select ~ length`, and `p_select ~ junction count` among short candidates.** §3 — the
+  regime flip is measured on the *head*; whether it survives the queue into the *picker* is
+  not. The cheapest things outstanding.
 - **Whether the posterior's −0.253 on `protein_coding` is error or the uORF mechanism
   working.** Leaving the main ORF is correct for an ATF4-like transcript and wrong for an
   ordinary one, and the biotype cannot separate them. **This decides whether 0.883
