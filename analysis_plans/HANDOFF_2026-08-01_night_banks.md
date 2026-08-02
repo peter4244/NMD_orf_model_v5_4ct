@@ -362,6 +362,43 @@ correlations (0.558, 0.549) beside very different sign agreement is exactly
 "agreement on which positions are large, with the small-magnitude bulk flipping
 sign at the floor."
 
+### The run-length result splits into two findings, and they can come apart
+
+From the interpretability window, and it is the most important thing to carry into
+tomorrow. The one positive that survived today is that elevated positions form runs
+of four or more bases, 34 times against 0 for random placement. **At a cross-seed
+track correlation of 0.558, the specific positions may not replicate even though
+the run structure does.**
+
+These are separable and must be reported separately:
+
+- **run-length distribution, per seed** — does each seed independently concentrate
+  sensitivity into short blocks?
+- **elevated-set overlap, between seeds** — do they agree on *which* blocks?
+
+The first can hold while the second fails, and that outcome is not a weaker version
+of the finding — it is a different finding: *"the model concentrates sensitivity
+into short blocks"* would be a property of the architecture, while *"these
+particular blocks"* would be a property of an initialisation. Only the first is
+claimable from five seeds; the second would need the discovery/confirmation arm.
+
+Reporting a single "the runs replicate" number would conflate them.
+
+### Two masks that are not interchangeable
+
+A dead perturbation **inside** an ATG window is a real measurement of zero. A
+stop-only position is not a measurement at all. Masking on "where `vals_capture` is
+nonzero" deletes both; masking on ATG geometry deletes only the second. The
+dead-perturbation rate is about 21% on this model, so the choice is not cosmetic —
+and I had this wrong in the first correction to `qc_ism_banks.py`, using the
+zeros-based mask for cross-seed agreement before the interpretability window
+pointed out the distinction.
+
+The geometric mask also buys a check that can fail, now asserted: every bank must
+agree on ATG coverage, because geometry does not depend on the seed. Disagreement
+would mean the banks were built over different candidate sets and nothing
+comparing them is valid.
+
 **Open for the morning, and the first thing worth doing:** `vals` sign agreement at
 44.1% is lower than a quantity intended for interpretation should be, and unlike
 the capture figure it is **not** explained by structural zeros. Condition it on

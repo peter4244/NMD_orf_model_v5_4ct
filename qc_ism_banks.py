@@ -147,18 +147,28 @@ def main():
             problems.append(f"seeds have different shapes: {shp}")
             print(f"  shapes differ: {shp}  <-- cannot compare")
         else:
+            # The ATG mask is GEOMETRY and geometry does not depend on the seed,
+            # so every bank must agree on it. If they do not, the banks were built
+            # over different candidate sets and nothing below compares like with
+            # like.
+            atgs = [banks[k]["atg"] for k in names]
+            assert all(np.array_equal(atgs[0], a) for a in atgs[1:]), \
+                "banks disagree on ATG coverage — different candidate geometry"
+            atg0 = atgs[0]
             for tag in ("vals", "cap"):
                 stk = np.stack([banks[k][tag] for k in names])
                 ok = np.isfinite(stk).all(0)
-                if not ok.any():
-                    continue
-                # STRUCTURAL ZEROS CANNOT AGREE ON A SIGN. np.sign(0) is 0, so a
-                # stop-only position -- where capture is exactly 0 by construction
-                # -- can never be unanimous, and including those deflates the
-                # agreement toward zero for reasons that have nothing to do with
-                # the seeds. They are dropped, and the count that remains is
-                # printed so the denominator is visible.
-                ok = ok & (np.abs(stk) > 0).any(0)
+                # MASK ON GEOMETRY, NOT ON THE ZEROS THEMSELVES. np.sign(0) is 0,
+                # so a structurally-zero entry can never be unanimous and drags the
+                # statistic down for reasons unrelated to the seeds -- but masking
+                # on "nonzero somewhere" would also delete a DEAD PERTURBATION
+                # inside an ATG window, and that is a real measurement of zero, not
+                # an absence of one. The dead-perturbation rate is around 21% on
+                # this model, so the two masks are not interchangeable. Capture is
+                # scored where capture can respond; vals is never structurally zero
+                # and needs no such mask.
+                if tag == "cap":
+                    ok = ok & atg0[..., None] if stk.ndim == 4 else ok & atg0
                 if not ok.any():
                     continue
                 x = stk[:, ok]
