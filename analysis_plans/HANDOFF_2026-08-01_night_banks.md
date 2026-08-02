@@ -448,6 +448,45 @@ reported, the ordering is reported with it.
   "up to 100" matters: fill stops at the ORF midpoint, so short candidates get
   fewer, and that clip is the geometric leak §8.5 exists to control.
 
+## Who runs what — proposed to the interpretability window, awaiting their reply
+
+Pete asked for this to be coordinated rather than left to converge. Split by what
+each window already has working:
+
+| who | analysis |
+|---|---|
+| interpretability | run-length: does *structure* replicate across seeds, and separately do *locations* |
+| interpretability | run-length across `discovery` vs `confirmation` arms, same seed, disjoint genes — the untouched axis |
+| this window | `vals` cross-seed sign agreement conditioned on above-floor entries |
+| this window | the 5.97% residual at `p_select` ∈ [1e-13, 1e-11): recompute `z_p` perturbed vs unperturbed on ~92 positions, since it needs the encoder re-run |
+
+**Deliberately duplicated: the run-length replication itself.** It is the
+load-bearing positive in §5, and tonight produced six or seven wrong claims between
+the two windows with **not one caught by whoever made it**. Independent computation
+of elevated-set overlap — their effect tracks and elevation rule against mine from
+`vals` — makes agreement worth something and disagreement worth more. Nothing else
+is duplicated.
+
+**Mechanics, because worktrees do not protect the shared results directory:**
+
+- output namespace `results_ism_v6/model_*` and `qc_*` for this window,
+  `interp_*` for theirs. Two jobs writing one path is the failure git cannot catch.
+- job-name prefix `md_*` here, so `squeue` distinguishes them.
+- **the four-job cap is per user and shared** — say so before running anything wide
+  rather than starving each other.
+- access expires ~09:00; long jobs checkpointed or restartable before then.
+
+**Two constraints to design around:** capture magnitude varies 47× across seeds, so
+any elevation threshold on that branch must be relative to the seed's own
+distribution (their 10×-transcript-median rule already is); and both the
+reference-anchor exclusion and the liveness gate are differential on the mechanism
+grouping, so anything that filters must report retention per cell, not overall.
+
+**Open question put to them:** is the run-length positive scored on `vals`,
+`vals_capture`, or both? `vals` and `vals_decay` clear the floor at 77–89% against
+`vals_capture`'s 53–78%, and they differ in seed stability. If the original finding
+was on `vals` it is largely a decay-arm result and should be described as one.
+
 ## Where the banks live, and where they do not
 
 **The five banks exist ONLY on Explorer**, at
