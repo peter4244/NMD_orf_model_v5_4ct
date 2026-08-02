@@ -149,6 +149,14 @@ diff size, or the fact that the commit was non-empty.** `CLAUDE.md` already says
 message is not evidence of its diff; this is the sharper version — *a non-empty diff is not
 evidence that the intended edit landed.*
 
+**Two practical notes, both learned by getting this wrong while writing this file.** Prose
+here is hard-wrapped, so a phrase you inserted will often straddle a newline and a plain
+`grep "some phrase"` returns nothing for text that is present. Flatten first:
+`tr '\n' ' ' < FILE | tr -s ' ' | grep -i "some phrase"`. And — the part that actually
+matters — **I committed anyway while my own check was reporting MISSING**, on the reasoning
+that I knew what I had written. The check was wrong that time. Next time it will not be, and
+the habit of overriding it is the defect, not the grep.
+
 ---
 
 ## THE STANDARD, WHICH IS THE POINT OF ALL OF IT
