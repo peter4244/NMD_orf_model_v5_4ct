@@ -49,6 +49,52 @@ Each has been hit for real. The "cost of getting it wrong" column is what actual
 
 ---
 
+## What each adjustment licenses you to say
+
+Pete's addition, 2026-08-02: an adjustment is only useful if you can state, in plain English, what
+it entitles you to conclude. Two things travel together and both must be written down:
+
+- **every adjustment narrows the claim.** The inference is always "given that X was held fixed,"
+  and dropping that qualifier is where a claim inflates
+- **every adjustment blinds you to the thing adjusted.** A null result after adjusting for
+  composition is not "no sequence preference" — it is "no preference beyond composition"
+
+| held fixed | you may say | you may **not** say |
+|---|---|---|
+| **nothing** | "these positions move the model's output most" | anything about sequence. At r ≈ 0.79 with selection mass, this is mostly a statement about routing |
+| **selection mass** (stratified) | "among positions the model routes to equally, these bases matter more" — the decay head's sequence response with routing controlled | "these positions matter most to the output." High-mass positions matter more whatever their sequence, and you removed that |
+| **window coverage** | "among positions seen by the same number of candidate windows…" | anything about a position's total influence |
+| **positional region** (stratified) | "within the 3′UTR, elevated positions differ from *other 3′UTR positions* in X" | "3′UTR positions are enriched for X" — that is a between-region claim and you stratified it away |
+| **compositional region left free** (the PTC decoupling) | one of three readings, stated: enriched in **both** downstream cells → tracks position; **normal only** → tracks 3′UTR composition; **PTC interval only** → coding sequence in a post-termination position | any pooled statement over the cells. Pooling is what the decoupling makes meaningless |
+| **local base composition** | "beyond what the base frequencies alone predict, the *arrangement* matters" — the motif claim | "the model prefers base X." That is exactly what you adjusted away, and it is undetectable by construction |
+| **distance to a boundary** | "independent of proximity to a window edge or a landmark…" | anything about the landmark itself |
+| **effect magnitude** | "at equal effect size, elevated positions still differ in X" — so X is not signal-to-noise | any elevated-versus-background comparison where elevation *is* magnitude. That claim is circular |
+| **substitution arity** | comparisons between arms of equal arity | any comparison of a max-over-3 statistic to a max-over-1 one. That difference alone is 1.37× |
+| **autocorrelation preserved in the null** | "beyond the smoothness the track already has, positions cluster" | "positions cluster" from a null that destroyed the smoothness. That says only that the track is smooth |
+| **anchor = annotated ORF** | "relative to the annotated ORF…", scoped to transcripts that have one | anything about the 31.5% without annotation, whose exclusion is differential by mechanism cell |
+| **anchor = model-selected ORF** | "relative to the ORF the model committed to…" | anything about whether the model selects correctly. That is circular |
+
+### Combinations, which is where the real claims live
+
+| combination | the sentence it licenses |
+|---|---|
+| **mass stratified + composition held + autocorrelation-preserving null** | "Among positions the model routes to equally, and beyond what base frequencies predict, sensitivity clusters into short arrangements." **This is the motif claim.** Nothing weaker earns the word |
+| **mass stratified, composition free** | "Among equally-routed positions, these bases are preferred." A *composition* claim — which is what we currently have, and it is not a motif |
+| **region stratified + composition held** | "Within the 3′UTR, beyond 3′UTR composition, arrangement matters." The regionally-honest version of the motif claim |
+| **magnitude held + mass stratified** | "At equal effect size and equal routing, elevated positions have property X." The only form in which a property-of-elevated-positions claim is not partly circular |
+| **nothing held, per-transcript elevation** | "Within each transcript, the largest effects fall here." True, weak, and almost entirely architecture |
+
+### The two failure sentences to watch for
+
+Both were written this week before being caught:
+
+- **"X is enriched at elevated positions"** with nothing held fixed — mostly says elevated positions
+  are high-mass positions.
+- **"X survives the control, therefore X is real"** where the control was adjusted for something on
+  the causal path — the GC-preserving operator, which was itself GC-biased at 0.679 against 0.502.
+
+---
+
 ## The rule applied, to the live question
 
 ### Hypothesis H1 — *the decay head responds to a local sequence feature, independent of routing*
