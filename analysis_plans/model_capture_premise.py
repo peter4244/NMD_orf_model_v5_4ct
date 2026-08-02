@@ -73,6 +73,7 @@ def main():
         off = f["cand_offset"][:]
         cnt = f["cand_count"][:]
         pcap = f["p_capture"][:]
+        pdec = f["p_decay"][:]
         psel = f["p_select"][:]
         is_ref = f["cand_is_ref_cds"][:]
         o_start = f["cand_orf_start"][:]
@@ -82,6 +83,8 @@ def main():
         N = len(cnt)
         ck = f.attrs.get("checkpoint", "?")
 
+    r_part, r_cp, r_ep = [], [], []
+    cv_dec, dec_at_sel, dec_max = [], [], []
     hit_sel = hit_cap = hit_5p = 0
     n_used = n_cand_used = 0
     ncands, cv_cap, ent_sel, maxsel = [], [], [], []
@@ -107,8 +110,33 @@ def main():
             maxsel.append(float(q.max()))
 
         # ---- Q3, within transcript so between-transcript structure cannot leak
-        r_ejc.append(spearman(pc, ejc[lo:lo + k].astype(float)))
+        e_ = ejc[lo:lo + k].astype(float)
+        pos_ = o_start[lo:lo + k].astype(float)
+        r_ejc.append(spearman(pc, e_))
         r_koz.append(spearman(pc, koz[lo:lo + k].astype(float)))
+
+        # IS THE EJC ASSOCIATION MEDIATED BY POSITION? Partial rank correlation
+        # of capture with EJC count, holding candidate start position fixed.
+        # The architecture forbids a direct route, so if the raw -0.46 is
+        # position it should collapse here. Position is NOT a confound to be
+        # removed -- it is the hypothesised mediator, and this measures how much
+        # of the association it accounts for.
+        rce, rcp, rep = spearman(pc, e_), spearman(pc, pos_), spearman(e_, pos_)
+        if all(np.isfinite([rce, rcp, rep])) and abs(rcp) < 1 and abs(rep) < 1:
+            den = np.sqrt((1 - rcp ** 2) * (1 - rep ** 2))
+            if den > 1e-9:
+                r_part.append(float((rce - rcp * rep) / den))
+                r_cp.append(rcp)
+                r_ep.append(rep)
+
+        # DOES DECAY DISCRIMINATE AMONG CANDIDATES AT ALL? If d_k is flat, decay
+        # cannot be carrying selection; if it is sharp and low off the chosen
+        # candidate, it can. Raised by the interpretability window.
+        d_ = pdec[lo:lo + k]
+        if d_.mean() > 0:
+            cv_dec.append(float(d_.std() / d_.mean()))
+        dec_at_sel.append(float(d_[int(np.argmax(ps))]))
+        dec_max.append(float(d_.max()))
 
         # ---- Q1, only where a reference candidate exists
         if not ref.any():
@@ -175,6 +203,28 @@ def main():
     print(f"    median {np.median(re_):+.3f}   mean {re_.mean():+.3f}   n {len(re_):,}")
     print(f"  within-transcript rank corr, p_capture vs kozak_score  (comparator)")
     print(f"    median {np.median(rk):+.3f}   mean {rk.mean():+.3f}   n {len(rk):,}")
+    rp = np.array(r_part)
+    print(f"\n  PARTIAL, holding candidate start position fixed")
+    print(f"    median {np.median(rp):+.3f}   mean {rp.mean():+.3f}   n {len(rp):,}")
+    print(f"    capture~position median {np.median(r_cp):+.3f}"
+          f"    ejc~position median {np.median(r_ep):+.3f}")
+    print("    If the raw association collapses here, it is POSITION, which is")
+    print("    what the architecture predicts. If it survives, capture is")
+    print("    tracking junction structure by some route we have not found.")
+
+    print("\n" + "=" * 70)
+    print("Q4  DOES DECAY DISCRIMINATE AMONG CANDIDATES?")
+    print("=" * 70)
+    cd_, ds_, dm_ = np.array(cv_dec), np.array(dec_at_sel), np.array(dec_max)
+    print(f"  p_decay CV within transcript        "
+          + " ".join(f"{np.percentile(cd_, p):.3f}" for p in (10, 25, 50, 75, 90)))
+    print(f"  p_decay at the SELECTED candidate   "
+          + " ".join(f"{np.percentile(ds_, p):.3f}" for p in (10, 25, 50, 75, 90)))
+    print(f"  p_decay max over candidates         "
+          + " ".join(f"{np.percentile(dm_, p):.3f}" for p in (10, 25, 50, 75, 90)))
+    print("  If decay were flat it could not be carrying selection; if it is")
+    print("  sharp, 'decay does everything and capture is decorative' is live.")
+
     print("  Architecture says capture sees the ATG window only, so any EJC")
     print("  association must be INDIRECT via start context. A large direct")
     print("  association would mean the invariance is broken -- worth finding.")

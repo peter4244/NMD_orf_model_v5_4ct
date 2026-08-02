@@ -1,5 +1,5 @@
 === code (sha256) ===
-1868bdf079592e8b31adb5d1fe5b598b98a7d7fdb651ff2320f68ecfefada17f  analysis_plans/model_capture_premise.py
+55638aac9341b8dc6cbd0f0abd270fbdef376fafafe120a4193c4b94301b25a9  analysis_plans/model_capture_premise.py
 
 BANK results_ism_v6/bank_interp_s100.h5
 checkpoint runs/interp_c32_b8_s100/best.pt
@@ -37,6 +37,22 @@ Q3  IS CAPTURE BLIND TO THE STRUCTURAL BLOCK, ON REAL DATA?
     median -0.460   mean -0.390   n 4,917
   within-transcript rank corr, p_capture vs kozak_score  (comparator)
     median +0.124   mean +0.116   n 4,917
+
+  PARTIAL, holding candidate start position fixed
+    median -0.582   mean -0.517   n 4,526
+    capture~position median -0.197    ejc~position median -0.378
+    If the raw association collapses here, it is POSITION, which is
+    what the architecture predicts. If it survives, capture is
+    tracking junction structure by some route we have not found.
+
+======================================================================
+Q4  DOES DECAY DISCRIMINATE AMONG CANDIDATES?
+======================================================================
+  p_decay CV within transcript        0.346 0.517 0.770 1.025 1.293
+  p_decay at the SELECTED candidate   0.008 0.033 0.171 0.807 0.975
+  p_decay max over candidates         0.143 0.267 0.563 0.879 0.980
+  If decay were flat it could not be carrying selection; if it is
+  sharp, 'decay does everything and capture is decorative' is live.
   Architecture says capture sees the ATG window only, so any EJC
   association must be INDIRECT via start context. A large direct
   association would mean the invariance is broken -- worth finding.
