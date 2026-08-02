@@ -54,6 +54,19 @@ substitutions with zero differing entries, 37 bank datasets bitwise identical ag
 the pre-cache builder, and agreement with the model's own `forward()` to 2.842e-09.
 Each check was first shown capable of failing, by deliberate mutation.
 
+**Hardware is not a confound in the cross-seed numbers, and this is already checked.**
+All five array tasks ran on **Tesla V100-SXM2-32GB** across five nodes (d1002, d1007,
+d1011, d1017, d1002). So cross-seed disagreement is initialization, not hardware.
+*Residual, stated because it is unlogged rather than excluded:* the bank script
+recorded GPU model but not driver version per task. Not plausible as a cause at these
+effect sizes; the script now logs driver, the banks predate the fix.
+
+**A name collision to resolve before it costs a day.** The sequencing plan's **A2**
+(the routing-versus-sequence gate) and the §5 claim list's **A2** (performance against
+the legacy architecture) are unrelated. Proposed: call the gate **"the routing gate"**
+in prose and prefix the plan's identifiers (`SEQ-A2`, `SEQ-B1`). A possessive label
+like "Maude's A2" will not survive this handover and should not be adopted.
+
 **`vals_decay` is the column.** Everything in the programme is the decay branch;
 capture is out of scope, not merely unreported.
 
