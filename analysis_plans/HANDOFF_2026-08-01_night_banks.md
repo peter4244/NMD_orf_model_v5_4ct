@@ -588,9 +588,50 @@ outlier.
 Independent implementations then agree to four decimals: 0.4668 here against 0.4664
 there, 21.9% of range against 22%.
 
-**The settled statement: elevated positions are 20.5% above the measured noise
-floor, which is 22% of the available range.** All positions are indistinguishable
-from the floor.
+**The settled statement: elevated positions are ~21% above the measured noise floor
+under per-transcript elevation, ~16% under global elevation, with the rule stated.**
+All positions are indistinguishable from the floor. Both windows agree to within a
+tenth of a percent on both rules:
+
+    rule              this window        interp window
+    global top 1%     +15.4% median      +15.7% median
+    per-transcript    +20.5% median      +20.6% median
+
+**That is not a range from uncertainty — it is two definitions, both defensible,
+differing by a stated choice.**
+
+**Use per-transcript, and say why, because the honest reason is consistency and not
+size.** Per-transcript gives the *larger* number, so global is the conservative
+choice and we are not taking it. The reason to prefer per-transcript is that the
+whole point of abandoning fold-over-median was to make "elevated" mean the same
+thing in every transcript regardless of its responsiveness — and a global quantile
+reintroduces exactly that bias, concentrating on high-responsiveness transcripts.
+A reviewer will ask why the larger of two numbers was chosen; the answer is that the
+selection rule was fixed before this comparison existed, for a reason unrelated to
+it.
+
+### The sharpest methodological point of the two days
+
+**An empirical null that matches an analytic prediction is not thereby validated.**
+
+The sub-floor band matched the analytic random-sign null on the mean (0.370 against
+0.375) and missed it by half on the median (0.389 against 0.250). The agreement was
+real and meaningless: it held on one estimator and failed on the other, and only
+checking both revealed that the model behind the prediction — independent random
+signs — does not describe this noise. The sub-floor substitutions agree in sign far
+more often than chance, so a shared per-position component dominates at that scale.
+*(Plausibly the same accumulation-order structure that produces the batch-shape
+offset. Unshown, and marked as such.)*
+
+This is a sharper form of the denominator check: **a reference point can be wrong in
+a way that agreeing with theory actively conceals.** The agreement is what stops you
+looking.
+
+### The standard form, because three scripts hit one cause
+
+`vals` is NaN at the observed base by construction, so `np.isfinite(x).all(1)` is
+**never true**. Use `(np.isfinite(x).sum(1) == 3)`. Three scripts across two windows
+hit this; one threw, one produced an empty set silently, one produced a table.
 
 **That number was corrected three times in one morning and shrank every time:** 62%
 of an attainable ceiling → ~14-15% above a wrong analytic null → 20.5% above the
