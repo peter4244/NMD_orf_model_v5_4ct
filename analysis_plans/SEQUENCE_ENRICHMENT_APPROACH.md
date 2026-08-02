@@ -20,9 +20,11 @@ by someone who has not followed the day-to-day.
 
 *Added 2026-08-02 on Pete's instruction: key terms must be defined and commonly
 understood across the team. Every term below was in active use across three windows
-and defined in none of them. **A term not in this list should not appear in a
-document, a legend or a commit message** — add it here first, or use ordinary
-words.*
+and defined in none of them. **Terms in this list are used as
+defined.** If you need one that is not here, add it here first or use ordinary words —
+the rule is enforceable that way, and the first version of it ("nothing outside this
+list belongs in a document") was not, since four live terms were missing from a
+twelve-term list, including `operative stop`, which the gate anchors on.*
 
 | term | what it means | note |
 |---|---|---|
@@ -30,13 +32,31 @@ words.*
 | **importance** | the change in the model's output when one base is substituted. Measured directly, one forward pass per substitution | this is in-silico mutagenesis (ISM), the standard term |
 | **unresponsive position** | a position where a substitution **cannot** change the output, because the candidate window containing it carries essentially no selection mass. Measured: all sit below mass ≈ 1e-8 | **preferred over "dead"**, which reads as a broken measurement. §5.5: a zero here is a true statement, not a failed one |
 | **mass band** | a group of positions with similar selection mass, so the analysis compares like with like. Bands are quantiles of log selection mass | "band" alone always means this |
-| **unresponsive stratum** | the band holding positions below the 1e-8 cutoff. Used as a **control**: nothing there can move the output, so any signal in it is an artifact of the instrument | was called "the dead band" |
+| **unresponsive stratum** | the band holding positions below the 1e-8 cutoff | was called "the dead band". **It is NOT a valid instrumental control** — see below |
 | **order of magnitude** | a factor of ten. Selection mass spans many, so it is sometimes grouped by powers of ten | **preferred over "decade"**, which is standard in engineering and opaque here |
 | **locale** | where a position sits relative to the reading frame the model committed to: 5′ of the start, inside the ORF, or 3′ of the stop | **one name only.** Previously also written "region" and "positional region"; `ADJUSTMENT_TOOLBOX.md` axis 3 is the governing definition |
 | **cell** | one (transcript × mass band × locale) group. The unit the analysis is computed in | |
 | **elevation** | the top fraction of positions **within a cell**, ranked by importance. Never a fold-change over a median, and never pooled across transcripts | §3.1 |
 | **qualifying cell** | a cell with enough positions to analyse (≥100). Cells below the floor are excluded and the exclusion is reported | job 8896584: the floor removes cells, not transcript classes |
 | **the gate** | the one measurement the programme turns on, `SEQ-A2` | renamed from "A2" because that collides with the claim-list A2 |
+| **operative stop** | the stop codon of the reading frame the model actually committed to — the candidate with the highest `p_select` — which in a PTC transcript is **not** the annotated stop | the anchor the locale split is defined against, so every locale claim depends on it |
+| **elevation rule** | the specific rule that picks the elevated set: top fraction **within a cell**, ranked by importance, threshold swept | "the elevation rule" as a phrase means this rule, not any particular threshold |
+| **seqlet** | a short window of high importance, represented by its per-base attribution matrix rather than by its letters. The unit Phase C clusters | from TF-MoDISco; not our coinage |
+| **envelope** | the smooth, large-scale variation the effect track inherits from selection mass, as distinct from anything local | say "selection-mass envelope" on first use in a document |
+
+**Why the unresponsive stratum is not a control** (measured, job 8896969, 2026-08-02).
+It was built as one, on the reasoning that a substitution there cannot move the output
+so any signal must be instrumental. **That reasoning is wrong because the statistic is
+scale-free.** Within a narrow mass band `|vals| ≈ mass × sensitivity(sequence)`, so
+ranking positions by importance is ranking them by sequence sensitivity and the mass
+level cancels. A uniform sequence preference in the decay head therefore reproduces
+the same ratio at *every* mass level, including the smallest — which is what we
+observe (5 of 6 sub-strata above their nulls, 3′ of the stop). These are not positions
+where nothing happens; they are positions where something real happens scaled to
+near-zero. The only genuinely null positions are the exact zeros, and those are
+degenerate: every value tied, so no ranking exists and the stratum returns nothing.
+**No valid instrumental control for a scale-free statistic currently exists**, and
+the encoder-artifact question is open rather than settled.
 
 **On what routing does and does not mean** (Pete, 2026-08-02): selection mass
 *locates* importance rather than invalidating it. A substitution that matters because
