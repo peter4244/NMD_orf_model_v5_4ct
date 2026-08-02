@@ -160,3 +160,47 @@ against 0.729 of controls, so NMD ORFs are not invisible to it. **Not establishe
    error it excuses.
 4. I cited `model.py` for architecture earlier in the day. It is the superseded v5
    file; the current model is `model_v6.py`. Caught by the interpretability window.
+
+
+---
+
+## The intervention we cannot run, and the retrain that would make it free
+
+**The design.** C12's boundary sits at 200 nt *because* the ATG window's downstream
+extent is 100 — fill = min(100, length/2). So a model trained with a different
+extent must show the boundary at **exactly twice the new extent**. A numeric
+prediction, at a specific location, registered before the run, that retraining noise
+cannot manufacture. It is the only route from observation to intervention available
+to this thread.
+
+**Why it is dead, on evidence rather than inference.**
+
+| artifact | date | size | family |
+|---|---|---|---|
+| `results_4ct_sweep/best_model_atg1000_*` | Jul 30 | 453,130 B | v5 |
+| `results_4ct/best_model_atg500_stop500.pt` | Jun 5 | 453,242 B | v5 |
+| `runs/interp_c32_b8_s100/best.pt` — **what every claim here is about** | Aug 1 | **281,978 B** | v6 |
+
+The sweep checkpoints carry essentially v5's parameter count and are 1.6× larger
+than v6. They are a **different architecture**, not a different window on the same
+one — so comparing across them varies the tensor builder, the candidate set (fixed
+5 against ragged ~19) and the architecture at once, and the moving-boundary
+prediction has no purchase. Naming and the absence of `.h5` files in the sweep
+directory were suggestive; the parameter count settles it.
+
+`build_tensor.py:47` also hardcodes `ATG_LEFT, ATG_RIGHT = 900, 100` as module
+constants, and its argparse exposes no window parameter, so **every tensor the
+current builder produces has the same extent**. There is nothing to compare even in
+principle.
+
+**⇒ A DESIGN REQUIREMENT FOR THE DEFERRED RETRAIN, not a dead experiment.** Pete has
+deferred retraining and re-architecture behind infrastructure. **If that retrain
+varies the downstream extent across even two settings, this test comes free** — and
+it is the only way to convert the geometric account from "the boundary lands at
+twice the encoded extent" into "the boundary *moves when we move the extent*."
+Recorded here so the requirement reaches the retrain rather than being rediscovered
+after it.
+
+**What the write-up must therefore say:** the geometric account is supported by
+where the boundary falls and **has not been tested by intervention, because no model
+exists that varies the quantity.** A named gap, not a hedge.
