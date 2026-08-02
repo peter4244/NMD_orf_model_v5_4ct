@@ -47,34 +47,29 @@ leaky scanning is.
 
 So the head's job is to be **quiet** at the wrong candidates.
 
-> **⚠ THE DEMONSTRATION BELOW IS SCORED AGAINST THE WRONG TARGET. Re-score pending.**
-> These three numbers score recovery of the **annotated main ORF** — the target §4
-> establishes is wrong. Under NMD the main ORF is not necessarily the frame being picked,
-> and it is not what the model is trying to find. *Pete, 2026-08-02.* The same five arms
-> are being re-run against GENCODE's own `nonsense_mediated_decay` call, where recovery and
-> decay-causation coincide: `model_gate_vs_ranker_gencode.py`, predictions registered.
->
-> **The mechanism is not at risk** — `p_select_k = p_capture_k × Π(1 − p_capture_j)` is
-> stick-breaking in `model_v6.py`, true whatever we score against. **The demonstration is**,
-> because it is entirely target-dependent. If the queue no longer beats the head's own
-> argmax on the right target, this table is retracted and the heading's claim survives on
-> code alone, as derived rather than measured.
-
-Three ways of choosing, all scored the same way, on recovering the annotated main ORF:
+Three ways of choosing, scored on GENCODE's own `nonsense_mediated_decay` call — where the
+annotated CDS **is** the frame that causes decay, so recovery and decay-causation coincide
+(n = 1,099 transcripts in 915 genes; job 8900942):
 
 | | |
 |---|---|
-| the head's own argmax | 0.305 |
-| the most 5′ candidate | 0.424 |
-| **the queue built from the head** | **0.697** |
+| the head's own argmax | 0.304 |
+| the most 5′ candidate | 0.702 |
+| **the queue built from the head** | **0.793** |
 
-**The head alone is worse than position; the queue built from it is far better than
-either** — the signature of a gate rather than a ranker, since the head's *low* scores
-upstream are what let a ribosome pass through to the right frame. **On the main-ORF target,
-which is why this is pending.**
+**The head's raw preference is nearly worthless, and the queue built from that same head is
+worth +0.489** — CI [+0.455, +0.522], and it wins on 546 transcripts while losing on 9. The
+head is not being overruled by the queue; it *is* the queue's only input. That gap is the
+whole claim: a gate, not a ranker. The head's **low** scores upstream are what let a
+ribosome pass through to the right frame.
 
-**The model's accuracy at the question that matters — finding the frame that causes decay —
-is 0.883** (§4), and that number is unaffected: it was measured against GENCODE throughout.
+**Its margin over pure position is real but modest: +0.091**, CI [+0.053, +0.129], 241 won
+against 141 lost (job 8900950, gene-clustered). Position alone recovers **0.702** here, so
+most of the queue's accuracy is reachable with no model at all, and the model's contribution
+over knowing nothing but the order of the candidates is a tenth.
+
+*Both intervals are gene-clustered bootstraps, not McNemar, because transcripts of one gene
+share architecture. McNemar agrees and is quoted in the runlog; it is the optimistic bound.*
 
 ## 2. What the picker reads
 
@@ -141,10 +136,10 @@ factors, so the alignment is part of what the model computes rather than a descr
 
 ## 4. The benchmark was wrong; fixed, the number is 0.883
 
-**The right target is the frame that causes decay, not the annotated CDS** — for an NMD
-substrate those are close to disjoint. **ATF4 is the case:** the prior picks the 1055-nt
-main ORF, the posterior flips **18×** onto a 179-nt uORF and puts **93%** of the signal
-there. That is the textbook mechanism, and against the annotated CDS it scores as a miss.
+**The right target is the frame that causes decay, not the annotated main ORF.** **ATF4 is
+the case:** the prior picks the 1055-nt main ORF, the posterior flips **18×** onto a 179-nt
+uORF and puts **93%** of the signal there. That is the textbook mechanism, and against the
+main ORF it scores as a miss.
 
 Scored against GENCODE's curated `nonsense_mediated_decay` biotype — a call made
 independently of anything we compute (job 8900631):
@@ -155,10 +150,30 @@ independently of anything we compute (job 8900631):
 | `protein_coding` | 1,285 | 0.844 | 0.591 |
 
 **The posterior is a decay-seeking correction** — +0.090 where the annotated frame is
-decay-causing, −0.253 where it is not.
+decay-causing, −0.253 where it is not, both gene-clustered and both excluding zero (job
+8900950).
 
-`[unclaimed]` **No heuristic baseline has been measured against 0.883.** The 0.678 figure
-belongs to main-ORF recovery. This number currently has no floor under it.
+**The floor under 0.883 is 0.460** — longest ORF, on these same transcripts, headroom
+**+0.423** (job 8900942). The interval measured is the prior's margin over that floor,
+**+0.333, CI [+0.298, +0.367]**; the posterior's own margin over it was not tested
+separately. This closes a gap that was `[unclaimed]` all day; the 0.678 figure that used to
+be quoted here belongs to main-ORF recovery and does not apply.
+
+**But this benchmark is one NMD mechanism, not both, and the same run says so.** On these
+transcripts the most 5′ candidate recovers the target **0.702** of the time and the longest
+ORF only **0.460** — exactly inverted from `protein_coding`, where position gets 0.493 and
+length 0.958. Read together: in a GENCODE NMD-biotype transcript the decay-causing frame
+**starts at the normal start codon with nothing in front of it**, and is **truncated** by
+the premature stop codon so it is no longer the longest frame. That is premature stop codon
+in the main frame — poison exons, retained introns, frameshifts.
+
+**The uORF mechanism is largely absent from it.** A transcript whose decay is driven by an
+upstream ORF keeps an intact main CDS and is annotated `protein_coding`. ATF4 is in the
+second row, not the first. So **0.883 is the model's accuracy on premature stop codon in the
+main frame**, and on the row where the uORF mechanism actually lives the posterior *loses*
+0.253 to the prior — some of which is the posterior correctly leaving the main ORF, as it
+does for ATF4, and some of which is it being wrong. `[unclaimed]` **Nothing separates those
+two.** It is the sharpest open question in this document.
 
 ## 5. The judge
 
@@ -205,6 +220,11 @@ survived cannot be checked.
 - **Whether the head reads the fill boundary or the start codon.** Closed to tiling.
 - **Whether the model is a single junction detector.** n = 49 against a pre-registered floor
   of 50. Needs pool-scale forward passes.
+- **Whether the posterior's −0.253 on `protein_coding` is error or the uORF mechanism
+  working.** Leaving the main ORF is correct for an ATF4-like transcript and wrong for an
+  ordinary one, and the GENCODE biotype cannot tell them apart because both are annotated
+  `protein_coding`. **The sharpest open question here**, and the one that decides whether
+  0.883 generalises past premature stop codon in the main frame (§4).
 - **C15 — why routing is junction-biased in NMD transcripts (+0.119) and anti-biased in
   controls (−0.189).** The model cannot see labels, so sequence carries a 0.31 gap and we
   have no mechanism for it. All three windows called this the most interesting open item.
@@ -292,6 +312,31 @@ demand for the direct measurement, the objective sentence by "measured or argued
 sparsity prediction by someone else's tiling. **One (C16) was caught by the author, using
 a rule a reader had proposed an hour earlier. One (1.148) surfaced from a cross-window
 discrepancy.** **None was caught by a check.**
+
+## §1's superseded table, and the prediction the re-score broke
+
+**§1 was scored against the annotated main ORF until 2026-08-02**, the target §4 establishes
+is wrong. Pete caught it: *"that is not necessarily the ORF that is actually being picked
+under the NMD case, and that is also not what the model is trying to do."* The document had
+contradicted itself two sections apart for a full day, and neither window caught it —
+§1 and §4 were each checked against their own producer and never against each other.
+
+| arm | main ORF *(superseded)* | GENCODE NMD *(current)* |
+|---|---|---|
+| the head's own argmax | 0.305 | 0.304 |
+| the most 5′ candidate | 0.424 | **0.702** |
+| the queue built from the head | 0.697 | 0.793 |
+
+**The conclusion survived; the argument for it did not.** The gate signature got *stronger*
+(+0.392 → +0.489) and the margin over position collapsed (+0.273 → +0.091). §1 had been
+resting the second half of its claim on the target's weakness.
+
+**I registered the wrong prediction, in the direction that flattered the model.** I predicted
+position would *fall* below 0.424 because "on NMD transcripts the most 5′ candidate is
+frequently a uORF." It rose to 0.702. The error was conflating two NMD mechanisms: that
+sentence is true of uORF-mediated decay and false of the premature-stop-in-main-frame decay
+that GENCODE's NMD biotype actually contains. Chasing down *why* the prediction failed is
+what produced §4's scope caveat, which is the more useful result of the two.
 
 ## Predictions this document made and lost
 
