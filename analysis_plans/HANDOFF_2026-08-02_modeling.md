@@ -184,6 +184,35 @@ checking the artifact.
 **So: check this document against the repository before relying on any state it
 asserts.** Including this section.
 
+**And there is a second layer, which is the best instance of the class we produced.**
+The interpretability window reported the gap as seven minutes. It is three minutes
+thirteen. Their number came from the file's **mtime**, not the **commit timestamp** —
+and the mtime has since moved again, because correcting this very section rewrote the
+file. **A filesystem timestamp and a commit timestamp are two things with one name**,
+and the quoted figure was not merely wrong but non-stationary. They checked *an*
+artifact rather than *the* artifact, inside a message telling someone else to check
+the artifact.
+
+### The gap in the arrangement that you inherit
+
+**Both compression failures were in documents written for readers, not in analyses.**
+The run-length restatement in the method document, and the false blocking instruction
+above. That is not a coincidence, and it explains why this class survived two windows
+cross-checking each other continuously:
+
+> **An analysis gets re-run. A document gets read.** A compressed error in prose
+> arrives at the next window as a fact with no producer attached — nothing to
+> re-execute, nothing to diff, no runlog to open.
+
+**The two windows cross-checked each other's numbers and neither cross-checked the
+other's prose.** Every number in this programme has been independently recomputed at
+least once; no paragraph has. That is a gap in the arrangement rather than in either
+window, and you inherit it.
+
+The cheap fix, and it is the same shape as everything else here: **when a document
+states a result, open the producer before believing it** — the runlog, the commit,
+the script. Not vigilance. A step.
+
 ## The other windows
 
 - **Harold — interpretability**, session `local_4c14cee7-60c5-4ecf-ba47-30edebf26c38`.
