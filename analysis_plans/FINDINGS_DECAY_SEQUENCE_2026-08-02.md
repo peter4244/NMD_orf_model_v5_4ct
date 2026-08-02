@@ -66,13 +66,48 @@ A+T and G+C are complementary.
 0.98–1.09**. The A+T enrichment is carried almost entirely by U, so the canonical ARE reading
 (AUUUA, A and U together) is not what this is.
 
-### It is not the GC-averaging window
+### ~~It is not the GC-averaging window~~ — RETIRED 2026-08-02
 
-Channel 5 is a rolling GC fraction over ±25, so an encoding artifact would plateau to ±25 and show
-a shoulder at the window edge. **The profile decays to baseline within about 8 bases and is gone by
-20.** Wrong length scale for the encoding; right length scale for a sequence feature. This is the
-same argument that held for the run lengths, arriving independently from composition rather than
-from clustering.
+> **The length-scale argument does not work, and it fails by two independent routes.** It previously
+> read: channel 5 is a rolling GC fraction over ±25, so an encoding artifact would plateau to ±25 and
+> show a shoulder at the window edge, whereas "the profile decays to baseline within about 8 bases and
+> is gone by 20" — wrong length scale for the encoding, right length scale for a sequence feature.
+>
+> **Route 1 — it reads the wrong column of its own table.** The decay quoted is the **U** profile. The
+> encoding channel is a **G+C** channel, and the G+C column of the table directly above runs 0.89–0.94
+> at ±8, **0.95–0.96 at ±20** and 0.97–1.00 at ±40. The quantity that would carry an encoding artifact
+> is still depleted at ±20 and only returns past ±40 — which is the scale of the channel, not a scale
+> that excludes it. "Gone by 20" is false for G+C by the table the sentence cites.
+>
+> **Route 2 — the track's length scale does not discriminate at all.**
+> `SEQUENCE_ENRICHMENT_APPROACH.md` §7.1: raw autocorrelation persists past lag 80, "which the ±25 GC
+> window cannot explain either, so the length-scale argument was never doing the work we credited it
+> with." Reached from autocorrelation; route 1 reached from composition; same conclusion.
+>
+> **What this does and does not touch.** The composition profile itself is unaffected — keto 1.156×,
+> amino 0.845×, G+C flat — because those are measurements. What dies is the *inference* built on top
+> of them. **We currently have no argument excluding the GC encoding channel as a contributor**, and
+> the sentence that claimed one has been standing in for that argument.
+>
+> The nearest thing pointing the other way is that **G+C is flat at the elevated position itself**
+> (1.004×), so positions are not selected by their own GC status. That is suggestive and it is not
+> decisive: channel 5 is a ±25 *average*, so what would matter is the neighbourhood's GC, and the
+> neighbourhood is GC-depleted out to ±20 — a signature the encoding could produce rather than one it
+> rules out.
+>
+> **What would settle it is conditioning, not ablation.** §5.3 records that both window leaks found so
+> far were invisible to ablation, because every channel is blank outside the filled region and a "turn
+> off feature X" test silently retains the fill mask; both were found by conditioning. So the test is
+> to stratify on channel 5's value and ask whether the composition profile survives within strata.
+> Note that the one conditioning-style control we had here — the run-length result surviving with the
+> GC channel held bitwise constant at 57% of its arity-matched level — was a control *on the retracted
+> analysis* and does not transfer.
+
+*Enumeration for the flank table above, per field 13:* it is the output of
+`probe_elevated_composition_profile.py`, which reads `bank_interp_s100.h5` alone and loops over the
+**first 600 transcripts in bank order** (not a sample), requiring ≥170 positions and trimming 60
+positions from each end before selecting. Seed 100. That set is **not** the 4,999-transcript set the
+centre table above is now measured over, and the two should not be read as one measurement.
 
 ### Controls run, and what each excludes
 
