@@ -166,9 +166,11 @@ substantive changes are marked ⇒ and each is argued in place.*
 > **10 · Decision rule.** Three outcomes, fixed before the run — see the table below. ⇒ **The band
 > count is evaluated under gene-clustered resampling**, not as a raw count of qualifying bands.
 >
-> **11 · Licensed.** Positive: the signature is a property of what the decay head reads, not of where
-> the model routes. Negative: our best surviving finding is routing. What a positive does *not*
-> license has its own subsection and is part of this field, not an addendum to it.
+> **11 · Licensed — per D55, neither outcome is a null.** **Positive:** two separable channels —
+> routing locates importance, *and* within equally-routed positions the decay head has its own
+> composition preference. **Negative:** one channel — the sequence dependence is **upstream, in
+> selection rather than in decay-head reading**. That is a localization, not a failure. What a
+> positive does *not* license has its own subsection and is part of this field, not an addendum.
 >
 > **12 · Owner.** Interpretability window. **Second independent implementation by the modeling window,
 > written against this row** — shared specification, independent code. The one case the replication
@@ -526,7 +528,7 @@ A gate whose reading is chosen after the run is not a gate.
 | outcome | rule | what it licenses |
 |---|---|---|
 | **positive** | within-band keto ratio above its own permutation 95th percentile, same direction, in **≥ 2/3 of qualifying bands**, direction holding in ≥4/5 seeds | the signature is a property of what the decay head reads. Everything downstream means what we have been saying |
-| **negative** | fewer than half of qualifying bands | our best surviving finding is routing. Propagates to the composition profile and the cross-seed k-mer agreement — **not to the PWM**, see below |
+| **negative** | fewer than half of qualifying bands | **the sequence dependence is upstream, in selection rather than in decay-head reading (D55)** — a localization, not a null. Propagates to the composition profile and the cross-seed k-mer agreement — **not to the PWM**, see below |
 | **conditional** | present in high-mass bands, absent in low | **not the clean positive.** The sequence response is conditional on routing — an interaction, not independence. Reported as such and not rounded up. **Read only against the all-bands transcript restriction**, or it is confounded with which transcripts qualify |
 
 ⇒ **The band count is evaluated under gene-clustered resampling, not as a raw count.** Bands are not
@@ -649,7 +651,12 @@ autocorrelation but not the mass envelope; and whose criterion 1 can fail, in wh
 contrast, is running now.
 
 **So the ordering turns on when A4's result changes a decision, and the answer is narrow: it changes
-how a *negative* A2 is written up.** The stopping rule already scopes a negative to "not separable
+how a *negative* A2 is written up.** ⇒ **D55 changes what that write-up says without changing the
+ordering.** A negative is a localization — the sequence dependence is upstream, in selection — so the
+bound A4 supplies now scopes a *localization* claim rather than a failure. That makes A4 more
+load-bearing on this branch, not less: without it, "the decay head has no composition preference" and
+"single-base ISM cannot see the decay head's composition preference" are indistinguishable, and only
+the first supports the localization. The stopping rule already scopes a negative to "not separable
 from routing **by single-base ISM at this resolution**." A4 supplies the magnitude of that scoping. A
 positive A2 needs it far less — a positive is a positive, and A4 then bounds what we *missed*, which
 is worth knowing and is not urgent.
@@ -678,6 +685,41 @@ region chain, not to replace the ruled analysis.
 sampled A4 the only available form rather than the fallback; or A2 returning **conditional**, which
 sharpens the instrument question rather than softening it and moves A4 up to the same urgency as the
 negative branch.
+
+### D56 — how much of the selection distribution is itself predictable from sequence
+
+*Posed, not run. Deferred as a measurement by Pete and integrated as a framework now, per D56 — the
+deferral is about sequencing, not merit. It is written here so A2 and A4 results are **interpreted
+against it rather than reinterpreted later**, which is the whole difference between a framework and
+a retrofit.*
+
+**The question.** Selection mass is not exogenous. It is produced by the model from start-codon
+context, Kozak strength and ORF structure — all sequence. So "importance is located in routing"
+(D55) invites the immediate follow-up: *how much of the routing distribution does sequence predict,
+and through which features?* Nobody has posed this in the corpus; the modeling window grepped and
+found nothing.
+
+**Why posing it now matters, and it is not bookkeeping.** Every outcome of A2 lands differently
+against it:
+
+- **A2 positive** → two channels, and this question asks how much the *first* one is itself
+  sequence-driven. Without it, "routing locates importance" reads as though routing were a
+  non-sequence nuisance, which is exactly the framing D55 corrects.
+- **A2 negative** → the localization claim's entire content is that sequence acts upstream. **The
+  claim is then only as strong as our ability to say sequence predicts selection at all**, which is
+  this question. A negative A2 without it is a localization pointing at an unmeasured place.
+- **A2 conditional** → the interaction is between two sequence-driven channels rather than between
+  sequence and architecture, which is a different sentence.
+
+**The form it would take, stated so the deferral is a deferral and not a vagueness:** predict
+`p_select` per candidate from sequence-derived features alone — start-codon context and Kozak score,
+ORF length and position, upstream-ORF count, distance to the 5′ end — held out on disjoint genes,
+reported as variance explained with its enumeration. Model-free, no ISM, and it needs no new bank.
+
+**Why it is not scheduled.** The 3′ positive is not established; the sub-stratified dead-band test
+has not run; the region caller's criterion 1 is in redesign and can fail; and A4 sits behind all of
+it. Adding a measurement above that stack would be building on the unvalidated, which is the
+organizing principle this document opens with.
 
 **Rides with whichever A4 job runs:** the `probe_stop_codon_control.py` rerun (review item 1.2 — the
 T-first skip rate is computed as `codon_ok` and never printed, so the diagnostic for a mixed anchor is
@@ -952,7 +994,8 @@ distinguished by name from here on:**
 | **the method-validation gate — SpliceAI/GT-AG** (`SEQUENCE_ENRICHMENT_APPROACH.md` §6) | whether the seqlet pipeline can recover a known motif at all | C2 is unreadable whatever it outputs |
 
 They are independent and neither substitutes for the other: A2 could pass on a pipeline that cannot
-find a motif, and the pipeline could recover GT/AG while our own signature is routing. **Two further
+find a motif, and the pipeline could recover GT/AG while our own signature is located in routing
+(D55). **Two further
 gates exist and are named as such elsewhere in this document** — the region caller's excess-over-
 surrogates criterion, which A4 is downstream of, and B2's annotation-derived PTC definition. The
 honest count is four, not one.
@@ -960,10 +1003,20 @@ honest count is four, not one.
 **The interpretive gate is A2.**
 
 - **A2 negative** → the decay branch's sequence contribution is not separable from routing **by
-  single-base ISM at this resolution**. Write that and stop. It is a real result: the model's
-  apparent sequence sensitivity is a readout of its selection distribution. The scoping to
-  single-base ISM is not a hedge — a pattern the model recognizes robustly is invisible to our
-  instrument by construction, so the negative belongs to the instrument and not to the model.
+  single-base ISM at this resolution**. ⇒ **Per D55 this is a localization, not a failure, and this
+  bullet used to call it one.** It says the sequence dependence sits **upstream, in selection rather
+  than in decay-head reading** — and selection is itself sequence-driven, through start-codon context,
+  Kozak strength and ORF structure, so a negative moves *where* sequence acts rather than removing it.
+  `P(NMD) = Σ P(select k)·d_k`: if a substitution matters because the model routes mass to that
+  candidate, it genuinely matters. **This document stated that principle in the toolbox and then let
+  its outcome language contradict it** — the corpus's dominant error class, in its most consequential
+  instance so far, since it would have written a real finding up as a null. Write it as a
+  localization and stop *that line*. The scoping to single-base ISM is not a hedge — a pattern the
+  model recognizes robustly is invisible to our instrument by construction, so the negative belongs
+  to the instrument and not to the model.
+  ⇒ **Also per D55: where stratified composition comes out flat — in-ORF and 5′ — that is not an
+  absence either.** It is importance located in routing alone, and is worth saying rather than
+  omitting.
   **A negative propagates to what selects on elevation:** the composition profile and the cross-seed
   k-mer agreement. (The model window argued the cross-seed agreement was independent of Phase A; it
   is not, because it uses the elevation rule even though it uses no elevation null. That correction
