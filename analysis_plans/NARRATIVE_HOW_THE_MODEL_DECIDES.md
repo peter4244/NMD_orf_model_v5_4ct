@@ -191,8 +191,12 @@ survived cannot be checked.
 - **Whether the model is a single junction detector.** n = 49 against a pre-registered floor
   of 50. Needs pool-scale forward passes.
 - **C15 — why routing is junction-biased in NMD transcripts (+0.119) and anti-biased in
-  controls (−0.189).** The model cannot see labels, so sequence carries a 0.31 gap and
-  neither window has a mechanism. **The most interesting open item.**
+  controls (−0.189).** The model cannot see labels, so sequence carries a 0.31 gap and we
+  have no mechanism for it. All three windows called this the most interesting open item.
+  **It should be designed expecting a confound, not a mechanism** — three claims reversed
+  under conditioning on 2026-08-02 and this has the shape of a fourth. First cut: does it
+  survive matching NMD and control transcripts on 5′UTR architecture (uORF count, UTR
+  length, candidate count)? If it collapses, it is population composition, not routing.
 - **Whether the composition signal is an encoder artifact.** No valid instrumental control
   exists for a scale-free statistic.
 - **Anything about motifs.** The region caller's criterion points the wrong way.
