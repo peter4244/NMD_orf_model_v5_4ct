@@ -106,34 +106,37 @@ def boot_ci(values, groups, rng, n_boot, statistic):
 
 
 # --------------------------------------------------------------- p_capture
-def capture_scores(codes, o_s, off, cnt, ckpts, device):
+def capture_scores(codes, o_s, off, cnt, n_cand, which_tx, ckpts, device):
     """p_k of §6.2 step 2, per candidate, one column per seed.
 
     The initiation head's own output on the ATG window. No aggregation: p_select
     would confound "this is a strong initiation context" with "everything upstream
     of it was weak", and this test is about the former.
+
+    Scored only for the transcripts of `which_tx`. Every other candidate is left
+    NaN rather than zero, so a candidate from outside the split that reached a pair
+    would propagate a NaN into the statistic and be seen, instead of silently
+    contributing a score of nothing.
     """
-    cols = []
-    for cp in ckpts:
+    out = np.full((n_cand, len(ckpts)), np.nan, dtype=np.float64)
+    for c, cp in enumerate(ckpts):
         ck = torch.load(cp, map_location="cpu", weights_only=False)
         a = ck["args"]
         m = ScanningNMDModel(conv_channels=a["conv_channels"], n_bins=a["n_bins"],
                              n_structural=1)
         m.load_state_dict(ck["model"])
         m.to(device).eval()
-        acc = []
         with torch.no_grad():
-            for i in range(len(off)):
-                sl = slice(int(off[i]), int(off[i]) + int(cnt[i]))
-                s0 = o_s[sl].astype(np.int64)
+            for i in which_tx:
+                lo = int(off[i]); hi = lo + int(cnt[i])
+                s0 = o_s[lo:hi].astype(np.int64)
                 x = torch.as_tensor(
-                    decode_windows(codes[sl][:, 0], s0, ATG_LEFT, s0), device=device)
-                acc.append(torch.sigmoid(
-                    m.init_head(m.enc_init(x)).squeeze(-1)).cpu().numpy())
-        cols.append(np.concatenate(acc))
-        print(f"    {Path(cp).parent.name if Path(cp).name == 'best.pt' else Path(cp).name}"
-              f": {len(cols[-1]):,} candidates", flush=True)
-    return np.stack(cols, 1)          # (n_cand, n_seed)
+                    decode_windows(codes[lo:hi][:, 0], s0, ATG_LEFT, s0), device=device)
+                out[lo:hi, c] = torch.sigmoid(
+                    m.init_head(m.enc_init(x)).squeeze(-1)).cpu().numpy()
+        print(f"    {cp.parent.name if cp.name == 'best.pt' else cp.name}"
+              f": {int(np.isfinite(out[:, c]).sum()):,} candidates scored", flush=True)
+    return out          # (n_cand, n_seed), NaN outside `which_tx`
 
 
 def main():
@@ -231,7 +234,8 @@ def main():
     if not ckpts:
         sys.exit(f"FATAL: no checkpoints matched {args.ckpt_glob}")
     print(f"  {len(ckpts)} checkpoints:")
-    cap_seeds = capture_scores(codes, o_s, off, cnt, ckpts, device)
+    cap_seeds = capture_scores(codes, o_s, off, cnt, len(start), keep_tx,
+                               ckpts, device)
     cap = cap_seeds.mean(1)
 
     # ------------------------------------------------------------- the pairs
@@ -257,6 +261,12 @@ def main():
         sys.exit("no pairs")
     R = np.concatenate(pairs_r)
     C = np.concatenate(pairs_c)
+    # Nothing outside the split may reach a pair. Both members are drawn from
+    # `eligible`, which is masked by `in_split`, so this holds by construction --
+    # and it is asserted because a NaN here would otherwise travel silently into
+    # a win rate as a comparison that is neither true nor false.
+    assert np.isfinite(cap[R]).all() and np.isfinite(cap[C]).all(), \
+        "a pair member has no capture score: a candidate outside the split got in"
     pair_gene = gene[tx_of[R]]
     n_genes = len(np.unique(pair_gene))
     print(f"\n  pairs {len(R):,}   genes {n_genes:,}   "
