@@ -130,6 +130,26 @@ diff, no runlog to open. You inherit this gap. The fix has the same shape as eve
 
 ---
 
+## How to read all of this
+
+**None of it was designed. It is a record of what we ran into.** The toolbox exists because a GC
+control had to be discarded; the autocorrelation-preserving null because the run-length null was
+invalid; the magnitude clause because the directionality claim was circular; the motif definition
+because we used the word for two days without one. Every piece of structure is the scar of a specific
+failure, and the documents therefore **stop exactly where our errors stopped**.
+
+So expect classes they do not cover — a third limit of the arrangement should be assumed, since both
+known ones were found by something going wrong that no document had an entry for. **When you hit a
+gap, add a row.** Do not work around it, and do not assume the omission was considered.
+
+The corollary, already demonstrated once: the incoming modeling window reviewed the A2 row before
+implementing it and found the row fixed four lines while leaving a dozen implementation choices open
+— two of which changed the design rather than filling a blank. Reviewing prose before it becomes code
+caught what no amount of independent implementation would have, because both implementations would
+have shared the error. That review is now the standing order, not a courtesy.
+
+---
+
 ## Practical
 
 - **Worktrees.** Model window has `NMD_orf_model_v5_4ct` on `master` and all the data. You have
