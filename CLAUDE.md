@@ -64,38 +64,81 @@ can be started from either direction. **The file is the single copy — add find
 - All output goes to `results_4ct/`
 - Original v5 project at `../nmd_orf_model_v5/` — do not modify
 
+## Data facts
+
+*What the artifacts contain, stated as facts rather than warnings — consult when you touch
+the thing. These lived only in dated handoffs until 2026-08-02, so every window recopied
+them and none could check them. Provenance is given for each; **two are marked unverified
+and should be checked before they are relied on**.*
+
+- **`structural` in the tensor is z-scored on the training split only. `structural_raw`
+  holds the untransformed values.** `build_tensor.py:224`, `:291-292`; columns at `:55`.
+- **`orf_length` in `orf_pool.tsv` is inclusive** — `orf_end − orf_start + 1`. *Verified
+  across all 802,035 rows; the offset is exactly −1 everywhere.* Rank statistics are
+  unaffected by this; differences, ratios and densities are not.
+- **`vals` in the ISM bank has four base slots per position and only the three substitutions
+  are filled, so the observed base stays NaN.** `np.isfinite(x).all(1)` is therefore never
+  true — use `.sum(1) == 3`. `build_ism_bank.py:243`, `:756`. All three windows hit this.
+- **`vals_capture` is roughly a thousandfold smaller than `vals_decay`, and the two have
+  different noise floors** — capture carries no clamp, the transcript log-odds does. **A
+  single liveness threshold applied across both is wrong in one of them.** h5 attribute
+  `branch_resolution`.
+- **`vals` ≠ `vals_capture` + `vals_decay`.** Stick-breaking is not additive in (p, d), so
+  the residual is the interaction and is recoverable by subtraction. A base that moves
+  initiation and a base that moves decay are different events and `vals` alone cannot tell
+  them apart. h5 attribute `branch_attribution`.
+- **The ISM bank is a stratified subset, not a sample of the pool.** Strata are
+  `{is_nmd} × {has_annotation} × {main_orf_stop}`; weights sum to **41,765** over **4,999**
+  rows; **annotated transcripts are ~8× over-represented** while recovery is scored against
+  the annotation. Population estimates require `sampling_weight`. *Verified in
+  `results_ism_v6/ism_subset.tsv`.* Exposure of any given statistic scales with how much its
+  quantity depends on the three stratifying variables.
+- **The keto and GC backgrounds are numerically identical in both existing measurements**
+  (.501/.501 and .502/.502) — G+T equals G+C exactly when T equals C, and they agree here to
+  a thousandth. "The background is .50" is therefore true of **two different quantities**,
+  and reconciling composition tables by eye can match the wrong pair.
+- **Explorer**: `p.castaldi@explorer.northeastern.edu`, `~/cc/nmd_orf_model_v5_4ct`, conda
+  env `nmd_model`. Four-job cap shared across windows. The checkpoint every interpretability
+  claim rests on is `runs/interp_c32_b8_s100/best.pt`, **which is not local**, and neither is
+  the tensor.
+- ⚠ **UNVERIFIED, carried forward from handoffs and not re-checked:** fold-over-median
+  degenerates on the ~2.8% of transcripts whose median is below 1e-6 (prefer rank statistics
+  by default). Stated here so it stops being invisible cargo, not because it has been
+  confirmed.
+
+## Roles — defined once, in the other repo
+
+**`nmd_lung_longread_2026:CLAUDE.md`, section "Roles".** Seven: model window, interpretability,
+storyteller, guardian of the manuscript, organizer, Pete, and Yul. A **pointer, not a copy** —
+duplicating a definition into a second file is how the two drift apart. Change it there.
+
+Two consequences that bite here: **escalation of a narrative to the guardian is Pete's call, not
+the producing window's** (D60), and **agents propose, never promote** — only Pete or Yul move a
+result to *in the paper* (D50).
+
 ## The standing hazard: position and length are entangled
 
-**No candidate-level correlation in this model is interpretable until position and ORF length are
-conditioned on jointly. Never read a single partial alone — each can be the other confounder
-leaking. Conditioning moves results in BOTH directions. Assume position is involved; never assume
-which way.**
+*Restored 2026-08-02 after a restructure dropped it. It is D62, approved by Pete and corrected
+once. It is not a data fact — it is an analysis hazard — which is why it needs its own section
+rather than a bullet above.*
 
-Approved by Pete 2026-08-02, **corrected the same day**: the first wording was *"any candidate-level
-correlation is position until proven otherwise"*, which is directionally wrong and was caught by
-the interpretability window before it had been read by anyone. Of the four instances, only one is a
-case where the answer was position:
+**No candidate-level correlation is interpretable until position and ORF length are conditioned on
+jointly. Never read a single partial alone — each can be the other confounder leaking.
+Conditioning moves results in BOTH directions. Assume position is involved; never assume which
+way.**
 
-- **C7 — position was SUPPRESSING.** Holding start position fixed makes `capture ~ junction count`
-  **−0.582**, *stronger* than the raw −0.460. "Position does not mediate C6."
-- **C8 — length was the mediator**, not position: `capture ~ ORF length` +0.760, and holding length
-  collapses the junction association.
-- **ATF4, 22.8%** — position proposed as the route and **refuted** by measurement.
-- **C16 — the one case where a partial manufactured a signal.** "Junction-seeking at matched
-  length", +0.452, because holding length does not hold position: `orf_start ~ orf_length` is only
-  **−0.150** (n 4,815, |r| < 0.30 in 54.8% of transcripts). Holding both returns −0.067, agreeing
-  with the marginal −0.050.
+Four instances in one day: **C7**, where holding position made the correlation *stronger*
+(−0.582 against −0.460) because position was suppressing; **C8**, where length was the mediator;
+the **ATF4 22.8%**, where position was proposed and refuted; and **C16**, the one case where a
+partial manufactured a signal — "junction-seeking at matched length" +0.452, because holding
+length does not hold position (`orf_start ~ orf_length` is only **−0.150**). Holding both returns
+−0.067, agreeing with the marginal.
 
-The lesson §3's own table teaches: **the two single partials were large (+0.452, −0.543) and both
-were artifacts; only the joint conditioning agreed with the marginal.**
-
-Candidates within one transcript span roughly two orders of magnitude in length — median
-within-transcript max/min **83.5×**, 9 nt against 894 nt — so *holding length* describes a regime
-the model never occupies. Prefer the **unconditional** comparison when asking what the model does;
-use a partial only to explain *why*, and never quote a partial as behaviour.
-
-**And zero is not the null** for a rank product, a monotone ordering or a normalised share. A queue
-with no model in it scores **+0.334 raw** against the model's **−0.050**.
+Candidates within one transcript span ~2 orders of magnitude in length — median within-transcript
+max/min **83.5×** — so *holding length* describes a regime the model never occupies. **Prefer the
+unconditional comparison for what the model does; use a partial to explain why, never to state
+behaviour.** And **zero is not the null** for a rank product: a queue with no model in it scores
+**+0.334 raw** against the model's −0.050.
 
 ## Multi-window operating rules
 
