@@ -64,6 +64,27 @@ can be started from either direction. **The file is the single copy — add find
 - All output goes to `results_4ct/`
 - Original v5 project at `../nmd_orf_model_v5/` — do not modify
 
+## The standing hazard: position
+
+**In this model, any candidate-level correlation is position until proven otherwise.**
+
+Approved by Pete 2026-08-02 after four instances in a single day:
+
+- **C7** — the capture/length association inverted when position was held.
+- **ATF4, 22.8%** — recovered as a position effect.
+- **C16** — routing "junction-seeking at matched length", +0.442. Holding length does not hold
+  position (`orf_start ~ orf_length` is only **−0.150**, n 4,815, |r| < 0.30 in 54.8% of
+  transcripts), so the length partial left the position channel intact and manufactured the signal.
+- **the queue-geometry null** — `p_select` is a rank product whose survival factor falls
+  monotonically with slot, and earlier slots carry more downstream junctions by construction. A
+  queue with **no model in it** scores **+0.334 raw / +0.568 holding length** against the model's
+  −0.050 / +0.442. Zero was the wrong reference.
+
+Candidates within one transcript span roughly two orders of magnitude in length — median
+within-transcript max/min **83.5×**, 9 nt against 894 nt — so *holding length* describes a regime
+the model never occupies. Prefer the **unconditional** comparison when asking what the model does;
+use a partial only to explain *why*, and never quote a partial as behaviour.
+
 ## Multi-window operating rules
 
 Two or more windows work this repo concurrently, in separate git worktrees. These rules exist
