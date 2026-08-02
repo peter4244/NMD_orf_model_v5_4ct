@@ -3,6 +3,44 @@
 *Written deliberately plainly. Pete's standing instruction: no invented shorthand, and a
 plain-English closer on every response.*
 
+## Where the one job stands, later the same evening
+
+**The optimisation is written and verified locally. It has not run on a GPU yet.**
+
+Written as specified: each candidate's window is decoded once and kept, and a substitution
+copies it and patches the ~51 positions it can reach (`window_cache.py`, commit `0ebaa5e`).
+Channels 4 and 6-8 are not merely observed to be unchanged, they cannot change, and the
+reason is written down where the code is.
+
+What was checked, all of it locally on the CPU:
+
+    step 1  449,344 substitutions, 4,030 candidates, 210 transcripts, both window
+            kinds, against decode_windows.  ZERO differing entries, max |diff| 0.0.
+    step 3  a three-transcript bank rebuilt with the pre-cache builder (0199a82):
+            37 datasets and every attribute bitwise identical.
+
+Neither check is vacuous, which was established rather than assumed:
+
+  - the verifier counts rows that took the channel-5 branch against rows that skipped it
+    and fails if either is zero — exactly half of all substitutions leave GC status
+    unchanged, so a pass drawn only from those would never test the span;
+  - three deliberate mutations — the span patch disabled, the span shortened by one at
+    either end, the wrong fill states read as GC — each produced thousands of differing
+    rows, so the check can fail;
+  - the bank comparator catches a one-float32-ulp change and a NaN turned into a zero;
+  - the banks being compared have signal: 8,499 finite `vals` over -0.085 to +0.131 on the
+    first transcript, so this is not two nulls agreeing.
+
+**Still owed, and it is the whole point:** `slurm_verify_window_cache.sh` repeats step 1 on
+the GPU, profiles both paths in one process on the same rows with five repeats, rebuilds the
+bank at the geometry extremes (K=102, K=103, K=1) both ways, and runs `verify_ism_bank.py`.
+**No speedup is claimed until that profile prints.** The local single-threaded CPU numbers
+are not evidence about a V100 and are deliberately not quoted here.
+
+Everything below is the original handoff, unchanged.
+
+---
+
 ## The one job
 
 **Make `decode_windows` faster, then build the mutagenesis banks.** Everything else on the
