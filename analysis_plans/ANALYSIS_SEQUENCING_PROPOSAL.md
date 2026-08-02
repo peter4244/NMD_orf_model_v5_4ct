@@ -67,11 +67,11 @@ what makes it urgent.
 **A correction to how these were first written, and it is the error the toolbox exists to prevent.**
 A1's row said *stratification* in one line and *residualized track* in the next. Those are different
 operations. Residualizing removes routing from the data and describes a model that weights every ORF
-equally, which is neither our model nor ribosomes. **Both A1 and A2 hold mass by stratification** —
-within bands of similar routing — never by removal.
+equally, which is neither our model nor ribosomes. **A2 holds mass by stratification** — within bands
+of similar routing — never by removal. (A1 said the same thing and is dropped; it is named here only
+because this is the record of the correction.)
 
-Each of these can invalidate a current claim. None needs a new instrument. A1–A3 run on the existing
-banks.
+Neither of these needs a new instrument. A2 and A3 run on the existing banks.
 
 ### A2 — **THE GATE.** Is the U-rich/keto signature routing or sequence?
 
@@ -84,6 +84,85 @@ banks.
 > **If negative:** our best surviving finding is routing. The composition profile, the cross-seed
 > k-mer agreement, and the PWM are all conditional on what elevation selects, so **a negative here
 > propagates to all three**.
+
+#### The specification, fixed 2026-08-02
+
+Written because the modeling window read the row and found it fixed four lines and left roughly a
+dozen implementation decisions open. That is the toolbox's own diagnosis — *every error was a choice
+made implicitly inside an implementation* — and a shared row that leaves the choices open puts the
+independence back exactly where the arrangement exists to remove it. **This section is the shared
+specification. Deviations from it are findings about the specification, not implementation detail.**
+
+**Bands.** Global log-`mass` quantile bands, so a band means the same thing in every transcript.
+Primary **8 bands**, swept over 4 and 16 (§3.1: a result that exists at one parameter setting is that
+setting).
+
+**Elevation is within-stratum, not global-then-binned.** `|vals| ≈ mass × sensitivity`, so a globally
+elevated set concentrates in high-mass bands by construction and leaves the low-mass bands nearly
+empty — no power exactly where the test has to discriminate. Each (transcript × band) cell
+contributes its own top fraction. This is the same one-name-two-sets shape as the global versus
+per-transcript top-1% pair that overlapped at Jaccard 0.24.
+
+**Cell size and the top fraction, jointly.** Mean 2,213 valid positions per transcript, so 8 bands
+gives ~277 per cell. Primary **top 10% within cell** (~28 positions), swept as (4 bands, 5%) and
+(16 bands, 20%) to hold the elevated count roughly constant while band resolution varies. A cell
+contributes only with **≥100 valid positions**; excluded cells are reported with their count and mass
+distribution, because that exclusion can be differential.
+
+**Background is within-cell.** Elevated positions are compared against the non-elevated positions of
+**the same transcript in the same band** — never a global background, which collapses the test back
+to the confounded version.
+
+**Aggregation** is per-transcript, then unweighted mean across transcripts (axis 8), interval by
+gene-clustered bootstrap.
+
+**Mass jointly, coverage marginally.** Mass is the axis in the hypothesis. Coverage correlates at
+r ≈ 0.54 but is not the exposure, and stratifying jointly on both fragments cells below the n the
+permutation null needs. Coverage is reported *within* band as a balance check; a band that comes out
+imbalanced gets a coverage-stratified re-run rather than fragmenting the whole analysis.
+
+**Dead positions get their own band and are the control, not an exclusion.** Every dead perturbation
+sits below mass ~1e-8 (§5.5), and §5.5 shows dropping them is differential on the mechanism cell —
+long 5′UTRs lose more — so exclusion would build a differential-selection error into the one gate.
+As a band they are free and they are the answer to the magnitude flag below: **nothing is read there,
+so any keto signature appearing in the dead band is instrumental rather than biological.**
+
+**Seeds.** All five. Cross-seed agreement is reported *beside* the gate, not folded into it — seed is
+a replication axis and folding it in conflates "the effect exists" with "the effect is stable across
+initializations." One stability floor only: the direction must hold in **≥4 of 5 seeds** for a
+positive to read as positive.
+
+**Reference points measured in-sample, per band.** The 1.148× keto ratio was measured over 11M
+positions; at ~28 elevated per cell the sampling floor is far larger. The null is a **within-cell
+permutation of the elevated label** at that cell's own n, and every ratio is reported against its own
+permutation floor and ceiling.
+
+#### The decision rule, fixed before the run
+
+A gate whose reading is chosen after the run is not a gate.
+
+| outcome | rule | what it licenses |
+|---|---|---|
+| **positive** | within-band keto ratio above its own permutation 95th percentile, same direction, in **≥ 2/3 of qualifying bands**, direction holding in ≥4/5 seeds | the signature is a property of what the decay head reads. Everything downstream means what we have been saying |
+| **negative** | fewer than half of qualifying bands | our best surviving finding is routing. Propagates to the composition profile, the cross-seed k-mer agreement and the PWM |
+| **conditional** | present in high-mass bands, absent in low | **not the clean positive.** The sequence response is conditional on routing — an interaction, not independence. Reported as such and not rounded up |
+
+Between half and 2/3 is **ambiguous, and is not resolved by looking at it.** It is resolved by more
+seeds or a finer sweep, decided before either is examined.
+
+**Not the rule: "retains X% of the unstratified 1.148×."** That makes the confounded quantity the
+denominator. Monotone decline across bands is a **diagnostic to report**, not the gate.
+
+#### What a positive does not license
+
+A2 does not escape axis 7. Within a band the elevated positions are still the larger-magnitude ones,
+so a positive licenses *"among equally-routed positions, the more sensitive ones are keto-enriched"*
+and **not** *"composition is enriched independent of effect magnitude."* This is a weaker circularity
+than the directionality claim — directionality mechanically rises with magnitude, composition does
+not — but it is not zero: if the instrument's numerical sensitivity is base-dependent, magnitude and
+composition correlate through the encoder rather than through what the head reads. **The dead band
+tests exactly that**, and A3 owns the general magnitude question. The bound belongs in the row rather
+than being discovered when someone asks.
 
 Cost: one job. **This is the load-bearing measurement of Phase A, and the only one.**
 
@@ -295,7 +374,7 @@ silent work that no longer exists.
 
 | phase | jobs | wall | needs new code |
 |---|---|---|---|
-| A1, A2 | 2 arrays | ~2 h | residualization step only |
+| A2 | 1 array | ~2 h | stratification and the within-band permutation null |
 | A3 | 1 | <1 h | none, written |
 | B1 | 1 array | ~2 h | multi-PWM deflation |
 | B2 | 1 array | ~2 h | three-cell stratification |
