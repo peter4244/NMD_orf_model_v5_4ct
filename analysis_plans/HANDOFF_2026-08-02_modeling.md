@@ -22,7 +22,9 @@ specification. **You write the second against their row, not your own reading of
 question** — shared specification, independent code. That is deliberate and §"How we
 got burned" below explains why.
 
-Do not start until Harold's three fixes land (§"What is owed to us").
+**Nothing blocks you. The plan is ready.** An earlier version of this document told
+you to wait for three fixes — see §"A correction to this document, and why it is
+instructive".
 
 ---
 
@@ -149,20 +151,38 @@ mid-script and the file was never written.
 
 ---
 
-## What is owed to us before A2 runs
+## A correction to this document, and why it is instructive
 
-Harold has three fixes outstanding, requested by Pete:
+**This handoff originally told you not to start until three fixes landed. They had
+already landed — at `4dd9f69`, 09:37:38, three minutes before this document was
+committed at 09:40:51.** Verify it yourself rather than take it from me:
 
-1. **The stopping rule is stale** — it still reads "if A1 and A2 are both negative"
-   after A1 was dropped. With A1 gone the programme turns on A2 alone and the rule
-   must say so.
-2. **A2 gets two implementations** — yours is the second.
-3. **B2 needs an annotation-derived PTC definition first.** As currently defined the
-   PTC interval is 282 NMD against 268 control, so roughly half of it is the model
-   choosing a shorter ORF rather than premature termination. `main_orf_stop` is in
-   the subset table.
+```bash
+git log --format='%h %cd %s' --date=format:'%H:%M:%S' -1 4dd9f69
+sed -n '/^## The stopping rule/,/^---/p' analysis_plans/ANALYSIS_SEQUENCING_PROPOSAL.md
+grep -n -A6 'BLOCKING PREREQUISITE' analysis_plans/ANALYSIS_SEQUENCING_PROPOSAL.md
+```
 
----
+All three are in the plan: the stopping rule rewritten with A1 gone and the negative
+scoped to single-base ISM; A2 given two implementations with the second written
+against Harold's row; and B2 carrying a **BLOCKING PREREQUISITE** for an
+annotation-derived PTC definition — the cell is 550 transcripts at **51.3% NMD
+against a 44.0% background**, so it is barely enriched for what it is meant to
+select.
+
+**This is the third failure mode on the list below, committed inside the document
+that lists it.** Not staleness: a correction that was made, verified, committed, and
+then reintroduced as an open item while the state was summarized for a new reader.
+Summarizing is where corrections go to die, and a handoff is the artifact most
+exposed to it.
+
+**It was caught mechanically, not by care.** The interpretability window went to the
+commit before repeating a claim about it. That is the whole technique. Neither window
+has ever caught one of these by being careful, and both have caught several by
+checking the artifact.
+
+**So: check this document against the repository before relying on any state it
+asserts.** Including this section.
 
 ## The other windows
 
