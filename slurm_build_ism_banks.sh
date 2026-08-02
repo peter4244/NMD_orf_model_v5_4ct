@@ -59,7 +59,7 @@ CK=runs/interp_c32_b8_s${SEED}/best.pt
 OUT=results_ism_v6/bank_interp_s${SEED}.h5
 
 echo "=== node: $(hostname)   seed: ${SEED} ==="
-nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
+nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null
 echo "=== code actually running (sha256, first 16) ==="
 sha256sum build_ism_bank.py window_cache.py tensor_io.py | awk '{print "  " substr($1,1,16), $2}'
 if [ ! -f "$CK" ]; then echo "FATAL: $CK missing" >&2; exit 1; fi
