@@ -18,12 +18,25 @@ with capture held at its unperturbed value. Replicating on `vals` would mix both
 branches and their interaction — it would be a third analysis wearing the word
 "replication", and agreement or disagreement would be uninterpretable.
 
-THE THRESHOLD IS SELF-NORMALISING BY NECESSITY, NOT PREFERENCE. Capture magnitude
-varies 47x across seeds and `largest / median` within a transcript runs to 1,671x
-on real data, so any absolute cut-off means something different per seed and per
-transcript. Elevation is `|effect| > K x that transcript's own median`, K = 10 to
-match the original, with other K reported so the result's dependence on it is
-visible rather than assumed away.
+THE ELEVATION RULE, AND WHY THE OBVIOUS ONE IS BROKEN. The original used
+`|effect| > K x that transcript's median`, K = 10. That self-normalises for
+MAGNITUDE and not for TAIL SHAPE, and tail shape is exactly what differs between a
+short-transcript pilot and the real subset: the same rule selects 1.7% of positions
+on a 50-transcript short draw and 10.7% on the real banks, reaching 43% on the 2.8%
+of transcripts whose median falls below 1e-6. The interpretability window measured
+that and retracted the pilot's "34 runs against 0" on the strength of it -- on the
+real banks the random-placement null does not merely become non-zero, it BEATS the
+data (15,304 observed against 17,454 null, seed 100).
+
+DEFAULT RULE HERE: elevated = the top FRACTION of each transcript's own valid
+positions. The count is then fixed by construction, so a null that redraws the same
+count is matched exactly rather than approximately, and the comparison is purely
+about WHERE the elevated positions fall. The fraction is swept, because resting on
+one value would hide that the effect size is a function of a number we chose.
+
+The fold rule is kept behind `--rule fold` so this script can CONFIRM the inversion
+independently rather than accept it on report. A retraction taken on trust is not
+verified.
 
 THE NULL PRESERVES THE COUNT, NOT THE PLACEMENT. For each transcript the same
 number of elevated positions is redrawn uniformly among that transcript's valid
@@ -56,8 +69,13 @@ def main():
     ap.add_argument("bank")
     ap.add_argument("--column", default="vals_decay",
                     choices=["vals_decay", "vals", "vals_capture"])
-    ap.add_argument("--k", type=float, default=10.0, help="elevation multiple of the median")
-    ap.add_argument("--k-sweep", default="5,10,20,50")
+    ap.add_argument("--rule", default="fraction", choices=["fraction", "fold"],
+                    help="fraction: top f of each transcript's valid positions "
+                         "(count fixed, null matched exactly). fold: |eff| > K x "
+                         "median, the retracted rule, kept to confirm the inversion")
+    ap.add_argument("--k", type=float, default=0.01,
+                    help="top fraction (rule=fraction) or median multiple (rule=fold)")
+    ap.add_argument("--k-sweep", default="0.005,0.01,0.02,0.05")
     ap.add_argument("--min-run", type=int, default=4)
     ap.add_argument("--null-draws", type=int, default=20)
     ap.add_argument("--limit", type=int, default=0)
@@ -67,8 +85,11 @@ def main():
     rng = np.random.default_rng(a.seed)
     sys.stdout.reconfigure(line_buffering=True)
     print(f"run-length replication on {Path(a.bank).name}, column {a.column}")
-    print(f"  elevation |effect| > K x transcript median; K = {a.k:g}; "
-          f"runs of >= {a.min_run}; null redraws the same COUNT, {a.null_draws} draws")
+    rule_txt = ("top K fraction of each transcript's valid positions"
+                if a.rule == "fraction" else
+                "|effect| > K x transcript median  [RETRACTED RULE, for confirmation]")
+    print(f"  elevation: {rule_txt}; K = {a.k:g}; runs of >= {a.min_run}; "
+          f"null redraws the same COUNT, {a.null_draws} draws")
 
     with h5py.File(a.bank, "r") as f:
         n = f[a.column].shape[0]
@@ -99,7 +120,13 @@ def main():
                 continue
             n_used += 1
             for k in ks:
-                hi = e > k * med
+                if a.rule == "fold":
+                    hi = e > k * med
+                else:
+                    # top k-fraction by |effect|; count fixed by construction
+                    m = max(1, int(round(k * len(e))))
+                    hi = np.zeros(len(e), bool)
+                    hi[np.argsort(-e, kind="stable")[:m]] = True
                 r = runs_of(hi)
                 long_obs = int((r >= a.min_run).sum())
                 # null: same count, uniform placement among this transcript's valid
@@ -132,8 +159,9 @@ def main():
         L = np.concatenate(d["lens"]) if d["lens"] else np.zeros(0)
         ml = float(L.mean()) if len(L) else float("nan")
         ratio = d["obs"] / d["null"] if d["null"] > 0 else float("inf")
+        flag = "  <- null BEATS observed" if ratio < 1.0 else ""
         print(f"  {k:>5g} {d['elev']:>11,} {d['runs']:>9,} {ml:>9.2f} "
-              f"{d['obs']:>10,} {d['null']:>9.1f} {ratio:>8.1f}x")
+              f"{d['obs']:>10,} {d['null']:>9.1f} {ratio:>8.2f}x{flag}")
 
     if len(per_arm) > 1:
         print(f"\n  === by arm, K = {a.k:g} — genes are DISJOINT between arms ===")
