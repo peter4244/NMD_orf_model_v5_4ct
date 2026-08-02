@@ -81,6 +81,26 @@ def per_position_effect(vals):
         return np.nanmax(np.abs(vals), axis=1)
 
 
+def atg_coverage(spans, P):
+    """Positions covered by ANY candidate's start-codon window.
+
+    WHY THIS GATES THE CAPTURE COLUMN. A substitution in a stop window reaches
+    z_d only -- build_ism_bank.py writes z_p just for the ATG branch -- so
+    out_cap equals its own no-op reference there and `vals_capture` is EXACTLY
+    zero by construction, not measured as zero. Scoring capture over all valid
+    positions therefore measures window geometry: roughly a third of every track
+    is structural zero, the transcript median is dragged down, the elevated
+    threshold with it, and an elevated-set overlap gets computed against a
+    background that cannot be elevated. `vals` and `vals_decay` are unaffected,
+    because a stop substitution does move z_d.
+    """
+    cov = np.zeros(P, dtype=bool)
+    for a_lo, a_hi, _, _ in spans:
+        if a_hi >= a_lo:
+            cov[max(int(a_lo), 1) - 1:int(a_hi)] = True
+    return cov
+
+
 def runs_of(mask):
     """Lengths of contiguous True runs."""
     if not mask.any():
@@ -160,6 +180,7 @@ def load_h5(path):
                             orf_start=int(c_start[lo + k]),
                             orf_end=int(c_end[lo + k]),
                             anchor_type=anchor_type, cell=cell[i],
+                            atg_cov=atg_coverage(sp, P),
                             base_logit=float(base[i]), weight=float(wt[i])))
     return out
 
@@ -270,6 +291,8 @@ def load_shards(shard_dir, pool):
         if k >= len(spans):
             continue
         out.append(dict(iso=iso, k=k, anchor_type="reference", cell="",
+                        atg_cov=atg_coverage(spans[:, :4] if spans.shape[1] == 4
+                                             else spans[:, 2:6], len(z["valid"])),
                         vals=z["vals"], cap=z["vals_capture"],
                         dec=z["vals_decay"], obs=z["obs"], valid=z["valid"],
                         floor=z["chunk_offset"], fill=z["fill_count"],
@@ -319,6 +342,25 @@ def main():
         print(f"  --anchor {args.anchor}: {len(recs):,} kept")
     if not recs:
         sys.exit("no transcripts under this anchor choice")
+
+    if args.column == "cap":
+        z_in = z_out = n_val = 0
+        for r in recs:
+            e = per_position_effect(r["cap"])
+            v = r["valid"] & np.isfinite(e)
+            n_val += int(v.sum())
+            z_in += int((v & r["atg_cov"] & (e == 0)).sum())
+            z_out += int((v & ~r["atg_cov"] & (e == 0)).sum())
+            r["valid"] = r["valid"] & r["atg_cov"]
+        cov = sum(int((r["valid"]).sum()) for r in recs)
+        print(f"CAPTURE COLUMN GATED to positions inside some ATG window: "
+              f"{cov:,} of {n_val:,} valid ({100*cov/max(n_val,1):.1f}%)")
+        print(f"  exact zeros OUTSIDE an ATG window {z_out:,} "
+              f"({100*z_out/max(n_val,1):.1f}%) — structural, now excluded")
+        print(f"  exact zeros INSIDE  an ATG window {z_in:,} "
+              f"({100*z_in/max(n_val,1):.1f}%) — dead perturbations, kept")
+        print(f"  the geometric mask and the exact zeros must agree to within the "
+              f"dead-perturbation rate, or one of them is wrong\n")
 
     key = {"vals": "vals", "cap": "cap", "dec": "dec"}[args.column]
     name = {"vals": "the transcript logit", "cap": "the capture branch",
