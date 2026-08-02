@@ -215,6 +215,45 @@ cluster directory, which is a second clobbering channel entirely outside git.
 Also adopted: **stage explicit paths, never `git add -A`.** That is the fix for the
 thing that actually happened.
 
+## Two checks, not a taxonomy
+
+Both windows kept making errors today. Sorted by what would have caught them, not
+by what they looked like — and counted rather than impressioned, across both
+windows:
+
+**Untraced mechanism — 2 instances.** A plausible cause asserted without opening
+the code that would exhibit it. My right-fill diagnosis blamed a transcript-length
+clip that is never active. The other window's "capture near the floor ⇒ capture
+claims at risk" was stated without checking which quantity those claims are
+computed from — they read `p_select` off a forward pass and never touch
+`vals_capture`.
+
+> **The check:** grep for the quantity before asserting anything about what
+> depends on it.
+
+**Uncharacterized denominator or comparison set — 4 instances, and this is the one
+that dominated.** My structural zeros in `vals_capture`. My zeros-based mask, which
+fixed that error by introducing another. The other window's reference-anchor
+exclusion, 31.5 points differential on the grouping variable. Their circular-shift
+null drawn from the whole transcript when the comparison lived inside one window.
+The dense-array padding, where 78% of every array is not a position at all.
+
+> **The check:** before reading any proportion or any null, enumerate what is in
+> the denominator **and** what is in the comparison set. Both halves. Most of
+> today's errors were the second half.
+
+Deliberately not a framework. A third pattern showed up today — a control coarser
+than the confound it is controlling — that fits neither cleanly, and three named
+categories would not survive contact with tomorrow. Two checks that have each
+caught something real are worth more than a taxonomy that hasn't.
+
+**One process note that generalises past this project.** A wrong framing sent
+between windows reaches artifacts faster than a correction travels: the other
+window's overbroad claim about §5's mechanism arm was in this handoff before they
+retracted it. The mitigation is not slower messaging. It is that a claim sent
+sideways carries the same provenance mark as one written down — traced, or
+explicitly not traced.
+
 ## Traps that still apply
 
 1. **The subset is stratified, not random.** 4,999 transcripts, weights summing to
