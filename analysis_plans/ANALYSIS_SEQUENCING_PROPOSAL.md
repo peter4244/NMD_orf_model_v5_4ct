@@ -56,7 +56,7 @@ survives its own row and is load-bearing for a Phase B or C claim earns a second
 
 ---
 
-## The row template — twelve fields, and an empty one blocks implementation
+## The row template — thirteen fields, and an empty one blocks implementation
 
 Added 2026-08-02, after the A2 row was found to fix four lines and leave a dozen implementation
 choices open. **The lesson is not "review rows more carefully."** That row was reviewed carefully and
