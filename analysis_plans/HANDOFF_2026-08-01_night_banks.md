@@ -475,7 +475,47 @@ effect sizes below.
 
 **Completeness, clean on every bank:** 4,999 / 4,999 transcripts, 11,062,149 valid
 positions, zero transcripts with no finite response, `chunk_rows` constant at
-[4096].
+[4096], ATG coverage 67.3% identical across seeds as the geometry assertion
+requires. Job 8886153, **exit 0, no problems found**; full output in
+`qc_ism_banks_runlog.txt`.
+
+                floor      vals med    capture med (ATG-covered)   >floor
+      s100   1.664e-06    1.326e-03         2.770e-05              63.1%
+      s200   1.873e-06    1.488e-03         6.281e-06              53.4%
+      s300   1.384e-06    1.205e-03         8.515e-05              68.9%
+      s400   1.869e-06    3.249e-03         2.941e-04              71.6%
+      s500   1.258e-06    1.453e-03         1.574e-04              78.3%
+
+      cross-seed   vals  26.8% unanimous sign   r 0.617
+                   cap   20.4% unanimous sign   r 0.610
+
+**The capture arm is usable** — 53–78% clears the floor on the honest denominator.
+The near-miss conclusion that it was mostly noise came from the wrong denominator
+and is retracted.
+
+### START HERE TOMORROW: capture magnitude is 47× seed-dependent
+
+The ATG-covered capture median runs **6.281e-06 (s200) to 2.941e-04 (s400)**, a
+factor of **47** across initialisations. Over the same five seeds `vals` spans a
+factor of 2.7 and `vals_decay` 2.1.
+
+So the capture arm's *magnitude* is strongly initialisation-dependent in a way the
+other two arms are not. It was invisible at three seeds. **Any elevation cut-off on
+the capture branch must be defined relative to that seed's own distribution, not in
+absolute effect size, and nothing from the capture branch should be pooled across
+seeds until this is handled.** An absolute threshold means something different in
+s200 than in s400 by a factor of 47.
+
+### Cross-seed at five seeds
+
+Raw unanimity is not comparable to the three-seed numbers — chance falls from 25% to
+6.25%. Against chance, `vals` is 4.3× and `cap` is 3.3×. Both real, both modest, and
+closer to each other than either window expected.
+
+**My recorded prediction — high for `vals`, low for `vals_capture` — is wrong on
+both halves.** They behave similarly and neither is high. At r = 0.62 for `vals` the
+caution about the run-length result stands, and splitting it into run *structure*
+versus run *locations* is the first thing to test.
 
     bank    floor       vals median   >floor   decay median   >floor
     s100   1.664e-06    1.326e-03     82.1%    1.018e-03      81.7%
