@@ -112,6 +112,28 @@ transcripts have a GENCODE CDS at all, **15,526** have a candidate sitting at it
 and in the bank **2,949** do. Both of my population claims were wrong and the
 interpretability window's were right.
 
+### Flag-column audit — which columns are safe to cast
+
+*Run after the retraction, across every flag column in the bank, because one
+instance of a defect is not evidence that there is only one.*
+
+| column | values | verdict |
+|---|---|---|
+| `valid` | native **bool** | safe — `astype(bool)` is an identity cast |
+| `cand_is_ref_cds` | `[0, 1]` | safe |
+| `cand_upstream_of_ref` | `[0, 1]` | safe |
+| `cand_has_gencode_cds` | `[0, 1]` | safe — but it is a **transcript-level** flag broadcast to every candidate row, so counting it per-candidate inflates by the candidate count |
+| `labels` | `[0, 1]` | safe |
+| `obs` | `[-1, 0..3]` | **−1 sentinel**; every use in this project is `obs >= 0`, which is correct |
+| **`cand_is_gencode_start`** | **`[-1, 0, 1]`** | **UNSAFE** — the retracted defect |
+| `cand_overlaps_gencode_start` | `[-1, 0, 1]` | **UNSAFE** — never used here |
+| `cand_upstream_of_gencode` | `[-1, 0, 1]` | **UNSAFE** — never used here |
+
+**All three unsafe columns are the GENCODE family**, and only one was ever touched.
+Every other result in this document is unaffected by the retraction: the gate, the
+factor-alignment finding, branch agreement, the branch SNR verdict, Kozak-versus-length
+and the ATF4 case study all stand.
+
 *The lesson, recorded because it recurred twice in one hour:* **`astype(bool)` is
 never the right cast on a flag column here.** These columns use `-1` (h5) and `NaN`
 (TSV) as "not applicable", and both are truthy. Use `== 1`. The same defect produced
