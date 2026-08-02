@@ -673,6 +673,14 @@ def main():
                  dsel=dsel_arr[0], dstart=dsel_arr[1], dgc=dsel_arr[2],
                  vals_capture=dsel_arr[3], vals_decay=dsel_arr[4],
                  chunk_offset=dsel_arr[5],
+                 # THE SHAPE THIS TRANSCRIPT WAS ACTUALLY BUILT AT. The OOM backoff
+                 # above halves chunk_rows and never restores it, so one OOM early
+                 # in a run silently builds every later transcript at a different
+                 # chunk shape -- and chunk shape is exactly what the batch-shape
+                 # offset depends on. Correctness is unaffected, because each
+                 # transcript's baseline is computed in its own chunk; provenance
+                 # was, because nothing recorded which shape produced which shard.
+                 chunk_rows=np.int64(chunk_rows),
                  noop=np.float64(noop[0]), n_floor=np.int64(noop[1]),
                  spread=spread)
         os.replace(tmp, shard)            # a shard is never half-written
@@ -700,7 +708,7 @@ def main():
     gc_is, gc_up, gc_ov, gc_hs = [], [], [], []
     fills, masses, dsels = [], [], []
     dstarts, dgcs = [], []
-    vcaps, vdecs, coffs = [], [], []
+    vcaps, vdecs, coffs, crows = [], [], [], []
     n_floor_samples = 0
     for n, r in enumerate(take.itertuples()):
         z = np.load(shard_dir / f"{r.isoform_id}.npz")
@@ -728,6 +736,9 @@ def main():
         dsels.append(z["dsel"]); dstarts.append(z["dstart"]); dgcs.append(z["dgc"])
         vcaps.append(z["vals_capture"]); vdecs.append(z["vals_decay"])
         coffs.append(z["chunk_offset"])
+        # -1 means the shard predates chunk_rows being recorded, not that it
+        # was built at -1. Old shards stay readable; new ones carry the shape.
+        crows.append(int(z["chunk_rows"]) if "chunk_rows" in z.files else -1)
         i = row[r.isoform_id]
         recs.append(dict(isoform_id=r.isoform_id, vals=z["vals"], valid=z["valid"],
                          obs=z["obs"], base_logit=float(z["base_logit"]),
@@ -835,6 +846,9 @@ def main():
         f.create_dataset("vals_capture", data=vals_cap, compression="lzf")
         f.create_dataset("vals_decay", data=vals_dec, compression="lzf")
         f.create_dataset("chunk_offset", data=chunk_offset, compression="lzf")
+        # the chunk shape each transcript was BUILT at. The OOM backoff never
+        # restores chunk_rows, so this is not constant down a run that OOMed.
+        f.create_dataset("chunk_rows", data=np.array(crows, np.int64))
         f.attrs["branch_resolution"] = (
             "vals_capture is roughly a thousandfold smaller than vals_decay, so "
             "it is the column where resolution could be mistaken for signal. It "

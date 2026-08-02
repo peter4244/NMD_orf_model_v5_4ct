@@ -219,15 +219,34 @@ def main():
     a_lo, a_hi, _, _ = window_spans(start, end, tx_len[tx_of])
     right_fill = np.maximum(0, a_hi - start + 1)
 
-    plan_formula = np.minimum(ATG_RIGHT, (pool.orf_length.to_numpy() // 2) + 1)
-    disagree = int((plan_formula != right_fill).sum())
-    print(f"  right-hand fill from window_spans; §8.5's stated formula disagrees "
-          f"on {disagree:,} of {len(right_fill):,} candidates "
-          f"({100*disagree/len(right_fill):.2f}%)")
-    if disagree:
-        print("    window_spans is the authority — it is what built the tensor. The")
-        print("    formula omits the transcript-length clip, so it overstates fill")
-        print("    for candidates near the 3' end.")
+    # §8.5 states right-hand fill as `min(100, (orf_length // 2) + 1)`. Read with
+    # the pool's `orf_length`, which is INCLUSIVE (orf_end - orf_start + 1,
+    # build_orf_pool.py:22), that overstates fill by exactly one whenever the span
+    # is odd and the value is under the cap. Read with the span it is exact.
+    #
+    # The transcript-length clip in window_spans never binds -- orf_end <= tx_len
+    # for all 796,584 candidates -- so it is not the cause, and an earlier version
+    # of this script said it was. Both readings are printed so the discrepancy is
+    # attributed rather than merely counted.
+    span = end - start
+    fill_span = np.minimum(ATG_RIGHT, (span // 2) + 1)
+    fill_inclusive = np.minimum(ATG_RIGHT, (pool.orf_length.to_numpy() // 2) + 1)
+    d_span = int((fill_span != right_fill).sum())
+    d_incl = int((fill_inclusive != right_fill).sum())
+    print(f"  right-hand fill: window_spans is the authority (it built the tensor)")
+    print(f"    §8.5's formula on the SPAN            : {d_span:,} disagreements")
+    print(f"    §8.5's formula on `orf_length`        : {d_incl:,} disagreements "
+          f"({100*d_incl/len(right_fill):.2f}%)")
+    if d_span:
+        sys.exit("FATAL: window_spans disagrees with the span formula — the "
+                 "geometry is not what §8.5 describes at all, and this test's "
+                 "midpoint-clip control cannot be trusted until that is resolved")
+    if d_incl:
+        print("    -> the gap is the inclusive/exclusive length, not the 3' clip:")
+        print("       every disagreement is span-odd and larger by exactly one, so")
+        print("       the plan's reading would admit candidates whose true fill is")
+        print("       99 as though it were 100. This code uses window_spans and")
+        print("       does not.")
 
     # ------------------------------------------------------------- p_capture
     ckpts = sorted((REPO).glob(args.ckpt_glob))
