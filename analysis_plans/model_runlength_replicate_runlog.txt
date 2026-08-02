@@ -1,0 +1,46 @@
+       State    Elapsed ExitCode 
+------------ ---------- -------- 
+   COMPLETED   00:02:28      0:0 
+=== code actually running (sha256, first 16) ===
+  40cc1ce50ad43ed4 analysis_runlength_replicate.py
+=== git HEAD on this clone is NOT the provenance: eadb797 ===
+
+########## 1. CONFIRMING THE RETRACTION: fold rule, seed 100 ##########
+run-length replication on bank_interp_s100.h5, column vals_decay
+  elevation: |effect| > K x transcript median  [RETRACTED RULE, for confirmation]; K = 10; runs of >= 4; null redraws the same COUNT, 20 draws
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_runlength_replicate.py:113: RuntimeWarning: All-NaN slice encountered
+  eff = np.nanmax(np.where(np.isfinite(x), x, np.nan), axis=1)
+
+  transcripts used 4,993
+
+      K    elevated      runs  mean len    runs>=4      null    ratio
+      5   2,417,352   362,422      6.67     69,008   65101.9     1.06x
+     10   1,666,351   213,687      7.80     40,733   46209.9     0.88x  <- null BEATS observed
+     20   1,226,652   126,955      9.66     25,863   36149.3     0.72x  <- null BEATS observed
+
+  === by arm, K = 10 — genes are DISJOINT between arms ===
+  arm                tx   genes   elevated     runs  mean len    runs>=4     null
+  confirmation    2,500   1,913    835,082  108,182      7.72     20,555  23094.0
+  discovery       2,493   1,913    831,269  105,505      7.88     20,178  23115.9
+  genes in BOTH arms: 0  (must be 0 — §9 step 1 assigns each gene once)
+
+########## 2. CORRECTED STATISTIC: fixed fraction, seed 100 ##########
+run-length replication on bank_interp_s100.h5, column vals_decay
+  elevation: top K fraction of each transcript's valid positions; K = 0.01; runs of >= 4; null redraws the same COUNT, 20 draws
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_runlength_replicate.py:113: RuntimeWarning: All-NaN slice encountered
+  eff = np.nanmax(np.where(np.isfinite(x), x, np.nan), axis=1)
+
+  transcripts used 4,993
+
+      K    elevated      runs  mean len    runs>=4      null    ratio
+  0.005      55,088    44,957      1.23        605       0.0      infx
+   0.01     110,263    80,459      1.37      2,539       0.2 16926.67x
+   0.02     220,503   141,714      1.56      7,553       1.7  4442.94x
+   0.05     551,321   285,593      1.93     26,318      59.7   440.47x
+
+  === by arm, K = 0.01 — genes are DISJOINT between arms ===
+  arm                tx   genes   elevated     runs  mean len    runs>=4     null
+  confirmation    2,500   1,913     55,099   40,194      1.37      1,253      0.1
+  discovery       2,493   1,913     55,164   40,265      1.37      1,286      0.1
+  genes in BOTH arms: 0  (must be 0 — §9 step 1 assigns each gene once)
+=== exit: 0 ===
