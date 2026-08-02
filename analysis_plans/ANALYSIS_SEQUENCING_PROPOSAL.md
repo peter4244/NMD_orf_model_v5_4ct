@@ -479,16 +479,33 @@ long 5′UTRs lose more — so exclusion would build a differential-selection er
 > the control is the one cell the stratification was never applied to. The observed 1.081 has that
 > available to it before anything instrumental is invoked.
 >
-> **What the diagnostic did settle, and it cuts the other way from where I pointed.** Within each mass
-> decade below the cut the keto ratio is 1.011, 1.025, 1.003, 1.055, 0.963, 0.998 — scattered about
-> 1.0 with no trend. **At equal mass, elevated dead positions are not keto-enriched**, so there is no
-> base-dependent numerical sensitivity and the live downstream positive is *not* impeached by an
-> encoder artifact. Not established: whether the 1.8-point background gradient fully accounts for
-> 1.081. It is the mechanism the data supports and the magnitude is not reconciled.
+> ⇒⇒ **SUPERSEDED WITHIN THE HOUR — and by the third position, not a return to the first.** This
+> block previously reported that within each mass decade the keto ratio scattered about 1.0, and
+> concluded the encoder reading was cleared. **That diagnostic pooled the three locales** (job
+> 8896744): in-ORF sits below 1, 3′ above, and pooling averaged them to 1.0 — the same
+> unstratified-pool error it had been written to diagnose, committed inside the diagnostic. The model
+> window found and reported this against itself at `9e83583`, job 8896969.
 >
-> **Consequence for this specification: the dead band must be sub-stratified by mass decade and
-> re-scored before it can serve as a control at all.** Until it is, it is a cell that behaves
-> differently from every other cell in the design and must not be read as the instrumental check.
+> **Scored at matched mass *and* locale, the control fires.** Downstream of the stop, 5 of 6
+> unresponsive strata sit above their nulls — 1.105, 1.127, 1.054, 1.090, 1.083 — the same range as
+> the live bands. In-ORF they do not (0.88–1.03), mirroring the live bands there too.
+>
+> **But the conclusion is not "artifact," and this is the part that matters.** The statistic is
+> **scale-free**: within a narrow mass stratum `|vals| ≈ mass × sensitivity(sequence)`, so ranking by
+> importance is ranking by sequence sensitivity and the mass level cancels. A uniform keto preference
+> in the decay head therefore reproduces the same ratio at *every* mass level including the tiniest —
+> which is what is observed, and is what a real preference predicts. Low-mass positions are not
+> positions where nothing happens; they are positions where something real happens, scaled to near
+> zero.
+>
+> **Consequence, and it is a genuine loss: the unresponsive stratum cannot be an instrumental control
+> for this statistic at all.** Not "needs sub-stratifying" — cannot serve. The only genuinely null
+> positions are the exact zeros, and those are degenerate: every value tied, no ranking possible, so
+> that stratum returns nothing. **My original prediction about the ties turns out to be the reason no
+> instrumental control is available**, rather than a defect to be patched around.
+>
+> **The encoder-artifact question is therefore OPEN**, neither supported nor cleared, and nothing in
+> the A2 design currently bounds it.
 >
 > *Also measured, and it corrects a claim of mine in the other direction:* **30.12%** of dead values
 > are exactly 0.0, not all of them, so the degeneracy I predicted is partial. But it is real and it
@@ -584,16 +601,18 @@ not — but it is not zero: if the instrument's numerical sensitivity is base-de
 composition correlate through the encoder rather than through what the head reads. A3 owns the general
 magnitude question. The bound belongs in the row rather than being discovered when someone asks.
 
-⇒ **This paragraph used to say "the dead band tests exactly that," and the dead band has now tested
-it — with the qualification that the band itself needs repair first.** Job 8896744: within each mass
-decade below the cut, the keto ratio scatters about 1.0 with no trend (1.011, 1.025, 1.003, 1.055,
-0.963, 0.998). **At equal mass, elevated dead positions are not keto-enriched**, so the encoder
-reading is not supported and this particular circularity is measured rather than merely bounded. The
-qualification: the dead band's own aggregate ratio of 1.081 is confounded by the band spanning six
-mass decades while every live band is a narrow quantile — see the dead-band block above — so the
-control is only readable **within** decade, which is exactly the form the answer above came in. Until
-the band is sub-stratified and re-scored, "the dead band tests it" is true per decade and false in
-aggregate, and only the per-decade version may be cited.
+⇒ **This paragraph used to say "the dead band tests exactly that." It cannot, and nothing else
+currently does.** The unresponsive stratum is not an instrumental control for a scale-free statistic
+— see the dead-band block above and `9e83583` — because a real sequence preference reproduces at
+every mass level, so its firing there is equally consistent with the preference being real. The only
+positions that would be genuinely null are the exact zeros, and they are degenerate.
+
+**So this bound is unmeasured, and A2 cannot supply it.** A positive still licenses only *"among
+equally-routed positions, the more sensitive ones are keto-enriched"*, and the possibility that the
+instrument's numerical sensitivity is base-dependent is **open rather than excluded**. Whatever
+addresses it will have to come from outside this design — an encoder-level test rather than a stratum
+of the same statistic. Recorded here rather than discovered when someone asks what the dead band
+showed.
 
 Cost: one job. **This is the load-bearing measurement of Phase A, and the only one.**
 

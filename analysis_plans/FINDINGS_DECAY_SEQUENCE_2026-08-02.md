@@ -6,6 +6,29 @@ bank, `chunk_rows` constant at 4,096). Both concern **`vals_decay`** — the cha
 transcript logit through the decay branch alone, with every capture probability held at its
 unperturbed value. Neither concerns `vals` or `vals_capture`.
 
+## SCOPE — every finding here is a MODEL claim, not a biology claim
+
+*Required by the primary directive, and flagged as a live hazard 2026-08-02.*
+
+**Everything below is measured on `vals_decay`, which is the model's own sensitivity.** A producer
+that reads an ISM bank never loads a checkpoint, so it *looks* like a data analysis — but the bank is
+cached model output, and every statistic computed on it is a statement about **what this trained
+network is sensitive to**, one step removed. Not about transcript sequence composition.
+
+So: "elevated positions sit at a keto base in a uridine-rich window" means **the positions this model
+is most sensitive to** sit at a keto base in a uridine-rich window. It does *not* mean U-rich context
+is a feature of NMD-relevant sequence. The biology-shaped reading is the more interesting one, which
+is exactly why it is the easy drift.
+
+**The standing proof that the two come apart is in this document.** Finding B: the +4 composition
+bias after a stop codon is real and structured **in the data**, and absent from **what the model
+reads**. Same positions, opposite answers, depending on which claim is being made.
+
+*(Same shape as the A1 logit cache: the number came out of a `.npz`, the model was nowhere in the
+call stack, and it read as data.)*
+
+---
+
 **Where the numbers come from.** Producers are `analysis_plans/analysis_ism_regions.py` and the
 probes named per section. Jobs: `8886733` (k-mer, five banks), `8893173` (region-matched and the
 GC arms), `8893305` (PWM), plus the composition probes below. The model window reproduced the
