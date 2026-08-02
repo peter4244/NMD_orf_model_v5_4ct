@@ -39,6 +39,29 @@ model ribosome initiation, or does it pick whichever frame best explains the lab
 
 ---
 
+> ## ⚠ EVERY RECOVERY NUMBER BELOW IS A SUBSET STATISTIC. Pete, 2026-08-02.
+>
+> The bank is **stratified, not a random sample**, and it says so in its own metadata:
+> *"Scarce mechanism cells were taken whole and abundant ones sampled, so the bank's
+> composition is not the pool's. Any population-level estimate must be reweighted by
+> `sampling_weight` or it describes this subset rather than the pool."*
+> **Thirty scripts read this bank. Two read `sampling_weight`, and neither is a recovery
+> producer.** So 0.883, 0.793, 0.702, 0.460 and 0.304 all describe the bank, not the
+> transcript pool.
+>
+> **Worse for §4's scope claim.** The strata are `{NMD, control} × {main-ORF stop, NO
+> main-ORF stop, no annotation}` — the bank was deliberately balanced **on whether the
+> annotated main ORF carries a premature stop**, which is the exact axis §4 interprets.
+> Its composition along that axis was engineered, so §4's mechanism conclusion may be
+> reading the sampling design. **C21 is suspended pending a reweighted recompute.**
+>
+> **And the benchmark drops 2,354 of 4,999 transcripts** — 47% — as unannotated, a
+> population `build_ism_subset.py` describes as *"where most NMD lives."*
+>
+> Contrasts between arms on the same transcripts (§1's +0.489) are the most robust to
+> this; levels (0.883, 0.460) are the least. Nothing here is retracted yet, because
+> nothing has been recomputed yet.
+
 ## 1. The picker gates a queue; it does not rank
 
 `p_select_k = p_capture_k × Π_{j<k}(1 − p_capture_j)`, ordered 5′→3′. A candidate wins by
