@@ -448,6 +448,59 @@ reported, the ordering is reported with it.
   "up to 100" matters: fill stops at the ORF midpoint, so short candidates get
   fewer, and that clip is the geometric leak §8.5 exists to control.
 
+## The run-length result is motif-scale, and that reframes the whole thing
+
+Pete's point: **RBPs bind RNA through recurring motifs that shift position across
+transcripts.** A binding preference is characterised by what it recognises, not by
+where it sits.
+
+**What that retires.** Position-level agreement across seeds is the wrong test for
+such a mechanism. Two members can agree completely on the pattern while weighting
+different instances of it, and a positional Jaccard cannot distinguish that from
+disagreement. So the low across-seed overlap (0.125, ~22% of top-1% sets) is **not**
+evidence against a shared learned feature. It also retires Q2 as a negative: offsets
+measured relative to the start and stop codon can only find *anchored* features, so
+"nothing at the start codon" is a question that design cannot answer.
+
+**What it explains, which is the part I had not drawn out.** An RBP motif is
+typically 4–8 nucleotides. The run-length finding is that elevated positions form
+runs of **4 or more**, mean length 1.2–1.9, with the excess concentrated at exactly
+that scale. That is motif scale.
+
+**And it turns the GC control from a control into positive evidence.** If the runs
+were an artifact of channel 5's ±25 averaging, they would be *tens of bases long*,
+matching the smoothing window. They are 4–6. **Wrong length for the encoding, right
+length for a motif** — which is independent of the fact that the clustering also
+survives with GC held bitwise constant.
+
+So the results are one story rather than three: the decay branch has learned short
+contiguous sequence features, they recur across transcripts, they replicate on genes
+the model never saw, and they are not an artifact of the GC encoding.
+
+**A prediction recorded before the k-mer job reports**, so its outcome is
+interpretable either way: k-mer agreement across members should be **high** while
+positional Jaccard stays at 0.125. Both low would falsify the motif reading and
+point at something transcript-specific. Both high would mean the positional Jaccard
+was underpowered rather than negative.
+
+### The arity-matched GC decomposition
+
+Two implementations, independently and simultaneously. Raw counts are **not**
+comparable across them — the `all` arms differ 1.36× — but ratios within an
+implementation are:
+
+                                 mine    interp
+      all, max of 3             1.000     1.000
+      changing, max of 2        0.962         -
+      one GC-changing               -     0.732
+      GC-PRESERVING             0.419     0.420
+
+**0.4187 against 0.4198.** At matched arity the interpretability window measures
+GC-changing substitutions clustering 1.74× more than GC-preserving ones, and **57%
+of the arity-matched clustering survives with GC held constant**. That is the number
+for §5 — "it survives" understates what GC does, and "GC contributes about half" is
+the arity artifact, not a measurement.
+
 ## RUN AND ANSWERED: floor conditioning does not rescue cross-seed agreement
 
 `analysis_crossseed_floor.py`, job 8886461, all five banks, exit 0. Full output in
