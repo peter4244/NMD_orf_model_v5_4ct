@@ -15,7 +15,10 @@ matters, then **judge** whether that frame triggers decay — `P(NMD) = Σ_k p_s
 Does the picking stage model ribosome initiation, or does it pick whichever frame best
 explains the label?
 
-**Neither.** It does a third thing, and the third thing explains most of what follows.
+**Neither — and the reason is that it does not have one answer.** The picker behaves
+differently depending on what it is choosing between, and that split explains almost
+everything below, including why our headline number is measured on the half where the model
+is least interesting.
 
 ---
 
@@ -94,10 +97,6 @@ The consequence lands exactly where you would predict: reference ORFs that are s
 recovered **0.276** of the time against **0.735** for long ones. **The head fails precisely
 where initiation context is the thing that decides.**
 
-`[unclaimed]` **`p_select ~ length` has never been measured.** Both numbers above are the
-*head*; the step to the *picker* rides on the queue's construction rather than on a
-measurement. It is the cheapest thing outstanding.
-
 **What it is not selecting for: premature stops.**
 
 | `p_select ~ junction count`, conditioning on | median |
@@ -108,21 +107,19 @@ measurement. It is the cheapest thing outstanding.
 | **length and position together** | **−0.070** |
 
 *Job 8900746.* Length and position mask each other in opposite directions, so holding either
-alone manufactures a signal that is not there. Holding both returns −0.070, agreeing with
-the marginal −0.050. The head's own apparent aversion, −0.453, collapses to −0.009 holding
-length — that arm is entirely length.
+alone manufactures a signal that is not there; holding both returns −0.070, agreeing with the
+marginal. The head's own apparent aversion, −0.453, is entirely length — it collapses to
+−0.009 when you hold it.
 
 ⇒ **The founding hypothesis — that the model picks frames because they carry a premature
-stop — does not hold at the routing step.** An independent route agrees: a queue with **no
-model in it** scores +0.568 holding length against the model's +0.447, so the model routes
-toward junction-bearing frames *less* than pure ordering does. Zero was never the right
-reference. *Commit f523f72. Bound: the degenerate null maximises queue influence, so the
-0.125 deficit is an upper bound and may be generic dilution.*
+stop — does not hold at the routing step.** A queue with **no model in it** scores +0.568
+holding length against the model's +0.447, so the model routes toward junction-bearing frames
+*less* than pure ordering does. Zero was never the right reference. *Commit f523f72; the
+degenerate null maximises queue influence, so the 0.125 deficit is an upper bound.*
 
-**But that is the aggregate, and the aggregate is hiding a sign flip.**
-
-Among candidates under 200 nt — the regime where uORFs compete, and where uORF-driven NMD
-actually arises — the head's criterion inverts (job 8900229, within transcript):
+**But the aggregate is hiding a sign flip.** Among candidates under 200 nt — where uORFs
+compete, and where uORF-driven NMD arises — the head's criterion inverts (job 8900229,
+within transcript):
 
 | among short candidates | |
 |---|---|
@@ -132,20 +129,19 @@ actually arises — the head's criterion inverts (job 8900229, within transcript
 | top-scoring candidate is the 5′-most | 22.8% |
 
 **Over all candidates the head appears to avoid junction-bearing frames, and that arm is
-entirely length** (−0.453 → −0.009 holding it). **Within the class where it has a real
-choice to make, it prefers them**, and predicts decay at +0.362.
+entirely length. Within the class where it has a real choice, it prefers them** — and
+predicts the judge at +0.362.
 
-**So the selection criterion is regime-dependent.** Length where the contest is between a
-main ORF and background; **decay-relevance where the contest is among uORFs.** That also
-settles ATF4: the uORF wins because it is decay-relevant, not because it is upstream —
-position accounts for only 22.8% of these cases.
+**So the criterion is regime-dependent**: length where the contest is a main ORF against
+background, **decay-relevance where the contest is among uORFs**. That settles ATF4 as well —
+the uORF wins because it is decay-relevant, not because it is upstream. Position accounts for
+22.8% of these cases.
 
-`[unclaimed]` **The flip is measured on the head, not on the picker.** `p_select ~ junction
-count` among short candidates has not been run; the table above it is `p_select` in
-aggregate. The two are not interchangeable and the section needs both.
-
-**In aggregate, the junction preference enters at the decay multiplication rather than at
-selection. Among short ORFs it is already in the head.**
+`[unclaimed]` **Both regime numbers are measured on `p_capture`, the head — not on
+`p_select`, the picker.** Neither `p_select ~ length` nor `p_select ~ junction count` among
+short candidates has been run, so the step from head to picker rides on the queue's
+construction rather than on a measurement. These are the cheapest things outstanding and this
+section needs them.
 
 ## 4. The benchmark was wrong; fixed, the number is 0.883
 
@@ -173,6 +169,15 @@ decay-causing frame here **starts at the normal start codon** and is **truncated
 premature stop: poison exons, retained introns, frameshifts. A transcript whose decay is
 uORF-driven keeps an intact CDS and is annotated `protein_coding`. **ATF4 is in the second
 row.** The mechanism the model demonstrably nails is not in the benchmark that scores it.
+
+**And the mechanism it does contain is the long-ORF regime — the one where the model is
+least interesting.** A premature-stop-in-main-frame substrate has a single long annotated
+CDS beginning at the normal start codon, which is exactly why position alone scores 0.702
+here. That is the regime where §2 and §3 both find the head reading **length** and the queue
+doing most of the work. **So the benchmark scores the model where it behaves like a
+length-and-position heuristic, and does not score it at all where it reads initiation
+context and decay-relevance.** The 0.460 floor and the thin +0.091 margin over position are
+measurements of the model at its most mechanical.
 
 ## 5. The judge
 
@@ -243,35 +248,47 @@ is +0.399 against `p_capture ~ d` +0.091 with the queue removed, and the mixture
 
 ## What this adds up to
 
-**The model solves the problem, and not by the route it was designed to take.**
+**The model has two modes, and the boundary is ORF length.**
 
-It was built to pick a frame and judge it. What it does is **gate**: its own preference is
-nearly worthless (0.304) and becomes strong (0.793) only through a product that turns
-vetoes into a choice. Over simply taking the first candidate, it is worth **+0.091**.
+Where the contest is a long main ORF against background, it reads **length** — seven times
+more than initiation context, and part of that length signal is our own window boundary
+rather than sequence. Position does most of the remaining work: taking the first candidate
+and ignoring the model scores 0.702, and everything the picker knows adds **+0.091** on top.
 
-**What it gates on depends on the contest, and two independent instruments find the same
-boundary.** Against background it uses **ORF length**, seven times more than initiation
-context — and part of that length signal is **our own window boundary** rather than
-sequence. Among short ORFs, where uORFs compete and the head has a real choice, the
-criterion flips to **decay-relevance**: its junction association goes from −0.453 to +0.100
-and it predicts the judge at +0.362. Tiled perturbation says it from the sequence side —
-the clean initiation-proximal signal dominates for short ORFs and length-tracking dominates
-for long. The aggregate reads as a length detector because the short-ORF regime is a
-minority of the variance, not because the head has one rule.
+Where the contest is **among short ORFs** — where uORFs compete, and where uORF-driven decay
+actually comes from — it reads something else. Its junction association flips from −0.453 to
+**+0.100**, it predicts the judge at **+0.362**, and 76.3% of its top picks carry a
+downstream junction while only 22.8% are simply the first candidate. Perturbation finds the
+same boundary independently: the clean initiation-proximal signal at −13 dominates for short
+ORFs, length-tracking for long. **Two instruments, one line.**
 
-The decay judge, handed the EJC count outright, is not a readout of it, never learned stop
-codons because we gave it no negative examples, and carries a real but diffuse composition
-signal past the stop.
+**The architecture is what makes the first mode work and the second mode possible.** The
+picker's own preference is nearly worthless — 0.304 — and becomes 0.793 only through
+stick-breaking, which turns a run of vetoes into a choice. That is a gate, not a ranker, and
+gating is precisely what leaky scanning past a uORF requires. Meanwhile the judge, handed
+the junction count outright, is not a readout of it, never learned to read stop codons
+because we gave it no negative examples, and responds at keto bases in a uridine-rich,
+GC-neutral window that is not a motif and not an ARE.
 
-And the separation we designed forward is **given back backward** by the loss — measurably,
-in the one regime where the picker has a real choice to make.
-
-**The result is 0.883 against GENCODE's own NMD call, on a floor of 0.460.** The number is
-sound. What it is accuracy *at* is narrower than it looks: premature stop in the main frame.
-The uORF mechanism the model gets right on ATF4 — 18×, 93% of the signal, textbook — is not
-in that benchmark at all.
+**And the two stages do not stay separate.** Forward they are — different encoders, different
+bases, agreement ~0.02. Backward the loss couples them, because BCE on a product scales the
+picker's gradient by the judge's output. The coupling is measurable exactly where the picker
+has a real choice to make: among short candidates, `capture ~ d` is +0.400 holding the
+junction column. **The regime where the model is interesting is the regime where its two
+halves have merged.**
 
 ---
+
+**The sting is in the benchmark.** 0.883 against GENCODE's own NMD call, on a floor of 0.460,
+is a sound number. But GENCODE assigns that biotype on the annotated CDS terminating
+prematurely — a single long ORF starting at the normal start codon. **That is the long-ORF
+regime: the half where the model behaves like a length-and-position heuristic.** The uORF
+mechanism, where it reads initiation context and decay-relevance and where it gets ATF4
+right by 18× with 93% of the signal on the correct 179-nt frame, is annotated
+`protein_coding` and sits in the row we treat as the contrast.
+
+**We measured the model where it is least interesting, and scored it there.** What it does in
+the other regime is the better result and it is currently unbenchmarked.
 
 ## Not established
 
