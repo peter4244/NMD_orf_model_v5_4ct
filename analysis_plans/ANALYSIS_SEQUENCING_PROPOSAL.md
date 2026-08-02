@@ -56,6 +56,39 @@ survives its own row and is load-bearing for a Phase B or C claim earns a second
 
 ---
 
+## The row template — twelve fields, and an empty one blocks implementation
+
+Added 2026-08-02, after the A2 row was found to fix four lines and leave a dozen implementation
+choices open. **The lesson is not "review rows more carefully."** That row was reviewed carefully and
+looked finished, because four confident lines look finished. The fix is structural: name the fields,
+so a row that omits one is visibly incomplete without anyone having to notice.
+
+Every field below was a real decision that a real implementation would otherwise have made silently.
+
+| # | field | the failure it prevents |
+|---|---|---|
+| 1 | **hypothesis**, one sentence | the run-length statistic: two implementations, agreement to four decimals, both wrong, no hypothesis written |
+| 2 | **selection rule** — what defines the set, *and within what* | global vs per-transcript top-1%, Jaccard 0.24; global-then-binned vs within-stratum |
+| 3 | **background** — compared against what, at what scope | a global background collapses a stratified test back to the confounded version |
+| 4 | **held fixed**, and **by stratification or by removal** | A1's row said stratification in one line and residualized in the next |
+| 5 | **deliberately not held**, and why | composition is the measurement in A2 and the exposure in B2; adjusting it away removes the thing |
+| 6 | **null** — what it preserves | random placement destroyed autocorrelation the track has architecturally |
+| 7 | **reference points** — floor *and* ceiling, measured in-sample at the analysis's own n | ceiling assumed 1.0 (is 0.75), floor assumed 0 (measured 0.387) |
+| 8 | **aggregation** — pooled or per-unit, and the interval | pooling reintroduces the weighting per-transcript selection removes |
+| 9 | **sweep** — which parameters, and the primary | the elevation threshold selected 1.7% on the pilot and 10.7% on the banks |
+| 10 | **decision rule**, with **all** outcomes fixed before the run | A2 had two outcomes written; the missing third was an interaction that would have been rounded up to a positive |
+| 11 | **licensed if positive / negative**, and **what a positive does not license** | every inflated claim this week dropped the qualifier rather than inventing a result |
+| 12 | **owner**, and whether it gets a second implementation | replication is for load-bearing survivors, not for everything |
+
+**A row with an empty field is not ready to implement.** The implementing window sends it back rather
+than resolving the gap in code — a choice made inside an implementation is invisible to review, which
+is the toolbox's own diagnosis of all eleven errors.
+
+**This is a template, not a checklist to satisfy.** A field can legitimately read "not applicable, and
+here is why." What it cannot do is be absent.
+
+---
+
 ## Phase A — repair. Cheap, existing code, and a go/no-go on the rest
 
 **Phase A is A2. One measurement.** A1 is dropped, A3 is tidying the other window owns, A4 is deferred pending the Hill/Dy interaction-attribution work. Pete asked whether ORF weighting should be

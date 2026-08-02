@@ -51,3 +51,28 @@ The model architecture is identical to the original v5: multi-branch transformer
 - Best model tag: `atg500_stop500`
 - All output goes to `results_4ct/`
 - Original v5 project at `../nmd_orf_model_v5/` — do not modify
+
+## Multi-window operating rules
+
+Two or more windows work this repo concurrently, in separate git worktrees. These rules exist
+because each one was learned by hitting it — see `analysis_plans/HANDOFF_INTERPRETABILITY_2026-08-02.md`.
+
+- **Review the specification before writing the code.** When implementing an analysis row another
+  window wrote, review it first and send back the choices it leaves open. **Do not resolve an
+  ambiguity in code** — a choice made inside an implementation is invisible to review, and that is
+  the origin of essentially every error this project has had. A row with an empty field in the
+  twelve-field template (`ANALYSIS_SEQUENCING_PROPOSAL.md`) is not ready to implement.
+- **Two implementations means one shared specification and independent code.** Writing your own
+  specification produces two analyses, not a replication.
+- **Check the artifact before repeating a claim about it.** When any document says something is
+  owed, blocked, settled or retracted, verify before acting: `git log --date=iso --format='%h %cd %s' -1 <sha>`.
+  Prose is the one thing here that never gets independently recomputed, and both errors that survived
+  two days of cross-checking lived in prose. A commit message is not evidence of its diff; `git show` is.
+  A file mtime is not a commit time.
+- **Namespace everything**, including cluster scratch scripts — outputs `interp_*` / `model_*`, jobs
+  `hi_*` / `md_*`. Two windows once wrote `autocorr.py` to the same cluster directory and the second
+  silently replaced the first.
+- **Ask before every Explorer login.** A loaded ssh-agent is not standing authorization.
+- **Where a document does not cover what you hit, add a row.** None of this structure was designed;
+  it is a record of failures, so it stops exactly where our failures stopped. Do not work around a
+  gap and do not assume the omission was considered.
