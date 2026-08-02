@@ -99,6 +99,21 @@ and the evidence is against independence: capture's *output* tracks downstream
 junction count at −0.460, information it cannot see. The two heads read different
 regions and arrive at correlated conclusions.
 
+### What C10's magnitude does and does not license
+
+It plausibly accounts for **both** `capture ~ ORF length` at +0.760 **and** the
+longest-ORF heuristic reproducing 97% of selection accuracy — the encoding hands the
+head most of that heuristic for free, before any sequence is read.
+
+**It is NOT established that the head uses it** (interpretability window's own
+caution, and it is the right one). The information is present and highly
+discriminative; whether `p_capture` reads it is a separate question and this
+measurement cannot answer it. **That distinction is the difference between a claim
+about our encoding and a claim about the model**, and the two must not be merged.
+
+*One precision note:* 47.1× is the **probability** ratio. The odds ratio is 52.8×.
+Both are computed here; the document uses the probability ratio throughout.
+
 **Instrument limit:** ISM sees only what is fragile to single substitutions, so a
 feature both heads encode robustly would be invisible to both profiles and would
 not register as agreement. This bounds detectable shared *reading*, not shared
@@ -111,6 +126,7 @@ representation.
 | # | finding | job / source |
 |---|---|---|
 | **C10/C12** | The ATG window's downstream fill is clipped at the ORF midpoint (`build_tensor.py:271`, `limit_hi=mid`) and runs 100 nt past the AUG, so **fill = min(100, length/2)** — below 200 nt the fill boundary encodes ORF length exactly. Measured: the length association is **+0.442** below 200 nt and **+0.200** at or above. A contributor, not the whole account. | 8899353 |
+| **C10 magnitude** | **The fill boundary is a 47× marker for "this is the real ORF", available from geometry with no sequence read.** Verified independently on `results_pool_v6/orf_pool.tsv`, 802,035 candidates over 42,043 transcripts: median candidate ORF length **81 nt**; **69.1%** of candidates fall below 200 nt where fill encodes length exactly — but only **4.5%** of reference-CDS candidates do, against **71.5%** of non-reference. So `P(reference \| fill saturated) = 11.1%` against `P(reference \| not saturated) = 0.24%`. **The encoding separates real from spurious candidates almost exactly along the axis the initiation head exists to compute.** | interpretability window; verified on the pool |
 | **C9** | The reading-frame channels are written across the **entire** window including all 900 upstream UTR positions (`data_prep.py:207-211`). A periodic 3-cycle grid is supplied throughout the 5′UTR, so **prior observations of "ORF periodicity bleeding into the 5′UTR" are most likely the encoding rather than the sequence.** | code |
 | — | **Selection mass confounds any two-branch comparison.** Both `vals` columns scale with mass, so a naive correlation between them measures mass co-scaling. Job 8899766 failed its own sanity check on exactly this: noise-vs-noise agreement +0.294, *higher* than the +0.266 among real positions. Fixed by stratifying on mass, never dividing it out. | 8899766 → 8899820 |
 | — | **The capture branch's exclusion from the programme was correct**, and its real reason was never written down. Median `\|vals\|` is 6,861× smaller than decay's while its own floor is only 23× lower, so **capture's signal-to-noise is 296× worse**. 64% of live positions clear their own floor against decay's 99%. | 8899965 |
@@ -147,20 +163,28 @@ pre-specified and therefore need no null to establish they exist. Tile width set
 the encoder — receptive field ~42, bins of 1000/8 = 125 — bin width primary,
 half-bin as the finer arm.
 
-> **PREDICTION, REGISTERED BEFORE THE RUN (model window, derived from job 8899965).**
-> Capture is **sparse, not weak**: its 10th and 25th percentiles sit at zero in
-> floor units while its 75th and 90th (9.7e7, 1.25e9) *exceed* decay's (6.9e7,
-> 1.6e8). If that sparsity reflects initiation biology, tiling should show **sharp
-> concentration at the start-codon neighbourhood and near-zero response across most
-> of the upstream 900.**
->
-> Concentration at the start codon → a weak initiation model.
-> Concentration at the **fill boundary** → the head is reading our encoding.
-> Neither → the sparsity has some third source and this account is wrong.
+**TWO MUTUALLY EXCLUSIVE PREDICTIONS, EACH DERIVED FROM AN INDEPENDENT MEASUREMENT,
+BOTH REGISTERED BEFORE ANY TEST.** They cannot both be right, and the tiling
+distinguishes them directly. This is an experiment rather than a characterisation.
 
-**What it will not do:** rescue the motif question, say anything about decay, or —
-if it confirms concentration at the start codon — produce a new finding rather than
-a confirmation. It answers one thing.
+> **PREDICTION A — model window, from job 8899965 (sparsity).** Capture is *sparse,
+> not weak*: its 10th and 25th percentiles sit at zero in floor units while its 75th
+> and 90th (9.7e7, 1.25e9) *exceed* decay's (6.9e7, 1.6e8). If that sparsity
+> reflects initiation biology, tiling shows **sharp concentration at the
+> start-codon neighbourhood** and near-zero response across most of the upstream
+> 900. ⇒ *a weak initiation model.*
+>
+> **PREDICTION B — interpretability window, from the pool measurement (fill).** A
+> 47× marker for the real ORF sits at the fill boundary, so a head optimising
+> selection accuracy would look there. Tiling shows **concentration at the fill
+> boundary**. ⇒ *the head is reading our encoding, and the finding is about us
+> rather than about the model.*
+>
+> **Neither** ⇒ both accounts are wrong and the sparsity has a third source.
+
+**What it will not do:** rescue the motif question, or say anything about decay. It
+answers one thing — but that one thing is currently the story's missing ending, and
+under two incompatible registered predictions it cannot come back uninformative.
 
 ---
 
