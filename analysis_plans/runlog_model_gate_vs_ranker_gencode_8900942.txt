@@ -1,0 +1,31 @@
+=== code (sha256) ===
+040a0c16ec76aeb4be66dc5a680a0a6ca69eb054e76e0746a792acd0a712453f  analysis_plans/model_gate_vs_ranker_gencode.py
+
+==============================================================================
+GATE VS RANKER, SCORED AGAINST GENCODE's OWN NMD CALL
+==============================================================================
+bank results_ism_v6/bank_interp_s100.h5
+target: cand_is_gencode_start == 1  (the annotated CDS, which on NMD-biotype
+        transcripts IS the PTC-bearing frame by GENCODE's curation)
+skipped: no_biotype=2,354  k<2=15  no_anchor=58  other_biotype=188
+
+  arm                              NMD_biotype  protein_coding
+  ------------------------------------------------------------
+  head argmax (p_capture)                0.304           0.304
+  most 5' candidate                      0.702           0.493
+  longest ORF                            0.460           0.958
+  queue / prior (p_select)               0.793           0.844
+  posterior (p_select*d)                 0.883           0.591
+  n                                      1,099           1,285
+
+==============================================================================
+THE REGISTERED DECISION
+==============================================================================
+  queue 0.793  vs  head's own argmax 0.304   -> G1 SURVIVES
+  position 0.702 against 0.424 on main ORFs   -> DID NOT FALL -- the two targets are less distinct than section 4 claims
+  longest-ORF floor under the 0.883 headline: 0.460   -> headroom +0.423
+  posterior 0.883 against job 8900631's 0.883   -> reconciles
+
+  NOTE: arms 1/2/4 are the section 1 comparison; arm 3 is the previously
+  [unclaimed] heuristic floor. Arm 5 is the reconciliation check, not a result.
+=== exit: 0 ===

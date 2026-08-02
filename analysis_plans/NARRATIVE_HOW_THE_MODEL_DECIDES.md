@@ -1,91 +1,93 @@
-# How the model decides — the running narrative
+# How the model decides
 
-**Owner: model window (storyteller), from 2026-08-02.** Drafted by the interpretability
-window and handed over on Pete's instruction; reconciled against the committed record and
-rewritten. Every sentence must be traceable to a numbered claim with a producer; where it
-is not, it says so.
-
-*This document exists because a summary is where our claims go wrong. Four framings
-survived in prose on 2026-08-02 after the measurement behind them had been retracted or
-was never taken. Analyses get re-run; narratives get repeated. This is the artifact that
-has to be checked like an analysis.*
-
-**Standards cited, not restated:** `PRIMARY_DIRECTIVE.md`; `CAPTURE_HEAD_STORY.md` for the
-claim→code map; `RETRAIN_ARCHITECTURE_CHANGES.md`.
-
-    [unclaimed]                 nothing measured behind it
-    [unclaimed — job NNNNNNN]   measured, producer and runlog exist, never filed as a claim
-
-**Markers are deliberate. Do not tidy them.**
-
-## Depends on
-
-**Claims** C1–C15, C17 (`CAPTURE_HEAD_STORY.md`); **C16 retracted**. **Decisions** D48, D50, D55, D56.
-**Findings** `FINDINGS_ORF_SCANNER_2026-08-02.md`, `FINDINGS_TILED_PERTURBATION_2026-08-02.md`,
-`FINDINGS_DECAY_SEQUENCE_2026-08-02.md`. **Retrain items** 3, 4, 6, 8.
-**Jobs** 8898926 · 8898939 · 8899132 · 8899353 · 8899766 · 8899820 · 8899905 · 8899965 ·
-8900114 · 8900209 · 8900229 · 8900407 · 8900420 · 8900473 · 8900631 · 8900643 · 8900685 ·
-8900746.
+**Owner: model window.** Every number here has a producer and a job id; the claim→code map
+is `CAPTURE_HEAD_STORY.md` (C1–C22). The corrections this document went through are in the
+git history rather than in your way. `[unclaimed]` marks an assertion with no measurement
+behind it — deliberate, and greppable.
 
 ---
 
 ## The question
 
 The model predicts decay in two stages: **pick** which of ~15 candidate reading frames
-matters, then **judge** whether it triggers decay. Pete's question: does the picking stage
-model ribosome initiation, or does it pick whichever frame best explains the label?
+matters, then **judge** whether that frame triggers decay — `P(NMD) = Σ_k p_select_k · d_k`.
 
-**The answer is neither, and the third thing is more interesting than both.**
+Does the picking stage model ribosome initiation, or does it pick whichever frame best
+explains the label?
+
+**Neither.** It does a third thing, and the third thing explains most of what follows.
 
 ---
 
 ## 1. The picker gates a queue; it does not rank
 
-`p_select_k = p_capture_k × Π_{j<k}(1 − p_capture_j)`, ordered 5′→3′. A candidate wins by
-being competent **and** by everything upstream being judged incompetent — which is what
-leaky scanning is.
+`p_select_k = p_capture_k × Π_{j<k}(1 − p_capture_j)`, candidates ordered 5′→3′. A frame
+wins by being competent **and** by everything upstream being judged incompetent. That is
+leaky scanning, written as arithmetic.
 
-So the head's job is to be *quiet* at the wrong candidates. Its own argmax scores **0.305**,
-worse than "take the most 5′ candidate" at 0.424, while the queue reaches 0.697 (C2, C3).
-We misread it for most of a day by looking at where it was loudest.
+Three ways of choosing, scored on GENCODE's own `nonsense_mediated_decay` call — where the
+annotated CDS **is** the decay-causing frame (n = 1,099 in 915 genes; job 8900942):
 
-⚠ **Those numbers are scored on main-ORF recovery**, which for an NMD substrate is close to
-a disjoint concept from the decay-causing frame. **On the question that matters — finding
-the frame that causes decay — the figure is 0.883**, and §4 derives it. If you read no
-further, carry 0.883 and not 0.697.
+| | |
+|---|---|
+| the head's own argmax | 0.304 |
+| the most 5′ candidate | 0.702 |
+| **the queue built from that same head** | **0.793** |
+
+**The head's raw preference is nearly worthless. Routed through the queue it is worth
++0.489** — CI [+0.455, +0.522], winning 546 transcripts and losing 9.
+
+The head is not being overruled by the queue; it *is* the queue's only input. So its job is
+not to score the right frame highly — it is to be **quiet at the wrong ones**, and let the
+product turn a run of vetoes into a choice. A gate, not a ranker.
+
+**Its margin over pure position is thin: +0.091**, CI [+0.053, +0.129], 241 won against 141
+lost (job 8900950). Taking the first candidate and ignoring the model gets 0.702. Everything
+the picker knows is worth a tenth on top of candidate order.
 
 ## 2. What the picker reads
 
-**Clean, and measured: initiation context immediately 5′ of the start codon.** Perturbing
-those 25 bases moves the head's logit more than anything else in its 900-base upstream
-window — 0.413 / 0.283 / 0.241 / 0.275 across ORF-length bands, **at the same position in
-every band**, in a tile 99.6% filled throughout and therefore carrying no fill confound.
-That position is where Kozak context sits. *Interpretability window, jobs 8900209, 8900420.*
+**A real initiation-context signal, and it is positional.** Perturbing the 25 bases
+immediately 5′ of the start codon moves the head's logit more than anything else in its
+900-base upstream window — 0.413 / 0.283 / 0.241 / 0.275 across four ORF-length bands, **at
+the same position in every band**, in a tile 99.6% filled throughout so no fill artifact
+explains it (jobs 8900209, 8900420). That position is where Kozak context sits. **This is
+the strongest candidate in this document for a statement about biology**, and the one result
+that got stronger under scrutiny rather than dissolving.
 
-**On a diffuse background — and this refutes my own registered prediction.** I predicted
-from the sparsity of `vals_capture` that adjacent upstream tiles would be highly variable.
-They are not: 32 consecutive tiles differ from their neighbours by ~6% and never by more
-than 50%. Capture's upstream sensitivity is **diffuse, not sparse**. *Job 8900420.*
-**Prediction A refuted.**
+`[unclaimed]` **That the head reads Kozak *content* is not established** — only that it
+responds at that *position*. The encoder's receptive field is ~42 nt against a ~10 nt motif,
+so the instrument may not be able to separate the two.
 
-**Unresolved: a second component tracking ORF length.** The response peak moves with length
-(−13, +12, +37, +87). Whether that is the head reading **our fill boundary** or reading
-**whatever happens to be filled** cannot be separated by this design, and the question is
-**closed to tiling** — downstream tiles already sit below the ~42-position receptive field.
+**Against a diffuse background.** Across the upstream window, 32 consecutive tiles differ
+from their neighbours by ~6% and never by more than 50%: a broad low response with one sharp
+peak, not a scatter of hot spots.
 
-**And that length route is partly ours.** The ATG window's fill stops at the ORF midpoint,
-so fill extent = `min(100, length/2)`, and fill saturation alone is a **47× marker** for
-"this is the real ORF" — `P(reference | saturated)` 11.1% against 0.24%. *Verified on
-`orf_pool.tsv`; retrain item 3.* `[unclaimed]` **Whether the head uses it is not
-established** — the information is present and discriminative; that the head reads it has
-no measurement behind it.
-
-**What it does not read is the thing biology says decides.** Among ORFs under 200 nt — 69%
-of candidates, median 81 nt — `capture ~ kozak` is +0.061 against `capture ~ length` +0.429.
-Reference ORFs that are short are recovered **0.276** of the time against **0.735** for long
-ones. **The head fails precisely where initiation biology says context should decide.**
+**And a second component that tracks ORF length.** The response peak moves with length (−13,
++12, +37, +87). **Part of that route is ours, not the model's** — the ATG window fills to
+`min(100, length/2)`, so for any ORF under 200 nt *where the fill stops encodes ORF length
+exactly*, and fill saturation alone is a **47× marker** for the real ORF (11.1% against
+0.24%). Whether the head exploits it is `[unclaimed]`, and the question is closed to tiling
+because downstream tiles already sit below the receptive field. *Retrain item 3.*
 
 ## 3. What the picker is actually selecting for
+
+**In aggregate, length — and length is not what initiation biology would nominate. But the
+criterion changes with the regime, and the aggregate hides that.**
+
+`p_capture ~ ORF length` is **+0.760** (C8, job 8899132), the strongest association measured
+anywhere in this work. Among candidates under 200 nt — 69% of them, median 81 nt — it is
++0.429 against **+0.061** for Kozak. **Seven to one.**
+
+The consequence lands exactly where you would predict: reference ORFs that are short are
+recovered **0.276** of the time against **0.735** for long ones. **The head fails precisely
+where initiation context is the thing that decides.**
+
+`[unclaimed]` **`p_select ~ length` has never been measured.** Both numbers above are the
+*head*; the step to the *picker* rides on the queue's construction rather than on a
+measurement. It is the cheapest thing outstanding.
+
+**What it is not selecting for: premature stops.**
 
 | `p_select ~ junction count`, conditioning on | median |
 |---|---|
@@ -94,211 +96,164 @@ ones. **The head fails precisely where initiation biology says context should de
 | position only | −0.553 |
 | **length and position together** | **−0.070** |
 
-*`model_c16_retraction.py`, job 8900746. The head's own aversion, −0.453, collapses to
-−0.009 holding length — that arm is entirely length. Provenance and the corrections behind
-this table are in the appendix.*
+*Job 8900746.* Length and position mask each other in opposite directions, so holding either
+alone manufactures a signal that is not there. Holding both returns −0.070, agreeing with
+the marginal −0.050. The head's own apparent aversion, −0.453, collapses to −0.009 holding
+length — that arm is entirely length.
 
-**Routing is indifferent to junction structure.** Length and position each mask the
-other in opposite directions, so holding either alone manufactures a signal that is
-not there; holding both returns −0.070, agreeing with the marginal −0.050.
+⇒ **The founding hypothesis — that the model picks frames because they carry a premature
+stop — does not hold at the routing step.** An independent route agrees: a queue with **no
+model in it** scores +0.568 holding length against the model's +0.447, so the model routes
+toward junction-bearing frames *less* than pure ordering does. Zero was never the right
+reference. *Commit f523f72. Bound: the degenerate null maximises queue influence, so the
+0.125 deficit is an upper bound and may be generic dilution.*
 
-⇒ **Pete's founding hypothesis does not hold at the routing step under the only valid
-conditioning.** The two single partials show large signal (+0.447, −0.553) and both are
-artifacts — each is the other confounder leaking. The junction preference enters at the
-decay multiplication.
+**But that is the aggregate, and the aggregate is hiding a sign flip.**
 
-**And an independent second route reaches the same place.** `p_select ~ ejc` is positive
-*by construction*: the queue's survival factor falls monotonically with slot, and earlier
-slots carry more downstream junctions. Measured in-bank, a **queue with no model in it**
-scores +0.334 raw and **+0.568** holding length, against the model's −0.050 and +0.447. So
-zero was the wrong reference, and against the right one the model routes toward
-junction-bearing candidates *less* than pure ordering does — a deficit of 0.125.
-*Interpretability window's argument, run in-bank; producer `model_queue_null_inbank.py`,
-f523f72.* **Bound:** the degenerate null maximises queue influence, so 0.125 is an upper
-bound on head aversion and may be generic dilution.
+Among candidates under 200 nt — the regime where uORFs compete, and where uORF-driven NMD
+actually arises — the head's criterion inverts (job 8900229, within transcript):
 
-> **⚠ STANDING HAZARD — in this model, any candidate-level correlation is position until
-> proven otherwise.** Four instances in one day: C7 (holding position *strengthened* the
-> capture–junction partial), the ATF4 uORF (queue position explains 22.8%, not the 100% we
-> assumed), C16 (a length partial that unmasked position), and the queue-geometry null
-> (`p_select ~ ejc` positive with no model in it). Pair this with the null rule: **for a
-> rank product, a monotone ordering or a normalised share, zero is not the null.**
+| among short candidates | |
+|---|---|
+| `p_capture ~ junction count` | **+0.100** — against **−0.453** over all candidates |
+| `p_capture ~ d` | **+0.362** |
+| top-scoring candidate carries a downstream junction | **76.3%** |
+| top-scoring candidate is the 5′-most | 22.8% |
 
-**The two stages are aligned, and the queue does it.** `p_select ~ d` +0.399 against
-`p_capture ~ d` +0.091 with the queue removed; the mixture runs **1.29×** above independent
-factors, so the alignment is part of what the model computes rather than a description of it
-(C13, job 8899905).
+**Over all candidates the head appears to avoid junction-bearing frames, and that arm is
+entirely length** (−0.453 → −0.009 holding it). **Within the class where it has a real
+choice to make, it prefers them**, and predicts decay at +0.362.
+
+**So the selection criterion is regime-dependent.** Length where the contest is between a
+main ORF and background; **decay-relevance where the contest is among uORFs.** That also
+settles ATF4: the uORF wins because it is decay-relevant, not because it is upstream —
+position accounts for only 22.8% of these cases.
+
+`[unclaimed]` **The flip is measured on the head, not on the picker.** `p_select ~ junction
+count` among short candidates has not been run; the table above it is `p_select` in
+aggregate. The two are not interchangeable and the section needs both.
+
+**In aggregate, the junction preference enters at the decay multiplication rather than at
+selection. Among short ORFs it is already in the head.**
 
 ## 4. The benchmark was wrong; fixed, the number is 0.883
 
-Recovery scored against the annotated CDS is the wrong target. **ATF4 proves it:** the prior
-picks the 1055-nt main ORF, the posterior flips **18×** onto a 179-nt uORF and puts **93%**
-of the signal there — the textbook mechanism — and it scores as a **miss**.
+**The right target is the frame that causes decay, not the annotated main ORF.** ATF4 is the
+case: the prior picks the 1055-nt main ORF, the posterior flips **18×** onto a 179-nt uORF
+and puts **93%** of the signal there — the textbook mechanism — and against the main ORF
+that scores as a **miss**.
 
-Against GENCODE's curated `nonsense_mediated_decay` biotype, with our EJC rule nowhere in
-the target (job 8900631):
+Scored against GENCODE's curated biotype, a call made independently of anything we compute
+(job 8900631):
 
 | GENCODE biotype | n | prior | posterior |
 |---|---|---|---|
 | `nonsense_mediated_decay` | 1,099 | 0.793 | **0.883** |
 | `protein_coding` | 1,285 | 0.844 | 0.591 |
 
-**The posterior is a decay-seeking correction** — +0.090 where the annotated frame is
-decay-causing, −0.253 where it is not.
+**The posterior is a decay-seeking correction** — +0.090 where the annotated frame causes
+decay, −0.253 where it does not, both gene-clustered and both excluding zero (job 8900950).
+**The floor under it is 0.460**, longest-ORF on the same transcripts, so the headroom is
+real: this is not an elaborate length heuristic.
 
-`[unclaimed]` **No heuristic baseline has been measured against 0.883.** The 0.678 figure
-belongs to main-ORF recovery. This number currently has no floor under it.
+**But 0.883 is one NMD mechanism, not both.** On these transcripts position recovers 0.702
+and length only 0.460 — inverted from `protein_coding` at 0.493 and 0.958. So the
+decay-causing frame here **starts at the normal start codon** and is **truncated** by the
+premature stop: poison exons, retained introns, frameshifts. A transcript whose decay is
+uORF-driven keeps an intact CDS and is annotated `protein_coding`. **ATF4 is in the second
+row.** The mechanism the model demonstrably nails is not in the benchmark that scores it.
 
 ## 5. The judge
 
-**It is handed the answer.** In the `interpretable` variant the decay head's entire
-non-sequence input is one column: `n_downstream_ejc`. *Retrain item 8.* But `d ~ ejc` is only
-+0.445 and `capture ~ d` survives holding that column at **+0.400**, so `d` is not a readout
-of it. *That +0.400 is a single measurement — `capture ~ d` among short candidates, holding
-the junction column — and it is used twice: here, to show `d` is more than the column, and
-in §6, to show the head became decay-predictive. One number, two readings, and both are
-legitimate; flagged so it is not mistaken for two independent results.*
+**It is handed the answer, and is not simply repeating it.** In the `interpretable` variant
+the decay head's entire non-sequence input is one column, `n_downstream_ejc`. But `d ~ ejc`
+is only +0.445, and `capture ~ d` survives holding that column at **+0.400** — so `d` is not
+a readout of the feature it was given. *Retrain item 8.*
 
-**It does not read the stop codon it is anchored on** — every candidate had one by
-construction, so no negative example and no gradient. *Retrain item 6.*
+**It never learned to read the stop codon it is anchored on.** Every candidate had one by
+construction, so there was no negative example and no gradient. *Retrain item 6.*
 
-**It has a composition preference 3′ of the stop** surviving mass stratification: keto
-1.084–1.150 across all eight bands, 5 of 5 seeds. Not established at 5′. **Bound: a single
-PWM explains 1.73% of importance variance.**
+**It has a composition preference 3′ of the stop** that survives mass stratification — keto
+enrichment 1.084–1.150 across all eight mass bands, 5 of 5 seeds, with nothing comparable at
+5′. **Bound: a single PWM explains 1.73% of importance variance**, so whatever this is, it
+is not one motif.
 
 ## 6. How the two stages relate
 
-**The forward separation is verified** — three encoders, and an invariance test that
-scrambles the stop window and leaves `p_capture` unmoved. **The coupling is derived** —
-`∂L/∂z_p_k ∝ d_k` is calculus on verified code, not an observation. **The consequence is
-measured** — `capture ~ d` is +0.362 among short candidates, +0.400 holding the junction
-column (**C17**, jobs 8900114 / 8900473). *Same measurement as §5's; see the note there.*
-*Filed as a claim rather than left marked: it is the measured leg of the sentence, and a
-marker is for a gap, not for a number that simply had not been written down.*
+**Forward, they are separate — verified, not assumed.** Three encoders, and an invariance
+test that scrambles the stop window and leaves `p_capture` unmoved. In aggregate the
+separation holds: `p_capture ~ d` is +0.091 and the two heads respond to **different bases**,
+agreement ~0.02 within mass band (job 8899820).
 
-**But scoped.** In aggregate the separation *holds*: `p_capture ~ d` is +0.091 and the two
-heads read **different bases**, agreement ~0.02 within mass band (job 8899820). It is given
-back **only among short candidates**, where the head must choose among uORFs.
+**Backward, the loss couples them.** BCE on the *product* means `∂L/∂z_p_k ∝ d_k` — the
+picker's gradient is scaled by the judge's output. That is calculus on verified code.
+
+**And the consequence is measured.** `capture ~ d` is +0.362 among short candidates and
+**+0.400** holding the junction column (C17, jobs 8900114, 8900473). **The picker became
+decay-predictive within its information limit** — and only among short candidates, which is
+exactly where it has room to choose, because that is where uORFs compete.
+
+**The alignment is something the model computes, not a description of it.** `p_select ~ d`
+is +0.399 against `p_capture ~ d` +0.091 with the queue removed, and the mixture runs
+**1.29×** above independent factors (C13, job 8899905). The queue is doing the aligning.
 
 ---
 
-## How to read this
+## What this adds up to
 
-Sections 1–6 are the science. **Every number in them is measured**, with its producer and
-job in the appendix. Two `[unclaimed]` markers flag assertions with no measurement behind
-them — they are deliberate and greppable. The appendix carries provenance and the record of
-what this document got wrong before it got it right; it is there because a narrative that
-only lists what survived cannot be checked.
+**The model solves the problem, and not by the route it was designed to take.**
+
+It was built to pick a frame and judge it. What it does is **gate**: its own preference is
+nearly worthless (0.304) and becomes strong (0.793) only through a product that turns
+vetoes into a choice. Over simply taking the first candidate, it is worth **+0.091**.
+
+**What it gates on depends on the contest.** Against background it uses **ORF length**,
+seven times more than initiation context — and part of that length signal is **our own
+window boundary** rather than sequence. Among short ORFs, where uORFs compete and where the
+head has a real choice, the criterion flips to **decay-relevance**: its junction association
+goes from −0.453 to +0.100 and it predicts the judge at +0.362. The aggregate reads as a
+length detector because the short-ORF regime is a minority of the variance, not because the
+head has one rule.
+
+The decay judge, handed the EJC count outright, is not a readout of it, never learned stop
+codons because we gave it no negative examples, and carries a real but diffuse composition
+signal past the stop.
+
+And the separation we designed forward is **given back backward** by the loss — measurably,
+in the one regime where the picker has a real choice to make.
+
+**The result is 0.883 against GENCODE's own NMD call, on a floor of 0.460.** The number is
+sound. What it is accuracy *at* is narrower than it looks: premature stop in the main frame.
+The uORF mechanism the model gets right on ATF4 — 18×, 93% of the signal, textbook — is not
+in that benchmark at all.
 
 ---
 
 ## Not established
 
-- **Whether the head reads the fill boundary or the start codon.** Closed to tiling.
+- **Whether the head reads Kozak content or only responds at that position.** §2. Receptive
+  field ~42 nt against a ~10 nt motif. **The most promising open item.**
+- **Whether the head reads the fill boundary or what is inside it.** Closed to tiling; needs
+  a retrain varying window extent. *Retrain item 7.*
+- **`p_select ~ length`, and `p_select ~ junction count` among short candidates.** §3 — the
+  regime flip is measured on the *head*; whether it survives the queue into the *picker* is
+  not. The cheapest things outstanding.
+- **Whether the posterior's −0.253 on `protein_coding` is error or the uORF mechanism
+  working.** Leaving the main ORF is correct for an ATF4-like transcript and wrong for an
+  ordinary one, and the biotype cannot separate them. **This decides whether 0.883
+  generalises.**
+- **C15 — routing is junction-biased +0.119 in NMD transcripts and −0.189 in controls.** The
+  model cannot see labels, so sequence carries a 0.31 gap. **Design it expecting a
+  confound** — first cut is whether it survives matching the groups on 5′UTR architecture.
 - **Whether the model is a single junction detector.** n = 49 against a pre-registered floor
-  of 50. Needs pool-scale forward passes.
-- **C15 — why routing is junction-biased in NMD transcripts (+0.119) and anti-biased in
-  controls (−0.189).** The model cannot see labels, so sequence carries a 0.31 gap and
-  neither window has a mechanism. **The most interesting open item.**
-- **Whether the composition signal is an encoder artifact.** No valid instrumental control
-  exists for a scale-free statistic.
-- **Anything about motifs.** The region caller's criterion points the wrong way.
-- **Any biology claim. Zero.** The +4 stop-context bias is real in the data and absent from
-  what the model reads — the only candidate, unworked.
+  of 50.
+- **Anything about motifs.** The region caller's success criterion points the wrong way.
+- **Any biology claim except §2's positional result.** The +4 stop-context bias is real in
+  the data and absent from what the model reads — the only other candidate, unworked.
 
-## Retracted, with reasons kept
-
-| | why |
-|---|---|
-| keto ratio **1.148×** | no reproducible producer; the cited script cannot emit that row |
-| recovery **0.941** | `astype(bool)` on a −1 sentinel → 0.885 → 0.883 against GENCODE |
-| "selects premature-stop frames" | never held: −0.050 marginal, −0.070 holding length and position |
-| "separation given back by the objective" as a **global** claim | true only among short candidates |
-| capture sensitivity is **sparse** upstream | diffuse — 32 tiles within ~6% (job 8900420) |
-| **C16 — routing junction-seeking at matched length** | held length, not position; holding both gives −0.070, and the figure is below a no-model queue null. **C14 stands.** |
-
-**Six entries. Of those, four were caught by a reader outside the derivation asking what
-a sentence rested on** — 0.941 by an arithmetic ceiling, the marginal routing claim by a
-demand for the direct measurement, the objective sentence by "measured or argued?", the
-sparsity prediction by someone else's tiling. **One (C16) was caught by the author, using
-a rule a reader had proposed an hour earlier. One (1.148) surfaced from a cross-window
-discrepancy.** **None was caught by a check.**
-
----
-
-# Appendix — provenance and corrections
-
-*Separated from the narrative so the science reads clean. Nothing here is optional: it is
-what makes sections 1–6 checkable.*
-
-## The §3 table, and what it cost to get right
-
-*C14. Producer `model_c16_retraction.py`, **job 8900746**, candidate filter k ≥ 4 —
-the same population as job 8900685. An earlier version of this table quoted +0.452
-and −0.067, which came from a k ≥ 6 run in an uncommitted temp file; the producer
-now reports both filters so the difference is visible rather than resolved by
-preference, and the conclusion is identical under each. Internal check: the
-rank-residual partial agrees with the closed form at one covariate.*
-
-*Also (jobs 8900643, 8900685). The head's own aversion, `p_capture ~ junction count`
-−0.453, collapses to −0.009 holding length — that arm is entirely length.*
-
-*This paragraph asserted the opposite for forty minutes.* C16 claimed routing was
-junction-seeking at matched length (+0.442); it held length and not position, and is
-retracted. Kept visible because the retraction table alone would not have shown that
-the body of this document once said it.
-
-*Why holding length does not hold position, measured rather than argued:*
-`orf_start ~ orf_length` within transcript is only **−0.150** (n 4,815, |r| < 0.30 in 54.8%
-of transcripts). The two covariates are nearly free of each other, which is why holding
-either one alone leaves the other's channel fully intact.
-
-**The producer was missing.** The retraction was first run from an uncommitted temp file:
-the conclusion was committed, the script, runlog and job id were not. The interpretability
-window caught it and stated it exactly — **the retraction was less well-evidenced than the
-claim it retracted**, since C16 had a committed script, a runlog, a job id and predictions
-registered before the run. Fixed at `b76bef8`.
-
-**And that caused a number discrepancy.** The table read +0.452 while job 8900685 read
-+0.442 for what looked like the same quantity. Cause: candidate filters k ≥ 6 against
-k ≥ 4. Both are now reported by the producer; the conclusion is identical under each.
-
-    k >= 4   marginal -0.050   length +0.447   position -0.553   both -0.070
-    k >= 6   marginal -0.023   length +0.452   position -0.546   both -0.067
-
-## The same defect, four times, inside this document
-
-**A correction that reaches one part of a document and not another** is the failure this
-narrative exists to record, and it has now happened four times *in this narrative*:
-
-1. The C16 retraction reached the claim map and the retraction table but **not §3's body** —
-   for one commit the document asserted C16 and retracted it simultaneously.
-2. The `+0.362 / +0.400` marker was **removed during a rewrite**, against this document's own
-   instruction not to tidy markers.
-3. The retraction table's count was **wrong twice** — six rows described as "four of the
-   five" — until replaced with an explicit accounting, because a ratio drifts from its
-   contents.
-4. When the §3 table was corrected from k ≥ 6 to k ≥ 4 figures, **the prose beneath it kept
-   quoting the old ones** (−0.067, +0.452, −0.543) for one commit — and then **the
-   retraction table kept them for one commit more**, after the prose was fixed. One
-   correction, three locations, three separate passes.
-
-Each was caught by grepping for the *result* rather than trusting the edit. **None would
-have been caught by reading.**
-
-## Four things this document asserted and had to withdraw
-
-Beyond the retraction table: the C16 retraction initially **did not reach the prose** — for
-one commit §3 asserted C16 in its body and retracted it in its table, inside the commit
-performing the retraction. Caught by grepping for the result rather than trusting the
-commit. The marker on `+0.362 / +0.400` was **removed during a rewrite** against this
-document's own instruction not to tidy markers, and restored. The retraction table's own
-count was **wrong twice** — six rows described as "four of the five" — and is now an
-explicit accounting rather than a ratio, because a ratio drifts from its contents.
-
-## Who caught what
-
-Of the six retractions, four were caught by a reader outside the derivation, one by the
-author using a rule a reader had proposed an hour earlier, one from a cross-window
-discrepancy. **None was caught by a check.** That is the case for reading narratives the way
-analyses are read.
+*One instrument caveat travels with every level above. The ISM bank is stratified and no
+recovery producer applies `sampling_weight`. On the `nonsense_mediated_decay` row — where
+every headline number is scored — 98.4% of transcripts sit at weight ≈1 and the worst-case
+shift is +0.095, adversarially; realistically it is an order smaller. On the `protein_coding`
+contrast row it is +0.295, so the −0.253 above needs weights before it is quoted. C22,
+`model_reweight_exposure.py`.*

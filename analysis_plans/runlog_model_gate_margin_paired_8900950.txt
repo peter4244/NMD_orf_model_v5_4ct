@@ -1,0 +1,39 @@
+=== code (sha256) ===
+3f9c87eec4d56ebe7e83dabc4d75ee612b48fefe8fe4fa62d29796940f64a6b7  analysis_plans/model_gate_margin_paired.py
+
+==============================================================================
+IS THE QUEUE'S MARGIN OVER PURE POSITION REAL?
+==============================================================================
+bank results_ism_v6/bank_interp_s100.h5   bootstrap 10,000 gene-clustered replicates   seed 20260802
+
+  NMD_biotype   n = 1,099 transcripts in 915 genes
+    comparison                  diff      b      c   McNemar p     gene-clustered 95% CI
+    queue - position          +0.091    241    141    3.52e-07          [+0.053, +0.129]  *
+    queue - head              +0.489    546      9   2.22e-148          [+0.455, +0.522]  *
+    queue - length            +0.333    407     41    6.97e-77          [+0.298, +0.367]  *
+    posterior - queue         +0.090    107      8    3.07e-23          [+0.071, +0.109]  *
+
+  protein_coding   n = 1,285 transcripts in 1,165 genes
+    comparison                  diff      b      c   McNemar p     gene-clustered 95% CI
+    queue - position          +0.351    478     27   8.93e-108          [+0.321, +0.381]  *
+    queue - head              +0.540    735     41   1.66e-165          [+0.508, +0.573]  *
+    queue - length            -0.114     33    179    1.81e-25          [-0.136, -0.092]  *
+    posterior - queue         -0.253      2    327    9.93e-95          [-0.278, -0.228]  *
+
+  * = gene-clustered interval excludes zero
+
+==============================================================================
+THE REGISTERED DECISION, on NMD_biotype
+==============================================================================
+  queue - position = +0.091   gene-clustered 95% CI [+0.053, +0.129]
+  discordant transcripts: queue-only 241, position-only 141
+  -> M1. The queue beats pure position, and the honest word is 'modest',
+     not 'far better'. Section 1 states two different margins.
+
+==============================================================================
+THE 0.304 / 0.304 COINCIDENCE, as raw counts
+==============================================================================
+  NMD_biotype           334 / 1099   = 0.3039
+  protein_coding        391 / 1285   = 0.3043
+  Equal to three decimals is a coincidence of two ratios, not a shared count.
+=== exit: 0 ===
