@@ -77,6 +77,7 @@ def main():
         psel = f["p_select"][:]
         is_ref = f["cand_is_ref_cds"][:]
         o_start = f["cand_orf_start"][:]
+        o_end = f["cand_orf_end"][:]
         ejc = f["cand_n_downstream_ejc"][:]
         koz = f["cand_kozak_score"][:]
         labels = f["labels"][:]
@@ -84,6 +85,7 @@ def main():
         ck = f.attrs.get("checkpoint", "?")
 
     r_part, r_cp, r_ep = [], [], []
+    r_len, r_part_len, r_short, r_long = [], [], [], []
     cv_dec, dec_at_sel, dec_max = [], [], []
     hit_sel = hit_cap = hit_5p = 0
     n_used = n_cand_used = 0
@@ -128,6 +130,26 @@ def main():
                 r_part.append(float((rce - rcp * rep) / den))
                 r_cp.append(rcp)
                 r_ep.append(rep)
+
+        # IS THE ROUTE ORF LENGTH? At a matched START, more downstream junctions
+        # means an earlier stop means a SHORTER ORF -- and the ATG window carries
+        # 100 nt INTO the ORF, so a short ORF's in-window portion is fill-limited
+        # or post-stop rather than coding. If capture is reading coding-likeness,
+        # holding LENGTH should collapse the capture-EJC association, and capture
+        # should track length directly.
+        len_ = (o_end[lo:lo + k] - o_start[lo:lo + k]).astype(float)
+        r_len.append(spearman(pc, len_))
+        rcl, rel = spearman(pc, len_), spearman(e_, len_)
+        if all(np.isfinite([rce, rcl, rel])) and abs(rcl) < 1 and abs(rel) < 1:
+            den2 = np.sqrt((1 - rcl ** 2) * (1 - rel ** 2))
+            if den2 > 1e-9:
+                r_part_len.append(float((rce - rcl * rel) / den2))
+        # the 100 nt prediction: strong among ORFs shorter than the in-window
+        # portion, weak among ORFs longer than it, where the window is coding
+        # either way
+        for band, acc in ((len_ <= 100, r_short), (len_ > 100, r_long)):
+            if band.sum() >= 3:
+                acc.append(spearman(pc[band], e_[band]))
 
         # DOES DECAY DISCRIMINATE AMONG CANDIDATES AT ALL? If d_k is flat, decay
         # cannot be carrying selection; if it is sharp and low off the chosen
@@ -211,6 +233,21 @@ def main():
     print("    If the raw association collapses here, it is POSITION, which is")
     print("    what the architecture predicts. If it survives, capture is")
     print("    tracking junction structure by some route we have not found.")
+
+    def med(x):
+        x = np.array(x); x = x[np.isfinite(x)]
+        return (np.median(x), len(x)) if len(x) else (np.nan, 0)
+    m1, n1 = med(r_len); m2, n2 = med(r_part_len)
+    m3, n3 = med(r_short); m4, n4 = med(r_long)
+    print("\n  IS THE ROUTE ORF LENGTH?")
+    print(f"    capture ~ ORF length                 median {m1:+.3f}  n {n1:,}")
+    print(f"    capture ~ EJC | ORF LENGTH held      median {m2:+.3f}  n {n2:,}")
+    print(f"      (vs raw -0.460 and position-held -0.582; if length is the")
+    print(f"       route this collapses toward zero)")
+    print(f"    capture ~ EJC, ORFs <= 100 nt        median {m3:+.3f}  n {n3:,}")
+    print(f"    capture ~ EJC, ORFs >  100 nt        median {m4:+.3f}  n {n4:,}")
+    print("      the ATG window carries 100 nt into the ORF, so a coding-likeness")
+    print("      account predicts strong in the first band and weak in the second")
 
     print("\n" + "=" * 70)
     print("Q4  DOES DECAY DISCRIMINATE AMONG CANDIDATES?")

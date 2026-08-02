@@ -1,5 +1,5 @@
 === code (sha256) ===
-55638aac9341b8dc6cbd0f0abd270fbdef376fafafe120a4193c4b94301b25a9  analysis_plans/model_capture_premise.py
+84b08051ae8bfe02d54a2bd5a192a5187b11c982de5314c684004f47dc912578  analysis_plans/model_capture_premise.py
 
 BANK results_ism_v6/bank_interp_s100.h5
 checkpoint runs/interp_c32_b8_s100/best.pt
@@ -44,6 +44,16 @@ Q3  IS CAPTURE BLIND TO THE STRUCTURAL BLOCK, ON REAL DATA?
     If the raw association collapses here, it is POSITION, which is
     what the architecture predicts. If it survives, capture is
     tracking junction structure by some route we have not found.
+
+  IS THE ROUTE ORF LENGTH?
+    capture ~ ORF length                 median +0.760  n 4,917
+    capture ~ EJC | ORF LENGTH held      median -0.009  n 4,695
+      (vs raw -0.460 and position-held -0.582; if length is the
+       route this collapses toward zero)
+    capture ~ EJC, ORFs <= 100 nt        median +0.176  n 4,207
+    capture ~ EJC, ORFs >  100 nt        median -0.490  n 4,477
+      the ATG window carries 100 nt into the ORF, so a coding-likeness
+      account predicts strong in the first band and weak in the second
 
 ======================================================================
 Q4  DOES DECAY DISCRIMINATE AMONG CANDIDATES?
