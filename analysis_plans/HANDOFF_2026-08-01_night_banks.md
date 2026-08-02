@@ -215,6 +215,31 @@ cluster directory, which is a second clobbering channel entirely outside git.
 Also adopted: **stage explicit paths, never `git add -A`.** That is the fix for the
 thing that actually happened.
 
+## The dead-perturbation rate is not hardware-dependent — tested, not argued
+
+The interpretability window's pilot found **0** exact zeros inside ATG windows; my
+300-transcript random draw off the GPU banks found **5.7%** of zeros inside. Their
+leading hypothesis was CPU against GPU: an exact zero in `vals_capture` needs the
+encoder output bitwise unchanged, so accumulation order could plausibly change the
+rate. If true, a liveness gate specified per (isoform, position, operator) would not
+be reproducible off this cluster.
+
+**Controlled test, same three transcripts, same seed, CPU build against GPU build:**
+
+    transcript                    exact zeros CPU/GPU   inside-ATG zeros CPU/GPU
+    ENSG00000000457.15.novel6         501 / 501                 0 / 0
+    ENSG00000000457.15.novel8         501 / 501                 0 / 0
+    ENSG00000001497.19.novel1         592 / 592                 0 / 0
+
+Identical. `base_logit` agrees to 1.2e-07 across machines, confirming the same
+weights and that inter-machine float noise is far too small to flip a dead
+perturbation. **The hypothesis is refuted and the gate is reproducible.**
+
+The variable is the **transcript**, not the machine: 5.7% on a random draw, 0 on a
+deliberately short draw, 0 on these three. Which transcripts carry inside-ATG dead
+perturbations, and why, is open — but it is a property of the data, and any gate
+built on it must be characterised across transcripts rather than assumed uniform.
+
 ## Two checks, not a taxonomy
 
 Both windows kept making errors today. Sorted by what would have caught them, not
