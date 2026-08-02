@@ -149,6 +149,14 @@ argparse exposes no window options.
 whether item 3's leak is causal — requires editing source and rebuilding tensors. We
 designed such a test today and had to abandon it for this reason.
 
+**And the existing sweep checkpoints cannot substitute**, which was established by
+parameter count rather than by naming: the sweep checkpoints are 453,130 B against v5
+production's 453,242 B and the v6 interpretability checkpoint's **281,978 B**. They are a
+different *architecture*, not a different window on the same model, so comparing across
+them varies builder, candidate set and architecture at once. Two windows reached that
+conclusion independently — one from the absent tensors and the argparse surface, one from
+the constants — and **neither inference was evidence until someone weighed the files.**
+
 **What a retrain should do.** Parameterise them, record them in the tensor attrs (which it
 already does), and keep at least one alternative-geometry tensor so leak questions are
 answerable without a rebuild.

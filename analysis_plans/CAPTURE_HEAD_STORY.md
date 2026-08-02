@@ -193,7 +193,9 @@ constants, and its argparse exposes no window parameter, so **every tensor the
 current builder produces has the same extent**. There is nothing to compare even in
 principle.
 
-**⇒ A DESIGN REQUIREMENT FOR THE DEFERRED RETRAIN, not a dead experiment.** Pete has
+**⇒ A DESIGN REQUIREMENT FOR THE DEFERRED RETRAIN, not a dead experiment.**
+*Filed as item 7 of [`RETRAIN_ARCHITECTURE_CHANGES.md`](../RETRAIN_ARCHITECTURE_CHANGES.md), which is the single copy of the retrain list and is pointed at from `03_train.py`, `train_v6.py` and `CLAUDE.md`. Keep the reasoning here; keep the requirement there.*
+ Pete has
 deferred retraining and re-architecture behind infrastructure. **If that retrain
 varies the downstream extent across even two settings, this test comes free** — and
 it is the only way to convert the geometric account from "the boundary lands at
