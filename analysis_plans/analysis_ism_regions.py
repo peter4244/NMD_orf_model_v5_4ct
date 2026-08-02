@@ -159,6 +159,7 @@ def load_h5(path):
                             spans=sp,
                             orf_start=int(c_start[lo + k]),
                             orf_end=int(c_end[lo + k]),
+                            anchor_type=anchor_type, cell=cell[i],
                             base_logit=float(base[i]), weight=float(wt[i])))
     return out
 
@@ -268,7 +269,7 @@ def load_shards(shard_dir, pool):
         spans = z["spans"]
         if k >= len(spans):
             continue
-        out.append(dict(iso=iso, k=k,
+        out.append(dict(iso=iso, k=k, anchor_type="reference", cell="",
                         vals=z["vals"], cap=z["vals_capture"],
                         dec=z["vals_decay"], obs=z["obs"], valid=z["valid"],
                         floor=z["chunk_offset"], fill=z["fill_count"],
@@ -290,6 +291,14 @@ def main():
                     help="vals = the transcript logit; dec = the decay branch")
     ap.add_argument("--fold", type=float, default=10.0,
                     help="elevation threshold, as a fold over the transcript median")
+    ap.add_argument("--anchor", default="reference",
+                    choices=["reference", "model", "all"],
+                    help="which transcripts to use. 'reference' is the primary: "
+                         "offsets are relative to the annotated ORF. 'model' uses "
+                         "the highest-mass candidate for transcripts lacking one, "
+                         "which keeps the mechanism cell whole but makes the "
+                         "coordinate system the model's own choice. Never pool "
+                         "them without saying so.")
     ap.add_argument("--seed", type=int, default=20260801)
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
@@ -301,6 +310,15 @@ def main():
     recs = load_bank(paths[0], pool)
     if not recs:
         sys.exit(f"no usable transcripts in {paths[0]}")
+
+    n_ref = sum(r["anchor_type"] == "reference" for r in recs)
+    print(f"anchors: {n_ref:,} reference, {len(recs) - n_ref:,} model-selected "
+          f"(no annotated ORF in the pool)")
+    if args.anchor != "all":
+        recs = [r for r in recs if r["anchor_type"] == args.anchor]
+        print(f"  --anchor {args.anchor}: {len(recs):,} kept")
+    if not recs:
+        sys.exit("no transcripts under this anchor choice")
 
     key = {"vals": "vals", "cap": "cap", "dec": "dec"}[args.column]
     name = {"vals": "the transcript logit", "cap": "the capture branch",
