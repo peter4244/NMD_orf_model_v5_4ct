@@ -294,14 +294,31 @@ def kmer_enrichment(recs, key, top_frac, k=5, by_region=False):
 
 
 def kmer_table(hi_c, bg_c, k, min_count=50):
-    """log2 enrichment per k-mer, with the counts it rests on."""
+    """log2 enrichment per k-mer, with the counts it rests on.
+
+    ITERATES THE BACKGROUND, NOT THE FOREGROUND. Walking `hi_c` drops every k-mer
+    with zero elevated occurrences -- which is precisely the most depleted end of
+    the distribution, so the depleted tail was truncated exactly where it was most
+    informative. The reported floor was not the most depleted k-mer, only the most
+    depleted one that happened to occur at least twice. That mattered here because
+    "GC-rich k-mers are depleted" was half the argument for reading the enriched
+    end as AU-rich.
+
+    SYMMETRIC HALF-COUNT, not add-one-to-the-foreground. A prior applied to one
+    side only is a large one-sided bias when the foreground is small -- the model
+    window measured it turning the most depleted k-mer of a toy into +1.00. Half a
+    count on both sides is defined at zero and shifts nothing at large counts.
+    """
     H, B = sum(hi_c.values()), sum(bg_c.values())
+    n_k = 4 ** k
     rows = []
-    for code, nh in hi_c.items():
-        nb = bg_c.get(code, 0)
+    for code, nb in bg_c.items():
         if nb < min_count:
             continue
-        rows.append((code, nh, nb, np.log2((nh / H) / (nb / B))))
+        nh = hi_c.get(code, 0)
+        rows.append((code, nh, nb,
+                     np.log2(((nh + 0.5) / (H + 0.5 * n_k))
+                             / ((nb + 0.5) / (B + 0.5 * n_k)))))
     rows.sort(key=lambda t: -t[3])
     return rows, H, B
 
