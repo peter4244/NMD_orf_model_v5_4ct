@@ -101,6 +101,32 @@ ones. **The head fails precisely where initiation biology says context should de
 
 ## 3. What the picker is actually selecting for
 
+**Length, and position — in that order, and neither is what biology would nominate.**
+
+**The head selects for ORF length, at +0.760** (C8, job 8899132) — the strongest single
+association measured anywhere in this document. Among candidates under 200 nt it is +0.429,
+**seven times** the Kozak association. §2 is the same finding from the sequence side: the
+head fails precisely where initiation context should decide.
+
+**Part of that is our own encoding, not gene-finding.** The ATG window fills to
+`min(100, length/2)`, so for any ORF shorter than 200 nt — 69% of candidates — **where the
+fill stops encodes ORF length exactly** (C10, retrain item 3). How much of +0.760 is the
+model reading sequence and how much is it reading our boundary is not separated.
+
+**The queue adds position**, mechanically rather than by preference: candidates are ordered
+5′→3′ and each one's survival is discounted by everything upstream. On GENCODE's NMD call
+the most 5′ candidate *alone* recovers the decay-causing frame **0.702** of the time (§1),
+so ordering carries most of what the picker achieves.
+
+`[unclaimed]` **`p_select ~ length` has never been measured.** Both positive numbers above
+are `p_capture` — the head — and this section's subject is the product. Nothing establishes
+that the *picker* selects for length; it is inferred from the head plus the queue's
+construction. **This is the gap that makes the section read as negative**, and it is the
+cheapest thing outstanding: the same conditioning structure as the table below, on length
+instead of junction count.
+
+**What it is not selecting for.**
+
 | `p_select ~ junction count`, conditioning on | median |
 |---|---|
 | nothing (marginal) | **−0.050** |
