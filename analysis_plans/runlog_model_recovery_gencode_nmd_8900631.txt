@@ -1,0 +1,22 @@
+=== code (sha256) ===
+4d7240594ef7b99de07f3b0df63e91b9df0180f0cecfb925fefe35dde0b5abc9  analysis_plans/model_recovery_gencode_nmd.py
+
+==========================================================================
+RECOVERY AGAINST GENCODE BIOTYPE -- no EJC rule in the target definition
+==========================================================================
+  GENCODE biotype           n    prior  posterior  post-prior
+  NMD_biotype            1099    0.793      0.883      +0.090
+  protein_coding         1285    0.844      0.591      -0.253
+
+  posterior helps on NMD-biotype: +0.090
+  posterior helps on protein_coding: -0.253
+  the decay-seeking-correction claim predicts + on the first, - on the second
+
+==========================================================================
+HOW GOOD WAS THE STRUCTURAL PROXY?
+==========================================================================
+                        proxy says PTC-bearing   proxy says not
+  GENCODE NMD biotype                  1,099                 0
+  GENCODE protein_cod                     58             1,227
+  agreement 0.976   proxy precision 0.950   proxy recall 1.000
+=== exit: 0 ===

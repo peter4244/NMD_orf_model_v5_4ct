@@ -140,10 +140,37 @@ never the right cast on a flag column here.** These columns use `-1` (h5) and `N
 a wrong benchmark and two wrong population figures, and neither was caught by any
 check I ran — it was caught by an arithmetic ceiling someone else supplied.
 
-*Circularity bound, per field 5:* defining the target as "annotated frame with a
-downstream EJC" uses the EJC rule to build a benchmark that partly tests whether
-the model uses the EJC rule. Annotation-derived rather than model-derived, so not
-fatal — but it bounds what a positive licenses.
+### ⇒ Repeated against GENCODE's own NMD biotype, and the circularity did not bite
+
+*Pete asked whether we had used GENCODE-encoded NMD as the gold standard. We had
+not — the target above is a structural proxy built with the EJC rule, which is
+circular against a benchmark that partly tests whether the model uses that rule.*
+
+GENCODE `transcript_type` is a curated call made independently of anything we
+compute. Mapped from `gencode.v49.primary_assembly.annotation.gtf.gz`: **2,645 of
+4,999 bank transcripts carry GENCODE IDs and all 2,645 matched**, giving **1,125
+`nonsense_mediated_decay`** and **1,332 `protein_coding`**. Job 8900631.
+
+| GENCODE biotype | n | prior | posterior | posterior − prior |
+|---|---|---|---|---|
+| **`nonsense_mediated_decay`** | 1,099 | 0.793 | **0.883** | **+0.090** |
+| `protein_coding` | 1,285 | 0.844 | 0.591 | **−0.253** |
+
+**The decay-seeking correction is confirmed with no EJC rule in the target
+definition.** The posterior helps where the annotated frame is decay-causing and
+hurts where it is not, exactly as registered.
+
+**And the structural proxy was very good:** precision 0.950, **recall 1.000**,
+agreement 0.976 against the curated biotype. All 1,099 NMD-biotype transcripts were
+captured; the only errors are 58 `protein_coding` transcripts wrongly included. The
+proxy result (0.821 / 0.885) and the gold-standard result (0.793 / 0.883) agree
+closely, so the earlier measurement is **validated rather than replaced**.
+
+*One asymmetry worth keeping:* the two definitions of "NMD substrate" are not the
+same object. Among GENCODE NMD-biotype transcripts our expression-derived label
+calls 916 NMD and 209 control; among `protein_coding` it calls 414 NMD. Curation
+and differential expression disagree on roughly a fifth of cases, and neither is
+wrong — they answer different questions.
 
 > **⇒ C2, C3 and C11 are hereby scoped to MAIN-ORF RECOVERY.** "A length heuristic
 > reproduces 97%" is a statement about finding the main ORF and says nothing about
