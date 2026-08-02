@@ -173,6 +173,7 @@ back **only among short candidates**, where the head must choose among uORFs.
 | "selects premature-stop frames" as a **marginal** claim | −0.050 (C14); reinstated within-length at +0.442 (C16) |
 | "separation given back by the objective" as a **global** claim | true only among short candidates |
 | capture sensitivity is **sparse** upstream | diffuse — 32 tiles within ~6% (job 8900420) |
+| **C16 — routing junction-seeking at matched length (+0.442)** | held length, not position; holding both gives −0.067. **C14 stands.** |
 
 **Four of the five were caught by a reader outside the derivation asking what a sentence
 rested on. None was caught by a check.**

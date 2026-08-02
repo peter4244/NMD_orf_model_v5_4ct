@@ -83,9 +83,35 @@ because the next person will hit the same shape.
 | C14 | **Routing itself is INDIFFERENT to junction structure.** `p_select ~ n_downstream_ejc` is **−0.050**. The head *avoids* junction-bearing candidates at **−0.453**; the 5′→3′ queue contributes **+0.403** and the two nearly cancel. The junction preference in the product comes from `d` (posterior ~ ejc **+0.101**), not from selection. | model | within transcript, n = 4,815 | job 8900643 |
 | C15 | **But routing is label-split**: `p_select ~ ejc` is **+0.119** in NMD transcripts and **−0.189** in controls, a 0.31 gap. The model cannot see labels, so this is carried by sequence and is **unexplained**. | model | n = 2,415 / 2,400 | job 8900643 |
 
-| C16 | **C14's "indifferent" is length masking a strong relationship.** Holding ORF length, `p_capture ~ ejc` collapses −0.453 → **−0.009** (the head's aversion IS length), but `p_select ~ ejc` **inverts and grows, −0.050 → +0.442**. **At matched length the model routes strongly toward junction-bearing candidates.** | model | within transcript, n = 4,682 / 4,672 | job 8900685 |
+| ~~C16~~ **RETRACTED — see below** | ~~C14's "indifferent" is length masking a strong relationship.~~ Holding ORF length, `p_capture ~ ejc` collapses −0.453 → **−0.009** (the head's aversion IS length), but `p_select ~ ejc` **inverts and grows, −0.050 → +0.442**. **At matched length the model routes strongly toward junction-bearing candidates.** | model | within transcript, n = 4,682 / 4,672 | job 8900685 |
 
-### C16 partially reverses C14, and the marginal number is the misleading one
+### ⚠ C16 IS RETRACTED. C14 STANDS. The marginal number was right.
+
+*Retracted within the hour, by the first use of the "name your weakest sentence"
+rule the conference had just adopted. I named C16 as most likely to fall and gave
+the reason — among same-length candidates, junction count still varies with
+POSITION, and the queue favours upstream. Then tested it.*
+
+    p_select ~ ejc   marginal                    -0.050
+                     holding LENGTH               +0.452
+                     holding POSITION             -0.543
+                     holding LENGTH AND POSITION  -0.067
+
+**Length and position each mask the other, in opposite directions.** Holding either
+alone manufactures a strong signal; holding both returns −0.067, which agrees with
+the marginal −0.050. **Both single partials were artifacts.**
+
+⇒ **Routing is indifferent to junction structure.** C14's marginal finding was
+correct and my correction to it was the error. Pete's founding hypothesis does not
+hold at the routing step under any conditioning; the junction preference enters at
+the decay multiplication.
+
+*The methodological point, which is the durable part:* I argued that a length
+partial was legitimate here because the question was "are these two arms the same
+relationship." **The argument was sound and the conclusion still wrong**, because I
+held one confounder and not the other. Pete had warned twice about length partials.
+
+### C16's original text, kept for the reason rather than the result
 
 The interpretability window proposed the −0.453/+0.403 cancellation was one ORF-length
 relationship seen twice with opposite sign. **Half right.** The head's arm is exactly
