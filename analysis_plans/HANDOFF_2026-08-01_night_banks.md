@@ -448,6 +448,38 @@ reported, the ordering is reported with it.
   "up to 100" matters: fill stops at the ORF midpoint, so short candidates get
   fewer, and that clip is the geometric leak §8.5 exists to control.
 
+## Where the banks live, and where they do not
+
+**The five banks exist ONLY on Explorer**, at
+`~/cc/nmd_orf_model_v5_4ct/results_ism_v6/bank_interp_s{100..500}.h5`, 652–703 MB
+each, 3.4 GB total. **Decision, 2026-08-01: do not copy them locally without a
+specific immediate use.** One authoritative location, so nobody has to work out
+which copy is the dataset — a partial local mirror is the artifact that later gets
+mistaken for the whole thing, or diverges from it with nothing to say when.
+
+Note the case that already exists and is worth not extending: `results_tensor_v6/`
+is present on **both** machines. That is the ambiguity this decision avoids
+repeating for the banks.
+
+There is also a hard reason beyond tidiness. **The laptop has 8 GB of RAM.** One
+bank with its dense arrays loaded is 3.9 GB; a cross-seed statistic over five seeds
+needs `vals` and `vals_capture` resident at 7.9 GB plus a stacked copy. Local
+cross-seed analysis is not slow, it is impossible.
+
+So: **every real computation on the banks runs on Explorer.** `qc_ism_banks.py` is
+cluster-only by construction — it uses `f["vals"][:]`, which loads 786 MB per array
+— and that is correct rather than a defect to fix.
+
+A related regime change for anyone moving from the tensor to a bank: the tensor is
+478 MB and comfortable in memory; a bank is 690 MB on disk and 3.9 GB loaded. Code
+that was fine against the tensor may not be against a bank. `h5py` slices lazily —
+`[:]` is what defeats it.
+
+**Access, as of 2026-08-01:** Explorer approved for 10 hours (to ~09:00 on
+2026-08-02) for work analyzing the ISM banks. Not for the §8.5 test read, not for
+training or tensor work, and not after it expires. Ask again for those. The standing
+rule otherwise remains: ask before every login.
+
 ## Practical
 
 - Local python: `~/miniforge3/envs/nmd_model_local/bin/python`.
