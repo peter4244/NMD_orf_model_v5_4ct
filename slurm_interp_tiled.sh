@@ -15,18 +15,23 @@
 # and with no model, that the shuffle preserves the fill mask, the junction bits,
 # everything outside the tile, and (for the shuffle arm) composition within it.
 # A perturbation that moved the fill mask would recreate the leak this tests for.
+#
+# ENV: the conda python by absolute path, matching slurm_model_a2_*.sh. An earlier
+# version of this script did `set -u` then `source ~/.bashrc`, and /etc/bashrc
+# references an unbound variable -- job 8900193, FAILED in 0:00. The working scripts
+# never sourced anything; copying their pattern rather than patching around mine.
 
-set -euo pipefail
+set -eo pipefail
 cd ~/cc/nmd_orf_model_v5_4ct
-source ~/.bashrc; conda activate nmd_model
+PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
 
 echo "=== code provenance (the sha is what ran, not the branch) ==="
 sha256sum analysis_plans/interp_tiled_perturbation.py
 echo "=== self-test, must pass before the model is loaded ==="
-python analysis_plans/interp_tiled_perturbation.py --self-test \
+$PY analysis_plans/interp_tiled_perturbation.py --self-test \
     --bank results_tensor_v6/nmd_tensor.h5
 echo "=== the measurement ==="
-python analysis_plans/interp_tiled_perturbation.py \
+$PY analysis_plans/interp_tiled_perturbation.py \
     --bank results_tensor_v6/nmd_tensor.h5 \
     --ckpt runs/interp_c32_b8_s100/best.pt \
     --sample 12000 --coarse 125 --fine 25 --seed 0
