@@ -36,7 +36,21 @@ central results from an independent implementation; agreements are stated where 
 
 ---
 
-## Finding A — elevated positions sit at a keto base in a uridine-rich, cytosine-poor window
+## Finding A — the decay branch is most sensitive at keto bases, in a uridine-rich, cytosine-poor window
+
+> **SCOPE: this is a claim about the model, not about transcript biology.** Retitled
+> 2026-08-02; it previously read "elevated positions sit at a keto base in a
+> uridine-rich, cytosine-poor window," which makes *sequence* the subject and invites
+> the reading that U-rich context matters for NMD. It does not say that. `vals_decay`
+> **is** the trained network's own sensitivity, so every number below describes what
+> this network responds to.
+>
+> The hazard is specific and was flagged by the results window: a claim built on
+> **cached** model output classifies as biology under the obvious test — does the
+> producer load weights? — because these probes read ISM banks rather than
+> checkpoints. Same shape as the A1 logit cache, where the number came from a `.npz`
+> and the model was nowhere in the call stack. The biology-shaped reading is the more
+> interesting one and therefore the easier one to drift into.
 
 ### What is measured
 

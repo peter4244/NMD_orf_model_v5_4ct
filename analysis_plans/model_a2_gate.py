@@ -121,6 +121,21 @@ question. Every negative reads "not detected by single-base ISM", never "not
 present" -- conv->ReLU is an m-of-n detector and a robust pattern is invisible to
 single substitutions by construction.
 
+
+SCOPE -- THIS PRODUCES CLAIMS ABOUT THE MODEL, NOT ABOUT BIOLOGY.
+This script reads ISM banks rather than a checkpoint, so it classifies as
+"biology" under the obvious test -- does the producer load weights? It is not.
+`vals_decay` IS the trained network's own sensitivity, so every number here
+describes what this network responds to, one step removed through a cache. Same
+shape as the A1 logit cache, where the number came from a .npz and the model was
+nowhere in the call stack.
+
+The keto ratio is NOT a statement about transcript sequence composition. It is a
+statement about what this trained network is sensitive to. Those are different
+claims and only the second is supported. Flagged by the results window,
+2026-08-02; enforcement sits here, upstream, where it is visible whether the
+model was touched.
+
 Run from the repo root.
 """
 
