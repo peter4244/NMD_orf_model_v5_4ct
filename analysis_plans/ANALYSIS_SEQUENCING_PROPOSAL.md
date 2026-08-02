@@ -79,6 +79,7 @@ Every field below was a real decision that a real implementation would otherwise
 | 10 | **decision rule**, with **all** outcomes fixed before the run | A2 had two outcomes written; the missing third was an interaction that would have been rounded up to a positive |
 | 11 | **licensed if positive / negative**, and **what a positive does not license** | every inflated claim this week dropped the qualifier rather than inventing a result |
 | 12 | **owner**, and whether it gets a second implementation | replication is for load-bearing survivors, not for everything |
+| 13 | **enumeration reported beside every statistic** — n units, n observations, n selected, seeds, exclusion handling, and the mask expression. **Never the ratio alone** | the keto ratio is 1.16× in one document and 1.148× in another, both internally consistent, because a table reporting only `.581` and `.501` makes every candidate cause invisible. Two windows, two days |
 
 **A row with an empty field is not ready to implement.** The implementing window sends it back rather
 than resolving the gap in code — a choice made inside an implementation is invisible to review, which
@@ -136,11 +137,31 @@ empty — no power exactly where the test has to discriminate. Each (transcript 
 contributes its own top fraction. This is the same one-name-two-sets shape as the global versus
 per-transcript top-1% pair that overlapped at Jaccard 0.24.
 
-**Cell size and the top fraction, jointly.** Mean 2,213 valid positions per transcript, so 8 bands
-gives ~277 per cell. Primary **top 10% within cell** (~28 positions), swept as (4 bands, 5%) and
-(16 bands, 20%) to hold the elevated count roughly constant while band resolution varies. A cell
-contributes only with **≥100 valid positions**; excluded cells are reported with their count and mass
-distribution, because that exclusion can be differential.
+**The dead cut is applied first, and the bands are quantiles of the LIVE positions.** Reading fixed
+2026-08-02 after the modeling window found that "8 global log-mass quantile bands" and "dead positions
+get their own band" do not compose. Dead (`mass` below ~1e-8, §5.5) is a **hard threshold, not a
+quantile** — `log(0)` is undefined and `mass` is float32 with a hard floor, so the band edges cannot
+be computed across it. Result: **9 cells per transcript** — 8 live quantile bands plus dead.
+
+> **⚠ THREE PARAMETERS BELOW ARE PROVISIONAL AND MUST BE FROZEN AFTER ONE MEASUREMENT.**
+> The band count, the top fraction and the ≥100 floor were chosen against **valid** positions as the
+> denominator. The reading just fixed bands over **live** positions, which is a smaller set — so the
+> three numbers were chosen against a denominator this reading removes. That is the
+> enumerate-what-you-divided-by error, in this specification's own arithmetic, found by the window
+> implementing it.
+>
+> **Required first:** the *distribution* of the dead fraction per transcript on one bank — not a
+> representative value, because the ≥100 floor bites in the tail and §5.5 puts the tail in the
+> mechanism cell (dead positions concentrate in long-5′UTR transcripts). A descriptive count on data
+> that already exists. **Band parameters freeze after it.**
+
+**Cell size and the top fraction, jointly — provisional.** At mean 2,213 *valid* positions per
+transcript, 8 bands would give ~277 per cell and **top 10% within cell** ~28 positions, swept as
+(4 bands, 5%) and (16 bands, 20%) to hold the elevated count roughly constant while band resolution
+varies; a cell contributing only with **≥100 valid positions**. **If dead is half of valid, the live
+cells are ~138 and ~14 elevated, and a materially larger share falls under the floor** — so these
+become (4, 20%) or similar. Excluded cells are reported with their count and mass distribution
+regardless, because that exclusion is differential by §5.5's own argument.
 
 **Background is within-cell.** Elevated positions are compared against the non-elevated positions of
 **the same transcript in the same band** — never a global background, which collapses the test back
@@ -165,10 +186,29 @@ a replication axis and folding it in conflates "the effect exists" with "the eff
 initializations." One stability floor only: the direction must hold in **≥4 of 5 seeds** for a
 positive to read as positive.
 
-**Reference points measured in-sample, per band.** The 1.148× keto ratio was measured over 11M
-positions; at ~28 elevated per cell the sampling floor is far larger. The null is a **within-cell
-permutation of the elevated label** at that cell's own n, and every ratio is reported against its own
-permutation floor and ceiling.
+**Reference points measured in-sample, per band.** The null is a **within-cell permutation of the
+elevated label** at that cell's own n, and every ratio is reported against its own permutation floor
+and ceiling. Whatever the unstratified reference turns out to be, it was measured over ~11M positions
+and the sampling floor at ~28 elevated per cell is far larger.
+
+> **⚠ THE UNSTRATIFIED KETO RATIO IS UNRESOLVED. Do not quote a number for it.**
+> `SEQUENCE_ENRICHMENT_APPROACH.md:849` says **1.16×** (elevated keto .581, background .501);
+> `FINDINGS_DECAY_SEQUENCE_2026-08-02.md:29` reconstructs to **1.148×** (elevated .576, background
+> .502). **Both are internally consistent** — the backgrounds sum correctly in each — so this is
+> neither a transcription slip nor rounding. Same statistic, different set: the fourth instance of
+> the error class, sitting in the two documents that govern this gate.
+>
+> **The gate is unaffected**, because the decision rule is the within-cell permutation percentile and
+> "retains X% of the unstratified ratio" was explicitly ruled out. It affects only what may be
+> *quoted*, including in figure legends. Resolution is the second implementation's first output, per
+> field 13 — the table with its enumeration beside it, never the ratio alone.
+>
+> **Candidate causes, in order of how much they move .581 to .576:** whether the background is all
+> valid positions of the elevated transcripts or of all transcripts; whether dead positions are in
+> the background (they cannot be elevated but they are valid, so including them shifts background
+> composition without touching the elevated set — **the same open question as the band construction,
+> so one measurement may answer both**); seed count; and whether the finite mask was
+> `isfinite.sum(1) == 3` or something that silently dropped rows.
 
 #### The decision rule, fixed before the run
 

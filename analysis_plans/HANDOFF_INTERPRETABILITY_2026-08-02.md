@@ -166,6 +166,12 @@ have shared the error. That review is now the standing order, not a courtesy.
   **NaN at the observed base**, so `np.isfinite(x).all(1)` is never true — use
   `.sum(1) == 3`; all three windows hit this. Fold-over-median degenerates on the 2.8% of transcripts
   whose median is below 1e-6 — **reach for rank statistics by default**.
+- **A coincidence that will mislead you.** The keto background and the GC background are numerically
+  identical in both existing measurements (.501/.501 and .502/.502). Not a bug: G+T equals G+C
+  exactly when T equals C, and C and T are within a thousandth of each other here. So "the background
+  is .50" is true of **two different quantities**, and anyone reconciling composition tables by eye
+  can match the wrong pair and conclude two sets agree when they do not. Found by the modeling
+  window while reconciling 1.16× against 1.148×.
 - **The other windows.** Model window (Maude) owns training, banks, and the second A2 implementation.
   A figures window (Larry) works in `nmd_lung_longread_2026`, which is **not** worktree-split and
   whose commit gate currently fails on six pre-existing artifacts.
