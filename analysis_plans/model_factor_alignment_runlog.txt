@@ -1,0 +1,29 @@
+=== code (sha256) ===
+b68e88f66cfca8ec843076beb1ff158b3579f50334f953f2cba3f49ba5e00182  analysis_plans/model_factor_alignment.py
+
+BANK results_ism_v6/bank_interp_s100.h5
+checkpoint runs/interp_c32_b8_s100/best.pt
+
+==========================================================================
+FACTOR ALIGNMENT -- within transcript, across candidates
+==========================================================================
+  p_select  ~  d        [THE ANSWER]           median +0.399   mean +0.305   n 4,917
+  p_capture ~  d        (queue removed)        median +0.091   mean +0.062   n 4,917
+  positive share 0.744   negative share 0.250
+
+==========================================================================
+WHAT THE ALIGNMENT DOES TO THE OUTPUT
+==========================================================================
+  actual mixture / independent-factor baseline
+    median 1.292   mean 1.552   n 4,917
+    deciles 0.223 0.648 1.292 2.103 3.120
+  1.0 = the factors are independent and the mixture is the product of
+  the marginals. Above 1 = routing and decay ALIGN and the model's
+  prediction is amplified by that alignment.
+
+==========================================================================
+BY LABEL
+==========================================================================
+  p_select ~ d, NMD      median +0.549   n 2,461
+  p_select ~ d, control  median +0.170   n 2,456
+=== exit: 0 ===
