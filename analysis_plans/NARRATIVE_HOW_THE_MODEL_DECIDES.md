@@ -67,7 +67,7 @@ that matters — finding the frame that causes decay — is 0.883** (§4).
 those 25 bases moves the head's logit more than anything else in its 900-base upstream
 window — 0.413 / 0.283 / 0.241 / 0.275 across ORF-length bands, **at the same position in
 every band**, in a tile 99.6% filled throughout and therefore carrying no fill confound.
-That position is where Kozak context sits. *Interpretability window, jobs 8900209, 8900420.*
+That position is where Kozak context sits. *Jobs 8900209, 8900420.*
 
 **On a diffuse background.** Across the upstream window, 32 consecutive tiles differ from
 their neighbours by ~6% and never by more than 50%. Capture's sensitivity there is
