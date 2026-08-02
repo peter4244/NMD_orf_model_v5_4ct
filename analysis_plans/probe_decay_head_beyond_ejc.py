@@ -194,14 +194,22 @@ def residualise(z, key):
     return out
 
 
-def pair_corr(mat, label, mask=None):
-    """Mean Pearson r over the 10 member pairs, on rows finite in every member."""
+def pair_corr(mat, label, mask=None, rank=False):
+    """Mean correlation over the 10 member pairs, on rows finite in every member.
+
+    `rank=True` gives Spearman. Both are reported everywhere because Pearson on a
+    residual is carried by its tails, and a handful of extreme candidates agreeing
+    across members would produce a large r with nothing behind it. If the two
+    disagree, the Pearson number is the one to distrust.
+    """
     ok = np.isfinite(mat).all(0)
     if mask is not None:
         ok &= mask
     if ok.sum() < 20:
         return float("nan"), int(ok.sum())
     x = mat[:, ok]
+    if rank:
+        x = np.stack([np.argsort(np.argsort(r)).astype(np.float64) for r in x])
     rs = [np.corrcoef(x[i], x[j])[0, 1]
           for i in range(len(x)) for j in range(i + 1, len(x))]
     return float(np.mean(rs)), int(ok.sum())
@@ -231,6 +239,7 @@ def main():
         # present" is about the count, and the two are not interchangeable.
         raw_all = f["structural_raw"][:]
         labels = f["labels"][:]
+        gene_all = np.array([s.decode() for s in f["gene_id"][:]])
         take = sp[sp.isoform_id.isin(row)]
         take = take.iloc[rng.permutation(len(take))[:args.n]]
         sl = [slice(int(offset[row[s]]), int(offset[row[s]]) + int(count[row[s]]))
@@ -243,6 +252,8 @@ def main():
         tx_i = np.concatenate([np.full(s.stop - s.start, i)
                                for i, s in enumerate(sl)])
         is_nmd = np.array([labels[row[s]] for s in take.isoform_id])
+        gene = np.array([gene_all[row[s]] for s in take.isoform_id])
+        tx_len_tx = take.tx_length.to_numpy()
 
     print(f"population   {args.split}, {len(take):,} transcripts drawn at "
           f"random from the stratified subset (seed {args.seed})")
@@ -289,7 +300,7 @@ def main():
     print("and the correlation can only lose shared structure -- if either moves the")
     print("other way, the strata are not nested and the run is void.\n")
     print(f"  {'conditioning on':<30} {'cells':>6} {'med':>5} {'R2':>6} "
-          f"{'r across members':>17} {'null':>7}")
+          f"{'pearson':>9} {'spearman':>9} {'null':>7}")
     prev_r2 = -np.inf
     for name, cols in rungs:
         key = strata(cols)
@@ -306,12 +317,14 @@ def main():
                     perm[i, m] = perm[i, rng.permutation(m)]
         r_res, n_res = pair_corr(resid, "")
         r_prm, _ = pair_corr(perm, "")
+        s_res, _ = pair_corr(resid, "", rank=True)
         assert r2 >= prev_r2 - 1e-9, (
             f"R2 fell from {prev_r2:.4f} to {r2:.4f} when covariates were ADDED; "
             f"nested strata cannot do that, so the stratification is wrong")
         prev_r2 = r2
         print(f"  {name:<30} {len(sizes):>6,} {int(np.median(sizes)):>5,} "
-              f"{r2:>6.3f} {r_res:>+17.4f} {r_prm:>+7.4f}   n {n_res:,}")
+              f"{r2:>6.3f} {r_res:>+9.4f} {s_res:>+9.4f} {r_prm:>+7.4f}   "
+              f"n {n_res:,}")
         rungs_last = (key, resid, perm)
 
     r_raw, _ = pair_corr(zd_m, "")
@@ -319,6 +332,46 @@ def main():
     print("\n  The null column is the same numbers with candidates permuted inside")
     print("  their own stratum. Agreement above it cannot be the covariates and")
     print("  cannot be one member's private solution.")
+
+    # ---- rung 4: conditioning that is not limited by cell counts ------------
+    # Quartile strata leave variation INSIDE each cell -- within one
+    # junction-distance quartile the distance still runs tens of nucleotides, and
+    # both members can read that finer distance off channel 4. Going finer thins
+    # cells until a within-cell residual is mostly small-sample noise, so the
+    # stratified ladder cannot settle it.
+    #
+    # So: predict z_d from every non-sequence covariate with a gradient-boosted
+    # regressor, OUT OF FOLD AND GROUPED BY GENE, and correlate what is left. The
+    # trees take interactions and continuous variables at their own resolution.
+    # Out-of-fold because an in-sample residual is shrunk by however much the
+    # model overfit, which would understate exactly the quantity of interest.
+    from sklearn.ensemble import HistGradientBoostingRegressor       # noqa: E402
+    from sklearn.model_selection import GroupKFold                   # noqa: E402
+
+    orf_len = (o_en - o_st).astype(np.float64)
+    X = np.column_stack([ejc_raw, up, dn, sup, sdn, d_junc, n_junc,
+                         orf_len, o_st.astype(np.float64),
+                         tx_len_tx[tx_i].astype(np.float64)])
+    groups = gene[tx_i]
+    oof = np.zeros_like(zd_m)
+    gkf = GroupKFold(n_splits=5)
+    for i in range(len(MEMBERS)):
+        for tr, te in gkf.split(X, zd_m[i], groups):
+            g = HistGradientBoostingRegressor(max_iter=300, random_state=0)
+            g.fit(X[tr], zd_m[i][tr])
+            oof[i, te] = g.predict(X[te])
+    res4 = zd_m - oof
+    r2_4 = float(np.mean([1 - (r ** 2).mean() / z.var()
+                          for r, z in zip(res4, zd_m)]))
+    perm4 = np.stack([r[rng.permutation(len(r))] for r in res4])
+    r_res4, n4 = pair_corr(res4, "")
+    r_prm4, _ = pair_corr(perm4, "")
+    s_res4, _ = pair_corr(res4, "", rank=True)
+    print(f"\n  {'4. + a GBM on all 10 covariates':<30} {'oof':>6} {'':>5} "
+          f"{r2_4:>6.3f} {r_res4:>+9.4f} {s_res4:>+9.4f} {r_prm4:>+7.4f}   "
+          f"n {n4:,}")
+    print("     covariates: EJC count, four fill extents, junction distance and")
+    print("     count, ORF length, ORF start, transcript length")
 
     key, resid, perm = rungs_last
     print("\n" + "=" * 78)

@@ -1,0 +1,38 @@
+§8.5 matched-pair initiation test — split=val  device=cpu
+  val_clean: 4,356 transcripts of 41,765
+  pool and tensor agree candidate-for-candidate on both ORF bounds
+  right-hand fill from window_spans; §8.5's stated formula disagrees on 281,349 of 796,584 candidates (35.32%)
+    window_spans is the authority — it is what built the tensor. The
+    formula omits the transcript-length clip, so it overstates fill
+    for candidates near the 3' end.
+  5 checkpoints:
+    b8_s100.pt: 90,100 candidates scored
+    b8_s200.pt: 90,100 candidates scored
+    b8_s300.pt: 90,100 candidates scored
+    b8_s400.pt: 90,100 candidates scored
+    b8_s500.pt: 90,100 candidates scored
+
+  pairs 538   genes 218   pairs per gene 2.47   reference candidates 477
+
+=== PRIMARY: p_capture prefers the annotated start ===
+  win rate                     0.5799
+  95% CI, genes resampled      [0.5066, 0.6486]   EXCLUDES 0.5
+  95% CI, pairs resampled      [0.5372, 0.6209]
+  design effect (width ratio)^2 2.88
+  per seed: 0.5929  0.5279  0.5948  0.5558  0.5335
+  THE CLAIM IS SUPPORTED — §8.5 requires the gene-clustered interval to exclude 0.5
+
+=== PRE-SPECIFIED SECONDARY: the direction split ===
+  A monotone positional preference must push one of these below 0.5.
+  reference UPSTREAM       0.5558   n 493
+  reference DOWNSTREAM     0.8444   n 45
+  BOTH above 0.5 — evidence no positional account can produce.
+
+=== PRE-SPECIFIED BASELINES, on the identical pairs ===
+  orf_length                   0.9535
+  right-hand window fill       0.5000
+  kozak_score                  0.5167
+  5' proximity (-orf_start)    0.9164
+  n_downstream_ejc             0.4665
+
+  329s
