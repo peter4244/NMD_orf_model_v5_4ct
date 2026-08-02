@@ -64,26 +64,38 @@ can be started from either direction. **The file is the single copy — add find
 - All output goes to `results_4ct/`
 - Original v5 project at `../nmd_orf_model_v5/` — do not modify
 
-## The standing hazard: position
+## The standing hazard: position and length are entangled
 
-**In this model, any candidate-level correlation is position until proven otherwise.**
+**No candidate-level correlation in this model is interpretable until position and ORF length are
+conditioned on jointly. Never read a single partial alone — each can be the other confounder
+leaking. Conditioning moves results in BOTH directions. Assume position is involved; never assume
+which way.**
 
-Approved by Pete 2026-08-02 after four instances in a single day:
+Approved by Pete 2026-08-02, **corrected the same day**: the first wording was *"any candidate-level
+correlation is position until proven otherwise"*, which is directionally wrong and was caught by
+the interpretability window before it had been read by anyone. Of the four instances, only one is a
+case where the answer was position:
 
-- **C7** — the capture/length association inverted when position was held.
-- **ATF4, 22.8%** — recovered as a position effect.
-- **C16** — routing "junction-seeking at matched length", +0.442. Holding length does not hold
-  position (`orf_start ~ orf_length` is only **−0.150**, n 4,815, |r| < 0.30 in 54.8% of
-  transcripts), so the length partial left the position channel intact and manufactured the signal.
-- **the queue-geometry null** — `p_select` is a rank product whose survival factor falls
-  monotonically with slot, and earlier slots carry more downstream junctions by construction. A
-  queue with **no model in it** scores **+0.334 raw / +0.568 holding length** against the model's
-  −0.050 / +0.442. Zero was the wrong reference.
+- **C7 — position was SUPPRESSING.** Holding start position fixed makes `capture ~ junction count`
+  **−0.582**, *stronger* than the raw −0.460. "Position does not mediate C6."
+- **C8 — length was the mediator**, not position: `capture ~ ORF length` +0.760, and holding length
+  collapses the junction association.
+- **ATF4, 22.8%** — position proposed as the route and **refuted** by measurement.
+- **C16 — the one case where a partial manufactured a signal.** "Junction-seeking at matched
+  length", +0.452, because holding length does not hold position: `orf_start ~ orf_length` is only
+  **−0.150** (n 4,815, |r| < 0.30 in 54.8% of transcripts). Holding both returns −0.067, agreeing
+  with the marginal −0.050.
+
+The lesson §3's own table teaches: **the two single partials were large (+0.452, −0.543) and both
+were artifacts; only the joint conditioning agreed with the marginal.**
 
 Candidates within one transcript span roughly two orders of magnitude in length — median
 within-transcript max/min **83.5×**, 9 nt against 894 nt — so *holding length* describes a regime
 the model never occupies. Prefer the **unconditional** comparison when asking what the model does;
 use a partial only to explain *why*, and never quote a partial as behaviour.
+
+**And zero is not the null** for a rank product, a monotone ordering or a normalised share. A queue
+with no model in it scores **+0.334 raw** against the model's **−0.050**.
 
 ## Multi-window operating rules
 
