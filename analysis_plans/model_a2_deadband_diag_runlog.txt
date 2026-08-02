@@ -1,0 +1,33 @@
+=== code (sha256) ===
+34bddd8db8fe542a041a2e2db43217f39ea001dd1b81d55d437ce71434cbd555  analysis_plans/model_a2_deadband_diag.py
+
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_plans/model_a2_deadband_diag.py:88: RuntimeWarning: All-NaN slice encountered
+  e = np.nanmax(np.abs(v), axis=1)
+BANK results_ism_v6/bank_interp_s100.h5   dead cut 1e-08   top 10%   floor >=100
+
+FACT 1 -- ARE DEAD VALUES EXACT ZEROS?
+  dead positions              606,774
+  exactly 0.0                 182,781   (30.12%)
+  => exact zeros make the top-k cut degenerate: every position ties,
+     the elevated set is the whole cell, and the k>=n guard drops it.
+
+FACT 2 -- HOW MANY DEAD CELLS CANNOT PRODUCE A NUMBER?
+  qualifying dead cells       850
+  degenerate (k >= n)         84   (9.9%)
+  tie fraction at the cut     deciles 0.000 0.001 0.003 0.007 1.000
+           in_orf  cells   283  degenerate   2.1%  median tie frac 0.002
+       3p_of_stop  cells   567  degenerate  13.8%  median tie frac 0.004
+
+FACT 3 -- IS THE KETO SIGNAL FLAT BELOW THE CUT, OR RISING?
+   mass decade   n_tx  keto elev   keto bg   ratio
+          1e-9    472      0.497     0.492   1.011
+         1e-10    342      0.507     0.495   1.025
+         1e-11    307      0.490     0.488   1.003
+         1e-12    194      0.512     0.485   1.055
+         1e-13    176      0.466     0.484   0.963
+         1e-14    138      0.476     0.477   0.998
+  flat across decades  -> encoder artifact; the same correlation is
+                          available to inflate the live bands
+  rising toward 1e-9   -> leakage of real signal past a threshold that
+                          is numerical, not physical; move the cut
+=== exit: 0 ===
