@@ -4,6 +4,31 @@ model_a2_gate.py — SEQ-A2, the second implementation.
 THE GATE. Is the keto composition signature at elevated positions a property of
 what the decay head reads, or of where the model routes?
 
+BOTH ANSWERS LOCATE THE SIGNAL; NEITHER DISSOLVES IT. Corrected 2026-08-02 on
+Pete's call, because the framing this file inherited was wrong and the wrongness
+would have propagated into how the result is written.
+
+Routing is a mechanism, not a nuisance. `P(NMD) = sum_k P(select k) * d_k`, so a
+substitution that matters because the model routes mass to that candidate
+genuinely matters -- the routing says WHERE the importance lives, not that it is
+illusory. The method document already forbids adjusting mass away on exactly this
+ground: it "asks what would matter if ribosomes distributed uniformly, which the
+model never computes."
+
+And routing is itself sequence-driven -- selection mass comes from start-codon
+context, Kozak strength and ORF structure. So sequence -> initiation -> routing ->
+importance is a sequence mechanism end to end. (Architectural reasoning, not
+measured here, and labelled as such.)
+
+  positive  TWO SEPARABLE CHANNELS. Routing locates importance, and within
+            equally-routed positions the decay head carries its own composition
+            preference on top of that.
+  negative  ONE CHANNEL, UPSTREAM. The sequence dependence acts through selection
+            rather than through decay-head reading. That is a localization result
+            and a more mechanistically specific one than a weak composition
+            preference would have been. It is NOT a null and must not be written
+            as one.
+
 This is the SECOND of two independent implementations. It is written against the
 interpretability window's row in `ANALYSIS_SEQUENCING_PROPOSAL.md` ("The
 specification, fixed 2026-08-02"), NOT against an independent reading of the
