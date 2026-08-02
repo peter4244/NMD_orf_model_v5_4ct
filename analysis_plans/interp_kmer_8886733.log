@@ -1,0 +1,521 @@
+script sha256: 993c4f68b6ed70b4d0b5cc26fb2a37fc55162848c295f66de5a11f5a709d3361  analysis_plans/analysis_ism_regions.py
+
+################ k=5, decay ################
+anchors: 3,422 reference, 1,577 model-selected (no annotated ORF in the pool)
+  --anchor reference: 3,422 kept
+3422 transcripts, effect column = the decay branch
+
+==============================================================================
+CHECK 1 OF SIX  Does it survive across independently trained members?
+
+  5 members, 4,999 transcripts in all of them
+
+  effect track, mean over member pairs, median over transcripts
+    pearson  +0.6116    spearman +0.7782
+
+  agreement on WHICH positions are elevated (top 1%), Jaccard
+    observed 0.1250    random placement 0.0000
+    a feature that does not clear the random line is one member's private solution
+
+==============================================================================
+Q1  Are there regions where the signal is clearly above baseline?
+
+  per-transcript effect distribution, 3422 transcripts
+    median position          3.060e-03
+    99th percentile          6.434e-02
+    largest position         1.267e-01
+    largest / median         35.1x   (range 4.8 to 384768000655360.0)
+    positions above floor    93.5%
+
+  So the answer to 'is anything elevated' is a fold, not a yes/no:
+  the strongest single position of a transcript runs 35x its own median.
+
+
+  EXCESS ACROSS THRESHOLDS — runs of >= 4, observed against the same count placed at random
+     top frac   elevated     runs  mean len   obs >=4  null >=4    ratio
+        0.001      7,879    7,529      1.05         0         0      n/a
+        0.002     15,644   14,154      1.11        24         0      inf
+        0.005     39,106   31,717      1.23       462         0      inf
+        0.010     78,273   56,675      1.38     1,865         0      inf
+        0.020    156,502   99,583      1.57     5,479         0      inf
+        0.050    391,325  199,605      1.96    19,039        50  380.78x
+    a ratio that holds across the sweep is an effect; one that appears at a single
+    threshold is that threshold
+  ARE THEY REGIONS OR SCATTERED BASES?  elevated = top 1% of each transcript's own positions,
+  against the same count placed at random in the same transcripts:
+
+    run length     observed     random
+    1                43,893     76,735
+    2                 9,337        763
+    3                 1,580          4
+    4                   769          0
+    5                   512          0
+    6                   152          0
+    7                   109          0
+    8                   113          0
+    9                    46          0
+    10                   28          0
+    >= 11               136          0
+
+    total elevated positions 78,273  in 56,675 runs (random: 77,502 runs)
+    mean run length  observed 1.38   random 1.01
+
+  ACROSS DISJOINT GENES — run structure by arm, each against its own null
+    arm              tx  elevated   runs  mean len   null  runs>=4   null
+    confirmation   1716    38,871 28,151      1.38   1.01      914      0
+    discovery      1706    39,402 28,524      1.38   1.01      951      0
+    a structure that holds in BOTH arms is a statement about transcripts;
+    one that holds only in discovery is a statement about the genes it was found on
+
+==============================================================================
+Q2  Where are they, relative to the start codon and the stop codon?
+
+  relative to the start codon, FILL-CONDITIONED — one transcript set across every offset
+    1414 transcripts cover -300 to +99
+     offset  mean fold   shifted   n tx   note
+        -30 15970628023.25 3612634994.34   1414   
+        -27 12531983379.63 3016100192.28   1414   
+        -33 10882905853.19 4541345029.96   1414   
+        -18 10873784631.11 2919592430.46   1414   FINAL POOLING BIN — flagged
+        -29 10841570072.98 2940265632.24   1414   
+        -64 10793566959.09 4616992408.11   1414   
+        -63 10070808371.10 3682542612.98   1414   
+        -24 9434743663.68 3066698465.75   1414   FINAL POOLING BIN — flagged
+    best unflagged offset -30: 15970628023.25 against shifted 3612634994.34 (+12357993028.91)
+
+  relative to the start codon, raw — the transcript set varies with offset
+    3417 transcripts cover -300 to +99
+     offset  mean fold   shifted   n tx   note
+       -107 26532786926.27 7354933264.06   2575   
+       -111 25849354247.60 8870836753.81   2544   
+       -101 25711293525.80 8270424265.63   2627   
+       -112 22166145091.41 15277932725.45   2534   
+       -113 21663205579.85 7305802016.41   2531   
+       -104 20105650324.49 6793019085.84   2602   
+       -103 19680661357.81 9897553929.81   2610   
+       -110 19517125020.40 8537500879.76   2556   
+    best unflagged offset -107: 26532786926.27 against shifted 7354933264.06 (+19177853662.21)
+
+  relative to the stop codon, FILL-CONDITIONED — one transcript set across every offset
+    2834 transcripts cover -300 to +300
+     offset  mean fold   shifted   n tx   note
+       +142 203482493172.33 59069074649.66   2834   
+       +129 201572693404.35 51386510927.71   2834   
+       +130 201349632782.56 46592810878.17   2834   
+       +249 200861705409.45 58822212567.43   2834   
+       +240 199487569276.56 57040049996.30   2834   
+       +139 199327553643.78 51666996602.45   2834   
+       +163 199299852255.26 60874818705.91   2834   
+       +254 193156377431.81 68023918915.69   2834   
+    best unflagged offset +142: 203482493172.33 against shifted 59069074649.66 (+144413418522.67)
+
+  relative to the stop codon, raw — the transcript set varies with offset
+    3417 transcripts cover -300 to +300
+     offset  mean fold   shifted   n tx   note
+       +240 210018074398.49 65891409968.99   3117   
+       +249 204033336670.24 63730026205.08   3109   
+       +129 192223761115.20 36074593891.75   3281   
+       +241 192170399594.85 70189518194.00   3116   
+       +247 190549315318.75 58681196581.97   3111   
+       +254 187915760840.69 64466787933.79   3105   
+       +244 186782151193.79 59719741476.20   3113   
+       +130 185608072392.16 43473796139.40   3281   
+    best unflagged offset +240: 210018074398.49 against shifted 65891409968.99 (+144126664429.50)
+
+
+==============================================================================
+Q2b Is the elevation a fill-boundary artifact?
+
+  ATG window: fold-elevation by distance from the nearest fill boundary,
+  excluding positions within 30 nt of the anchor so the two are not confounded
+      distance  mean fold         n
+          0-19 14030907156.15   129,666
+         20-39 10738769495.92   125,846
+         40-59 7157740575.31   121,574
+         60-79 7610267794.07    80,097
+         80-99 3942736901.84    50,371
+       100-119 2663303098.00    47,979
+       120-139 2976935490.21    64,688
+       140-159 3166323074.98    75,805
+       160-179 3173340743.80    66,996
+       180-199 1513171293.24   530,475
+
+  ATG window: fold-elevation by distance from the ANCHOR, reported separately
+      distance  mean fold         n
+          0-19 5845602912.87   131,978
+         20-39 7090104059.41   131,991
+         40-59 6591892866.08   127,930
+         60-79 8408156437.34   123,194
+         80-99 10487836495.56   117,909
+       100-119 17733522463.11    51,162
+       120-139 4765827115.12    47,946
+       140-159 1809391902.34    44,739
+       160-179 1254959462.81    42,079
+       180-199 2430842145.67   679,671
+
+  stop window: fold-elevation by distance from the nearest fill boundary,
+  excluding positions within 30 nt of the anchor so the two are not confounded
+      distance  mean fold         n
+          0-19 52054374145.69   135,043
+         20-39 32258081856.59   133,526
+         40-59 27786467643.97   131,702
+         60-79 30427336754.21   130,055
+         80-99 28041393927.30   129,199
+       100-119 36588272224.81   128,819
+       120-139 48475380342.90   127,137
+       140-159 32148250779.16   125,843
+       160-179 30434107712.47   124,514
+       180-199 73322742992.14 1,293,033
+
+  stop window: fold-elevation by distance from the ANCHOR, reported separately
+      distance  mean fold         n
+          0-19 30783334849.31   132,856
+         20-39 28735574896.91   135,596
+         40-59 34331725876.50   134,469
+         60-79 55372961828.38   132,267
+         80-99 43336423720.72   129,875
+       100-119 57372702906.84   127,377
+       120-139 86950827219.07   125,051
+       140-159 83991634017.94   121,857
+       160-179 74333244112.19   118,468
+       180-199 52578167284.76 1,508,579
+
+
+==============================================================================
+Q2c Does the downstream peak track the stop codon or the 3' fill edge?
+
+  3396 transcripts; downstream fill ends at offset 33 to 499 (median 499)
+
+  common search range +1..+499: 2737 of 3396 transcripts reach it (659 dropped, and they are the short ones)
+    every eligible transcript ends at 499 — no length contrast left to stratify on
+
+  common search range +1..+499: 2737 of 3396 transcripts reach it (659 dropped, and they are the short ones)
+    every eligible transcript ends at 499 — no length contrast left to stratify on
+
+  Both strata now search the same offsets. A peak at the same offset
+  in both is anchored on the stop codon; a peak that shifts with the
+  stratum's own fill extent is 3' UTR length.
+==============================================================================
+Q3a Is the signal base identity, or local GC?
+
+  positions       GC-neutral   GC-changing   neutral/changing
+  all              6.991e-04     1.085e-03               0.64
+  elevated         3.046e-02     4.815e-02               0.63
+
+  per transcript, at elevated positions only (3415 transcripts):
+    median ratio 0.54   quartiles 0.42 to 0.73
+    transcripts where the GC-neutral substitution is at least half the GC-changing one: 58%
+
+==============================================================================
+Q3  Do the elevated positions carry a sequence signature?
+
+  base at elevated positions, against all measured positions
+    base     elevated        all   enrichment
+    A           20.8%      25.1%        0.83x
+    C           21.3%      25.0%        0.85x
+    G           29.9%      26.1%        1.15x
+    T           27.9%      23.8%        1.17x
+
+  77,839 elevated positions with a full 9-mer context
+  most frequent contexts (centre base is the elevated one):
+    TTTT [T] TTTT   269
+    TTTT [G] TTTT   44
+    ATTT [T] TTTT   36
+    TTTT [G] TATT   33
+    CTTT [T] TTTT   29
+    TTTG [T] ATTT   27
+    TTTC [T] TTTT   26
+    AAAA [A] AAAA   26
+    distinct 9-mers 53,927 over 77,839 sites — some repetition, worth a larger sample
+
+==============================================================================
+Q4  What sequence sits under elevated positions? (5-mers)
+
+  78,078 elevated sites with full flanks, 7,810,303 background positions
+
+  kmer       n elevated  n background  log2 enr
+  TTTTT           1,071        21,158    +2.340
+  TTGTT             371         8,915    +2.058
+  TTTAT             389        10,282    +1.920
+  TATAT             237         6,421    +1.884
+  TTGAT             264         7,359    +1.843
+  TTGTA             217         6,190    +1.810
+  TAGAT             139         4,025    +1.788
+  TCGAT              53         1,537    +1.786
+  TTTAA             343        10,527    +1.705
+  TCGTT              51         1,582    +1.689
+  ...      
+  GCACG              12         3,666    -1.611
+  ATCCG               9         2,761    -1.617
+  GCTCG              12         4,109    -1.775
+  AGTCC              20         6,923    -1.791
+  TACGC               2         1,347    -2.751
+
+  ACROSS MEMBERS, on the k-mer enrichment rather than the positions
+    1,024 k-mers measured in every member
+    mean pairwise r of the enrichment vector  +0.7501
+    range +0.7144 to +0.8090
+
+    Compare against the position-level Jaccard above. High here with low
+    there is a motif the members agree on and place differently -- which is
+    what a variable-position binding preference looks like.
+
+################ k=6, decay ################
+anchors: 3,422 reference, 1,577 model-selected (no annotated ORF in the pool)
+  --anchor reference: 3,422 kept
+3422 transcripts, effect column = the decay branch
+
+==============================================================================
+CHECK 1 OF SIX  Does it survive across independently trained members?
+
+  5 members, 4,999 transcripts in all of them
+
+  effect track, mean over member pairs, median over transcripts
+    pearson  +0.6116    spearman +0.7782
+
+  agreement on WHICH positions are elevated (top 1%), Jaccard
+    observed 0.1250    random placement 0.0000
+    a feature that does not clear the random line is one member's private solution
+
+==============================================================================
+Q1  Are there regions where the signal is clearly above baseline?
+
+  per-transcript effect distribution, 3422 transcripts
+    median position          3.060e-03
+    99th percentile          6.434e-02
+    largest position         1.267e-01
+    largest / median         35.1x   (range 4.8 to 384768000655360.0)
+    positions above floor    93.5%
+
+  So the answer to 'is anything elevated' is a fold, not a yes/no:
+  the strongest single position of a transcript runs 35x its own median.
+
+
+  EXCESS ACROSS THRESHOLDS — runs of >= 4, observed against the same count placed at random
+     top frac   elevated     runs  mean len   obs >=4  null >=4    ratio
+        0.001      7,879    7,529      1.05         0         0      n/a
+        0.002     15,644   14,154      1.11        24         0      inf
+        0.005     39,106   31,717      1.23       462         0      inf
+        0.010     78,273   56,675      1.38     1,865         0      inf
+        0.020    156,502   99,583      1.57     5,479         0      inf
+        0.050    391,325  199,605      1.96    19,039        50  380.78x
+    a ratio that holds across the sweep is an effect; one that appears at a single
+    threshold is that threshold
+  ARE THEY REGIONS OR SCATTERED BASES?  elevated = top 1% of each transcript's own positions,
+  against the same count placed at random in the same transcripts:
+
+    run length     observed     random
+    1                43,893     76,735
+    2                 9,337        763
+    3                 1,580          4
+    4                   769          0
+    5                   512          0
+    6                   152          0
+    7                   109          0
+    8                   113          0
+    9                    46          0
+    10                   28          0
+    >= 11               136          0
+
+    total elevated positions 78,273  in 56,675 runs (random: 77,502 runs)
+    mean run length  observed 1.38   random 1.01
+
+  ACROSS DISJOINT GENES — run structure by arm, each against its own null
+    arm              tx  elevated   runs  mean len   null  runs>=4   null
+    confirmation   1716    38,871 28,151      1.38   1.01      914      0
+    discovery      1706    39,402 28,524      1.38   1.01      951      0
+    a structure that holds in BOTH arms is a statement about transcripts;
+    one that holds only in discovery is a statement about the genes it was found on
+
+==============================================================================
+Q2  Where are they, relative to the start codon and the stop codon?
+
+  relative to the start codon, FILL-CONDITIONED — one transcript set across every offset
+    1414 transcripts cover -300 to +99
+     offset  mean fold   shifted   n tx   note
+        -30 15970628023.25 3612634994.34   1414   
+        -27 12531983379.63 3016100192.28   1414   
+        -33 10882905853.19 4541345029.96   1414   
+        -18 10873784631.11 2919592430.46   1414   FINAL POOLING BIN — flagged
+        -29 10841570072.98 2940265632.24   1414   
+        -64 10793566959.09 4616992408.11   1414   
+        -63 10070808371.10 3682542612.98   1414   
+        -24 9434743663.68 3066698465.75   1414   FINAL POOLING BIN — flagged
+    best unflagged offset -30: 15970628023.25 against shifted 3612634994.34 (+12357993028.91)
+
+  relative to the start codon, raw — the transcript set varies with offset
+    3417 transcripts cover -300 to +99
+     offset  mean fold   shifted   n tx   note
+       -107 26532786926.27 7354933264.06   2575   
+       -111 25849354247.60 8870836753.81   2544   
+       -101 25711293525.80 8270424265.63   2627   
+       -112 22166145091.41 15277932725.45   2534   
+       -113 21663205579.85 7305802016.41   2531   
+       -104 20105650324.49 6793019085.84   2602   
+       -103 19680661357.81 9897553929.81   2610   
+       -110 19517125020.40 8537500879.76   2556   
+    best unflagged offset -107: 26532786926.27 against shifted 7354933264.06 (+19177853662.21)
+
+  relative to the stop codon, FILL-CONDITIONED — one transcript set across every offset
+    2834 transcripts cover -300 to +300
+     offset  mean fold   shifted   n tx   note
+       +142 203482493172.33 59069074649.66   2834   
+       +129 201572693404.35 51386510927.71   2834   
+       +130 201349632782.56 46592810878.17   2834   
+       +249 200861705409.45 58822212567.43   2834   
+       +240 199487569276.56 57040049996.30   2834   
+       +139 199327553643.78 51666996602.45   2834   
+       +163 199299852255.26 60874818705.91   2834   
+       +254 193156377431.81 68023918915.69   2834   
+    best unflagged offset +142: 203482493172.33 against shifted 59069074649.66 (+144413418522.67)
+
+  relative to the stop codon, raw — the transcript set varies with offset
+    3417 transcripts cover -300 to +300
+     offset  mean fold   shifted   n tx   note
+       +240 210018074398.49 65891409968.99   3117   
+       +249 204033336670.24 63730026205.08   3109   
+       +129 192223761115.20 36074593891.75   3281   
+       +241 192170399594.85 70189518194.00   3116   
+       +247 190549315318.75 58681196581.97   3111   
+       +254 187915760840.69 64466787933.79   3105   
+       +244 186782151193.79 59719741476.20   3113   
+       +130 185608072392.16 43473796139.40   3281   
+    best unflagged offset +240: 210018074398.49 against shifted 65891409968.99 (+144126664429.50)
+
+
+==============================================================================
+Q2b Is the elevation a fill-boundary artifact?
+
+  ATG window: fold-elevation by distance from the nearest fill boundary,
+  excluding positions within 30 nt of the anchor so the two are not confounded
+      distance  mean fold         n
+          0-19 14030907156.15   129,666
+         20-39 10738769495.92   125,846
+         40-59 7157740575.31   121,574
+         60-79 7610267794.07    80,097
+         80-99 3942736901.84    50,371
+       100-119 2663303098.00    47,979
+       120-139 2976935490.21    64,688
+       140-159 3166323074.98    75,805
+       160-179 3173340743.80    66,996
+       180-199 1513171293.24   530,475
+
+  ATG window: fold-elevation by distance from the ANCHOR, reported separately
+      distance  mean fold         n
+          0-19 5845602912.87   131,978
+         20-39 7090104059.41   131,991
+         40-59 6591892866.08   127,930
+         60-79 8408156437.34   123,194
+         80-99 10487836495.56   117,909
+       100-119 17733522463.11    51,162
+       120-139 4765827115.12    47,946
+       140-159 1809391902.34    44,739
+       160-179 1254959462.81    42,079
+       180-199 2430842145.67   679,671
+
+  stop window: fold-elevation by distance from the nearest fill boundary,
+  excluding positions within 30 nt of the anchor so the two are not confounded
+      distance  mean fold         n
+          0-19 52054374145.69   135,043
+         20-39 32258081856.59   133,526
+         40-59 27786467643.97   131,702
+         60-79 30427336754.21   130,055
+         80-99 28041393927.30   129,199
+       100-119 36588272224.81   128,819
+       120-139 48475380342.90   127,137
+       140-159 32148250779.16   125,843
+       160-179 30434107712.47   124,514
+       180-199 73322742992.14 1,293,033
+
+  stop window: fold-elevation by distance from the ANCHOR, reported separately
+      distance  mean fold         n
+          0-19 30783334849.31   132,856
+         20-39 28735574896.91   135,596
+         40-59 34331725876.50   134,469
+         60-79 55372961828.38   132,267
+         80-99 43336423720.72   129,875
+       100-119 57372702906.84   127,377
+       120-139 86950827219.07   125,051
+       140-159 83991634017.94   121,857
+       160-179 74333244112.19   118,468
+       180-199 52578167284.76 1,508,579
+
+
+==============================================================================
+Q2c Does the downstream peak track the stop codon or the 3' fill edge?
+
+  3396 transcripts; downstream fill ends at offset 33 to 499 (median 499)
+
+  common search range +1..+499: 2737 of 3396 transcripts reach it (659 dropped, and they are the short ones)
+    every eligible transcript ends at 499 — no length contrast left to stratify on
+
+  common search range +1..+499: 2737 of 3396 transcripts reach it (659 dropped, and they are the short ones)
+    every eligible transcript ends at 499 — no length contrast left to stratify on
+
+  Both strata now search the same offsets. A peak at the same offset
+  in both is anchored on the stop codon; a peak that shifts with the
+  stratum's own fill extent is 3' UTR length.
+==============================================================================
+Q3a Is the signal base identity, or local GC?
+
+  positions       GC-neutral   GC-changing   neutral/changing
+  all              6.991e-04     1.085e-03               0.64
+  elevated         3.046e-02     4.815e-02               0.63
+
+  per transcript, at elevated positions only (3415 transcripts):
+    median ratio 0.54   quartiles 0.42 to 0.73
+    transcripts where the GC-neutral substitution is at least half the GC-changing one: 58%
+
+==============================================================================
+Q3  Do the elevated positions carry a sequence signature?
+
+  base at elevated positions, against all measured positions
+    base     elevated        all   enrichment
+    A           20.8%      25.1%        0.83x
+    C           21.3%      25.0%        0.85x
+    G           29.9%      26.1%        1.15x
+    T           27.9%      23.8%        1.17x
+
+  77,839 elevated positions with a full 9-mer context
+  most frequent contexts (centre base is the elevated one):
+    TTTT [T] TTTT   269
+    TTTT [G] TTTT   44
+    ATTT [T] TTTT   36
+    TTTT [G] TATT   33
+    CTTT [T] TTTT   29
+    TTTG [T] ATTT   27
+    TTTC [T] TTTT   26
+    AAAA [A] AAAA   26
+    distinct 9-mers 53,927 over 77,839 sites — some repetition, worth a larger sample
+
+==============================================================================
+Q4  What sequence sits under elevated positions? (6-mers)
+
+  77,941 elevated sites with full flanks, 7,802,663 background positions
+
+  kmer       n elevated  n background  log2 enr
+  TTTTTT            619         9,078    +2.771
+  TTCGTT             25           461    +2.441
+  ATATAT            115         2,182    +2.399
+  TTTGTT            172         3,545    +2.280
+  TTTTAT            177         3,699    +2.260
+  TTTGTA            120         2,558    +2.232
+  TTTGAT            121         2,600    +2.220
+  TTAGAT             50         1,110    +2.173
+  ATTTTT            223         5,101    +2.130
+  ATTGAT             78         1,785    +2.129
+  ...      
+  CGAAGC              1           958    -3.258
+  GGGATA              1           971    -3.278
+  CACCGT              1           972    -3.279
+  CCGTGC              1         1,388    -3.793
+  AAGTCC              1         1,844    -4.203
+
+  ACROSS MEMBERS, on the k-mer enrichment rather than the positions
+    3,941 k-mers measured in every member
+    mean pairwise r of the enrichment vector  +0.6055
+    range +0.5603 to +0.6605
+
+    Compare against the position-level Jaccard above. High here with low
+    there is a motif the members agree on and place differently -- which is
+    what a variable-position binding preference looks like.
