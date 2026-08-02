@@ -233,7 +233,7 @@ def kmer_enrichment(recs, key, top_frac, k=5, by_region=False):
 
     WHY THIS AND NOT A POSITIONAL PROFILE. Sequence sensitivity and positional
     sensitivity are different things and need not co-occur -- an RBP binds at
-    variable locations and is characterised by its motif, not by where it sits.
+    variable locations and is characterized by its motif, not by where it sits.
     An offset-from-the-anchor profile can only find anchored features, so a
     floating motif fails it by construction and its absence there is not evidence.
 
@@ -465,7 +465,7 @@ def main():
                     help="vals = the transcript logit; dec = the decay branch")
     ap.add_argument("--fold", type=float, default=10.0,
                     help="elevation threshold as a fold over the transcript median. "
-                         "DEPRECATED as a headline: it is self-normalising for "
+                         "DEPRECATED as a headline: it is self-normalizing for "
                          "magnitude but NOT for tail shape, so it selected 1.7%% of "
                          "positions on a short-transcript pilot and 10.7%% on real "
                          "full-length banks. Kept only to reproduce older runs.")
@@ -504,7 +504,7 @@ def main():
     ap.add_argument("--kmer", type=int, default=5,
                     help="k for the sequence-signature analysis. Sequence and "
                          "positional sensitivity are separable -- an RBP binds at "
-                         "variable positions and is characterised by its motif -- "
+                         "variable positions and is characterized by its motif -- "
                          "so this asks what sits under elevated positions rather "
                          "than where they are.")
     ap.add_argument("--seed", type=int, default=20260801)

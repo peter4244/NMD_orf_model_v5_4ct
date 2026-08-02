@@ -147,7 +147,7 @@ def main():
         print()
 
     # ---- the floor in absolute terms, and what it censors -------------------
-    # `chunk_offset` is the WRONG normaliser and the table above shows why: the
+    # `chunk_offset` is the WRONG normalizer and the table above shows why: the
     # measured floor runs 1.5x it on one transcript and 20x on another, because
     # chunk_offset measures the distance to the batch-K base pass -- which is
     # large exactly when K is small -- and not the chunk-to-chunk variation the
