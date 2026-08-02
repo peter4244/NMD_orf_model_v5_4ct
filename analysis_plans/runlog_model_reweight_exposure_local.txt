@@ -1,0 +1,46 @@
+==========================================================================
+REWEIGHTING EXPOSURE, BY BENCHMARK ROW
+==========================================================================
+subset results_ism_v6/ism_subset.tsv
+biotype analysis_plans/gencode_biotype_bank.tsv
+
+bank 4,999 transcripts   weights sum to 41,765   (8.35x)
+
+--------------------------------------------------------------------------
+NMD_biotype   n = 1,125
+  stratum                                n    share   weight
+  NMD / main-ORF stop                  899    79.9%     1.07
+  control / main-ORF stop              208    18.5%     1.00
+  NMD / no annotation                   17     1.5%     7.59
+  control / no annotation                1     0.1%    18.01
+
+  weights within this group: 4 distinct, 1.00 to 18.01   cv 0.803
+  share of the group at weight <= 1.1: 98.4%
+  ⇒ WORST-CASE SHIFT FROM REWEIGHTING: +0.0954
+
+--------------------------------------------------------------------------
+protein_coding   n = 1,332
+  stratum                                n    share   weight
+  control / NO main-ORF stop           851    63.9%    13.20
+  NMD / NO main-ORF stop               381    28.6%     1.00
+  control / main-ORF stop               34     2.6%     1.00
+  control / no annotation               33     2.5%    18.01
+  NMD / main-ORF stop                   24     1.8%     1.07
+  NMD / no annotation                    9     0.7%     7.59
+
+  weights within this group: 5 distinct, 1.00 to 18.01   cv 0.633
+  share of the group at weight <= 1.1: 33.0%
+  ⇒ WORST-CASE SHIFT FROM REWEIGHTING: +0.2951
+
+==========================================================================
+WHAT THIS SETTLES
+==========================================================================
+  Every headline number in the narrative is scored on NMD_biotype, whose
+  worst case is +0.0954 and whose realistic shift is far
+  smaller -- 98.4% of the group sits at weight ~1, and only
+  18 transcripts carry the heavy weights at all.
+
+  The protein_coding CONTRAST row is a different matter: worst case
+  +0.2951, with 66.4% of the group at weight > 10.
+  Any claim resting on that row -- including the posterior's -0.253 --
+  needs weights before it is quoted.

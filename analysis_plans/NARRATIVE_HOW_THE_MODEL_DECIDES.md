@@ -20,7 +20,7 @@ claim→code map; `RETRAIN_ARCHITECTURE_CHANGES.md`.
 
 ## Depends on
 
-**Claims** C1–C15, C17–C21 (`CAPTURE_HEAD_STORY.md`); **C16 retracted**. **Decisions** D48, D50, D55, D56.
+**Claims** C1–C15, C17–C22 (`CAPTURE_HEAD_STORY.md`); **C16 retracted**. **Decisions** D48, D50, D55, D56.
 **Findings** `FINDINGS_ORF_SCANNER_2026-08-02.md`, `FINDINGS_TILED_PERTURBATION_2026-08-02.md`,
 `FINDINGS_DECAY_SEQUENCE_2026-08-02.md`. **Retrain items** 3, 4, 6, 8.
 **Jobs** 8898926 · 8898939 · 8899132 · 8899353 · 8899766 · 8899820 · 8899905 · 8899965 ·
@@ -101,6 +101,32 @@ ones. **The head fails precisely where initiation biology says context should de
 
 ## 3. What the picker is actually selecting for
 
+**Length, and position — in that order, and neither is what biology would nominate.**
+
+**The head selects for ORF length, at +0.760** (C8, job 8899132) — the strongest single
+association measured anywhere in this document. Among candidates under 200 nt it is +0.429,
+**seven times** the Kozak association. §2 is the same finding from the sequence side: the
+head fails precisely where initiation context should decide.
+
+**Part of that is our own encoding, not gene-finding.** The ATG window fills to
+`min(100, length/2)`, so for any ORF shorter than 200 nt — 69% of candidates — **where the
+fill stops encodes ORF length exactly** (C10, retrain item 3). How much of +0.760 is the
+model reading sequence and how much is it reading our boundary is not separated.
+
+**The queue adds position**, mechanically rather than by preference: candidates are ordered
+5′→3′ and each one's survival is discounted by everything upstream. On GENCODE's NMD call
+the most 5′ candidate *alone* recovers the decay-causing frame **0.702** of the time (§1),
+so ordering carries most of what the picker achieves.
+
+`[unclaimed]` **`p_select ~ length` has never been measured.** Both positive numbers above
+are `p_capture` — the head — and this section's subject is the product. Nothing establishes
+that the *picker* selects for length; it is inferred from the head plus the queue's
+construction. **This is the gap that makes the section read as negative**, and it is the
+cheapest thing outstanding: the same conditioning structure as the table below, on length
+instead of junction count.
+
+**What it is not selecting for.**
+
 | `p_select ~ junction count`, conditioning on | median |
 |---|---|
 | nothing (marginal) | **−0.050** |
@@ -153,8 +179,8 @@ independently of anything we compute (job 8900631):
 decay-causing, −0.253 where it is not, both gene-clustered and both excluding zero (job
 8900950).
 
-*Levels here are unweighted means over a stratified bank, so they describe the bank's
-composition rather than the pool's; the appendix says what that does and does not touch.*
+*Levels here are unweighted means over a stratified bank. For this row that is bounded at
+±0.095 worst case and far less in practice; the `protein_coding` row is not — see appendix.*
 
 **The floor under 0.883 is 0.460** — longest ORF, on these same transcripts, headroom
 **+0.423** (job 8900942). The interval measured is the prior's margin over that floor,
@@ -341,26 +367,41 @@ sentence is true of uORF-mediated decay and false of the premature-stop-in-main-
 that GENCODE's NMD biotype actually contains. Chasing down *why* the prediction failed is
 what produced §4's scope caveat, which is the more useful result of the two.
 
-## The bank is stratified, and what that does to these numbers
+## The bank is stratified, and it is bounded
 
 `build_ism_subset.py` takes scarce mechanism cells whole and down-samples abundant ones,
-recording a `sampling_weight` per transcript; `build_ism_bank.py` writes the consequence
-into the h5 as an attribute — population-level estimates must be reweighted or they
-describe the subset. **No recovery producer applies it**, here or in the earlier work, so
-every level in this document (0.883, 0.793, 0.702, 0.460, 0.304) is a bank statistic.
+recording a `sampling_weight`; `build_ism_bank.py` writes the consequence into the h5 —
+population estimates must be reweighted. **No recovery producer applies it**, here or in the
+earlier work. Pete's call was that this does not change the conclusion. **It is bounded, and
+he is right about the rows this document quotes** (`model_reweight_exposure.py`, local).
 
-**What this touches, and what it does not.** It moves the **magnitudes**. It does not move
-§4's mechanism conclusion, because that one is **definitional**: GENCODE assigns
-`nonsense_mediated_decay` on the annotated CDS terminating prematurely, so a transcript
-with an intact main CDS and a regulatory uORF is `protein_coding` whatever we sample. The
-biotype selects one mechanism by construction. §1's +0.489 is a contrast between two arms
-on the same 1,099 transcripts, which is the shape least disturbed by reweighting; the
-+0.091 margin is the most exposed of the contrasts.
+Reweighting can only move a within-group mean to the extent the weights **vary within that
+group**, so the question is whether the strata cut across the rows we report.
+
+| row | weights within it | worst-case shift |
+|---|---|---|
+| **`nonsense_mediated_decay`** — every headline number | **98.4% at weight ≈1**, 18 transcripts heavy | **+0.095** |
+| `protein_coding` — the contrast | 66.4% at weight > 10 | **+0.295** |
+
+**The NMD-biotype row is nearly flat because GENCODE's NMD biotype is close to coextensive
+with the `main_orf_stop` strata, and both of those took weight ~1.** 0.883, 0.793, 0.702,
+0.460 and 0.304 are therefore safe to within a bound that is itself adversarial — it assumes
+every hit lands on the 18 heavy transcripts. The realistic movement is an order smaller.
+
+**The contrast row is not safe.** 63.9% of `protein_coding` sits in one stratum at weight
+13.20, so weighted it would be largely that stratum. **Anything resting on that row needs
+weights first — including the posterior's −0.253**, which §4 names as the sharpest open
+question. That question is now partly an instrument question.
+
+§4's mechanism conclusion is unaffected either way, because it is **definitional**: GENCODE
+assigns `nonsense_mediated_decay` on the annotated CDS terminating prematurely, so
+uORF-driven decay is annotated `protein_coding` whatever we sample.
 
 **Two provenance gaps recorded, not closed.** `gencode_biotype_bank.tsv` has no producer —
 committed in `d63b5bd` as data beside its consumer, so the GENCODE release and the
-ID-matching rule are unrecorded. And the benchmark drops 2,354 of 4,999 bank transcripts as
-unannotated, a population `build_ism_subset.py` calls *"where most NMD lives."*
+ID-matching rule are unrecorded, and that is upstream of every recovery number. And the
+benchmark drops 2,354 of 4,999 bank transcripts as unannotated, a population
+`build_ism_subset.py` calls *"where most NMD lives."*
 
 ## Predictions this document made and lost
 
