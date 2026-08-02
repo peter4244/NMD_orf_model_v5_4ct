@@ -362,14 +362,17 @@ Ordered by how much each bounds what the rest can be worth.
   variance at width 9, held out.** That bounds how much *any* single motif can
   account for, and it belongs beside every enrichment claim rather than after it. An
   enrichment can be real and still be a small part of what the branch is doing.
-- **Directionality may be a magnitude artifact, and is therefore NOT established.**
-  Elevated positions are *defined* as the largest effects, and small effects sit near
-  the numerical floor where the three substitutions have near-random signs. Our own
-  banded measurement rises monotonically with |effect| across all positions
-  (0.359 → 0.427). If directionality is simply a function of magnitude, then
-  "elevated positions are more directional" is tautological and the ~21% figure is
-  not independent evidence of learned structure. It was listed as established in an
-  earlier draft; it is not, until a magnitude-matched comparison exists.
+- **Directionality is NOT established and was moved here from §7** (Pete's call,
+  2026-08-02). Elevated positions run ~21% above the measured in-sample noise floor
+  on `|mean_b vals| / max_b |vals|`. But elevated positions are *defined* as the
+  largest effects, and small effects sit near the floor where the three substitutions
+  have near-random signs and the signed mean cancels — so the gap may be a
+  signal-to-noise property of magnitude rather than learned directional structure.
+  The banded profile rises monotonically with |effect| across all positions
+  (0.359 → 0.427), which is what the magnitude explanation predicts. **If
+  directionality is a function of effect size, "elevated positions are more
+  directional" is tautological.** `probe_directionality_null.py` tests it and has not
+  been run.
 - **The observed-base convention for the port is unsettled and consequential.**
   Mean-centring against observed-equals-zero produce **different motifs from
   identical data**. Both will be run; the prediction that the second under-weights
