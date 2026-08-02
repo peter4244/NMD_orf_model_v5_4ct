@@ -143,7 +143,7 @@ short candidates has been run, so the step from head to picker rides on the queu
 construction rather than on a measurement. These are the cheapest things outstanding and this
 section needs them.
 
-## 4. The benchmark was wrong; fixed, the number is 0.883
+## 4. The benchmark, and which half of the model it scores
 
 **The right target is the frame that causes decay, not the annotated main ORF.** ATF4 is the
 case: the prior picks the 1055-nt main ORF, the posterior flips **18×** onto a 179-nt uORF
