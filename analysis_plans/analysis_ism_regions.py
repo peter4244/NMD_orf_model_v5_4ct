@@ -134,6 +134,8 @@ def load_h5(path):
         base = f["base_logit"][:]
         cell = ([s.decode() for s in f["cell"][:]] if "cell" in f
                 else [""] * len(tx))
+        arm = ([s.decode() for s in f["arm"][:]] if "arm" in f
+               else [""] * len(tx))
         wt = (f["sampling_weight"][:] if "sampling_weight" in f
               else np.ones(len(tx), np.float32))
         for i in range(len(tx)):
@@ -180,6 +182,7 @@ def load_h5(path):
                             orf_start=int(c_start[lo + k]),
                             orf_end=int(c_end[lo + k]),
                             anchor_type=anchor_type, cell=cell[i],
+                            arm=arm[i],
                             atg_cov=atg_coverage(sp, P),
                             base_logit=float(base[i]), weight=float(wt[i])))
     return out
@@ -290,7 +293,7 @@ def load_shards(shard_dir, pool):
         spans = z["spans"]
         if k >= len(spans):
             continue
-        out.append(dict(iso=iso, k=k, anchor_type="reference", cell="",
+        out.append(dict(iso=iso, k=k, anchor_type="reference", cell="", arm="",
                         atg_cov=atg_coverage(spans[:, :4] if spans.shape[1] == 4
                                              else spans[:, 2:6], len(z["valid"])),
                         vals=z["vals"], cap=z["vals_capture"],
@@ -391,7 +394,7 @@ def main():
     # ================================================================== Q1
     print("=" * 78)
     print("Q1  Are there regions where the signal is clearly above baseline?\n")
-    rows, run_real, run_null = [], [], []
+    rows, run_real, run_null, run_arm = [], [], [], []
     for r in recs:
         eff = per_position_effect(r[key])
         ok = r["valid"] & np.isfinite(eff)
@@ -410,6 +413,7 @@ def main():
         nm = np.zeros_like(hi)
         nm[pick] = True
         run_null.append(runs_of(nm))
+        run_arm.append(r["arm"])
         rows.append((r["iso"], int(ok.sum()), med, np.percentile(e, 99), e.max(),
                      e.max() / med if med > 0 else np.nan,
                      100 * above_floor, int(hi.sum())))
@@ -440,6 +444,36 @@ def main():
           f"(random: {len(rn):,} runs)")
     print(f"    mean run length  observed {rr.mean() if len(rr) else 0:.2f}   "
           f"random {rn.mean() if len(rn) else 0:.2f}")
+
+    # THE AXIS NEITHER CHECK ABOVE REACHES. Across-seed agreement asks whether a
+    # result is a property of the architecture or of one initialisation. It cannot
+    # ask whether the result holds on genes it was not found on -- and that is the
+    # question a reviewer asks first. The discovery/confirmation split is by GENE
+    # and no gene appears in both arms, so the confirmation arm is genes this
+    # analysis has never seen.
+    #
+    # Reported as two independent measurements, never as a test of one against the
+    # other: each arm carries its own random-placement null, because the arms
+    # differ in size and the null's yield depends on how many elevated positions
+    # there are to place.
+    arms = sorted({a for a in run_arm if a})
+    if len(arms) > 1:
+        print(f"\n  ACROSS DISJOINT GENES — run structure by arm, each against its "
+              f"own null")
+        print(f"    {'arm':<14} {'tx':>4} {'elevated':>9} {'runs':>6} "
+              f"{'mean len':>9} {'null':>6} {'runs>=4':>8} {'null':>6}")
+        for a in arms:
+            idx = [i for i, x in enumerate(run_arm) if x == a]
+            ra = np.concatenate([run_real[i] for i in idx]) if idx else np.zeros(0)
+            na = np.concatenate([run_null[i] for i in idx]) if idx else np.zeros(0)
+            if not len(ra):
+                continue
+            print(f"    {a:<14} {len(idx):>4} {int(ra.sum()):>9,} {len(ra):>6,} "
+                  f"{ra.mean():>9.2f} {na.mean() if len(na) else 0:>6.2f} "
+                  f"{int((ra >= 4).sum()):>8,} {int((na >= 4).sum()):>6,}")
+        print(f"    a structure that holds in BOTH arms is a statement about "
+              f"transcripts;\n    one that holds only in discovery is a statement "
+              f"about the genes it was found on")
 
     # ================================================================== Q2
     # FILL-CONDITIONED IS THE HEADLINE, RAW IS THE SECONDARY. In the raw profile
