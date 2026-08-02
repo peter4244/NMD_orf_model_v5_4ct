@@ -482,10 +482,35 @@ distribution (their 10×-transcript-median rule already is); and both the
 reference-anchor exclusion and the liveness gate are differential on the mechanism
 grouping, so anything that filters must report retention per cell, not overall.
 
-**Open question put to them:** is the run-length positive scored on `vals`,
-`vals_capture`, or both? `vals` and `vals_decay` clear the floor at 77–89% against
-`vals_capture`'s 53–78%, and they differ in seed stability. If the original finding
-was on `vals` it is largely a decay-arm result and should be described as one.
+**Answered: the run-length positive is on `vals_decay`.** Not `vals`, not
+`vals_capture` — confirmed from the runlog, whose first line reads `effect column =
+the decay branch`, and it is the only run-length runlog that exists.
+
+**So it is a decay-branch result outright, not "largely" one, and must be described
+that way from the start:** *positions where a substitution changes whether the
+selected reading frame triggers decay* — **not** "positions the model is sensitive
+to." The second phrasing mixes branches the decomposition deliberately separated,
+and wording of this kind propagates faster than its correction.
+
+Three things follow, and all of them make the finding **easier** to defend:
+
+- it sits on the arm clearing the floor at **77–89%**, not capture's 53–78%, so the
+  readability question does not touch it;
+- it sits on the arm whose magnitude varies **2.1×** across seeds (8.747e-04 to
+  1.867e-03) rather than capture's 47×, so cross-seed comparison is well
+  conditioned and the self-normalising threshold is not doing heavy lifting;
+- it is the more interesting arm to have found it on. A localised decay-branch
+  sensitivity speaks to what makes a *committed* frame get degraded, which is the
+  question §5 asks. The same result on `vals` would have mixed both branches and
+  their interaction.
+
+**Consequence for the duplicated check: it must be computed on `vals_decay` too.**
+Running the independent replication on `vals` would not be a replication — it would
+be a third analysis, and any agreement or disagreement would be uninterpretable.
+
+The interpretability window will run capture separately and report it separately,
+never pooled, and has put on record **before looking** that they expect little
+there.
 
 ## Where the banks live, and where they do not
 
