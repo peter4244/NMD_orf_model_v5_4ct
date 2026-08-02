@@ -48,6 +48,14 @@ product turn a run of vetoes into a choice. A gate, not a ranker.
 lost (job 8900950). Taking the first candidate and ignoring the model gets 0.702. Everything
 the picker knows is worth a tenth on top of candidate order.
 
+**But read that margin as scoped, not as a verdict on the model.** The target here is the
+annotated CDS of a GENCODE NMD transcript — a single long frame starting at the normal start
+codon (§4). So this is the **long-ORF contest**, the regime where §2 and §3 both find the
+head reading length and position doing the work. In the short-ORF contest the head's top
+pick is the 5′-most candidate only **22.8%** of the time, so it is demonstrably not
+reproducing position there. `[unclaimed]` **The margin over position has never been measured
+in that regime**, and there is no reason to expect it to be a tenth.
+
 ## 2. What the picker reads
 
 **A real initiation-context signal, and it is positional.** Perturbing the 25 bases
@@ -296,9 +304,11 @@ the other regime is the better result and it is currently unbenchmarked.
   field ~42 nt against a ~10 nt motif. **The most promising open item.**
 - **Whether the head reads the fill boundary or what is inside it.** Closed to tiling; needs
   a retrain varying window extent. *Retrain item 7.*
-- **`p_select ~ length`, and `p_select ~ junction count` among short candidates.** §3 — the
-  regime flip is measured on the *head*; whether it survives the queue into the *picker* is
-  not. The cheapest things outstanding.
+- **Everything about the short-ORF regime that is not the head.** §1 and §3. The regime flip
+  is measured on `p_capture`; neither `p_select ~ length`, nor `p_select ~ junction count`
+  among short candidates, nor **the queue's margin over position in that regime** has been
+  run. The whole interesting half of the model is characterised through one of its two
+  factors. **These are the cheapest things outstanding and they are the ones that matter.**
 - **Whether the posterior's −0.253 on `protein_coding` is error or the uORF mechanism
   working.** Leaving the main ORF is correct for an ATF4-like transcript and wrong for an
   ordinary one, and the biotype cannot separate them. **This decides whether 0.883
