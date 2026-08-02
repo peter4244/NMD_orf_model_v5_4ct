@@ -56,8 +56,7 @@ all scored the same way, on recovering the annotated main ORF:
 
 **The head alone is worse than position; the queue built from it is far better than
 either.** That is the signature of a gate rather than a ranker — the head's *low* scores
-upstream are what let a ribosome pass through to the right frame, and we misread it for
-most of a day by looking at where it was loudest.
+upstream are what let a ribosome pass through to the right frame.
 
 **Those three are an internal comparison establishing mechanism, not a performance
 figure.** The model's accuracy at the question that matters — finding the frame that
@@ -71,11 +70,10 @@ window — 0.413 / 0.283 / 0.241 / 0.275 across ORF-length bands, **at the same 
 every band**, in a tile 99.6% filled throughout and therefore carrying no fill confound.
 That position is where Kozak context sits. *Interpretability window, jobs 8900209, 8900420.*
 
-**On a diffuse background — and this refutes my own registered prediction.** I predicted
-from the sparsity of `vals_capture` that adjacent upstream tiles would be highly variable.
-They are not: 32 consecutive tiles differ from their neighbours by ~6% and never by more
-than 50%. Capture's upstream sensitivity is **diffuse, not sparse**. *Job 8900420.*
-**Prediction A refuted.**
+**On a diffuse background.** Across the upstream window, 32 consecutive tiles differ from
+their neighbours by ~6% and never by more than 50%. Capture's sensitivity there is
+**diffuse rather than sparse** — a broad low response with one sharp peak at the start
+codon, not a scatter of isolated hot positions. *Job 8900420.*
 
 **Unresolved: a second component tracking ORF length.** The response peak moves with length
 (−13, +12, +37, +87). Whether that is the head reading **our fill boundary** or reading
@@ -163,10 +161,7 @@ belongs to main-ORF recovery. This number currently has no floor under it.
 **It is handed the answer.** In the `interpretable` variant the decay head's entire
 non-sequence input is one column: `n_downstream_ejc`. *Retrain item 8.* But `d ~ ejc` is only
 +0.445 and `capture ~ d` survives holding that column at **+0.400**, so `d` is not a readout
-of it. *That +0.400 is a single measurement — `capture ~ d` among short candidates, holding
-the junction column — and it is used twice: here, to show `d` is more than the column, and
-in §6, to show the head became decay-predictive. One number, two readings, and both are
-legitimate; flagged so it is not mistaken for two independent results.*
+of it. *Also used in §6; one measurement, two readings.*
 
 **It does not read the stop codon it is anchored on** — every candidate had one by
 construction, so no negative example and no gradient. *Retrain item 6.*
@@ -181,9 +176,9 @@ PWM explains 1.73% of importance variance.**
 scrambles the stop window and leaves `p_capture` unmoved. **The coupling is derived** —
 `∂L/∂z_p_k ∝ d_k` is calculus on verified code, not an observation. **The consequence is
 measured** — `capture ~ d` is +0.362 among short candidates, +0.400 holding the junction
-column (**C17**, jobs 8900114 / 8900473). *Same measurement as §5's; see the note there.*
-*Filed as a claim rather than left marked: it is the measured leg of the sentence, and a
-marker is for a gap, not for a number that simply had not been written down.*
+column (**C17**, jobs 8900114 / 8900473). *The same measurement appears in §5, where it shows `d` is more than the
+supplied column; here it shows the head became decay-predictive. One number, two
+readings.*
 
 **But scoped.** In aggregate the separation *holds*: `p_capture ~ d` is +0.091 and the two
 heads read **different bases**, agreement ~0.02 within mass band (job 8899820). It is given
@@ -274,6 +269,20 @@ k ≥ 4. Both are now reported by the producer; the conclusion is identical unde
 
     k >= 4   marginal -0.050   length +0.447   position -0.553   both -0.070
     k >= 6   marginal -0.023   length +0.452   position -0.546   both -0.067
+
+## Predictions this document made and lost
+
+**Capture's upstream sensitivity is sparse.** Predicted from the `vals_capture` floor
+analysis — its lower quartile sits at zero while its upper exceeds decay's — that adjacent
+25-nt upstream tiles would be highly variable. Registered before the tiling ran. **Refuted**
+(job 8900420): 32 consecutive tiles within ~6%. The sensitivity is diffuse.
+
+**Routing favours junction-bearing frames at matched length.** C16, +0.442. **Retracted** —
+it held length and not position, and it sits below a queue-only null. Two independent routes.
+
+**The keto composition ratio differs by set definition.** Predicted four candidate causes
+for the 1.16 / 1.148 discrepancy; six set definitions returned 1.155–1.162 and all four were
+refuted. The figure had no reproducible producer.
 
 ## Why §1's three numbers are not the headline
 
