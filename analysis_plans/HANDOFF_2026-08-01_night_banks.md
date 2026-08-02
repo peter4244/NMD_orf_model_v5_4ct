@@ -240,6 +240,41 @@ deliberately short draw, 0 on these three. Which transcripts carry inside-ATG de
 perturbations, and why, is open — but it is a property of the data, and any gate
 built on it must be characterised across transcripts rather than assumed uniform.
 
+## A liveness gate would be a third differential filter — measured, not predicted
+
+The interpretability window predicted the inside-ATG dead-perturbation rate rises
+with upstream fill extent, and that if so, a liveness gate would be the anchor
+exclusion one level down. Tested on `bank_interp_s100`, 400 transcripts, positions
+covered by **exactly one** ATG window so the covariate is well defined:
+
+    upstream fill extent          n        dead rate
+    100-200                     450          0.00%
+    200-400                   2,293          0.00%
+    400-600                   3,552          0.51%
+    600-900                   4,901          0.00%
+    900 (saturated)          26,996         10.78%
+    point-biserial r = +0.1457
+
+**The direction holds; the shape does not.** This is a step at saturation, not a
+gradient. The proposed mechanism — more filled positions competing to be a bin's
+pooled maximum — predicts a smooth rise with extent, and there is none: every
+truncated bin is at or near zero and the fully-filled bin jumps to 10.78%. What is
+special about a *completely* filled upstream window is not explained and is worth
+one look before anyone relies on liveness.
+
+**The consequence is confirmed and larger than predicted.** A liveness gate drops
+~11% of positions where the upstream window is saturated and ~0% elsewhere.
+Saturated upstream means ≥900 bases 5′ of the start, i.e. a long 5′UTR — which is
+the NMD / no-main-ORF-stop cell. So gating on liveness silently removes an order of
+magnitude more positions from the mechanism arm than from its comparator.
+
+That is the **third** filter today that looks neutral and correlates with the
+comparison, after the reference anchor (49.9% vs 93.1% retention) and the
+structural zeros. Any liveness-gated comparison between mechanism groups needs this
+characterised first.
+
+Caveats: one seed, 400 transcripts, singly-covered positions only.
+
 ## Two checks, not a taxonomy
 
 Both windows kept making errors today. Sorted by what would have caught them, not
