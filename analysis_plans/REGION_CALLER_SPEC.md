@@ -71,7 +71,7 @@ original rank order. This destroys the *location* of any localized feature, whic
 Random placement of marks — the null used previously — preserves neither the spectrum nor the
 marginal, which is why it reported the data beating a null that had no structure at all.
 
-### 4.1 ⇒ Two corrections to the above, 2026-08-02, incoming interpretability window
+### 4.1 ⇒ Four corrections to the above, 2026-08-02, incoming interpretability window
 
 This section previously claimed iAAFT preserves the power spectrum "exactly by construction" **and**
 the marginal distribution "exactly, via the rank rescaling." Both were flagged by the author as
