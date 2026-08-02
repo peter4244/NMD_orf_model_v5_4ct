@@ -1,48 +1,43 @@
-"""
-probe_directionality_null.py — the in-sample null for |mean_b vals| / max_b|vals|.
-
-A RATIO STATISTIC HAS TWO REFERENCE POINTS AND BOTH WERE WRONG ONCE. The ceiling
-is 0.75, not 1.0 -- three substitutions agreeing give mean 3v/4 against max v. The
-floor is not 0: random signs give a MEAN of 0.375 and a MEDIAN of 0.25, and
-neither describes this data, whose sub-floor band measures 0.387 median / 0.370
-mean. Sub-floor positions are not sign-random; their substitutions agree far more
-often than chance, so a shared per-position component dominates at that scale.
-
-The null is therefore measured in-sample from positions below the bank's own
-batch-shape floor, per statistic, and never taken from the analytic model. Reports
-mean, median and median-of-medians, because the first two differ by 0.02 and that
-difference is what made two windows disagree for an hour.
-"""
-
+# IS DIRECTIONALITY JUST MAGNITUDE?
+# |mean_b vals| / max_b |vals| is higher at elevated positions (0.466) than at all
+# positions (0.391). But elevated positions are DEFINED as the largest effects, and
+# a small effect is closer to the noise floor, where the three substitutions have
+# near-random signs and the signed mean cancels. So higher directionality among
+# elevated positions may be entirely a signal-to-noise effect and not evidence of
+# learned directional structure.
+#
+# TEST: does directionality rise monotonically with |effect| across ALL positions?
+# If it does, the elevated-vs-background gap is explained by magnitude alone and
+# says nothing extra. Ceiling is 0.75: with vals[obs]=0 and three substitutions
+# agreeing, mean = 3v/4 against max = v.
 import h5py, numpy as np
-f = h5py.File("results_ism_v6/bank_interp_s100.h5","r")
-co, cc, sp = f["cand_offset"][:], f["cand_count"][:], f["spans"][:]
-FLOOR = 1.66e-06          # the bank's own batch-shape floor, s100
-pool_all, pool_sub, pool_hi = [], [], []
-med_all, med_sub, med_hi = [], [], []
-for i in range(600):
-    lo, nk = int(co[i]), int(cc[i]); b = sp[lo:lo+nk]
-    P = int(max(b[:,3].max(), b[:,5].max()))
-    if P < 50: continue
-    v = f["vals_decay"][i,:P].astype(np.float64)
-    ok = f["valid"][i,:P] & np.isfinite(v).any(1)
-    if ok.sum() < 100: continue
-    vv = np.where(np.isfinite(v), v, 0.0)
-    with np.errstate(invalid="ignore"):
-        uns = np.nanmax(np.abs(np.where(np.isfinite(v), v, np.nan)), axis=1)
-    good = ok & np.isfinite(uns) & (uns > 0)
-    r = np.abs(vv.mean(1))[good] / uns[good]
-    u = uns[good]
-    sub = u < FLOOR
-    k = max(1, int(round(0.01*good.sum())))
-    hi = u >= np.partition(u, -k)[-k]
-    pool_all.append(r); med_all.append(np.median(r))
-    if sub.sum() > 20: pool_sub.append(r[sub]); med_sub.append(np.median(r[sub]))
-    if hi.sum() > 5:   pool_hi.append(r[hi]);  med_hi.append(np.median(r[hi]))
-def rep(name, pool, meds):
-    p = np.concatenate(pool)
-    print(f"  {name:<26} pooled median {np.median(p):.4f}   pooled mean {p.mean():.4f}"
-          f"   median-of-medians {np.median(meds):.4f}   n {len(p):,}")
-rep("all positions", pool_all, med_all)
-rep("SUB-FLOOR (|eff|<1.66e-6)", pool_sub, med_sub)
-rep("top 1%", pool_hi, med_hi)
+f = h5py.File("results_ism_v6/bank_interp_s100.h5", "r")
+rng = np.random.default_rng(0)
+take = rng.choice(f["vals_decay"].shape[0], 500, replace=False)
+D, M, floor = [], [], float(f.attrs["batch_shape_offset"])
+for i in take:
+    v = f["valid"][i]
+    x = f["vals_decay"][i].astype(np.float64)
+    # vals is NaN AT THE OBSERVED BASE by construction -- you cannot substitute a
+    # base for itself -- so .all(1) is never true. Require the three substitutions
+    # finite and set the observed base to 0, which is the mean-centring convention.
+    fin = (np.isfinite(x).sum(1) == 3) & v
+    if fin.sum() < 200: continue
+    xx = np.where(np.isfinite(x[fin]), x[fin], 0.0)   # vals[obs] := 0
+    mx = np.abs(xx).max(1)
+    ok = mx > 0
+    D.append(np.abs(xx[ok].mean(1)) / mx[ok]); M.append(mx[ok])
+D = np.concatenate(D); M = np.concatenate(M)
+print(f"  {len(D):,} positions   ceiling 0.75   floor {floor:.3e}\n")
+q = np.quantile(M, [0, .2, .4, .6, .8, .95, .99, 1.0])
+print(f"  {'|effect| decile band':<26} {'n':>10} {'median |eff|':>13} {'directionality':>15} {'% of ceiling':>13}")
+for lo, hi in zip(q[:-1], q[1:]):
+    m = (M >= lo) & (M < hi) if hi < q[-1] else (M >= lo)
+    if m.sum() < 100: continue
+    print(f"  {f'{lo:.2e} - {hi:.2e}':<26} {int(m.sum()):>10,} "
+          f"{np.median(M[m]):>13.3e} {np.mean(D[m]):>15.3f} {100*np.mean(D[m])/0.75:>12.1f}%")
+top = M >= np.quantile(M, 0.99)
+print(f"\n  all positions          directionality {D.mean():.3f}  ({100*D.mean()/0.75:.0f}% of ceiling)")
+print(f"  top 1% by |effect|     directionality {D[top].mean():.3f}  ({100*D[top].mean()/0.75:.0f}% of ceiling)")
+print(f"  above the floor only   directionality {D[M>floor].mean():.3f}  "
+      f"({100*D[M>floor].mean()/0.75:.0f}% of ceiling)   n {int((M>floor).sum()):,}")

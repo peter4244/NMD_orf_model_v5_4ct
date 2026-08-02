@@ -1,0 +1,49 @@
+       State    Elapsed ExitCode 
+------------ ---------- -------- 
+   COMPLETED   00:08:38      0:0 
+=== code actually running (sha256, first 16) ===
+  3a1e5c6a5e317303 analysis_kmer_controlled.py
+
+################ k=5 ################
+k-mer enrichment with both confounds controlled — bank_interp_s100.h5
+  column vals_decay   k = 5   elevated = top 1% of each transcript's valid positions
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_kmer_controlled.py:154: RuntimeWarning: All-NaN slice encountered
+  eff = np.nanmax(np.where(np.isfinite(xx), xx, np.nan), axis=1)
+
+  transcripts used 4,999
+
+  scoring   region        fg k-mers    bg k-mers               top enriched               top depleted  r vs pooled/all
+  all       pooled          110,351   11,040,009   TTTTT +2.31, TTGTT +2.06   TGTCG -1.59, TACGC -2.06            1.000
+  all       upstream         55,471    5,541,320   TTGTT +1.79, TCGAT +1.75   CGTAA -2.24, TACGC -2.25            0.806
+  all       downstream       54,731    5,463,156   TCGTA +2.04, TTGAT +1.99   TAACC -2.50, TACGC -3.81            0.774
+  neutral   pooled          110,397   11,040,009   TCGTA +1.88, ACGAT +1.78   ACTCG -2.64, CCTCG -2.72            0.496
+  neutral   upstream         55,467    5,541,320   ACGAT +1.95, CCGTT +1.79   ACTCC -3.05, TCACG -5.45            0.482
+  neutral   downstream       54,727    5,463,156   TCGTC +2.33, CCGAC +2.28   TACGC -3.81, GAACG -5.04            0.390
+
+  r is the enrichment vector against pooled/all, on shared k-mers.
+  If AU enrichment is REGIONAL, the downstream rows lose it (r drops, and
+  the top-enriched k-mers stop being U/A-rich). If it is GC-DRIVEN, the
+  neutral rows lose it. Both controls are independent and both are here.
+
+################ k=6 ################
+k-mer enrichment with both confounds controlled — bank_interp_s100.h5
+  column vals_decay   k = 6   elevated = top 1% of each transcript's valid positions
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_kmer_controlled.py:154: RuntimeWarning: All-NaN slice encountered
+  eff = np.nanmax(np.where(np.isfinite(xx), xx, np.nan), axis=1)
+
+  transcripts used 4,999
+
+  scoring   region        fg k-mers    bg k-mers               top enriched               top depleted  r vs pooled/all
+  all       pooled          110,304   11,034,474 TTTTTT +2.68, TTTGTT +2.37 CGATGC -4.32, CCTAGT -4.66            1.000
+  all       upstream         55,439    5,536,095 TAAGAT +2.46, TTCGAA +2.42 CCCGGT -4.17, CGCGGA -4.58            0.687
+  all       downstream       54,731    5,462,889 TTCGTT +2.51, GTCGTA +2.46 ACCTGG -4.31, TAAAGC -4.74            0.659
+  neutral   pooled          110,337   11,034,474 GTCGTA +2.64, GTCGAT +2.43 CATACC -4.67, CAATCC -4.93            0.495
+  neutral   upstream         55,423    5,536,095 GTCGAT +2.46, ACCGTT +2.27 GTCATG -4.50, AACTCC -4.83            0.430
+  neutral   downstream       54,727    5,462,889 GCCGTT +2.90, GTCGTC +2.82 GAGTGA -4.97, GGCTCA -5.39            0.356
+
+  r is the enrichment vector against pooled/all, on shared k-mers.
+  If AU enrichment is REGIONAL, the downstream rows lose it (r drops, and
+  the top-enriched k-mers stop being U/A-rich). If it is GC-DRIVEN, the
+  neutral rows lose it. Both controls are independent and both are here.
+
+=== exit: 0 ===

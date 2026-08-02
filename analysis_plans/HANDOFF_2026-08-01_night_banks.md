@@ -497,6 +497,308 @@ conclusion that the runs are transcript-specific.** The amendment is recorded be
 the result for the same reason §8.5's was: the same change afterwards would not be
 defensible.
 
+### 2026-08-02: directionality has a null of 0.37, not 0
+
+The two extraction criteria overlap at Jaccard 0.524 (median, quartiles 0.455–0.589),
+so a third of each set is criterion-specific and both must be run. Directionality
+`|mean_b vals| / max_b |vals|` was then reported as 0.466 at elevated positions
+against 0.391 at all positions, on a **ceiling of 0.75** — with `vals[obs] = 0` and
+three substitutions agreeing, `mean = 3v/4` against `max = v`. The ceiling
+correction was right.
+
+**But the floor was assumed to be 0, and it is not reachable.** Three substitutions
+with random signs give
+
+    |sum| = 3  with probability 2/8,   |sum| = 1  with probability 6/8
+    E[ |mean| / max ] = (2/8)(3/4) + (6/8)(1/4) = 0.375
+
+so **0.375 is the random-sign null**, and 0 requires perfect opposition, which noise
+never produces. Simulated: 0.3750 at equal magnitudes, 0.255–0.263 for heavy-tailed
+magnitude distributions.
+
+**The data supplies its own null and it lands on the analytic value.** Measured on
+s100, 500 transcripts, 1,036,981 positions:
+
+    |effect| band              n         median      directionality   % of ceiling
+    2.2e-16 - 1.4e-05    207,396      7.37e-08          0.370           49.4%
+    1.4e-05 - 1.1e-03    207,396      2.33e-04          0.364           48.5%
+    1.1e-03 - 5.1e-03    207,396      2.78e-03          0.359           47.9%
+    5.1e-03 - 1.4e-02    207,396      8.60e-03          0.375           50.0%
+    1.4e-02 - 4.3e-02    155,547      2.25e-02          0.392           52.3%
+    4.3e-02 - 9.5e-02     41,480      5.73e-02          0.409           54.5%
+    9.5e-02 - 6.7e-01     10,370      1.25e-01          0.427           56.9%
+
+    all positions      0.373    indistinguishable from the null
+    sub-floor band     0.370    pure noise (median 7.4e-08 against a floor of 1.7e-06)
+    top 1%             0.427    above the null by 14%
+
+**RECONCILED, and my own null was wrong.** The 0.373-against-0.391 gap between the
+two windows is **mean versus median**, not data: median of the ratio gives 0.3911
+against their reported 0.391. Ruled out first, on one sample: pooling method
+(per-transcript 0.3733 against pooled 0.3732), floor restriction (0.3737), column
+(`vals` 0.372, `vals_capture` 0.365), dead substitutions (0.3732), mean over three
+rather than four (0.4975, far too high).
+
+**And the null is statistic-dependent, which broke my correction of theirs:**
+
+    RANDOM-SIGN NULL          mean      median
+      equal magnitudes       0.3749    0.2500
+      exponential            0.2585    0.2502
+      half-normal            0.2627    0.2503
+
+    MEASURED                  mean      median          n
+      all positions          0.3731    0.3913   1,108,267
+      sub-floor (noise)      0.3709    0.3888     171,041
+      top 1% by |effect|     0.4273    0.4481      11,083
+
+I claimed the sub-floor band "lands on the analytic prediction without being told
+to". **That was a coincidence of the mean.** On the median it misses badly — 0.389
+measured against 0.250 predicted — so the sub-floor data is **not sign-random
+noise**: its three substitutions agree in sign far more than chance, meaning a
+shared per-position component dominates at that scale. The analytic random-sign null
+is the wrong reference, and I used it to correct the other window while making the
+parallel error.
+
+**The right null is the one the data measures — the sub-floor band — and it makes
+both statistics agree:**
+
+    against the in-sample sub-floor null      mean      median
+      all positions                          +0.6%     +0.6%
+      top 1% by |effect|                    +15.2%    +15.3%
+
+**FULLY RECONCILED. Two gaps, both "same name, different set", and the settled
+number is 20.5%.**
+
+    set                                median     mean         n
+    sub-floor null (measured)          0.3872   0.3700   158,036
+    top 1% GLOBAL quantile             0.4469   0.4270    10,370
+    top 1% PER-TRANSCRIPT              0.4668   0.4519    10,369
+
+    per-transcript:  +20.5% above null,  21.9% of the range 0.387-0.75
+    global:          +15.4% above null,  16.4% of the range
+    the two definitions overlap at Jaccard 0.240
+
+Gap one was **mean versus median**. Gap two was **global versus per-transcript top
+1%** — and those two definitions share only 24% of their positions, because the
+global quantile over-weights transcripts whose effects are large overall.
+Per-transcript is what every other elevation analysis here uses, including the
+run-length and k-mer work, so it is the right one and the global version was the
+outlier.
+
+Independent implementations then agree to four decimals: 0.4668 here against 0.4664
+there, 21.9% of range against 22%.
+
+**The settled statement: elevated positions are ~21% above the measured noise floor
+under per-transcript elevation, ~16% under global elevation, with the rule stated.**
+All positions are indistinguishable from the floor. Both windows agree to within a
+tenth of a percent on both rules:
+
+    rule              this window        interp window
+    global top 1%     +15.4% median      +15.7% median
+    per-transcript    +20.5% median      +20.6% median
+
+**That is not a range from uncertainty — it is two definitions, both defensible,
+differing by a stated choice.**
+
+**Use per-transcript, and say why, because the honest reason is consistency and not
+size.** Per-transcript gives the *larger* number, so global is the conservative
+choice and we are not taking it. The reason to prefer per-transcript is that the
+whole point of abandoning fold-over-median was to make "elevated" mean the same
+thing in every transcript regardless of its responsiveness — and a global quantile
+reintroduces exactly that bias, concentrating on high-responsiveness transcripts.
+A reviewer will ask why the larger of two numbers was chosen; the answer is that the
+selection rule was fixed before this comparison existed, for a reason unrelated to
+it.
+
+### The sharpest methodological point of the two days
+
+**An empirical null that matches an analytic prediction is not thereby validated.**
+
+The sub-floor band matched the analytic random-sign null on the mean (0.370 against
+0.375) and missed it by half on the median (0.389 against 0.250). The agreement was
+real and meaningless: it held on one estimator and failed on the other, and only
+checking both revealed that the model behind the prediction — independent random
+signs — does not describe this noise. The sub-floor substitutions agree in sign far
+more often than chance, so a shared per-position component dominates at that scale.
+*(Plausibly the same accumulation-order structure that produces the batch-shape
+offset. Unshown, and marked as such.)*
+
+This is a sharper form of the denominator check: **a reference point can be wrong in
+a way that agreeing with theory actively conceals.** The agreement is what stops you
+looking.
+
+### The standard form, because three scripts hit one cause
+
+`vals` is NaN at the observed base by construction, so `np.isfinite(x).all(1)` is
+**never true**. Use `(np.isfinite(x).sum(1) == 3)`. Three scripts across two windows
+hit this; one threw, one produced an empty set silently, one produced a table.
+
+**That number was corrected three times in one morning and shrank every time:** 62%
+of an attainable ceiling → ~14-15% above a wrong analytic null → 20.5% above the
+measured in-sample null. Worth stating plainly wherever it is written, because the
+first figure travelled between windows before any of the corrections did.
+
+The conclusion that the branch learned both directional and non-directional features
+stands. The size of the directional part is ~15% over noise, and it should be quoted
+against the measured sub-floor band rather than against 0 or against an analytic
+sign-null.
+
+**The error class, again, and from the other end.** The ceiling was checked and
+corrected; the floor was never checked because 0 *looks* like a null. A ratio
+statistic has two reference points and both need enumerating. That is the same
+lesson as the denominators, arriving through the numerator.
+
+`probe_directionality_null.py`. Note it also caught one of mine: `np.isfinite(x).all(1)`
+is never true, because `vals` is NaN at the observed base by construction. It failed
+loudly rather than returning an empty comparison, which is the good version.
+
+### 2026-08-02: the seqlet plan, and the four things that decide whether it works
+
+Agreed with the interpretability window. The reason to move off k-mer enrichment is
+**not** that clustering is better — it is that a contribution weight matrix is
+defined by *what recurs across independent sites* and never computes a ratio against
+a reference set. Every problem of the last twelve hours lived in the background.
+`vals_decay` is (n, W, 4), which is natively what MoDISco consumes.
+
+**Order of work, and the gate.**
+
+1. **The SpliceAI positive control is BLOCKING.** MoDISco was demoted here on a
+   measurement — zero patterns from a model that demonstrably encodes GT/AG, on 56
+   seqlets against a floor of 100. That is an underpowered negative. At 110,000
+   seqlets the stated cause is gone. **If the pipeline cannot recover GT/AG from
+   SpliceAI at scale, nothing it says about our model is worth reading.** It is the
+   only control this project has that separates "the method failed" from "the model
+   has nothing".
+2. **Direct PWM fitting before MoDISco** — no background *and* no clustering, ~40
+   parameters against grouping 110,000 seqlets, degeneracy represented natively.
+   **Pre-committed: a poor PWM fit does NOT license "no sequence preference."** A
+   single PWM assumes one motif; several motifs return a blend, and a poor fit is
+   then ambiguous between "nothing" and "more than one". A poor fit licenses going
+   to MoDISco, nothing else. Otherwise we replace one underpowered negative with
+   another, which is how MoDISco was demoted in the first place.
+3. MoDISco as the richer follow-up.
+
+**Four port decisions, each capable of producing a plausible wrong answer.**
+
+- **No reverse complement.** MoDISco revcomp-collapses by default because a TF motif
+  is double-stranded. RNA is single-stranded and the model reads one strand;
+  revcomp would merge genuinely different motifs. The likeliest naive-port error.
+- **The observed base.** `vals` is **NaN at the observed base by construction** — you
+  cannot substitute a base for itself — so MoDISco's four-valued input needs a
+  convention. Writing `L[b]` for the logit under base `b`, the bank gives
+  `vals[b] = L[b] − L[obs]` with `vals[obs] := 0`, so mean-centring is well defined
+  and is what hypothetical contributions already are:
+  `hyp[b] = vals[b] − mean_b(vals[b])`. The alternative — observed = 0, others
+  = −Δ — additionally asserts the observed base contributes nothing, which is false
+  exactly when the observed base is the one doing the work. **Run both; predicted in
+  advance that the second under-weights the consensus base.**
+- **Seqlet width from our data.** The run-length excess concentrates at 4–6 bases, so
+  ~7–11 windows are indicated by measurement rather than by ChIP-seq defaults.
+- **Per-transcript cap and multiple draws.** One long poly-U tract contributes
+  thousands of near-identical seqlets that recur trivially. Stratify the subsample by
+  transcript with a cap, take several independent draws, and require the CWM to
+  recur **across draws as well as across seeds** — the cross-seed logic applied to
+  the sampling axis.
+
+**The composition null, which keeps the no-background property.** A compositional
+tendency also recurs, so recurrence alone cannot exclude the keto skew — but
+composition produces a **low-information** CWM and a motif a high-information one.
+From the measured compositions:
+
+    background   A .256  C .243  G .258  T .243     H = 1.9994 bits
+    elevated     A .214  C .206  G .297  T .284     H = 1.9809 bits
+    IC of a composition-only column vs background       0.0183 bits
+
+**A CWM column carrying ≤ ~0.016–0.018 bits over background is fully explained by
+the keto skew.** Bracketed, not point-quoted: 0.0183 on 600 transcripts here,
+0.0159 on 800 in the other window. The difference is sampling, but a single
+decimal-quoted figure is how 0.877 and 2.34 both travelled further than they should
+have this week.
+
+**Report per-column KL beside every CWM, not a pass/fail.** The bar is worth far
+less at the weak end than the strong:
+
+    strong consensus, 90% one base    1.358 bits    75x the bar
+    moderate,         60/20/10/10     0.423 bits    24x
+    weak,             35/25/25/15     0.055 bits     3x
+
+At 3×, with width 11 across several clusters, multiplicity eats it entirely. The bar
+rejects the keto skew and nothing more; a pass/fail would imply a discrimination it
+does not have.
+
+**SEQLET CALLING IS A SECOND CONVENTION, and it selects different positions.**
+Ours is the top 1% by **max |vals| across substitutions** — unsigned magnitude.
+MoDISco calls seqlets on the windowed **actual** contribution `hyp[obs]`, which under
+mean-centring is `−mean_b(vals[b])` — signed. A position where one substitution
+raises the logit hard and another lowers it hard scores high on ours and near zero on
+theirs, because the signed mean cancels. **Highly sensitive but not directionally so
+is a seqlet to us and invisible to MoDISco.**
+
+Which is correct depends on what a motif is taken to be — "this base suppresses
+decay" (signed) against "this position is load-bearing whichever way it moves"
+(unsigned) — and that cannot be settled a priori. **Extract on both and report the
+overlap; the overlap fraction is itself informative about which kind of feature the
+branch learned.** It also sharpens the SpliceAI control: GT/AG is a *directional*
+consensus, so the signed criterion must recover it, and failure there means the port
+is wrong on a model where the answer is known.
+
+**Confidence, stated because it was overstated once already:** mean-centring being
+correct for ISM contributions is algebra and is verified in both windows. Mean-centring
+being what MoDISco *requires* rather than merely tolerates is reasoning from how the
+method works, **not** from reading its source, and should be checked there before the
+port rather than after.
+
+    keto  (G+T)  elevated .581  background .501   ratio 1.160
+    amino (A+C)  elevated .420  background .499   ratio 0.842
+    GC    (G+C)  elevated .503  background .501   ratio 1.004
+
+**What this trades, stated plainly:** the background problem for a clustering
+problem. Seqlet threshold, similarity metric, cluster granularity and alignment
+window are all assumptions capable of manufacturing structure. They are assumptions
+about *the signal* rather than about what a fair comparison population is, which is
+the better thing to have to defend — but it is a trade, not an escape.
+
+### 2026-08-02: the GC confound was diagnosed by eye and never applied
+
+Measured on 600 transcripts of s100 (`probe_base_composition_bias.py`), base
+composition at elevated positions against all valid positions:
+
+    set                              A       C       G       T     G+C
+    background (all valid)       0.256   0.243   0.258   0.243   0.501
+    elevated, all scoring        0.214   0.206   0.297   0.284   0.503
+      ratio to background         0.83    0.85    1.15    1.17
+    elevated, neutral scoring    0.159   0.325   0.357   0.159   0.682
+      ratio to background         0.62    1.34    1.38    0.65
+
+**Two findings, and the second matters more.**
+
+1. **The GC-preserving control is itself compositionally biased**, by more than
+   anything it was testing: it drives GC at elevated positions from 0.501 to
+   **0.682**. Under that restriction an A/T position can only be scored by A<->T and
+   a C/G position only by C<->G, so if the model responds more strongly to C<->G the
+   restriction selects for C/G positions. Every one of the nine top-enriched k-mers
+   under neutral scoring has G at the substituted position. **Its k-mer output is an
+   artifact of the control and must not be used.**
+
+2. **Under normal scoring the elevated set is not GC-biased at all** — 0.503 against
+   a background of 0.501, two parts in a thousand. **So the GC confound never applied
+   to the original enrichment.** It was diagnosed by eye, from k-mers that *looked*
+   AU-rich, and never measured on the positions themselves. Two jobs were spent
+   controlling for it, and the control introduced a bias three times larger than any
+   effect it was testing.
+
+**The axis that IS asymmetric is a different one:** G and T enriched (1.15, 1.17),
+A and C depleted (0.83, 0.85), with GC flat. That is keto versus amino, orthogonal
+to everything we controlled for.
+
+**The methodological lesson, which is the transferable part.** A confound noticed in
+the *output* of an analysis must be measured on the *input* before it is controlled
+for. The enriched k-mers looked AU-rich, so GC was assumed to be the driver; nobody
+checked the base composition of the selected positions, which is one line and
+settles it. This is the same class as the four denominator errors of the night —
+reasoning about a set without enumerating it — arriving through the door marked
+"being careful".
+
 ### The k-mer result: the motif branch, with one confound the GC control cannot touch
 
 k = 5, five members, decay (interpretability window, job 8886733):
