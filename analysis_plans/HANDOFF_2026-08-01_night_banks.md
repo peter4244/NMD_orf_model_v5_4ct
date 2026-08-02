@@ -137,6 +137,36 @@ signal-to-noise, not a demonstration of it. Measure before relying on it.
 be high for `vals` and low for `vals_capture`. If it is low, capture-arm findings
 need cross-seed replication as a gate, not as a robustness check.
 
+### "Is it robust" hides three different questions
+
+Do not collapse them. Collapsing them is the same error as carrying one design
+effect across statistics.
+
+| what varies | what is fixed | instrument | question it answers |
+|---|---|---|---|
+| initialisation | the transcripts | cross-seed **sign** agreement (`qc_ism_banks.py`) | do the seeds agree which *direction* each substitution pushes? |
+| initialisation | the transcripts | cross-seed **magnitude rank** and elevated-set overlap (`analysis_ism_regions.py`) | do the seeds agree which *positions* are extreme? |
+| the genes | the seed | the `arm` column — discovery vs confirmation, disjoint genes | does a finding **generalise** to genes it was not found on? |
+
+The first two are the same axis and different comparisons, and they can disagree
+without contradiction. Seeds can agree on direction everywhere while disagreeing
+about which positions are extreme, because sign agreement is insensitive to
+magnitude. The reverse is also possible: agreement about which positions are large,
+with the small-magnitude bulk flipping sign at the floor. **Given that roughly half
+the capture arm may sit near the noise, expect exactly that pattern in
+`vals_capture`.**
+
+**The third axis is shipped and unused.** §9 step 1 assigned every gene to
+`discovery` or `confirmation` by a fair draw seeded at 20260801, no gene spans both
+arms, and the bank carries `arm` per transcript. Nothing tonight touched it. It is
+the only one of the three that answers whether a finding holds on genes it was not
+discovered on, which is the question a reviewer asks. Use it before claiming
+generality from the other two.
+
+I had this wrong in a message to the interpretability window — I described their
+check as varying transcripts. It does not; it varies the seed, as mine does. They
+corrected it from their code.
+
 ## Anchoring on the reference candidate is a differential exclusion
 
 From the interpretability window, and it is the sharpest trap waiting for tomorrow.
