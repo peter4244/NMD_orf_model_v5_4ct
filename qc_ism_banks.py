@@ -65,6 +65,23 @@ def main():
             dec = f["vals_decay"][:] if "vals_decay" in f else None
             mass = f["mass"][:] if "mass" in f else None
             crows = f["chunk_rows"][:] if "chunk_rows" in f else None
+            # WHERE CAN CAPTURE RESPOND AT ALL. A substitution in a STOP window
+            # changes e_stop -> z_d only; it cannot touch z_p, so vals_capture is
+            # EXACTLY zero there by construction. A third of valid positions are
+            # stop-only, so scoring the capture arm over all valid positions
+            # measures the geometry of the windows, not the readability of the
+            # arm. Measured: 33.8% of valid positions lie outside every ATG
+            # window, and 94% of capture's exact zeros are exactly those.
+            spans = f["spans"][:]
+            c_off, c_cnt = f["cand_offset"][:], f["cand_count"][:]
+            atg_cov = np.zeros_like(valid)
+            for i in range(n):
+                sl = slice(int(c_off[i]), int(c_off[i]) + int(c_cnt[i]))
+                for row in spans[sl]:
+                    a_lo, a_hi = int(row[2]), int(row[3])
+                    if a_hi >= a_lo:
+                        atg_cov[i, max(0, a_lo - 1):a_hi] = True
+            atg_cov &= valid
             print(f"\n=== {p.name} ===")
             print(f"  transcripts {n:,}   valid positions {int(valid.sum()):,}   "
                   f"reported floor {floor:.3e}")
@@ -88,19 +105,29 @@ def main():
             else:
                 print("  chunk_rows: not recorded (shard predates the field)")
 
+            print(f"  positions inside >=1 ATG window: "
+                  f"{100*float(atg_cov.sum())/float(valid.sum()):.1f}% of valid "
+                  f"(the rest are stop-only, where capture is structurally 0)")
             print(f"  {'arm':<14} {'n finite':>12} {'median |eff|':>14} "
                   f"{'>floor':>8} {'>10x':>8}")
             for name, arr in (("vals", vals), ("vals_capture", cap),
                               ("vals_decay", dec)):
                 if arr is None:
                     continue
-                s = arm_stats(arr, floor)
-                print(f"  {name:<14} {s['n']:>12,} {s['median']:>14.3e} "
-                      f"{100*s['above']:>7.1f}% {100*s['above10']:>7.1f}%")
-                if name == "vals_capture" and s["above"] < 0.5:
+                st = arm_stats(arr, floor)
+                print(f"  {name:<14} {st['n']:>12,} {st['median']:>14.3e} "
+                      f"{100*st['above']:>7.1f}% {100*st['above10']:>7.1f}%")
+            # the capture arm judged ONLY where it can respond
+            capm = cap[atg_cov] if cap is not None else None
+            if capm is not None:
+                st = arm_stats(capm, floor)
+                print(f"  {'  ..ATG-covered':<14} {st['n']:>12,} "
+                      f"{st['median']:>14.3e} {100*st['above']:>7.1f}% "
+                      f"{100*st['above10']:>7.1f}%   <- the honest denominator")
+                if st["above"] < 0.5:
                     problems.append(
-                        f"{p.name}: only {100*s['above']:.1f}% of vals_capture "
-                        f"clears the floor — the capture arm is mostly floor")
+                        f"{p.name}: only {100*st['above']:.1f}% of vals_capture "
+                        f"clears the floor WHERE CAPTURE CAN RESPOND")
 
             # expressibility: a position whose covering candidates carry no
             # selection mass cannot move the output however its base changes
@@ -109,7 +136,7 @@ def main():
                 for thr in (1e-4, 1e-2):
                     print(f"  positions with selection mass < {thr:g}: "
                           f"{100*float((m < thr).mean()):.1f}%")
-            banks[p.name] = dict(vals=vals, cap=cap, valid=valid)
+            banks[p.name] = dict(vals=vals, cap=cap, valid=valid, atg=atg_cov)
 
     # cross-seed agreement, on the entries every seed calls finite
     names = sorted(banks)
@@ -125,8 +152,16 @@ def main():
                 ok = np.isfinite(stk).all(0)
                 if not ok.any():
                     continue
+                # STRUCTURAL ZEROS CANNOT AGREE ON A SIGN. np.sign(0) is 0, so a
+                # stop-only position -- where capture is exactly 0 by construction
+                # -- can never be unanimous, and including those deflates the
+                # agreement toward zero for reasons that have nothing to do with
+                # the seeds. They are dropped, and the count that remains is
+                # printed so the denominator is visible.
+                ok = ok & (np.abs(stk) > 0).any(0)
+                if not ok.any():
+                    continue
                 x = stk[:, ok]
-                # sign agreement: how often all five seeds move the same way
                 sgn = np.sign(x)
                 unanimous = float((np.abs(sgn.sum(0)) == len(names)).mean())
                 # correlation of seed 1 against the mean of the rest
