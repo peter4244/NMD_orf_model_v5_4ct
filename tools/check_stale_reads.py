@@ -102,7 +102,7 @@ def main():
 
     if not args.paths:
         if not changed:
-            print("  nothing differs from the reference.")
+            print("  nothing missing from the reference.")
             return 0
         print(f"\n  {len(changed)} file(s) differ from {ref}:")
         for f in sorted(changed):
@@ -139,7 +139,8 @@ def main():
         print(f"\n  {len(stale)} of {len(args.paths)} cited path(s) are stale here.")
         print(f"  Do not quote them. `git merge {ref}` first.")
         return 1
-    print(f"\n  All {len(args.paths)} cited path(s) match {ref}. Safe to quote.")
+    print(f"\n  Nothing missing from {ref} for the {len(args.paths)} cited path(s).")
+    print(f"  (This branch may still be AHEAD — the check asks what you are missing,\n   not whether you differ.)")
     return 0
 
 
