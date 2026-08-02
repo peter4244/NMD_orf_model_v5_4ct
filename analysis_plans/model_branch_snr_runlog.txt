@@ -1,0 +1,32 @@
+=== code (sha256) ===
+42d048b89b3541c8aa9702c3de3deeb6df5a9024b80fd3b046b50c3480b5500d  analysis_plans/model_branch_snr.py
+
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_plans/model_branch_snr.py:60: RuntimeWarning: All-NaN slice encountered
+  ec = np.nanmax(np.abs(f["vals_capture"][i, :P]), 1)
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_plans/model_branch_snr.py:61: RuntimeWarning: All-NaN slice encountered
+  ed = np.nanmax(np.abs(f["vals_decay"][i, :P]), 1)
+BANK results_ism_v6/bank_interp_s100.h5
+live positions sampled 2,111,948   dead 112,895
+
+========================================================================
+MAGNITUDES -- is capture ~1000x smaller, as the exclusion said?
+========================================================================
+  median |vals| among LIVE positions   capture 4.178e-07   decay 2.866e-03   ratio 6861x
+  95th pct floor from DEAD positions   capture 6.607e-12   decay 1.529e-10   ratio 23.1x
+
+========================================================================
+THE DECIDING STATISTIC -- each branch against ITS OWN floor
+========================================================================
+  capture  median |vals| / own floor      63230.2
+  decay    median |vals| / own floor   18745752.0
+  capture is 296.5x worse in signal-to-noise
+     10th pct   capture        0.0   decay     3984.8
+     25th pct   capture        0.0   decay   979077.4
+     50th pct   capture    63230.2   decay 18745752.0
+     75th pct   capture 97492392.0   decay 68603888.0
+     90th pct   capture 1254034176.0   decay 162824160.0
+
+  live positions clearing their own floor:   capture 0.641   decay 0.992
+
+  -> EXCLUSION WAS RIGHT -- and its real reason was never written down
+=== exit: 0 ===
