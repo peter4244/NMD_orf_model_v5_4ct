@@ -97,14 +97,21 @@ Three failure modes that are *not* that one, and all three bit:
   diff; `git show` is. Same rule as the cluster, where `git rev-parse HEAD` is not the provenance of
   what ran.
 - **Compression.** A correction made, accepted by both windows, verified, committed — and then
-  **reintroduced when the state was summarized for a new reader.** This is not hypothetical and not
-  historical: the modeling handoff written at 09:44 today tells its incoming window not to start
-  until three fixes land that had landed at 09:37. Seven minutes. A correction became a blocking
-  instruction inside a document that lists compression as a failure mode.
+  **reintroduced when the state was summarized for a new reader.** Twice in two days, both times in
+  a document written *for a reader* rather than in an analysis. The second: the modeling handoff
+  (`eb48a54`, 09:40:51) told its incoming window not to start until three fixes landed that had
+  landed at 09:37:38 (`4dd9f69`). Three minutes. A blocking instruction, inside a document listing
+  compression as a failure mode. Corrected at `d1a0941`.
 
-  Neither window caught that by being careful. It was caught by going to the commit before repeating
-  a claim about it, which is mechanical. **When any document — including this one — tells you
-  something is owed, blocked, settled or retracted, check the commit before acting on it.**
+  **Then the report of it repeated the error class.** I gave the gap as seven minutes, from the
+  file's mtime rather than the commit time — and the mtime had since moved to 09:47:36, because the
+  correcting commit rewrote the file. A filesystem timestamp and a commit timestamp are two
+  quantities with one name. Caught by the model window checking my number.
+
+  Neither instance was caught by anyone being careful. Each was caught by going to the artifact
+  before repeating a claim about it, which is a step and not a virtue. **When any document —
+  including this one, including this bullet — says something is owed, blocked, settled or retracted,
+  check the commit before acting on it.** `git log --date=iso --format='%h %cd %s' -1 <sha>`.
 
 And the limit of the arrangement: **replication catches errors the two implementations do not
 share.** Both windows built the run-length statistic independently, agreed to four decimals, and were
