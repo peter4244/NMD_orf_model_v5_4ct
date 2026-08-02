@@ -554,9 +554,44 @@ From the measured compositions:
     elevated     A .214  C .206  G .297  T .284     H = 1.9809 bits
     IC of a composition-only column vs background       0.0183 bits
 
-**A CWM column carrying ≤ 0.018 bits over background is fully explained by the keto
-skew**, and must clear it by enough to survive the multiplicity of columns tested.
-Computable now, from numbers already measured, with no reference set.
+**A CWM column carrying ≤ ~0.016–0.018 bits over background is fully explained by
+the keto skew.** Bracketed, not point-quoted: 0.0183 on 600 transcripts here,
+0.0159 on 800 in the other window. The difference is sampling, but a single
+decimal-quoted figure is how 0.877 and 2.34 both travelled further than they should
+have this week.
+
+**Report per-column KL beside every CWM, not a pass/fail.** The bar is worth far
+less at the weak end than the strong:
+
+    strong consensus, 90% one base    1.358 bits    75x the bar
+    moderate,         60/20/10/10     0.423 bits    24x
+    weak,             35/25/25/15     0.055 bits     3x
+
+At 3×, with width 11 across several clusters, multiplicity eats it entirely. The bar
+rejects the keto skew and nothing more; a pass/fail would imply a discrimination it
+does not have.
+
+**SEQLET CALLING IS A SECOND CONVENTION, and it selects different positions.**
+Ours is the top 1% by **max |vals| across substitutions** — unsigned magnitude.
+MoDISco calls seqlets on the windowed **actual** contribution `hyp[obs]`, which under
+mean-centring is `−mean_b(vals[b])` — signed. A position where one substitution
+raises the logit hard and another lowers it hard scores high on ours and near zero on
+theirs, because the signed mean cancels. **Highly sensitive but not directionally so
+is a seqlet to us and invisible to MoDISco.**
+
+Which is correct depends on what a motif is taken to be — "this base suppresses
+decay" (signed) against "this position is load-bearing whichever way it moves"
+(unsigned) — and that cannot be settled a priori. **Extract on both and report the
+overlap; the overlap fraction is itself informative about which kind of feature the
+branch learned.** It also sharpens the SpliceAI control: GT/AG is a *directional*
+consensus, so the signed criterion must recover it, and failure there means the port
+is wrong on a model where the answer is known.
+
+**Confidence, stated because it was overstated once already:** mean-centring being
+correct for ISM contributions is algebra and is verified in both windows. Mean-centring
+being what MoDISco *requires* rather than merely tolerates is reasoning from how the
+method works, **not** from reading its source, and should be checked there before the
+port rather than after.
 
     keto  (G+T)  elevated .581  background .501   ratio 1.160
     amino (A+C)  elevated .420  background .499   ratio 0.842
