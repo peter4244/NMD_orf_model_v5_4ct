@@ -255,6 +255,42 @@ covered by **exactly one** ATG window so the covariate is well defined:
     900 (saturated)          26,996         10.78%
     point-biserial r = +0.1457
 
+**RESOLVED — the driver is selection mass, and the interpretation flips.** Tested
+the interpretability window's third hypothesis on the same positions:
+
+    dead rate by SELECTION MASS
+      p_select < 1e-8            n  9,044       32.38%
+      p_select >= 1e-8   every remaining stratum, n 29,148      0.00%
+
+    fill extent, HOLDING mass
+      p_select < 1e-8      saturated 34.74%   truncated 2.70%
+      every other stratum  saturated  0.00%   truncated 0.00%
+
+    r(extent, dead)          = +0.1457
+    r(log10 p_select, dead)  = -0.7294
+
+Every dead perturbation is in the near-zero-mass stratum, and it is a **threshold,
+not a gradient** — 0.00% in all five strata above 1e-8. Fill extent's association
+disappears once mass is held, except *within* the dead-mass stratum where it still
+modulates 34.7% against 2.7%, so extent is a partial proxy rather than a pure one.
+Saturated upstream extent means `orf_start >= 901`, so many AUGs precede the
+candidate and its stick-breaking mass is a product over a long prefix.
+
+**This changes what a liveness gate means.** It is not a geometric artifact
+corrupting the measurement. At `p_select` < 1e-8 a dead perturbation is a *true
+statement*: nothing done to that window moves the output, because no mass reaches
+it. The gate is correctly identifying candidates the model cannot route to.
+
+**The differential exclusion is still real, but it is biological rather than
+encoding.** The mechanism cell has long 5′UTRs, therefore more upstream candidates,
+therefore more deep low-mass ones. The honest framing is not "the gate is broken"
+but *"the mechanism arm contains more unreachable candidates, and any comparison
+must say whether it is counting them."* Those two readings imply different fixes,
+which is why this was worth testing before the sentence was written.
+
+**The superseded reading, kept because the shape is still unexplained on its own
+terms:**
+
 **The direction holds; the shape does not.** This is a step at saturation, not a
 gradient. The proposed mechanism — more filled positions competing to be a bin's
 pooled maximum — predicts a smooth rise with extent, and there is none: every
