@@ -137,6 +137,54 @@ signal-to-noise, not a demonstration of it. Measure before relying on it.
 be high for `vals` and low for `vals_capture`. If it is low, capture-arm findings
 need cross-seed replication as a gate, not as a robustness check.
 
+## Anchoring on the reference candidate is a differential exclusion
+
+From the interpretability window, and it is the sharpest trap waiting for tomorrow.
+**3,422 of the 4,999 subset transcripts have a reference candidate; the 1,577
+without are not evenly spread.** The NMD / no-main-ORF-stop cell — the mechanism
+cell this section is about — retains 49.9%, while its matched control, control /
+no-main-ORF-stop, retains 93.1%.
+
+So any analysis that filters on `cand_is_ref_cds`, or anchors a positional profile
+on the reference start, drops half the mechanism cell and almost none of its
+control. A difference between them would then be partly the filter. This is the
+same shape as the geometric leaks in §8.5: the control that looks like it holds
+something fixed is itself correlated with the comparison.
+
+`qc_ism_banks.py` is **not** exposed — checked, not assumed: it reads only `valid`,
+`vals`, `vals_capture`, `vals_decay`, `mass` and `chunk_rows`, and never touches
+`cand_is_ref_cds`. Anything built tomorrow needs the same check made explicitly.
+
+## Two worktrees, and the merge that now has to be deliberate
+
+Both windows were committing from one checkout and `git add -A` swept up whatever
+the other had in flight. It cost provenance in both directions — several of the
+interpretability window's files landed under my commit messages, including the
+chunk-invariance probe that stopped five banks shipping at the wrong chunk size,
+and half of their anchor fix sits inside my `e7da9b2`. Nothing was lost, but the
+history is wrong about who did what.
+
+    ~/claude_projects/NMD_orf_model_v5_4ct          master   this window
+    ~/claude_projects/NMD_orf_model_v5_4ct_interp   interp   interpretability
+
+Layout is in `analysis_plans/WORKTREE_LAYOUT.md` (aedf42a).
+
+**The new obligation is merging, in both directions, often:**
+
+    git -C ~/claude_projects/NMD_orf_model_v5_4ct merge interp
+
+Neither window now sees the other's new files until a merge, and today each of us
+used the other's code within minutes of it being written. Infrequent merges trade
+one failure mode for a worse one.
+
+**Two things worktrees do not fix.** The results directories are shared by symlink,
+so two builds writing one shard directory would still collide — the bank build is
+unaffected and unprotected in equal measure. And both windows `scp` to the same
+cluster directory, which is a second clobbering channel entirely outside git.
+
+Also adopted: **stage explicit paths, never `git add -A`.** That is the fix for the
+thing that actually happened.
+
 ## Traps that still apply
 
 1. **The subset is stratified, not random.** 4,999 transcripts, weights summing to
