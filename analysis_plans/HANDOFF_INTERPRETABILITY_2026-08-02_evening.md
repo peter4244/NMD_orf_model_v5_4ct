@@ -213,13 +213,49 @@ it*; verify a change *by grepping the artifact*.
 move that keeps not working, and it is the bloat mechanism too: every incident spawns
 another document.
 
-**Where the drift actually lives.** Not one script was wrong that day. Self-tests passed,
-runlogs were accurate, every number with a producer was correct. What drifted was
-uniformly the **narration layer** — sentences joining true endpoints through an unmeasured
-middle, a retraction adopted with no producer, "four of the five" when there were six, a
-commit message describing a fix that had not happened. **Prose is the only artifact that
-never gets recomputed.** A script fails when it is wrong; a number gets re-derived; a
-sentence sits there being repeated with growing authority.
+**⇒ AND THAT IS NOT SUFFICIENT — the model window's amendment, which is better than my
+rule.** The `sampling_weight` warning is the *strongest* form of text that can fail:
+machine-written, attached to the data itself, stating a precondition. **It still failed,
+because nothing was obliged to read it.** So: *a contract no consumer must read is
+decoration.* The medium was never the problem; the missing enforcement point was.
+
+**Their counter would have fired where mine would not.** A script that reads the bank and
+computes a mean must either apply `sampling_weight` or declare in one line that it reports
+a subset statistic — **and fail if it does neither.** That triggers on the **shape of the
+computation** rather than on whether a number appears in a table, which is why it also
+catches the qualitative case. Note what it means for my two counters: **producer-before-prose
+would not have caught this** — every one of those numbers had a producer, a runlog, a job id
+and registered predictions; the producers agreed with each other and were wrong together.
+**Nor would the linter** — every number was in the claims table, so it would have gone green.
+
+**Where the drift lives — I claimed "not one script was wrong that day" and it is FALSE.
+Retracted the same evening.** The narration point below stands for the six drifts it was
+drawn from; **the generalisation to the scripts does not.**
+
+⇒ **The bank is a stratified subset and almost nothing reweights it.** `build_ism_bank.py`
+writes the warning into the h5 as an attribute — *scarce mechanism cells taken whole,
+abundant ones sampled, so any population estimate must be reweighted by `sampling_weight`.*
+**Thirty scripts read that bank; two read `sampling_weight`, neither a recovery producer.**
+Verified independently against `results_ism_v6/ism_subset.tsv`: five distinct weights
+summing to **41,765** over a bank of **4,999**, and annotated transcripts over-represented
+about **8×** — while recovery is scored *against the annotation*. So 0.883, 0.793 and 0.697
+are correct **bank** statistics quoted all day as **population** statistics. Nothing is
+retracted because nothing has been recomputed; the model window holds this.
+
+**How exposed is a given number? In proportion to how much its quantity depends on the
+stratifying variables** — `is_nmd`, `has_annotation`, `main_orf_stop`. Recovery is maximally
+exposed. The queue null is not: measured three ways it moves 0.016 — full pool **+0.500**,
+unweighted subset **+0.501**, weighted subset **+0.485** — because it is within-transcript
+queue geometry and the strata are label and annotation axes. **Use that to triage what needs
+recomputing rather than recomputing everything.**
+
+**My error, in the exact class this file warns about.** I had six observations of narration
+drift, generalised to a claim about every script, and never measured the middle. **That is
+A → C with B unmeasured — the rule this window filed — applied to my own summary.**
+
+*What survives:* **prose is the only artifact that never gets recomputed.** A script fails
+when it is wrong; a number gets re-derived; a sentence sits there being repeated with
+growing authority. That is true of the six drifts. It is not the whole disease.
 
 **Two counters, cheapest first.**
 
