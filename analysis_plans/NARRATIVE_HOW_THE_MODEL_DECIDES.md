@@ -39,29 +39,6 @@ model ribosome initiation, or does it pick whichever frame best explains the lab
 
 ---
 
-> ## ⚠ EVERY RECOVERY NUMBER BELOW IS A SUBSET STATISTIC. Pete, 2026-08-02.
->
-> The bank is **stratified, not a random sample**, and it says so in its own metadata:
-> *"Scarce mechanism cells were taken whole and abundant ones sampled, so the bank's
-> composition is not the pool's. Any population-level estimate must be reweighted by
-> `sampling_weight` or it describes this subset rather than the pool."*
-> **Thirty scripts read this bank. Two read `sampling_weight`, and neither is a recovery
-> producer.** So 0.883, 0.793, 0.702, 0.460 and 0.304 all describe the bank, not the
-> transcript pool.
->
-> **Worse for §4's scope claim.** The strata are `{NMD, control} × {main-ORF stop, NO
-> main-ORF stop, no annotation}` — the bank was deliberately balanced **on whether the
-> annotated main ORF carries a premature stop**, which is the exact axis §4 interprets.
-> Its composition along that axis was engineered, so §4's mechanism conclusion may be
-> reading the sampling design. **C21 is suspended pending a reweighted recompute.**
->
-> **And the benchmark drops 2,354 of 4,999 transcripts** — 47% — as unannotated, a
-> population `build_ism_subset.py` describes as *"where most NMD lives."*
->
-> Contrasts between arms on the same transcripts (§1's +0.489) are the most robust to
-> this; levels (0.883, 0.460) are the least. Nothing here is retracted yet, because
-> nothing has been recomputed yet.
-
 ## 1. The picker gates a queue; it does not rank
 
 `p_select_k = p_capture_k × Π_{j<k}(1 − p_capture_j)`, ordered 5′→3′. A candidate wins by
@@ -175,6 +152,9 @@ independently of anything we compute (job 8900631):
 **The posterior is a decay-seeking correction** — +0.090 where the annotated frame is
 decay-causing, −0.253 where it is not, both gene-clustered and both excluding zero (job
 8900950).
+
+*Levels here are unweighted means over a stratified bank, so they describe the bank's
+composition rather than the pool's; the appendix says what that does and does not touch.*
 
 **The floor under 0.883 is 0.460** — longest ORF, on these same transcripts, headroom
 **+0.423** (job 8900942). The interval measured is the prior's margin over that floor,
@@ -360,6 +340,27 @@ frequently a uORF." It rose to 0.702. The error was conflating two NMD mechanism
 sentence is true of uORF-mediated decay and false of the premature-stop-in-main-frame decay
 that GENCODE's NMD biotype actually contains. Chasing down *why* the prediction failed is
 what produced §4's scope caveat, which is the more useful result of the two.
+
+## The bank is stratified, and what that does to these numbers
+
+`build_ism_subset.py` takes scarce mechanism cells whole and down-samples abundant ones,
+recording a `sampling_weight` per transcript; `build_ism_bank.py` writes the consequence
+into the h5 as an attribute — population-level estimates must be reweighted or they
+describe the subset. **No recovery producer applies it**, here or in the earlier work, so
+every level in this document (0.883, 0.793, 0.702, 0.460, 0.304) is a bank statistic.
+
+**What this touches, and what it does not.** It moves the **magnitudes**. It does not move
+§4's mechanism conclusion, because that one is **definitional**: GENCODE assigns
+`nonsense_mediated_decay` on the annotated CDS terminating prematurely, so a transcript
+with an intact main CDS and a regulatory uORF is `protein_coding` whatever we sample. The
+biotype selects one mechanism by construction. §1's +0.489 is a contrast between two arms
+on the same 1,099 transcripts, which is the shape least disturbed by reweighting; the
++0.091 margin is the most exposed of the contrasts.
+
+**Two provenance gaps recorded, not closed.** `gencode_biotype_bank.tsv` has no producer —
+committed in `d63b5bd` as data beside its consumer, so the GENCODE release and the
+ID-matching rule are unrecorded. And the benchmark drops 2,354 of 4,999 bank transcripts as
+unannotated, a population `build_ism_subset.py` calls *"where most NMD lives."*
 
 ## Predictions this document made and lost
 
