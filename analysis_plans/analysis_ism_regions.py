@@ -81,6 +81,30 @@ def per_position_effect(vals):
         return np.nanmax(np.abs(vals), axis=1)
 
 
+def gc_neutral_effect(vals, dgc):
+    """|effect| of the ONE substitution at each position that preserves GC status.
+
+    MAUDE'S DISCRIMINATING TEST FOR THE CLUSTERING RESULT. Channel 5 is a rolling
+    GC fraction over +/-25 bases, so adjacent positions share nearly all of their
+    GC window and their effects are correlated BY CONSTRUCTION. Run-length
+    clustering could therefore be an encoding artifact containing no biology.
+
+    Every position has exactly one GC-neutral alternative -- A<->T if the observed
+    base is A or T, C<->G if it is C or G -- so this needs no matching and drops
+    no positions. If the clustering survives when only those substitutions are
+    scored, the GC smoothing is not what produces it.
+
+    `dgc` is +1 for non-GC -> GC, -1 for the reverse, 0 when unchanged. The
+    observed base itself is NaN in `vals`, so it cannot be selected even though its
+    dgc is also 0.
+    """
+    out = np.full(len(vals), np.nan, dtype=np.float64)
+    ok = (dgc == 0) & np.isfinite(vals)
+    r, c = np.nonzero(ok)
+    out[r] = np.abs(vals[r, c])
+    return out
+
+
 def atg_coverage(spans, P):
     """Positions covered by ANY candidate's start-codon window.
 
@@ -351,6 +375,12 @@ def main():
                          "the job that needs it; NOT for analysis, since the bank "
                          "order is the stratified subset order and a prefix is not "
                          "a sample of it.")
+    ap.add_argument("--gc-neutral-only", action="store_true",
+                    help="score each position by its ONE GC-preserving "
+                         "substitution instead of the max over all three. "
+                         "Discriminates real clustering from the rolling-GC "
+                         "window's built-in correlation between adjacent "
+                         "positions.")
     ap.add_argument("--seed", type=int, default=20260801)
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
@@ -411,6 +441,10 @@ def main():
     key = {"vals": "vals", "cap": "cap", "dec": "dec"}[args.column]
     name = {"vals": "the transcript logit", "cap": "the capture branch",
             "dec": "the decay branch"}[args.column]
+    if args.gc_neutral_only:
+        for r in recs:
+            r[key] = gc_neutral_effect(r[key], r["dgc"])[:, None]
+        name += ", GC-PRESERVING SUBSTITUTIONS ONLY"
     print(f"{len(recs)} transcripts, effect column = {name}\n")
 
     if len(paths) > 1:
