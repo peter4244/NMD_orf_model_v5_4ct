@@ -17,6 +17,12 @@ rounds of cross-review and both still contained errors at the end of the second.
 
 Do **not** start by reading the older handoffs. They contain claims retracted since.
 
+**State on arrival.** Nothing running on the cluster; both worktrees clean. The model window's review
+of the plan is **already folded in** at `4dd9f69` — three fixes: the stopping rule rewritten (it still
+named A1 after A1 was dropped, and a rule naming a nonexistent analysis gets read loosely at exactly
+the moment it fires); A2 given two independent implementations against one shared row; B2 formally
+blocked. There is no pending review queue. The figures window has the retractions below.
+
 ---
 
 ## What is true now
@@ -26,7 +32,7 @@ All on the five production ISM banks: `results_ism_v6/bank_interp_s{100..500}.h5
 
 | claim | evidence | caveat that must travel with it |
 |---|---|---|
-| **Elevated decay positions sit at a keto base (G or U) in a uridine-rich, cytosine-poor window** | keto 1.148×, amino 0.851×, **G+C flat at 1.004×**; flanks ±2–6 carry U at 1.19–1.41 with A flat | **U-rich, not AU-rich** — A contributes nothing. The centre is GC-neutral; the AU enrichment is in the *flanks*, and reporting the centre while describing the whole signal was an error Pete caught |
+| **Elevated decay positions sit at a keto base (G or U) in a uridine-rich, cytosine-poor window** | keto 1.148×, amino 0.851×, **G+C flat at 1.004×**; flanks ±2–6 carry U at 1.19–1.41 with A flat | **U-rich, not AU-rich** — A contributes nothing. The center is GC-neutral; the AU enrichment is in the *flanks*, and reporting the center while describing the whole signal was an error Pete caught |
 | **The signal is not the GC encoding window** | profile decays to baseline by ~8 bases and is gone by 20; channel 5 averages over ±25 | wrong length for the encoding, right length for a sequence feature |
 | **Five members agree on sequence far better than on position** | k-mer enrichment r = 0.7529 (0.7176–0.8111) against positional Jaccard 0.125 | uses the **elevation rule**, so it does not survive a negative A2 untouched |
 | **A PWM predicts importance on held-out genes** | held-out r = 0.1316 = in-sample, 5.5M confirmation positions, disjoint genes | **1.73% of variance.** This is a ceiling on what any single motif can be worth, not a finding |
@@ -38,7 +44,7 @@ All on the five production ISM banks: `results_ism_v6/bank_interp_s{100..500}.h5
 | retracted | why it died |
 |---|---|
 | run-length clustering, "hundreds of times a count-matched null" | the null placed marks at random, destroying autocorrelation the track has **architecturally**. The track is smooth because selection mass is smooth (log-mass correlation 0.93 with the effect track). The statistic showed the track is autocorrelated, not that a sequence feature exists |
-| "AU-rich element" | G+C is flat at the elevated position — 0.505 against 0.502. AU and GC are complementary, so there is no AU enrichment at the centre |
+| "AU-rich element" | G+C is flat at the elevated position — 0.505 against 0.502. AU and GC are complementary, so there is no AU enrichment at the center |
 | the GC confound, and the control built for it | the elevated set was never GC-biased. The GC-preserving operator drove G+C to **0.679** — the control was three times more biased than the thing it tested. Its k-mer output is discarded, not fixed |
 | directionality, "21% above the noise floor" | moved to *not settled*. Elevated positions are **defined** as the largest effects, and directionality rises with effect magnitude across all positions, so the claim may be tautological. Untestable until magnitude is held fixed |
 | "§5's mechanism claim rests on the capture arm" | E4/E5 read `p_select` / `p` off forward passes and never touch `vals_capture`. The capture floor threatens D3 and sequence-level *explanations* of capture, nothing else |
