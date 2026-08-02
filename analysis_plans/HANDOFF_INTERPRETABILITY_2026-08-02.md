@@ -113,10 +113,20 @@ Three failure modes that are *not* that one, and all three bit:
   including this one, including this bullet — says something is owed, blocked, settled or retracted,
   check the commit before acting on it.** `git log --date=iso --format='%h %cd %s' -1 <sha>`.
 
-And the limit of the arrangement: **replication catches errors the two implementations do not
-share.** Both windows built the run-length statistic independently, agreed to four decimals, and were
-both wrong — neither had written the hypothesis down first. Hence: hypothesis row → one
-implementation → replication only for load-bearing survivors.
+Two limits of the two-window arrangement, both found by hitting them:
+
+**Replication catches only the errors the two implementations do not share.** Both windows built the
+run-length statistic independently, agreed to four decimals, and were both wrong — neither had
+written the hypothesis down first, so the error sat upstream of both implementations where no amount
+of independence reaches it. Hence the ordering: hypothesis row → one implementation → replication
+only for load-bearing survivors.
+
+**Every number here has been independently recomputed at least once. No paragraph has.** That is the
+gap, and it is exactly where both surviving failures live (model window, `7225cdb`). The reason is
+structural: an analysis gets *re-run*, but a document gets *read* — a compressed error in prose
+arrives at the next window as a fact with no producer attached, nothing to re-execute, nothing to
+diff, no runlog to open. You inherit this gap. The fix has the same shape as everything else above:
+**when a document states a result, open the producer before believing it.**
 
 ---
 
