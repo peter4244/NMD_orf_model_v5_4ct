@@ -326,10 +326,24 @@ def main():
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
 
-    pool = pd.read_csv(REPO / "results_pool_v6" / "orf_pool.tsv", sep="\t",
-                       usecols=["isoform_id", "slot", "orf_start", "orf_end",
-                                "is_ref_cds"])
+    # THE POOL TABLE IS READ ONLY IF A SHARD DIRECTORY NEEDS IT. `load_h5` takes
+    # the reference candidate from the bank's own `cand_is_ref_cds`, so an
+    # assembled-bank run needs nothing outside the .h5 -- and on the cluster the
+    # pool table sits at a path derived from __file__, which is exactly the
+    # dependency that turns "copied the script up" into "job died on a file it
+    # never opens". Loading it unconditionally cost nothing locally and would have
+    # cost a submission remotely.
     paths = [x for x in args.shards.split(",") if x]
+    pool = None
+    if Path(paths[0]).is_dir():
+        pool_tsv = REPO / "results_pool_v6" / "orf_pool.tsv"
+        if not pool_tsv.exists():
+            sys.exit(f"shard input needs {pool_tsv}, which is not there. An "
+                     f"assembled .h5 needs no pool table; pass one of those, or "
+                     f"run from a tree where the pool exists.")
+        pool = pd.read_csv(pool_tsv, sep="\t",
+                           usecols=["isoform_id", "slot", "orf_start", "orf_end",
+                                    "is_ref_cds"])
     recs = load_bank(paths[0], pool)
     if not recs:
         sys.exit(f"no usable transcripts in {paths[0]}")
