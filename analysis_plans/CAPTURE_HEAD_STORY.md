@@ -83,6 +83,30 @@ because the next person will hit the same shape.
 | C14 | **Routing itself is INDIFFERENT to junction structure.** `p_select ~ n_downstream_ejc` is **−0.050**. The head *avoids* junction-bearing candidates at **−0.453**; the 5′→3′ queue contributes **+0.403** and the two nearly cancel. The junction preference in the product comes from `d` (posterior ~ ejc **+0.101**), not from selection. | model | within transcript, n = 4,815 | job 8900643 |
 | C15 | **But routing is label-split**: `p_select ~ ejc` is **+0.119** in NMD transcripts and **−0.189** in controls, a 0.31 gap. The model cannot see labels, so this is carried by sequence and is **unexplained**. | model | n = 2,415 / 2,400 | job 8900643 |
 
+| C16 | **C14's "indifferent" is length masking a strong relationship.** Holding ORF length, `p_capture ~ ejc` collapses −0.453 → **−0.009** (the head's aversion IS length), but `p_select ~ ejc` **inverts and grows, −0.050 → +0.442**. **At matched length the model routes strongly toward junction-bearing candidates.** | model | within transcript, n = 4,682 / 4,672 | job 8900685 |
+
+### C16 partially reverses C14, and the marginal number is the misleading one
+
+The interpretability window proposed the −0.453/+0.403 cancellation was one ORF-length
+relationship seen twice with opposite sign. **Half right.** The head's arm is exactly
+that — it collapses to −0.009. The routing arm is not: length was *suppressing* a
++0.442 relationship, the same inversion C7 produced when position was held.
+
+So **"routing is indifferent to junction structure" is true marginally and false at
+matched length**, and the marginal version is the one that misleads, because the
+masking is what produces it. Among candidates the model is actually choosing
+between — same length, different junction structure — it routes toward the
+junction-bearing one.
+
+**Pete's founding hypothesis holds in that form.** It failed as a marginal claim
+(C14) and holds as a within-length one (C16), and only the second describes a
+choice the model makes.
+
+*Why a length partial is legitimate here* when Pete ruled it out elsewhere: his
+correction applies when the question is *how big is the effect*, since length sits
+upstream of window content. It does not apply when the question is *are these two
+arms the same relationship*, which is what a partial answers.
+
 ### C14 retires a sentence both windows were using
 
 **"The model selects premature-stop-bearing frames" is FALSE at the routing step.**
