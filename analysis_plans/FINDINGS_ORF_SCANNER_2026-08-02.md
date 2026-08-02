@@ -52,6 +52,56 @@ uses.
 
 ---
 
+## THE BENCHMARK WAS WRONG, AND FIXING IT REVERSES THE HEADLINE
+
+*Pete, 2026-08-02. C2/C3/C11 score on recovering the ANNOTATED reference CDS. For
+an NMD substrate that is close to a **disjoint** concept from finding the
+decay-causing ORF. **ATF4 is the proof:** the posterior flips 18× onto the 179-nt
+uORF, puts 93% of the signal there, reproduces the textbook mechanism — and on the
+old benchmark scores as a **miss**. A benchmark on which the right answer is wrong
+is not a benchmark.*
+
+Rebuilt on transcripts where the annotated CDS is **itself PTC-bearing** — its own
+stop has a junction downstream — so recovery and decay-causation coincide. No
+biotype column exists in our tables; the set is identified structurally. Job 8900407.
+
+**Anchored on the GENCODE annotation:**
+
+| stratum | n | prior | posterior |
+|---|---|---|---|
+| **PTC-bearing anchor, NMD** | 1,995 | **0.908** | **0.941** |
+| non-PTC anchor, NMD | 453 | 0.722 | 0.483 |
+| PTC-bearing anchor, control | 1,254 | 0.849 | 0.892 |
+| non-PTC anchor, control | 1,193 | 0.900 | 0.661 |
+
+**When recovery means decay-causation the model is right 94% of the time**, against
+the 0.697 headline. That headline was averaging two populations the model handles
+completely differently.
+
+**And the posterior is a decay-seeking correction, visible in its sign.** It
+*improves* recovery where the answer is decay-causing (+0.033) and *degrades* it
+where it is not (−0.239 in NMD, −0.239 in control). The decay term pulls weight
+toward junction-bearing candidates — right when that is the answer, wrong
+otherwise. **This is the backwards-reasoning account showing up in the benchmark
+itself**, which is the BETTER outcome registered before the run.
+
+**The anchor choice was the largest lever in the measurement**: 0.753 on the pool
+reference against 0.908 on the GENCODE annotation. Both were run because an
+unexamined choice between them is this project's error class.
+
+> **⇒ C2, C3 and C11 are hereby scoped to MAIN-ORF RECOVERY.** "A length heuristic
+> reproduces 97%" is a statement about finding the main ORF and says nothing about
+> finding the ORF that causes decay. On that second question, which is the one that
+> matters, the model scores 0.941 and no heuristic baseline has been measured
+> against it.
+
+*A defect in my own test, recorded:* the docstring registered a BETTER branch and
+the code implemented only the ≥0.60 MEANINGFUL threshold, so the script printed the
+coarser verdict. The registered rule governs; the implementation was less precise
+than the pre-specification.
+
+---
+
 ## What the capture head is doing, and it is not initiation
 
 | # | claim | job |
