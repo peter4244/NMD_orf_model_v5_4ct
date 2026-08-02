@@ -500,10 +500,25 @@ Note the case that already exists and is worth not extending: `results_tensor_v6
 is present on **both** machines. That is the ambiguity this decision avoids
 repeating for the banks.
 
-There is also a hard reason beyond tidiness. **The laptop has 8 GB of RAM.** One
-bank with its dense arrays loaded is 3.9 GB; a cross-seed statistic over five seeds
-needs `vals` and `vals_capture` resident at 7.9 GB plus a stacked copy. Local
-cross-seed analysis is not slow, it is impossible.
+**The memory picture, corrected — it depends entirely on how the file is read.**
+The laptop has 8 GB of RAM, and the bank's `vals` is `(4999, 9833, 4)` float32:
+
+    dense, whole-array reads (`f["vals"][:]`)   0.79 GB per array
+      five such arrays                          3.9 GB
+      cross-seed, vals + capture over 5 seeds   7.9 GB + a stacked copy  -> impossible locally
+    sliced, retaining only real extents         ~0.66 GB for one bank
+      per-member effect tracks, five seeds      ~0.4 GB                  -> fits easily
+
+Padding is **77.5%** of the dense array, which is the whole difference. Code that
+slices per transcript never materialises the padded form and fits comfortably; code
+that slurps does not. `qc_ism_banks.py` slurps by design and is cluster-only;
+`analysis_ism_regions.py` slices and is not.
+
+Two size figures were computed tonight over different sets and disagreed: `W` is
+**9,833**, the largest *last covered position*, not 18,626, which is the largest
+`tx_length` in the subset — a transcript is covered only to its last window, not to
+its end. Likewise 11,062,149 valid positions against 15,018,697 as the sum of
+`tx_length`. Checked against the bank rather than argued.
 
 So: **every real computation on the banks runs on Explorer.** `qc_ism_banks.py` is
 cluster-only by construction — it uses `f["vals"][:]`, which loads 786 MB per array
