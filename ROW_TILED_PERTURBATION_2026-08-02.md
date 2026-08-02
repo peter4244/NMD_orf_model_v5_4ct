@@ -150,6 +150,44 @@ passes — seconds of GPU, and the read is tens of megabytes.
 
 ---
 
+## Second run — registered 2026-08-02, before it ran
+
+*The first run refuted prediction A and left B unearned. This run tests a different
+prediction and I am narrowing its stated purpose because my first proposal for it was
+wrong.*
+
+**WHAT IT CANNOT DO, corrected.** I proposed re-running with a finer grid to settle
+whether the offset between peak and predicted fill boundary is constant (supporting B) or
+rising (against it). **That is not available.** Downstream tiles are already 25 nt, below
+the ~42-position receptive field, so finer tiles there measure blur rather than location.
+**The offset question is bounded by the architecture, not by tile choice, and no tiling
+run can settle it.** Recorded so it is not proposed a third time.
+
+**WHAT IT DOES TEST — the model window's sparsity prediction, registered by them before
+this run.** Their measurement found capture sensitivity *sparse rather than weak*: lower
+quartile at zero, upper quartile exceeding decay's in floor units. If that is right, then
+at 25 nt upstream resolution:
+
+> **Adjacent upstream tiles should be HIGHLY VARIABLE**, because sparse critical positions
+> land in some tiles and not others — **not the smooth monotone rise** the 125 nt tiling
+> showed (0.031 at −838 to 0.18 at −88).
+
+**The first run cannot distinguish these.** At 125 nt a tile holding one critical base and
+a tile with weak signal spread over 125 produce the same median. That is their point and
+it is correct.
+
+**Outcomes, fixed before the run.**
+
+| result | reading |
+|---|---|
+| upstream tiles highly variable, adjacent tiles differing severalfold | sparsity confirmed; the smooth rise at 125 nt was an averaging artifact |
+| upstream profile still smooth at 25 nt | capture's upstream sensitivity is genuinely diffuse, and the sparsity seen at position level does not aggregate into localised tiles |
+| variable only near the anchor, smooth far upstream | both — a localised initiation signal on a diffuse background |
+
+**Implementation: no code change.** `--coarse 25` gives 25 nt tiles throughout, 40 tiles
+against 12. Same script, same sha, same sample and seed as job 8900209 so the two runs are
+directly comparable.
+
 ## Prerequisites
 
 1. **The checkpoint.** Not local. `n_bins` and `permute_bins` live in its saved arguments
