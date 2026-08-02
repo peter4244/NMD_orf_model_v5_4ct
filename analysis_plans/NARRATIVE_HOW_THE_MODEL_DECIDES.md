@@ -94,39 +94,28 @@ ones. **The head fails precisely where initiation biology says context should de
 | position only | −0.553 |
 | **length and position together** | **−0.070** |
 
-*C14. Producer `model_c16_retraction.py`, **job 8900746**, candidate filter k ≥ 4 —
-the same population as job 8900685. An earlier version of this table quoted +0.452
-and −0.067, which came from a k ≥ 6 run in an uncommitted temp file; the producer
-now reports both filters so the difference is visible rather than resolved by
-preference, and the conclusion is identical under each. Internal check: the
-rank-residual partial agrees with the closed form at one covariate.*
-
-*Also (jobs 8900643, 8900685). The head's own aversion, `p_capture ~ junction count`
-−0.453, collapses to −0.009 holding length — that arm is entirely length.*
+*`model_c16_retraction.py`, job 8900746. The head's own aversion, −0.453, collapses to
+−0.009 holding length — that arm is entirely length. Provenance and the corrections behind
+this table are in the appendix.*
 
 **Routing is indifferent to junction structure.** Length and position each mask the
 other in opposite directions, so holding either alone manufactures a signal that is
-not there; holding both returns −0.067, agreeing with the marginal −0.050.
+not there; holding both returns −0.070, agreeing with the marginal −0.050.
 
 ⇒ **Pete's founding hypothesis does not hold at the routing step under the only valid
-conditioning.** The two single partials show large signal (+0.452, −0.543) and both are
+conditioning.** The two single partials show large signal (+0.447, −0.553) and both are
 artifacts — each is the other confounder leaking. The junction preference enters at the
 decay multiplication.
 
 **And an independent second route reaches the same place.** `p_select ~ ejc` is positive
 *by construction*: the queue's survival factor falls monotonically with slot, and earlier
 slots carry more downstream junctions. Measured in-bank, a **queue with no model in it**
-scores +0.334 raw and **+0.568** holding length, against the model's −0.050 and +0.442. So
+scores +0.334 raw and **+0.568** holding length, against the model's −0.050 and +0.447. So
 zero was the wrong reference, and against the right one the model routes toward
 junction-bearing candidates *less* than pure ordering does — a deficit of 0.125.
 *Interpretability window's argument, run in-bank; producer `model_queue_null_inbank.py`,
 f523f72.* **Bound:** the degenerate null maximises queue influence, so 0.125 is an upper
 bound on head aversion and may be generic dilution.
-
-*Why holding length does not hold position, measured rather than argued:*
-`orf_start ~ orf_length` within transcript is only **−0.150** (n 4,815, |r| < 0.30 in 54.8%
-of transcripts). The two covariates are nearly free of each other, which is why holding
-either one alone leaves the other's channel fully intact.
 
 > **⚠ STANDING HAZARD — in this model, any candidate-level correlation is position until
 > proven otherwise.** Four instances in one day: C7 (holding position *strengthened* the
@@ -134,11 +123,6 @@ either one alone leaves the other's channel fully intact.
 > assumed), C16 (a length partial that unmasked position), and the queue-geometry null
 > (`p_select ~ ejc` positive with no model in it). Pair this with the null rule: **for a
 > rank product, a monotone ordering or a normalised share, zero is not the null.**
-
-*This paragraph asserted the opposite for forty minutes.* C16 claimed routing was
-junction-seeking at matched length (+0.442); it held length and not position, and is
-retracted. Kept visible because the retraction table alone would not have shown that
-the body of this document once said it.
 
 **The two stages are aligned, and the queue does it.** `p_select ~ d` +0.399 against
 `p_capture ~ d` +0.091 with the queue removed; the mixture runs **1.29×** above independent
@@ -201,6 +185,16 @@ back **only among short candidates**, where the head must choose among uORFs.
 
 ---
 
+## How to read this
+
+Sections 1–6 are the science. **Every number in them is measured**, with its producer and
+job in the appendix. Two `[unclaimed]` markers flag assertions with no measurement behind
+them — they are deliberate and greppable. The appendix carries provenance and the record of
+what this document got wrong before it got it right; it is there because a narrative that
+only lists what survived cannot be checked.
+
+---
+
 ## Not established
 
 - **Whether the head reads the fill boundary or the start codon.** Closed to tiling.
@@ -221,10 +215,10 @@ back **only among short candidates**, where the head must choose among uORFs.
 |---|---|
 | keto ratio **1.148×** | no reproducible producer; the cited script cannot emit that row |
 | recovery **0.941** | `astype(bool)` on a −1 sentinel → 0.885 → 0.883 against GENCODE |
-| "selects premature-stop frames" | never held: −0.050 marginal, −0.067 holding length and position |
+| "selects premature-stop frames" | never held: −0.050 marginal, −0.070 holding length and position |
 | "separation given back by the objective" as a **global** claim | true only among short candidates |
 | capture sensitivity is **sparse** upstream | diffuse — 32 tiles within ~6% (job 8900420) |
-| **C16 — routing junction-seeking at matched length (+0.442)** | held length, not position; holding both gives −0.067. **C14 stands.** |
+| **C16 — routing junction-seeking at matched length** | held length, not position; holding both gives −0.070, and the figure is below a no-model queue null. **C14 stands.** |
 
 **Six entries. Of those, four were caught by a reader outside the derivation asking what
 a sentence rested on** — 0.941 by an arithmetic ceiling, the marginal routing claim by a
@@ -232,3 +226,82 @@ demand for the direct measurement, the objective sentence by "measured or argued
 sparsity prediction by someone else's tiling. **One (C16) was caught by the author, using
 a rule a reader had proposed an hour earlier. One (1.148) surfaced from a cross-window
 discrepancy.** **None was caught by a check.**
+
+---
+
+# Appendix — provenance and corrections
+
+*Separated from the narrative so the science reads clean. Nothing here is optional: it is
+what makes sections 1–6 checkable.*
+
+## The §3 table, and what it cost to get right
+
+*C14. Producer `model_c16_retraction.py`, **job 8900746**, candidate filter k ≥ 4 —
+the same population as job 8900685. An earlier version of this table quoted +0.452
+and −0.067, which came from a k ≥ 6 run in an uncommitted temp file; the producer
+now reports both filters so the difference is visible rather than resolved by
+preference, and the conclusion is identical under each. Internal check: the
+rank-residual partial agrees with the closed form at one covariate.*
+
+*Also (jobs 8900643, 8900685). The head's own aversion, `p_capture ~ junction count`
+−0.453, collapses to −0.009 holding length — that arm is entirely length.*
+
+*This paragraph asserted the opposite for forty minutes.* C16 claimed routing was
+junction-seeking at matched length (+0.442); it held length and not position, and is
+retracted. Kept visible because the retraction table alone would not have shown that
+the body of this document once said it.
+
+*Why holding length does not hold position, measured rather than argued:*
+`orf_start ~ orf_length` within transcript is only **−0.150** (n 4,815, |r| < 0.30 in 54.8%
+of transcripts). The two covariates are nearly free of each other, which is why holding
+either one alone leaves the other's channel fully intact.
+
+**The producer was missing.** The retraction was first run from an uncommitted temp file:
+the conclusion was committed, the script, runlog and job id were not. The interpretability
+window caught it and stated it exactly — **the retraction was less well-evidenced than the
+claim it retracted**, since C16 had a committed script, a runlog, a job id and predictions
+registered before the run. Fixed at `b76bef8`.
+
+**And that caused a number discrepancy.** The table read +0.452 while job 8900685 read
++0.442 for what looked like the same quantity. Cause: candidate filters k ≥ 6 against
+k ≥ 4. Both are now reported by the producer; the conclusion is identical under each.
+
+    k >= 4   marginal -0.050   length +0.447   position -0.553   both -0.070
+    k >= 6   marginal -0.023   length +0.452   position -0.546   both -0.067
+
+## The same defect, four times, inside this document
+
+**A correction that reaches one part of a document and not another** is the failure this
+narrative exists to record, and it has now happened four times *in this narrative*:
+
+1. The C16 retraction reached the claim map and the retraction table but **not §3's body** —
+   for one commit the document asserted C16 and retracted it simultaneously.
+2. The `+0.362 / +0.400` marker was **removed during a rewrite**, against this document's own
+   instruction not to tidy markers.
+3. The retraction table's count was **wrong twice** — six rows described as "four of the
+   five" — until replaced with an explicit accounting, because a ratio drifts from its
+   contents.
+4. When the §3 table was corrected from k ≥ 6 to k ≥ 4 figures, **the prose beneath it kept
+   quoting the old ones** (−0.067, +0.452, −0.543) for one commit — and then **the
+   retraction table kept them for one commit more**, after the prose was fixed. One
+   correction, three locations, three separate passes.
+
+Each was caught by grepping for the *result* rather than trusting the edit. **None would
+have been caught by reading.**
+
+## Four things this document asserted and had to withdraw
+
+Beyond the retraction table: the C16 retraction initially **did not reach the prose** — for
+one commit §3 asserted C16 in its body and retracted it in its table, inside the commit
+performing the retraction. Caught by grepping for the result rather than trusting the
+commit. The marker on `+0.362 / +0.400` was **removed during a rewrite** against this
+document's own instruction not to tidy markers, and restored. The retraction table's own
+count was **wrong twice** — six rows described as "four of the five" — and is now an
+explicit accounting rather than a ratio, because a ratio drifts from its contents.
+
+## Who caught what
+
+Of the six retractions, four were caught by a reader outside the derivation, one by the
+author using a rule a reader had proposed an hour earlier, one from a cross-window
+discrepancy. **None was caught by a check.** That is the case for reading narratives the way
+analyses are read.
