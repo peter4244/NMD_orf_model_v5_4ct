@@ -497,6 +497,77 @@ conclusion that the runs are transcript-specific.** The amendment is recorded be
 the result for the same reason §8.5's was: the same change afterwards would not be
 defensible.
 
+### 2026-08-02: the seqlet plan, and the four things that decide whether it works
+
+Agreed with the interpretability window. The reason to move off k-mer enrichment is
+**not** that clustering is better — it is that a contribution weight matrix is
+defined by *what recurs across independent sites* and never computes a ratio against
+a reference set. Every problem of the last twelve hours lived in the background.
+`vals_decay` is (n, W, 4), which is natively what MoDISco consumes.
+
+**Order of work, and the gate.**
+
+1. **The SpliceAI positive control is BLOCKING.** MoDISco was demoted here on a
+   measurement — zero patterns from a model that demonstrably encodes GT/AG, on 56
+   seqlets against a floor of 100. That is an underpowered negative. At 110,000
+   seqlets the stated cause is gone. **If the pipeline cannot recover GT/AG from
+   SpliceAI at scale, nothing it says about our model is worth reading.** It is the
+   only control this project has that separates "the method failed" from "the model
+   has nothing".
+2. **Direct PWM fitting before MoDISco** — no background *and* no clustering, ~40
+   parameters against grouping 110,000 seqlets, degeneracy represented natively.
+   **Pre-committed: a poor PWM fit does NOT license "no sequence preference."** A
+   single PWM assumes one motif; several motifs return a blend, and a poor fit is
+   then ambiguous between "nothing" and "more than one". A poor fit licenses going
+   to MoDISco, nothing else. Otherwise we replace one underpowered negative with
+   another, which is how MoDISco was demoted in the first place.
+3. MoDISco as the richer follow-up.
+
+**Four port decisions, each capable of producing a plausible wrong answer.**
+
+- **No reverse complement.** MoDISco revcomp-collapses by default because a TF motif
+  is double-stranded. RNA is single-stranded and the model reads one strand;
+  revcomp would merge genuinely different motifs. The likeliest naive-port error.
+- **The observed base.** `vals` is **NaN at the observed base by construction** — you
+  cannot substitute a base for itself — so MoDISco's four-valued input needs a
+  convention. Writing `L[b]` for the logit under base `b`, the bank gives
+  `vals[b] = L[b] − L[obs]` with `vals[obs] := 0`, so mean-centring is well defined
+  and is what hypothetical contributions already are:
+  `hyp[b] = vals[b] − mean_b(vals[b])`. The alternative — observed = 0, others
+  = −Δ — additionally asserts the observed base contributes nothing, which is false
+  exactly when the observed base is the one doing the work. **Run both; predicted in
+  advance that the second under-weights the consensus base.**
+- **Seqlet width from our data.** The run-length excess concentrates at 4–6 bases, so
+  ~7–11 windows are indicated by measurement rather than by ChIP-seq defaults.
+- **Per-transcript cap and multiple draws.** One long poly-U tract contributes
+  thousands of near-identical seqlets that recur trivially. Stratify the subsample by
+  transcript with a cap, take several independent draws, and require the CWM to
+  recur **across draws as well as across seeds** — the cross-seed logic applied to
+  the sampling axis.
+
+**The composition null, which keeps the no-background property.** A compositional
+tendency also recurs, so recurrence alone cannot exclude the keto skew — but
+composition produces a **low-information** CWM and a motif a high-information one.
+From the measured compositions:
+
+    background   A .256  C .243  G .258  T .243     H = 1.9994 bits
+    elevated     A .214  C .206  G .297  T .284     H = 1.9809 bits
+    IC of a composition-only column vs background       0.0183 bits
+
+**A CWM column carrying ≤ 0.018 bits over background is fully explained by the keto
+skew**, and must clear it by enough to survive the multiplicity of columns tested.
+Computable now, from numbers already measured, with no reference set.
+
+    keto  (G+T)  elevated .581  background .501   ratio 1.160
+    amino (A+C)  elevated .420  background .499   ratio 0.842
+    GC    (G+C)  elevated .503  background .501   ratio 1.004
+
+**What this trades, stated plainly:** the background problem for a clustering
+problem. Seqlet threshold, similarity metric, cluster granularity and alignment
+window are all assumptions capable of manufacturing structure. They are assumptions
+about *the signal* rather than about what a fair comparison population is, which is
+the better thing to have to defend — but it is a trade, not an escape.
+
 ### 2026-08-02: the GC confound was diagnosed by eye and never applied
 
 Measured on 600 transcripts of s100 (`probe_base_composition_bias.py`), base
