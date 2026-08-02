@@ -159,6 +159,42 @@ junction" is close to circular, since that is the property under test. **Until t
 resolved, accuracy on NMD transcripts is uninterpretable rather than merely lower**, and
 no claim should rest on it.
 
+## ⇒ RETRACTED FRAMING: "the alignment comes from the ordering, not the head"
+
+*Pete, 2026-08-02, challenging a sentence in the interpretability window's summary. It does
+not survive, and it contradicts two measurements already in this document.*
+
+**The sentence was:** *the model selects premature-stop-bearing frames, not by looking at
+stops, but because the queue's order correlates with them.* **Three problems.**
+
+**1. The mechanism has been tested twice and refuted twice.** C7 — holding candidate start
+position fixed, the capture-to-junction correlation **strengthened**, −0.460 to −0.582. The
+errors list already records this: *"I proposed position as the route for C6. Measurement
+refuted it."* And the ATF4 correction measured queue position at **22.8%** of cases.
+
+**2. The evidence points the other way.** `capture ~ p_decay` is **+0.362** among short
+candidates and **+0.400** holding EJC constant — the head detects decay-relevance from the
+start window *directly*, which is the opposite of the retracted clause.
+
+**3. The result the sentence rested on is not in this document.** The pair `p_select ~ d`
+**+0.399** against `p_capture ~ d` **+0.091** (job 8899905) has never been written up as a
+numbered claim — no enumeration, no producer row — and was carried into a summary as
+though established. **That is the failure mode this project has spent two days on: a number
+that lives in prose acquiring authority it never earned.** It should be recorded properly
+or dropped.
+
+**WHAT IS ACTUALLY SUPPORTED.** The head uses decay-relevant information detectable from
+the start-codon window. The product correlates with decay more than the head's own scores
+do — **but the cause of that gap is not established, and the one candidate cause we tested
+is refuted.** A defensible restatement, if the underlying pair is recorded: *the head's
+suppression decisions upstream shape which candidate survives the queue, and it makes those
+decisions using decay-relevant information* — which is the head acting **through** the
+queue, not the queue acting instead of the head.
+
+**AND `p_select ~ n_downstream_ejc` HAS NEVER BEEN MEASURED DIRECTLY.** So "the model
+selects premature-stop-bearing frames" currently rests on a two-step chain, `p_select ~ d`
+and `d ~ ejc`, rather than on the direct link. One measurement would settle it.
+
 ## What follows from C9, and it matters for a prior observation
 
 "ORF periodicity bleeding into the 5′UTR" is most likely **the encoding, not the
