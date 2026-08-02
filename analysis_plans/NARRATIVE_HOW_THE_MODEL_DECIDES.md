@@ -215,10 +215,10 @@ only lists what survived cannot be checked.
 |---|---|
 | keto ratio **1.148×** | no reproducible producer; the cited script cannot emit that row |
 | recovery **0.941** | `astype(bool)` on a −1 sentinel → 0.885 → 0.883 against GENCODE |
-| "selects premature-stop frames" | never held: −0.050 marginal, −0.067 holding length and position |
+| "selects premature-stop frames" | never held: −0.050 marginal, −0.070 holding length and position |
 | "separation given back by the objective" as a **global** claim | true only among short candidates |
 | capture sensitivity is **sparse** upstream | diffuse — 32 tiles within ~6% (job 8900420) |
-| **C16 — routing junction-seeking at matched length (+0.442)** | held length, not position; holding both gives −0.067. **C14 stands.** |
+| **C16 — routing junction-seeking at matched length** | held length, not position; holding both gives −0.070, and the figure is below a no-model queue null. **C14 stands.** |
 
 **Six entries. Of those, four were caught by a reader outside the derivation asking what
 a sentence rested on** — 0.941 by an arithmetic ceiling, the marginal routing claim by a
@@ -282,7 +282,9 @@ narrative exists to record, and it has now happened four times *in this narrativ
    five" — until replaced with an explicit accounting, because a ratio drifts from its
    contents.
 4. When the §3 table was corrected from k ≥ 6 to k ≥ 4 figures, **the prose beneath it kept
-   quoting the old ones** (−0.067, +0.452, −0.543) for one commit.
+   quoting the old ones** (−0.067, +0.452, −0.543) for one commit — and then **the
+   retraction table kept them for one commit more**, after the prose was fixed. One
+   correction, three locations, three separate passes.
 
 Each was caught by grepping for the *result* rather than trusting the edit. **None would
 have been caught by reading.**
