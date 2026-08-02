@@ -235,7 +235,7 @@ def main():
         o_start_all, o_end_all = f["orf_start"][:], f["orf_end"][:]
         struct_all, codes_all = f["structural"][:], f["codes"][:]
         # NORMALISED for the model, RAW for the stratification. The model is fed
-        # the normalised block and must be; the question "is a premature stop
+        # the normalized block and must be; the question "is a premature stop
         # present" is about the count, and the two are not interchangeable.
         raw_all = f["structural_raw"][:]
         labels = f["labels"][:]

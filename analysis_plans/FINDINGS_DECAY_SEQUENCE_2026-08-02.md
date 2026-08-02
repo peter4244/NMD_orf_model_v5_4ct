@@ -65,7 +65,7 @@ from clustering.
 | **region anchor definition** — annotated stop vs max-`p_select` stop | same k-mers, same correlations; only split sizes move (model window, job 8893238) | the boundary choice being load-bearing |
 | **across members** — k-mer enrichment vector, five independently trained seeds | mean pairwise r **0.7529**, range 0.7176–0.8111, over all 1,024 5-mers | one initialisation's private solution |
 | **clustering underneath** — runs of ≥4 elevated positions | present at every threshold 0.2%–5%; disjoint gene arms give 914 confirmation against 951 discovery; survives GC-preserving scoring at 57% of its arity-matched level | scattered sensitivity; GC smoothing as the cause |
-| **PWM, held out on disjoint genes** | r = 0.1316 held out against 0.1316 in-sample, 5.5M confirmation positions | overfitting. The sequence→importance relationship generalises |
+| **PWM, held out on disjoint genes** | r = 0.1316 held out against 0.1316 in-sample, 5.5M confirmation positions | overfitting. The sequence→importance relationship generalizes |
 
 ### What is NOT established
 
@@ -118,7 +118,7 @@ the 75th percentile, which is what any position in the stop window does.
 
 ### The coordinate system is verified, so this is not a lookup error
 
-The composition profile centred on the same anchor recovers the stop codon exactly:
+The composition profile centered on the same anchor recovers the stop codon exactly:
 
       offset -2    T 1.000
       offset -1    A 0.465   G 0.535
