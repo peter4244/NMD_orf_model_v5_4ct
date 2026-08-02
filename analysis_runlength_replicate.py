@@ -38,6 +38,23 @@ The fold rule is kept behind `--rule fold` so this script can CONFIRM the invers
 independently rather than accept it on report. A retraction taken on trust is not
 verified.
 
+THE GC CONTROL, AND WHY IT IS THE DECISIVE ONE. Channel 5 averages GC over +/-25
+bases, so two adjacent positions share 49 of the 51 positions in their GC window. If
+the effect of a substitution is driven by the GC shift it causes, adjacent positions
+would have correlated effects BY CONSTRUCTION and the clustering would be an
+encoding artifact containing no biology.
+
+Exactly one of the three substitutions at any position leaves GC status unchanged --
+A<->T and C<->G -- and `dgc` records the change per entry. So:
+
+    --subset neutral    the single GC-preserving substitution per position
+    --subset changing   the two that move GC by +/-1
+    --subset all        max over all three, as the original does
+
+If the clustering survives on `neutral`, GC smoothing is not the driver. If it
+appears only in `changing`, it is. This uses a column already in the bank and needs
+no new forward passes.
+
 THE NULL PRESERVES THE COUNT, NOT THE PLACEMENT. For each transcript the same
 number of elevated positions is redrawn uniformly among that transcript's valid
 positions and the runs recounted. That asks exactly "would this many elevated
@@ -76,6 +93,9 @@ def main():
     ap.add_argument("--k", type=float, default=0.01,
                     help="top fraction (rule=fraction) or median multiple (rule=fold)")
     ap.add_argument("--k-sweep", default="0.005,0.01,0.02,0.05")
+    ap.add_argument("--subset", default="all", choices=["all", "neutral", "changing"],
+                    help="which substitutions contribute: all three, the single "
+                         "GC-preserving one, or the two that shift GC")
     ap.add_argument("--min-run", type=int, default=4)
     ap.add_argument("--null-draws", type=int, default=20)
     ap.add_argument("--limit", type=int, default=0)
@@ -88,6 +108,10 @@ def main():
     rule_txt = ("top K fraction of each transcript's valid positions"
                 if a.rule == "fraction" else
                 "|effect| > K x transcript median  [RETRACTED RULE, for confirmation]")
+    sub_txt = {"all": "all three substitutions per position",
+               "neutral": "ONLY the GC-preserving substitution (A<->T, C<->G)",
+               "changing": "ONLY substitutions that shift GC by +/-1"}[a.subset]
+    print(f"  substitutions: {sub_txt}")
     print(f"  elevation: {rule_txt}; K = {a.k:g}; runs of >= {a.min_run}; "
           f"null redraws the same COUNT, {a.null_draws} draws")
 
@@ -107,8 +131,14 @@ def main():
             v = f["valid"][i]
             if not v.any():
                 continue
-            # max over the three substitutions at each position, as the original does
+            # max over the contributing substitutions at each position
             x = np.abs(f[a.column][i])
+            if a.subset != "all":
+                # dgc is the GC-status change: 0 for the preserving substitution
+                # (and for the observed base, whose vals are NaN and drop out).
+                d = f["dgc"][i]
+                want = (d == 0) if a.subset == "neutral" else (d != 0)
+                x = np.where(want, x, np.nan)
             with np.errstate(all="ignore"):
                 eff = np.nanmax(np.where(np.isfinite(x), x, np.nan), axis=1)
             ok = v & np.isfinite(eff)
