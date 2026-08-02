@@ -23,10 +23,27 @@ base composition at and around them.
 
     base composition at the elevated position, against all valid positions of the same transcripts
 
-      background   A 0.253   C 0.245   G 0.257   T 0.245      G+C 0.502
-      elevated     A 0.214   C 0.210   G 0.295   T 0.281      G+C 0.505
+      background   A 0.251   C 0.250   G 0.261   T 0.239      G+C 0.511
+      elevated     A 0.210   C 0.213   G 0.299   T 0.278      G+C 0.512
 
-      keto  (G+T)  1.148x        amino (A+C)  0.851x        G+C  1.004x
+      keto  (G+T)  1.156x        amino (A+C)  0.845x        G+C  1.004x
+
+      4,999 transcripts; 11,062,149 valid positions; 110,631 elevated at top 1%
+      within transcript; seed 100; dead positions included; finite mask
+      (np.isfinite(vals_decay).sum(1) == 3); pooled by count.
+      Producer: analysis_plans/model_a2_enumeration.py, runlog beside it,
+      Explorer job 8896445.
+
+> **STRUCK 2026-08-02, on Pete's call.** This table previously read keto **1.148×**, amino 0.851×,
+> with background A 0.253 C 0.245 G 0.257 T 0.245 — and cited
+> `probe_elevated_composition_profile.py` as its producer. **That script cannot have produced those
+> lines:** it prints a background row and a per-offset U/C/A+T/G+C table and nothing else, never an
+> elevated A/C/G/T row and never keto or amino. Re-running its exact set definition on the same bank
+> returns keto 1.158, not 1.148.
+>
+> The value is not sensitive to the choice of set. Six definitions spanning 600 against 4,999
+> transcripts, ±60 edge trim against none, and dead-in against dead-out backgrounds all return
+> **1.155–1.162**. The numbers above are the widest of those and are the ones to quote.
 
 **The enrichment is keto versus amino and it is orthogonal to GC.** G+C is flat to four parts in a
 thousand, so there is no GC bias at the sensitive position — and therefore no AU bias either, since

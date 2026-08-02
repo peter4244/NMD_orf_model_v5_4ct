@@ -43,8 +43,10 @@ give a blend indistinguishable from a bad fit. Pre-registered, before running:
 preference".** That is the underpowered negative that demoted MoDISco the first
 time and it is not to be repeated in a new costume.
 
-THE COMPOSITION FLOOR. The elevated set is keto-skewed -- G+T at 1.15x, A+C at
-0.85x, GC flat at 1.00x -- so a fitted column can be entirely composition. Each
+THE COMPOSITION FLOOR. The elevated set is keto-skewed -- G+T at 1.16x, A+C at
+0.85x, GC flat at 1.00x, measured over 4,999 transcripts and 11,062,149 valid
+positions (model_a2_enumeration.py) -- so a fitted column can be entirely
+composition. Each
 column's KL against background composition is reported beside it; the
 composition-only bar is 0.016-0.018 bits, measured independently at 600 and 800
 transcripts. Reported per column rather than as a verdict, because at the weak end

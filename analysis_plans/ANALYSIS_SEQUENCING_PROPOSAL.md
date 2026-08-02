@@ -79,7 +79,7 @@ Every field below was a real decision that a real implementation would otherwise
 | 10 | **decision rule**, with **all** outcomes fixed before the run | A2 had two outcomes written; the missing third was an interaction that would have been rounded up to a positive |
 | 11 | **licensed if positive / negative**, and **what a positive does not license** | every inflated claim this week dropped the qualifier rather than inventing a result |
 | 12 | **owner**, and whether it gets a second implementation | replication is for load-bearing survivors, not for everything |
-| 13 | **enumeration reported beside every statistic** — n units, n observations, n selected, seeds, exclusion handling, and the mask expression. **Never the ratio alone** | the keto ratio is 1.16× in one document and 1.148× in another, both internally consistent, because a table reporting only `.581` and `.501` makes every candidate cause invisible. Two windows, two days |
+| 13 | **enumeration reported beside every statistic** — n units, n observations, n selected, seeds, exclusion handling, and the mask expression. **Never the ratio alone** | the keto ratio read 1.16× in one document and 1.148× in another for two days across two windows, both internally consistent, because a table reporting only `.581` and `.501` makes every candidate cause invisible. Measured 2026-08-02: 1.148× has no producer and was struck. The enumeration is what would have caught it on day one |
 
 **A row with an empty field is not ready to implement.** The implementing window sends it back rather
 than resolving the gap in code — a choice made inside an implementation is invisible to review, which
@@ -287,24 +287,29 @@ elevated label** at that cell's own n, and every ratio is reported against its o
 and ceiling. Whatever the unstratified reference turns out to be, it was measured over ~11M positions
 and the sampling floor at ~28 elevated per cell is far larger.
 
-> **⚠ THE UNSTRATIFIED KETO RATIO IS UNRESOLVED. Do not quote a number for it.**
-> `SEQUENCE_ENRICHMENT_APPROACH.md:849` says **1.16×** (elevated keto .581, background .501);
-> `FINDINGS_DECAY_SEQUENCE_2026-08-02.md:29` reconstructs to **1.148×** (elevated .576, background
-> .502). **Both are internally consistent** — the backgrounds sum correctly in each — so this is
-> neither a transcription slip nor rounding. Same statistic, different set: the fourth instance of
-> the error class, sitting in the two documents that govern this gate.
+> **RESOLVED 2026-08-02, measured. The unstratified keto ratio is ~1.16×, and 1.148× is struck on
+> Pete's call.**
 >
-> **The gate is unaffected**, because the decision rule is the within-cell permutation percentile and
-> "retains X% of the unstratified ratio" was explicitly ruled out. It affects only what may be
-> *quoted*, including in figure legends. Resolution is the second implementation's first output, per
-> field 13 — the table with its enumeration beside it, never the ratio alone.
+> **The ratio is insensitive to the set**, which was the hypothesis and it was wrong. Six definitions
+> spanning 600 against 4,999 transcripts, ±60 edge trim against none, and dead-in against dead-out
+> backgrounds all return **1.155–1.162**. So the disagreement was never a set-definition problem, and
+> the candidate causes listed here previously — background scope, dead handling, seed count, the
+> finite mask — are all ruled out by measurement rather than by argument.
 >
-> **Candidate causes, in order of how much they move .581 to .576:** whether the background is all
-> valid positions of the elevated transcripts or of all transcripts; whether dead positions are in
-> the background (they cannot be elevated but they are valid, so including them shifts background
-> composition without touching the elevated set — **the same open question as the band construction,
-> so one measurement may answer both**); seed count; and whether the finite mask was
-> `isfinite.sum(1) == 3` or something that silently dropped rows.
+> **1.148× has no producer.** `FINDINGS_DECAY_SEQUENCE_2026-08-02.md:29` cited
+> `probe_elevated_composition_profile.py`, which prints a background row and a per-offset
+> U/C/A+T/G+C table and nothing else — never an elevated A/C/G/T row, never keto or amino. Re-running
+> its exact set definition on the same bank returns 1.158. The script is unmodified since it was
+> committed with those findings.
+>
+> **Quote 1.16× with its enumeration attached**, per field 13: 4,999 transcripts, 11,062,149 valid
+> positions, 110,631 elevated at top 1% within transcript, seed 100, dead included, finite mask
+> `(np.isfinite(vals_decay).sum(1) == 3)`. Producer `analysis_plans/model_a2_enumeration.py`,
+> Explorer job 8896445.
+>
+> **The gate was never affected**, because the decision rule is the within-cell permutation
+> percentile and "retains X% of the unstratified ratio" was explicitly ruled out. Writing the rule
+> defensively is what made this a documentation problem rather than a re-run.
 
 #### The decision rule, fixed before the run
 
@@ -343,8 +348,10 @@ fires.
 Between half and 2/3 is **ambiguous, and is not resolved by looking at it.** It is resolved by more
 seeds or a finer sweep, decided before either is examined.
 
-**Not the rule: "retains X% of the unstratified 1.148×."** That makes the confounded quantity the
-denominator. Monotone decline across bands is a **diagnostic to report**, not the gate.
+**Not the rule: "retains X% of the unstratified ratio."** That makes the confounded quantity the
+denominator, and it holds whatever the unstratified value turns out to be — it was written when that
+value was thought to be 1.148× and stands unchanged now that it is measured at ~1.16×. Monotone
+decline across bands is a **diagnostic to report**, not the gate.
 
 #### What a positive does not license
 

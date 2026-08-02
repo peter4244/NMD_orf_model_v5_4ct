@@ -1,0 +1,83 @@
+=== code (sha256) ===
+6e1c1cf6fd5f0dd1be4703c1bf8e04237f40584bcbc8a434396b95125448f9d7  analysis_plans/model_a2_enumeration.py
+=== bank ===
+-rw-r--r-- 1 p.castaldi users 723224704 Aug  1 21:53 results_ism_v6/bank_interp_s100.h5
+
+/home/p.castaldi/cc/nmd_orf_model_v5_4ct/analysis_plans/model_a2_enumeration.py:94: RuntimeWarning: All-NaN slice encountered
+  e = np.nanmax(np.abs(v), axis=1)
+BANK results_ism_v6/bank_interp_s100.h5   transcripts 4999   dead cut 1e-08
+finite mask: (np.isfinite(vals_decay).sum(1) == 3); vals is NaN at
+the observed base by construction, so .all(1) is never true.
+
+==============================================================================
+Q1a  DEAD FRACTION PER TRANSCRIPT -- distribution, not a mean
+==============================================================================
+  transcripts contributing        4999
+  valid positions, total          11,062,149
+  live  positions, total          10,455,375
+  dead  positions, total          606,774   (5.5% of valid)
+  rows whose finite count != 3    0
+
+    decile  dead frac   valid/tx    live/tx
+        0%      0.000        437        437
+       10%      0.000       1102       1098
+       20%      0.000       1437       1415
+       30%      0.000       1663       1626
+       40%      0.000       1879       1821
+       50%      0.000       2094       2008
+       60%      0.000       2319       2203
+       70%      0.000       2578       2421
+       80%      0.000       2895       2709
+       90%      0.148       3424       3173
+      100%      0.783       9833       9833
+
+  MEAN valid per transcript      2213   (the specification's 2,213)
+  MEAN live  per transcript      2091   <- the denominator the bands actually use
+
+==============================================================================
+Q1b  LIVE-BANDED CELL SIZES -- qualifying at >=100 live
+==============================================================================
+
+  4 bands   cells 19,996   qualifying 14,542  (72.7%)
+    per-cell live count, deciles: 0 19 273 565 945 8030
+    qualifying cells by band: 3426 3809 3451 3856
+    at top   5%: median elevated per qualifying cell ~31
+    at top  10%: median elevated per qualifying cell ~62
+    at top  20%: median elevated per qualifying cell ~125
+
+  8 bands   cells 39,992   qualifying 18,395  (46.0%)
+    per-cell live count, deciles: 0 0 0 169 518 8030
+    qualifying cells by band: 2100 2498 2653 2044 2027 2202 2308 2563
+    at top   5%: median elevated per qualifying cell ~22
+    at top  10%: median elevated per qualifying cell ~45
+    at top  20%: median elevated per qualifying cell ~90
+
+  16 bands   cells 79,984   qualifying 21,588  (27.0%)
+    per-cell live count, deciles: 0 0 0 0 205 4989
+    qualifying cells by band: 1248 1391 1518 1495 1560 1467 1351 1049 1197 1197 1229 1290 1291 1318 1467 1520
+    at top   5%: median elevated per qualifying cell ~18
+    at top  10%: median elevated per qualifying cell ~36
+    at top  20%: median elevated per qualifying cell ~72
+
+==============================================================================
+Q2  COMPOSITION BY SET DEFINITION -- reconciling 1.16 / 1.148 / 1.15
+==============================================================================
+
+  set                           keto   amino      GC  keto/tx   n_tx    n_elev     n_valid
+  profile probe as written     1.158   0.842   0.998    1.161    600    14,047   1,404,779
+                             elevated A 0.210 C 0.211 G 0.294 T 0.285   background A 0.252 C 0.248 G 0.258 T 0.242
+    ...all transcripts         1.162   0.840   1.016    1.165   4999   104,614  10,462,723
+                             elevated A 0.207 C 0.214 G 0.302 T 0.276   background A 0.252 C 0.250 G 0.259 T 0.239
+    ...no edge trim            1.155   0.844   0.987    1.157    600    14,763   1,476,599
+                             elevated A 0.214 C 0.207 G 0.294 T 0.285   background A 0.251 C 0.248 G 0.259 T 0.242
+    ...live background         1.157   0.842   0.997    1.161    600    14,047   1,404,779
+                             elevated A 0.210 C 0.211 G 0.294 T 0.285   background A 0.252 C 0.248 G 0.259 T 0.242
+  all tx, no trim              1.156   0.845   1.004    1.160   4999   110,631  11,062,149
+                             elevated A 0.210 C 0.213 G 0.299 T 0.278   background A 0.251 C 0.250 G 0.261 T 0.239
+  all tx, no trim, live bg     1.155   0.845   1.002    1.160   4999   110,631  11,062,149
+                             elevated A 0.210 C 0.213 G 0.299 T 0.278   background A 0.251 C 0.250 G 0.261 T 0.238
+
+  NOTE: keto background and GC background are the SAME NUMBER
+  whenever T == C, since G+T == G+C. Two quantities, one value --
+  reconciling by eye matches the wrong pair.
+=== exit: 0 ===

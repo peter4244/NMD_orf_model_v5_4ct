@@ -32,7 +32,7 @@ All on the five production ISM banks: `results_ism_v6/bank_interp_s{100..500}.h5
 
 | claim | evidence | caveat that must travel with it |
 |---|---|---|
-| **Elevated decay positions sit at a keto base (G or U) in a uridine-rich, cytosine-poor window** | keto 1.148×, amino 0.851×, **G+C flat at 1.004×**; flanks ±2–6 carry U at 1.19–1.41 with A flat | **U-rich, not AU-rich** — A contributes nothing. The center is GC-neutral; the AU enrichment is in the *flanks*, and reporting the center while describing the whole signal was an error Pete caught |
+| **Elevated decay positions sit at a keto base (G or U) in a uridine-rich, cytosine-poor window** | keto **1.16×** (measured; 1.148× struck 2026-08-02 — see `ANALYSIS_SEQUENCING_PROPOSAL.md`), amino 0.845×, **G+C flat at 1.004×**; flanks ±2–6 carry U at 1.19–1.41 with A flat | **U-rich, not AU-rich** — A contributes nothing. The center is GC-neutral; the AU enrichment is in the *flanks*, and reporting the center while describing the whole signal was an error Pete caught |
 | **The signal is not the GC encoding window** | profile decays to baseline by ~8 bases and is gone by 20; channel 5 averages over ±25 | wrong length for the encoding, right length for a sequence feature |
 | **Five members agree on sequence far better than on position** | k-mer enrichment r = 0.7529 (0.7176–0.8111) against positional Jaccard 0.125 | uses the **elevation rule**, so it does not survive a negative A2 untouched |
 | **A PWM predicts importance on held-out genes** | held-out r = 0.1316 = in-sample, 5.5M confirmation positions, disjoint genes | **1.73% of variance.** This is a ceiling on what any single motif can be worth, not a finding |
