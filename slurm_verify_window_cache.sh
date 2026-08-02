@@ -28,7 +28,16 @@ mkdir -p $SC
 
 echo "=== node: $(hostname) ==="
 nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null
-echo "=== commit: $(git rev-parse --short HEAD) ==="
+# NOT `git rev-parse HEAD`. The scripts are copied onto this clone rather than
+# pulled into it, so the clone's HEAD is the provenance of whatever was last
+# committed HERE and says nothing about the code about to run. It read eadb797 on
+# the first run of this job while the code was from 7ac672f on the laptop. The
+# hashes below are the code that actually runs.
+echo "=== code actually running (sha256, first 16) ==="
+sha256sum tensor_io.py window_cache.py verify_window_cache.py compare_banks.py \
+          build_ism_bank.py analysis_plans/profile_ism_cluster.py 2>/dev/null \
+  | awk '{print "  " substr($1,1,16), $2}'
+echo "=== this clone's HEAD, for reference only: $(git rev-parse --short HEAD) ==="
 echo ""
 
 echo "=== STEP 1: patched windows against decode_windows, on the GPU ==="
