@@ -18,6 +18,34 @@ internal check. Treating it as blocking for everything would delay work it has n
 
 ---
 
+## Where independent replication sits — and it is not where we have been putting it
+
+The model window's point, 2026-08-02, and it bounds what our two-window arrangement can deliver:
+
+> Replication catches errors the two implementations **do not share**. A common design assumption is
+> invisible to it. We both wrote the run-length statistic independently, agreed to four decimals,
+> and it was wrong — because we had both reached for random placement without stating the
+> hypothesis first.
+
+That is exactly what happened. The fold-rule inversion ratio matched at 0.877 against 0.88, the
+normalized GC decomposition at 0.4198 against 0.4187, the arm split near-identically. **All of that
+agreement was real and none of it was evidence**, because both implementations shared the design
+error rather than the coding error.
+
+**So the order is: hypothesis row → one implementation → replication only for results that survive.**
+
+- A **hypothesis row before the first implementation** is what catches shared design assumptions.
+  Nothing else can.
+- **Replication after** then means what we want it to mean: two executions of an *agreed
+  specification*, so agreement is about execution rather than about a premise neither party stated.
+- Replication is expensive and should be **reserved for load-bearing results**. Two implementations
+  of an unspecified analysis agree on the wrong thing and cost twice as much doing it.
+
+Under this ordering, Phase A gets rows first and single implementations. Only a result that
+survives its own row and is load-bearing for a Phase B or C claim earns a second implementation.
+
+---
+
 ## Phase A — repair. Cheap, existing code, and a go/no-go on the rest
 
 Each of these can invalidate a current claim. None needs a new instrument. All run on the existing
