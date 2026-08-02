@@ -58,7 +58,7 @@ survives its own row and is load-bearing for a Phase B or C claim earns a second
 
 ## Phase A — repair. Cheap, existing code, and a go/no-go on the rest
 
-**Order: A2 first, then A1 and A3 in parallel, then A4.** Pete asked whether ORF weighting should be
+**Phase A is A2. One measurement.** A1 is dropped, A3 is tidying the other window owns, A4 is deferred pending the Hill/Dy interaction-attribution work. Pete asked whether ORF weighting should be
 accounted for at all, and the model window independently concluded the same thing from the other
 direction: **every surviving claim is downstream of A2**, while A1 can only retire something already
 retracted. A4 runs last because it is the only item needing new forward passes, and a negative A2 is
@@ -87,28 +87,31 @@ banks.
 
 Cost: one job. **This is the load-bearing measurement of Phase A.**
 
-### A1 — does the clustering survive holding routing fixed? *(secondary, weak instrument)*
+### A1 — DROPPED
 
-> **Hypothesis.** Within bands of similar selection mass, sensitivity clusters into short
-> arrangements beyond chance placement.
-> **Held fixed:** mass and coverage **by stratification, not residualization**; transcript identity.
-> **Not held:** base composition.
-> **Licensed if positive:** the *second* combinations row — "among equally-routed positions these
-> bases are preferred" — not a motif.
-> **If negative:** the run-length line ends, retiring a claim already retracted.
+Pete, 2026-08-02: *"If we don't think A1 is informative we shouldn't do it."*
 
-**Labelled a weak instrument deliberately.** Run length was always a proxy for "a motif spans several
-bases," and it is weak in both directions: mass-driven smoothness produces it without sequence, and
-per A4 a *robust* motif would produce none at all, since no single substitution disturbs it. It is
-kept because it is nearly free, not because it is informative.
+It was labelled a weak instrument and kept because it was nearly free. That is not a
+reason. **A weak instrument returning a positive is worse than no instrument**, because
+the positive gets quoted — and eleven errors in two days came mostly from analyses
+that returned plausible tables. Cheapness is not an argument for adding surface area.
 
-### A3 — is directionality anything but magnitude?
+The claim it would have tested is already retracted, and run length is weak in both
+directions: mass-driven smoothness produces it without sequence, and a robust motif
+produces none at all.
+
+### A3 — is directionality anything but magnitude? *(tidying, not a gate)*
 
 > **Hypothesis.** At equal effect size, elevated positions are more directional than others.
 > **Held fixed:** effect magnitude — the axis without which the claim is circular.
 > **Owner:** model window (`probe_directionality_null.py`, written, unrun).
 > **Licensed if positive:** directionality returns from §6 to §7. **If negative:** it is deleted,
 > not softened.
+>
+> **Honestly labelled:** this resolves an item in §6 but nothing is downstream of it. A negative
+> deletes a line from a document; a positive adds an observation nothing depends on. Kept only
+> because it is written and owned by the other window — it is not a Phase A gate, and the same
+> criterion that dropped A1 applies to it.
 
 ### A4 — can single-base ISM see a motif at all?
 
