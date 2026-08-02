@@ -473,32 +473,162 @@ Conditional on Phase A. Each requires the top row of the combinations table.
 
 ### B1 — composition-held enrichment on the residual track
 
-> **Hypothesis.** Beyond what base frequencies predict, the *arrangement* of bases at
+*Written against the thirteen-field template 2026-08-02. Two things came out of writing it that were
+not visible in the five-field version, both marked ⇒.*
+
+> **1 · Hypothesis.** Beyond what base frequencies predict, the *arrangement* of bases at
 > equally-routed positions carries information.
-> **Held fixed:** mass (stratified), composition (held), region (stratified).
-> **Null:** autocorrelation-preserving, on the residual track.
-> **Licensed if positive:** the motif claim, in full, with all three qualifiers.
-> **Instrument:** direct PWM fitting on the residual, extended to several PWMs by deflation, since a
-> single PWM assumes one motif and a blend is indistinguishable from a poor fit.
+>
+> **2 · Selection rule.** None — and this is the property being bought. PWM fitting regresses over
+> **every valid position** of the mass-residualized track, as `analysis_pwm_fit.py` already does on
+> the raw track. There is no elevated set to enumerate wrongly. B1 is gated on A2 for *meaning* (a
+> negative A2 makes the composition claim a routing claim, and there is then nothing to go beyond),
+> not because it shares A2's selection.
+>
+> **3 · Background.** Composition, held. The claim is against what local base frequencies predict.
+> ⇒ **The composition bar must be local and the code currently uses the global one.**
+> `SEQUENCE_ENRICHMENT_APPROACH.md` §3.2.1 measures the global bar at 0.0186 bits and the applicable
+> **downstream** bar at **0.0405 — more than twice** — and states that "the ~0.016–0.018 figure quoted
+> so far is the global one and is a floor on the bar, not the bar." `analysis_pwm_fit.py:64` hardcodes
+> `KL_BAR = (0.0159, 0.0183)` and reports every fitted column against it. Elevated positions
+> concentrate downstream. **This must be fixed before B1 runs**, or every column called "above the
+> composition floor" is being judged against under half the bar that applies to it.
+>
+> **4 · Held fixed, by stratification unless stated.** Mass (A2's bands). Locale (A2's split).
+> Composition — **held, not stratified**, which is the one removal in the programme and is legitimate
+> because composition is the null here rather than the exposure.
+>
+> **5 · Deliberately not held.** Arrangement — it is the measurement. Effect magnitude — no elevation
+> threshold is applied, so magnitude never enters the selection and axis 7 does not bite here. This is
+> the only analysis in the programme with that property.
+>
+> **6 · Null.** Autocorrelation-preserving, on the mass-residualized track. ⇒ **This is the same null
+> the region caller specifies, and it is not yet validated on this track — so B1 inherits the region
+> caller's null validation as a prerequisite, which was recorded nowhere before this row was
+> written.** See `REGION_CALLER_SPEC.md` §4 and the correction now standing there.
+> The residual track is the right substrate, and that part is measured: after removing coverage and
+> mass the track holds 0.724 at lag 1 and decays to 0.107 by lag 80 — "high at short lag and decaying,
+> which is the shape a local sequence feature makes and the raw track does not"
+> (`SEQUENCE_ENRICHMENT_APPROACH.md` §7.1).
+>
+> **7 · Reference points.** Per column, KL against the **local** composition bar, with the floor from
+> a permutation at that column's own n — not the analytic bar, and not the global one. KL is
+> positively biased at small n (≈ (K−1)/(2N ln2), which is 0.108 bits at N≈20 and accounts for most of
+> the 0.142 per-transcript median), so a permutation at matched n is what absorbs the bias.
+>
+> **8 · Aggregation.** Fit on discovery genes, evaluate on confirmation genes — disjoint by gene.
+> Interval by gene-clustered bootstrap. The null passes through byte-identical aggregation code.
+>
+> **9 · Sweep.** PWM width; number of components in the deflation series. Primary declared before the
+> run. A single PWM assumes one motif and a blend is indistinguishable from a poor fit, which is why
+> deflation is in the instrument rather than optional.
+>
+> **10 · Decision rule, all outcomes fixed before the run.**
+> **Positive:** ≥1 column carrying information above its *local* bar at matched-n permutation, held
+> out on disjoint genes, at the primary width. → the motif claim, in full.
+> **Negative:** no column clears its local bar. → the claim is compositional, not a motif. Write it as
+> composition; do not proceed to C.
+> **The third outcome, and it is the one that gets rounded up:** columns clear the bar in-sample and
+> not held out. → the fit is describing discovery genes, and licenses nothing about the model. Named
+> here because a poor held-out fit is the expected shape of overfitting and will otherwise be read as
+> the negative, which is a different result.
+> **A poor fit does not license "no sequence preference"** — pre-registered in
+> `analysis_pwm_fit.py`'s own docstring, and it is the underpowered negative that demoted MoDISco the
+> first time.
+>
+> **11 · Licensed if positive.** "Among positions the model routes to equally, and beyond what base
+> frequencies predict, sensitivity depends on the arrangement of bases." The top row of the
+> combinations table, with all three qualifiers attached. **It does not license** any statement about
+> which base the model prefers — that is exactly what was held fixed and is undetectable here by
+> construction.
+>
+> **12 · Owner.** Interpretability window. Second implementation **only if positive**, per the
+> replication rule — a negative B1 stops the branch and nothing is downstream of it.
+>
+> **13 · Enumeration.** n positions fitted, n genes per arm, n columns, per-column n, the local bar
+> used and which population it came from, the seed, and the mask expression. Never a KL value without
+> the bar it is being compared against.
 
 ### B2 — the three-cell PTC comparison
 
-> **Hypothesis.** Sequence downstream of a premature stop behaves as coding sequence in a
+*Written against the thirteen-field template 2026-08-02. Field 10 was empty in the five-field version
+and filling it found a missing outcome, which is the second time that has happened on this template.*
+
+> **1 · Hypothesis.** Sequence downstream of a premature stop behaves as coding sequence in a
 > post-termination position.
-> **Stratified:** the three cells — normal-downstream, PTC-interval, control.
-> **Not adjusted:** composition. The position/composition decoupling *is* the exposure.
-> **Licensed:** one of three readings, stated, never pooled.
-> **Limit:** power. The PTC-interval cell is the small one, and that bounds the conclusion.
 >
-> **BLOCKING PREREQUISITE — an annotation-derived PTC definition.** As currently specified the cell
-> is defined by the *model's own* selection: operative stop before annotated stop. Measured on the
-> banks, that cell is **550 transcripts, 282 NMD against 268 control — 51.3% NMD against a 44.0%
-> background.** It is barely enriched for the thing it is supposed to select, because "model
-> committed to a shorter ORF" and "genuine premature termination" are conflated and roughly half the
-> cell is the former. Worse, the crossed table shows the annotation flag runs the *opposite* way
-> inside it. **Run as written, B2 compares a mixed population against itself.** `main_orf_stop` is
-> already in the subset table; the redefinition is small and must precede B2 rather than accompany
-> it.
+> **2 · Selection rule.** Three cells, defined on transcripts rather than on positions:
+> **normal-downstream** (positions 3′ of the annotated stop in transcripts with no premature stop),
+> **PTC-interval** (positions between the operative stop and the annotated stop), and **control**
+> (positions 3′ of the annotated stop in the same PTC transcripts). The third is what makes the
+> comparison within-transcript and is why the design does not need an artificial background.
+>
+> **3 · Background.** Each cell against its own positions. **Never pooled across cells** — pooling is
+> precisely what the position/composition decoupling makes meaningless.
+>
+> **4 · Held fixed.** Nothing on toolbox axis 4. Transcript identity, by the within-transcript
+> control cell.
+>
+> **5 · Deliberately not held — and this is the whole design.** Composition. The position/composition
+> decoupling *is* the exposure: a PTC interval is downstream by position and coding by composition,
+> and conditioning that away removes the thing being measured, in the same way adjusting for a
+> variable on the causal path removes the effect. **No artificial background can construct this cell**
+> — a dinucleotide shuffle, a GC-matched set and a region-matched set all fail to produce "downstream
+> position with coding composition," because in a normal transcriptome that combination does not
+> exist.
+>
+> **6 · Null.** Within-cell permutation at that cell's own n. No placement null — the track's
+> autocorrelation makes placement invalid here for the same reason it was invalid for run length.
+>
+> **7 · Reference points.** Floor and ceiling per cell, measured in-sample at that cell's n. The
+> PTC-interval cell is the small one, so its floor is the widest and must not be compared against a
+> floor measured on the large cell.
+>
+> **8 · Aggregation.** Per transcript, then across transcripts; gene-clustered bootstrap.
+>
+> **9 · Sweep.** Elevation fraction, matching A2's primary and its sweep so the two are readable
+> against each other.
+>
+> **10 · Decision rule — the three readings, plus the fourth that was missing.**
+> Enriched in **both** downstream cells → tracks **position**. Enriched in the **normal cell only** →
+> tracks **3′UTR composition**. Enriched in the **PTC interval only** → **coding sequence in a
+> post-termination position**, the most mechanistically interesting outcome and the one this design is
+> uniquely able to see. ⇒ **Enriched in neither → the model does not respond to this contrast at all**,
+> which is a real outcome, is not any of the three readings, and would otherwise be reported as
+> "underpowered" — a claim about the instrument standing in for a result about the model. Which of the
+> four is being reported is stated explicitly; **never pooled**.
+>
+> **11 · Licensed.** Exactly one of the four readings above, named. **Limit:** power. The PTC-interval
+> cell is the small one and that bounds the conclusion — it is not a reason to adjust anything.
+>
+> **12 · Owner.** Interpretability window. Second implementation only if the reading is the
+> PTC-interval-only one, which is the only outcome anything downstream rests on.
+>
+> **13 · Enumeration.** n transcripts and n positions **per cell**, the NMD/control split per cell,
+> the definition used for "premature," the seed, and the mask expression. This field is why the
+> prerequisite below is a prerequisite.
+
+> **BLOCKING PREREQUISITE — an annotation-derived PTC definition.** As currently specified the cell is
+> defined by the *model's own* selection: operative stop before annotated stop. That conflates "the
+> model committed to a shorter ORF" with "genuine premature termination," and roughly half the cell is
+> the former. **Run as written, B2 compares a mixed population against itself.** `main_orf_stop` is
+> already in the subset table; the redefinition is small and must precede B2 rather than accompany it.
+>
+> ⇒ **The provenance of the numbers that justify this block, corrected 2026-08-02.** An earlier
+> reviewer — me — reported that the quoted figures had no producer in either worktree. That was wrong,
+> and wrong for an instructive reason: the producer is
+> `8725053:analysis_plans/probe_ptc_interval_cell.py`, committed 08:20, **before** the claim was
+> quoted at `4dd9f69` 09:37, and it was invisible from an interpretability worktree that was 26
+> commits behind. Checking the artifact requires being on the branch that has it.
+>
+> What survives is narrower and still blocks: **there is no committed runlog**, and the script prints
+> counts and weighted counts only — it never computes `51.3%`, and no quantity in it is a `44.0%`
+> background. Both percentages are hand-derived, the denominator of the second is defined nowhere, and
+> the only 44.0% elsewhere in the corpus is unrelated (7,896 of 17,944 transcripts whose triggering
+> upstream ORFs are all admitted, `RETRAIN_PLAN_2026-08-01.md:280`). The script also reads
+> `bank_interp_s100.h5` alone. **Run it, commit the runlog, and quote the cell with its enumeration**
+> — field 13 applied to a number already in use. The block itself is almost certainly right; what is
+> missing is the evidence for it in the form this document requires of everything else.
 
 **This is the only analysis in the programme that no artificial background can construct**, and it
 is the one most specific to our data rather than to sequence models in general. If Phase A is
