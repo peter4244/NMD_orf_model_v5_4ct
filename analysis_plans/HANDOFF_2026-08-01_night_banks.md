@@ -497,6 +497,47 @@ conclusion that the runs are transcript-specific.** The amendment is recorded be
 the result for the same reason §8.5's was: the same change afterwards would not be
 defensible.
 
+### 2026-08-02: the GC confound was diagnosed by eye and never applied
+
+Measured on 600 transcripts of s100 (`probe_base_composition_bias.py`), base
+composition at elevated positions against all valid positions:
+
+    set                              A       C       G       T     G+C
+    background (all valid)       0.256   0.243   0.258   0.243   0.501
+    elevated, all scoring        0.214   0.206   0.297   0.284   0.503
+      ratio to background         0.83    0.85    1.15    1.17
+    elevated, neutral scoring    0.159   0.325   0.357   0.159   0.682
+      ratio to background         0.62    1.34    1.38    0.65
+
+**Two findings, and the second matters more.**
+
+1. **The GC-preserving control is itself compositionally biased**, by more than
+   anything it was testing: it drives GC at elevated positions from 0.501 to
+   **0.682**. Under that restriction an A/T position can only be scored by A<->T and
+   a C/G position only by C<->G, so if the model responds more strongly to C<->G the
+   restriction selects for C/G positions. Every one of the nine top-enriched k-mers
+   under neutral scoring has G at the substituted position. **Its k-mer output is an
+   artifact of the control and must not be used.**
+
+2. **Under normal scoring the elevated set is not GC-biased at all** — 0.503 against
+   a background of 0.501, two parts in a thousand. **So the GC confound never applied
+   to the original enrichment.** It was diagnosed by eye, from k-mers that *looked*
+   AU-rich, and never measured on the positions themselves. Two jobs were spent
+   controlling for it, and the control introduced a bias three times larger than any
+   effect it was testing.
+
+**The axis that IS asymmetric is a different one:** G and T enriched (1.15, 1.17),
+A and C depleted (0.83, 0.85), with GC flat. That is keto versus amino, orthogonal
+to everything we controlled for.
+
+**The methodological lesson, which is the transferable part.** A confound noticed in
+the *output* of an analysis must be measured on the *input* before it is controlled
+for. The enriched k-mers looked AU-rich, so GC was assumed to be the driver; nobody
+checked the base composition of the selected positions, which is one line and
+settles it. This is the same class as the four denominator errors of the night —
+reasoning about a set without enumerating it — arriving through the door marked
+"being careful".
+
 ### The k-mer result: the motif branch, with one confound the GC control cannot touch
 
 k = 5, five members, decay (interpretability window, job 8886733):
