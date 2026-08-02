@@ -239,25 +239,69 @@ be computed across it. Result: **9 cells per transcript** — 8 live quantile ba
 >    top of this document.
 > 3. ⇒ **Cell counts under the locale split**, since locale is now a third dimension and halves them.
 >
-> A descriptive count on data that already exists. **Band parameters freeze after it, and not before.**
+> **ANSWERED — the measurement landed while this was being written.** `model_a2_enumeration.py`,
+> Explorer job 8896445, runlog at `analysis_plans/model_a2_enumeration_runlog.txt`, bank
+> `bank_interp_s100.h5`, 4,999 transcripts, dead cut 1e-8.
 >
-> ⇒ **Consequence for the decision rule, whatever the occupancy turns out to be.** If transcripts do
-> not occupy all bands, then band 1 and band 8 are computed over **different transcript populations**,
-> and "≥2/3 of qualifying bands" aggregates over sets that are not comparable. The **conditional**
-> outcome — present in high-mass bands, absent in low — then cannot be distinguished from a change in
-> which transcripts qualify, which is exactly the reading that outcome was added to protect. So the
-> primary analysis is restricted to **transcripts qualifying in every band**, with the full set
-> reported beside it and the difference between them stated. If the occupancy measurement shows near-
-> complete occupancy, the restriction costs nothing and the two agree; if it does not, the restriction
-> is the only version of the test that means what the row says.
+> **Dead is 5.5% of valid overall and is concentrated, not spread.** 606,774 dead of 11,062,149
+> valid. The per-transcript dead fraction is **0.000 through the 80th percentile**, 0.148 at the 90th
+> and 0.783 at the maximum — so §5.5's warning holds in the sharpest possible form: dead positions are
+> a property of a minority of transcripts, and that minority is the mechanism cell. Mean live per
+> transcript is **2,091**, against the 2,213 valid the arithmetic used.
+>
+> **Occupancy is far from complete, which is the answer to (2) and it goes the way the concern went.**
+> At **8 bands: 39,992 cells, 18,395 qualifying at ≥100 live — 46.0%.** The per-cell live-count deciles
+> are `0 0 0 169 518 8030`, so **at least 30% of cells are empty outright**. A transcript occupies
+> ~3.7 of 8 bands on average, not 8. The `2,213 / 8 ≈ 277` arithmetic described a cell that mostly
+> does not exist.
+>
+>     bands   cells    qualifying        median elevated per qualifying cell (top 10%)
+>       4    19,996   14,542  (72.7%)                  ~62
+>       8    39,992   18,395  (46.0%)                  ~45
+>      16    79,984   21,588  (27.0%)                  ~36
+>
+> ⇒ **So the primary freezes at 4 bands, not 8**, sweeping 8 and 16 as before. This is a real
+> trade — 4 bands is a coarser control on routing, which is the axis the gate exists to hold — and it
+> is taken because a finer band that half the transcripts cannot enter does not control routing better,
+> it controls routing on a different and unstated population. **Recorded as a proposal rather than
+> executed unilaterally**, since the enumeration is the modeling window's and the trade is a judgement
+> call: if they prefer 8 with the exclusion profile carried explicitly, that is defensible and I would
+> not argue it hard.
+>
+> ⇒ **And the restriction I wrote before the measurement has to be withdrawn.** I specified that the
+> primary analysis be restricted to transcripts qualifying in *every* band. At 8 bands that set is
+> near-empty — per-band qualifying counts run 2,027–2,653 of 4,999, so an all-bands intersection is a
+> few hundred transcripts at best and possibly far fewer. The restriction was written to make the
+> bands comparable and would instead have replaced the analysis with an underpowered one. **What
+> replaces it:** the qualifying transcript set is reported **per band** with its overlap matrix, and
+> the **conditional** outcome may only be read if the high- and low-mass bands it contrasts are drawn
+> from substantially the same transcripts. That is the same guarantee, obtained by measurement rather
+> than by exclusion, and it costs no power.
+>
+> **Still open from this block:** (3), cell counts under the locale split, which halves everything
+> above. At 4 bands and 72.7% qualifying there is room for it; at 8 there is not, which is a second
+> argument for 4.
 
-**Cell size and the top fraction, jointly — provisional.** At mean 2,213 *valid* positions per
-transcript, 8 bands would give ~277 per cell and **top 10% within cell** ~28 positions, swept as
-(4 bands, 5%) and (16 bands, 20%) to hold the elevated count roughly constant while band resolution
-varies; a cell contributing only with **≥100 valid positions**. **If dead is half of valid, the live
-cells are ~138 and ~14 elevated, and a materially larger share falls under the floor** — so these
-become (4, 20%) or similar. Excluded cells are reported with their count and mass distribution
-regardless, because that exclusion is differential by §5.5's own argument.
+**Cell size and the top fraction, jointly — no longer provisional. Measured, job 8896445.** The
+earlier arithmetic here read: mean 2,213 *valid* positions per transcript, 8 bands giving ~277 per
+cell and top 10% giving ~28 elevated, with a contingency for "if dead is half of valid." **Every part
+of that is now superseded and it is worth recording how each part was wrong**, since this is the
+specification's own arithmetic and the error class is the one the document is organized around.
+
+- *Denominator.* Bands read **live** positions, not valid. Mean live is **2,091**, not 2,213.
+- *The contingency was the wrong shape.* Dead is **5.5% of valid**, not half — but it is not spread
+  thinly either. It is **zero through the 80th percentile** and 0.783 at the maximum, so no mean or
+  single contingency describes it. A distribution was the right thing to ask for and a representative
+  value would have misled in both directions at once.
+- *The divisor was the real error.* Positions do not spread evenly across global quantile bands. At 8
+  bands **only 46.0% of cells qualify** and at least 30% hold nothing. The ~277-position cell was
+  mostly hypothetical.
+
+**Frozen: primary (4 bands, top 10%)** — ~62 elevated per qualifying cell, 72.7% of cells qualifying
+— swept over (8, 10%) and (16, 20%). A cell contributes only with **≥100 live positions**. Excluded
+cells are reported with their count and mass distribution, because that exclusion is differential by
+§5.5's own argument and Q1a now shows exactly how: the transcripts carrying dead positions are the
+top two deciles, which is the mechanism cell.
 
 **Background is within-cell.** Elevated positions are compared against the non-elevated positions of
 **the same transcript in the same band** — never a global background, which collapses the test back
