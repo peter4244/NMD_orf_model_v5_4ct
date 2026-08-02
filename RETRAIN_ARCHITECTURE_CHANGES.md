@@ -65,6 +65,28 @@ read. Measured consequence: capture correlates with ORF length at **+0.760**, an
 association weakens by more than half below/above the 200 nt boundary (job 8899353),
 confirming fill is a contributor though not the whole account.
 
+**How much it matters — measured 2026-08-02 after Pete asked whether it applies to enough
+of the data to care about.** It does, and the shape is the damaging one:
+
+      share of candidates with ORF length < 200 nt (fill encodes length)
+        all candidates              69.1%   (553,940 of 802,035)
+        REFERENCE CDS candidates     4.5%
+        non-reference candidates    71.5%
+      median candidate ORF length    81 nt
+
+**Real ORFs are long and spurious ones are short, so the fill boundary separates them
+almost perfectly.** A reference candidate has its fill pinned at 100; a spurious upstream
+ORF has its fill boundary sitting at length/2, well inside the window. Working the odds:
+`P(reference | fill saturated)` = **11.1%** against **0.23%** when it is not — **fill
+saturation alone is a ~47× odds marker for "this is the real ORF,"** available from
+geometry with no sequence read.
+
+That is the discriminative axis the initiation head exists to compute, handed to it for
+free by our encoding. It plausibly accounts for capture's +0.760 correlation with ORF
+length, and for a one-line longest-ORF heuristic reproducing 97% of the model's selection
+accuracy. **Not yet established that the head uses it** — that needs the tiled-perturbation
+test, which would localise sensitivity to the fill boundary or away from it.
+
 **Why it matters.** The initiation head is supposed to model where a ribosome starts. It
 is reading a geometric artifact of our own encoding that happens to correlate with the
 answer. **This is the third leak of this class** — `SEQUENCE_ENRICHMENT_APPROACH.md` §5.3
