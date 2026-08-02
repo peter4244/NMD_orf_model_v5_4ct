@@ -48,6 +48,25 @@ U-rich and AU-rich up, GC-rich down.
    the 3′UTR reproduces this enrichment with no motif involved. **A region-matched background is
    the next thing to write.** It does not exist.
 
+### READ THIS BEFORE OPENING `8886938` — the model window's catch, and it is easy to misread tired
+
+**The two controls are not substitutes, and `8886938` does not answer confound 2.** Holding
+channel 5 bitwise constant does not move the elevated positions. A 3′UTR-biased set scored against
+a whole-transcript background recovers 3′UTR composition whether the scoring substitution preserved
+GC or not.
+
+So if `8886938` comes back clean, the only supported reading is **"not driven by the GC channel."**
+It is *not* "the AU enrichment is real." Only a region-matched background can say that.
+
+Their reason for flagging it is the sharper half: **a clean result on the control you have is
+exactly when the control you do not have stops being noticed.** Same structure as the agreement
+observation below, one level up — a passing check is another place where both parties stop looking.
+
+This is also the fourth appearance of one structure in a single session: the reference anchor, the
+structural zeros, the liveness gate, and now regional composition. All four are a filter or a
+comparison whose two sides are drawn from different sets, and all four looked neutral until someone
+split them by cell.
+
 ## Retracted tonight — do not re-derive
 
 | claim | why it died |
