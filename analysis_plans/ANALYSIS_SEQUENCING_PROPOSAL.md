@@ -307,6 +307,65 @@ be computed across it. Result: **9 cells per transcript** — 8 live quantile ba
 > the primary drops to 4 bands and the sweep becomes 8 and 16. Above 90%, 8 stands. That threshold is
 > set here, before the census runs, and not revisited afterwards.
 
+#### The census row — SEQ-A2-CENSUS, written before the producer
+
+*Row first, code second, 2026-08-02, interpretability window. Written as a **standby**: the model
+window owns this measurement by design and emits it from the second implementation. This row and its
+producer exist so the freeze is not blocked if that implementation is not imminent, and so there is a
+specification for it to be checked against either way. **Ledger disposition on entry: preliminary.***
+
+> **1 · Hypothesis.** None — this is a **descriptive census**, and saying so is the field rather than
+> a gap in it. Its output feeds a conditional that is already fixed; a census carrying a hypothesis
+> invites being read as a test of one.
+>
+> **2 · Selection rule.** Cells are **(transcript × live mass band × locale)**. The dead cut is a hard
+> threshold applied first (`mass < 1e-8`); bands are global log-mass quantiles **of live positions**;
+> locale is **upstream / downstream of the operative stop**, the operative stop being
+> `cand_orf_end` at `argmax(p_select)`, which is how `probe_composition_null_locality.py` already
+> defines it.
+>
+> **3 · Background.** None. Nothing is being compared to anything — the failure mode here is reporting
+> a census as though it were a contrast.
+>
+> **4 · Held fixed.** Not applicable.
+> **5 · Deliberately not held.** Not applicable.
+> **6 · Null.** None, and the absence is a design fact rather than an omission: a count of cells has
+> no sampling model here.
+>
+> **7 · Reference points — the denominators, and this field is the reason the row exists.** Two
+> retention figures, **both reported, always labelled**:
+> **cell-level** = qualifying cells / total cells, and **position-level** = live positions in
+> qualifying cells / total live positions. These are two quantities with one name. I conflated them
+> and recommended a band change on the strength of the wrong one — 46.0% of *cells* qualify at 8 bands
+> while 97.9% of *positions* are retained, because a cell fails the floor precisely by holding few
+> positions. **The pre-set 90% conditional is on the position-level figure.**
+>
+> **8 · Aggregation.** Counts pooled; per-transcript distributions reported as **deciles, never
+> means** — Q1a showed the dead fraction is 0.000 through the 80th percentile and 0.783 at the
+> maximum, so a mean describes nothing here.
+>
+> **9 · Sweep.** bands {4, 8, 16} × floor {50, 100, 200}, matching job 8896584 exactly so the two-way
+> and three-way numbers are directly comparable. Primary: 8 bands, floor 100.
+>
+> **10 · Decision rule, fixed at `2f8717c` before any of this ran.** Three-way position-level
+> retention at 8 bands **< 90%** → primary drops to 4 bands, sweep becomes 8 and 16. **≥ 90%** → 8
+> stands. Not revisited after the numbers are seen.
+>
+> **11 · Licensed.** How much data survives cell construction, and nothing else. **It does not license
+> "the floor is harmless"** — 54% of cells leave at 8 bands two-way and that bounds power everywhere.
+> A non-differential retention result licenses only that departure is not selective **on the classes
+> tested**, which at job 8896584 were NMD label, 5′UTR-length quintile, dead-fraction stratum and
+> upstream-of-reference candidate. Locale is a new axis and is not covered by that result.
+>
+> **12 · Owner.** Model window by design. Interpretability holds this row and a standby producer,
+> `interp_locale_census.py`, submitted **only** if the model window confirms it is not emitting the
+> census soon. If both run, they are compared rather than averaged.
+>
+> **13 · Enumeration.** Bank and its checksum; n transcripts; n cells total and qualifying, two-way
+> and three-way; n live positions total and retained; the dead cut; the locale definition and its
+> anchor; the seed; the finite-mask expression `(np.isfinite(vals_decay).sum(1) == 3)`; job id; and
+> the producer's sha256 verified at both ends.
+
 **Cell size and the top fraction, jointly — no longer provisional. Measured, job 8896445.** The
 earlier arithmetic here read: mean 2,213 *valid* positions per transcript, 8 bands giving ~277 per
 cell and top 10% giving ~28 elevated, with a contingency for "if dead is half of valid." **Every part
