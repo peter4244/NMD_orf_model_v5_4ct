@@ -74,9 +74,22 @@ def main():
 
     rng = np.random.default_rng(0)
     REP = 5
+    # Substitute only where the window actually holds a base. A uniform draw over
+    # [50, 950) lands on unfilled positions -- a window is filled for a mean of 742
+    # of its 1000 positions -- and the bank never substitutes there, because a
+    # position with no observed base has nothing to substitute FOR ITSELF and is
+    # excluded by `valid`. Timing rows the bank would never build measures the
+    # wrong thing; WindowCache.windows rejects them outright, which is how this
+    # was caught.
+    fill = (codes[:, 0] & 7)
+    ok_idx = [np.flatnonzero((fill[k] >= 1) & (fill[k] <= 4)) for k in range(K)]
+    assert all(len(v) for v in ok_idx), "a candidate window holds no ACGT base"
     for n_rows in (4096, 16384, 49152):
         rc = rng.integers(0, K, n_rows)
-        idx = rng.integers(50, 950, n_rows)
+        idx = np.array([ok_idx[c][rng.integers(len(ok_idx[c]))] for c in rc])
+        # a real mix of substituted bases: about half move the local GC count and
+        # take the channel-5 span patch, half do not
+        nb = rng.integers(1, 5, n_rows)
         anchor = s0[rc]
         t = {}
 
@@ -91,7 +104,7 @@ def main():
 
         pc = clock("build codes", lambda: (
             lambda z: (z.__setitem__((np.arange(n_rows), idx),
-                                     (z[np.arange(n_rows), idx] & 8) | 2), z)[1]
+                                     (z[np.arange(n_rows), idx] & 8) | nb), z)[1]
         )(codes[rc, 0].copy()))
         dec = clock("decode_windows", lambda: decode_windows(pc, anchor, ATG_LEFT, anchor))
         x = clock("host->device", lambda: torch.as_tensor(dec, device=dev))
@@ -117,7 +130,7 @@ def main():
         cache = WindowCache(codes[:, 0], s0, ATG_LEFT, s0, dev)
         ci = torch.as_tensor(rc, dtype=torch.long, device=dev)
         wi = torch.as_tensor(idx, dtype=torch.long, device=dev)
-        bi = torch.full((n_rows,), 2, dtype=torch.long, device=dev)   # substitute C
+        bi = torch.as_tensor(nb, dtype=torch.long, device=dev)   # the same bases
         clock("cache.windows", lambda: cache.windows(ci, wi, bi))
 
         old_input = t["build codes"][0] + t["decode_windows"][0] + t["host->device"][0]

@@ -102,11 +102,19 @@ if [ ! -f "$REF" ]; then
   exit 1
 fi
 echo "  reference builder sha256: $(sha256sum $REF | cut -d' ' -f1)"
-PYTHONPATH=$PWD $PY $REF --tensor results_tensor_v6 \
+# It must RUN from the repo root, not from $SC. build_ism_bank resolves the pool
+# table and the GENCODE flags from Path(__file__).parent, so from a subdirectory it
+# looked for results_ism_v6/cache_check/results_pool_v6/orf_pool.tsv and died --
+# and had it merely missed the GENCODE flags it would have built a bank without
+# those columns and step 3c would have reported a difference the cache did not
+# cause. Copied in, run, removed, so no superseded builder is left in the tree.
+cp $REF ./build_ism_bank_ref_run.py
+$PY ./build_ism_bank_ref_run.py --tensor results_tensor_v6 \
     --checkpoint runs/interp_c32_b8_s100/best.pt \
     --split results_ism_v6/ism_subset.tsv \
     --only "$ONLY" --out $SC/bank_decoded.h5 --device cuda
 rc=$?
+rm -f ./build_ism_bank_ref_run.py
 echo "=== step 3b exit: $rc ==="
 if [ $rc -ne 0 ]; then echo "STOP: the reference build failed"; exit $rc; fi
 echo ""
