@@ -192,3 +192,44 @@ The model window's sharpening of this is better than mine and is the sentence to
 **both of the things that caught errors required someone reading with the expectation of
 finding something wrong, and that is not automatable.** Weight accordingly before building
 the next gate. More prompts of that kind; fewer gates.
+
+### Why the failed safeguards failed — the actionable half
+
+*Pete's framing, 2026-08-02 evening: a tendency to bloat and confabulate that needs
+structure to counteract. Kept short deliberately; a long section here would be its own
+counterexample.*
+
+**Every safeguard that did not fire was an annotation on prose** — the `[unclaimed]`
+markers, the thirteen-field row template, the enumeration requirement, the claims table,
+the `Depends on` block. All existed that day. None fired. A marker was *tidied away* while
+its number was still unfiled, and the claims table stalled at C12 while the narrative ran
+ahead using numbers past it.
+
+**Every safeguard that worked converted a prose claim back into something that could
+fail** — name your most-retractable sentence *and test it*; state the null *and measure
+it*; verify a change *by grepping the artifact*.
+
+⇒ **Text that cannot fail does not get written.** Adding prose to discipline prose is the
+move that keeps not working, and it is the bloat mechanism too: every incident spawns
+another document.
+
+**Where the drift actually lives.** Not one script was wrong that day. Self-tests passed,
+runlogs were accurate, every number with a producer was correct. What drifted was
+uniformly the **narration layer** — sentences joining true endpoints through an unmeasured
+middle, a retraction adopted with no producer, "four of the five" when there were six, a
+commit message describing a fix that had not happened. **Prose is the only artifact that
+never gets recomputed.** A script fails when it is wrong; a number gets re-derived; a
+sentence sits there being repeated with growing authority.
+
+**Two counters, cheapest first.**
+
+1. **Producer before prose.** A claim enters a document only after its producer exists,
+   never the reverse. Every drift that day was written in the opposite order.
+2. **Split state from history.** These documents bloat because one artifact does both
+   jobs. Git stores history perfectly and nobody has to read it. Keep one short document
+   for what is true now, every sentence pointing at a producer.
+
+A linter extracting each number from the narrative and failing when it is absent from the
+claims table would have caught three of the six mechanically. **It catches nothing
+qualitative** — the two dead sentences contained no numbers — so it supplements reading
+and does not replace it.
