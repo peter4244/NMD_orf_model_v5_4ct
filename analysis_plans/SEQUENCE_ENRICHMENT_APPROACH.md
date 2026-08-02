@@ -635,30 +635,72 @@ demonstrated positive alongside it is worth far more than a bare absence.
 
 ## 7. Established, with its controls
 
+**Read §7.1 first. The run-length result has been retracted.**
+
 What currently survives, stated in the form the measurements support:
 
-- **decay-branch importance clusters into short runs**, at every threshold from 0.2%
-  to 5%. The null is **exactly 0** below the 5% threshold, so the ratio is undefined
-  there and "hundreds of times chance" is the wrong summary. The better statement is
-  that the null reproduces closed-form binomial arithmetic — 45.13 runs of ≥4
-  expected against 50 observed at density 0.05, under 0.1 expected at 0.01 — so a
-  zero null is *correct* rather than suspicious, and the data gives 1,865 against
-  ~0.08 expected at the 1% threshold.
-- **the excess is at motif scale, and the typical run is not.** Mean run length is
-  **1.38**; runs of ≥4 are **3.3%** of runs (1,865 of 56,675, seed 100). What sits at
-  4–8 bases is the *excess over chance*, not the typical run. A reader must not take
-  "runs of 4–6" as typical, and an earlier draft of this document said exactly that.
-- it **replicates on disjoint gene sets** — the discovery/confirmation split, the only
-  axis that answers "does this hold on genes it was not found on"
-- it **survives with the GC channel held bitwise constant**, at 57% of its
-  arity-matched level
-- the run lengths are **wrong for the encoding**: an artifact of channel 5's ±25
-  averaging window would produce runs on the order of tens of bases, and the excess
-  sits at 4–8
-- the five model seeds agree on the **sequence** (k-mer enrichment r = 0.75) far
-  better than on the **positions** (Jaccard 0.125), which is what a binding preference
-  at variable locations produces
+- **the five model seeds agree on the *sequence* far better than on the *positions***
+  — k-mer enrichment r = 0.75 against a positional Jaccard of 0.125. This is what a
+  binding preference at variable locations produces, and it uses no elevation null.
+- **the composition profile of elevated positions**: keto (G+T) at 1.16× background,
+  amino (A+C) at 0.84×, GC flat at 1.004×. A different measurement from the
+  clustering — it conditions on being elevated and asks what base is there.
+- **the PWM held-out fit**, which regresses on every position with no elevation
+  threshold at all — and therefore bounds the rest: **1.73% of importance variance at
+  width 9**.
+- **the enrichment survives the regional control** — computed within each region
+  against that region's own positions, r = 0.77–0.81 against the pooled vector.
 
-**Everything above is `vals_decay`.** The capture branch is out of scope for this
-document, not merely unreported.
+**Everything above is `vals_decay`.** The capture branch is out of scope here, not
+merely unreported.
 
+### 7.1 RETRACTED: the run-length clustering result
+
+**Both windows reported that decay-branch importance clusters into short runs at
+hundreds of times a count-matched null, and that the run lengths were "wrong for the
+encoding." Neither claim survives.**
+
+The null was random placement of elevated positions. **The effect track is
+autocorrelated at every scale and does not decay**, so random placement destroys
+structure the architecture puts there and the comparison measures smoothness rather
+than a sequence feature. Measured independently in both windows:
+
+    correlation of the log effect track with     median r
+      fill_count                                 +0.674
+      log selection mass                         +0.934
+
+      lag     raw autocorr    after coverage + mass
+        1          0.965                   0.724
+       10          0.930                   0.594
+       25          0.863                   0.289
+       50          0.795                   0.136
+       80          0.740                   0.107
+
+**The track is smooth because selection mass is smooth.** And the mass correlation is
+**largely arithmetic** — |vals| ≈ mass × sensitivity, so a log-scale correlation is
+close to definitional and is not a discovery about the model.
+
+**This also retires the "wrong length for the encoding" argument.** Raw
+autocorrelation persists past lag 80, which the ±25 GC window cannot explain either,
+so the length-scale argument was never doing the work we credited it with.
+
+**Two things worth recording about how this got through.**
+
+*Independent implementation did not catch it.* Both windows wrote the statistic
+separately and agreed closely — which validated the *implementation* and said nothing
+about the *design*, because both used the same null. **Replication catches errors the
+two implementations do not share.** A shared design assumption is invisible to it, and
+we had been treating agreement as stronger evidence than it was.
+
+*Mass is not to be adjusted away.* `P(NMD) = Σ P(select k)·d_k`, so a substitution at
+a zero-mass candidate genuinely cannot move the output. Conditioning mass away asks
+what would matter if ribosomes distributed uniformly, which the model never computes.
+**Stratify and state** — the same resolution as the PTC composition point in §5.2,
+reached from the other direction.
+
+**The constructive residual, and it is a real test.** After removing coverage and
+mass the track retains 0.724 at lag 1 and decays to 0.107 by lag 80 — **high at short
+lag and decaying, which is the shape a local sequence feature makes and the raw track
+does not.** Re-running the run-length analysis on the mass-residualized track, against
+an autocorrelation-preserving null, is a test with a real chance of failing. That is
+more than the original had.
