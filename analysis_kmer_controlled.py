@@ -102,6 +102,14 @@ def main():
     ap.add_argument("--top-frac", type=float, default=0.01)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--min-bg", type=int, default=50)
+    ap.add_argument("--region-anchor", default="selected",
+                    choices=["selected", "reference"],
+                    help="which ORF's stop defines downstream. selected: the "
+                         "max-p_select candidate, the ORF whose decay is being "
+                         "scored. reference: the annotated candidate where one "
+                         "exists, max-p_select otherwise. They disagree for the "
+                         "3,422 of 4,999 transcripts that have a reference, and "
+                         "neither is obviously right -- run both.")
     a = ap.parse_args()
     sys.stdout.reconfigure(line_buffering=True)
 
@@ -121,6 +129,8 @@ def main():
         c_off, c_cnt = f["cand_offset"][:], f["cand_count"][:]
         c_end = f["cand_orf_end"][:]
         p_sel = f["p_select"][:]
+        c_ref = f["cand_is_ref_cds"][:] if "cand_is_ref_cds" in f else None
+        n_ref_anchor = 0
         take = range(n if not a.limit else min(a.limit, n))
         if a.limit:
             print(f"  --limit {a.limit}: a PREFIX of the stratified order, not a sample")
@@ -141,7 +151,18 @@ def main():
             if not len(ps) or not np.isfinite(ps).any():
                 n_no_stop += 1
                 continue
-            stop = int(c_end[sl][int(np.argmax(ps))])
+            # WHICH ORF'S STOP DEFINES "DOWNSTREAM". The selected candidate is the
+            # ORF whose decay the branch is actually scoring; the reference is the
+            # annotation. They differ for most transcripts and neither is obviously
+            # right, so the flag exists and both are run. If the result depends on
+            # which, that dependence is the finding.
+            j = int(np.argmax(ps))
+            if a.region_anchor == "reference" and c_ref is not None:
+                r_ = np.flatnonzero(c_ref[sl] == 1)
+                if len(r_):
+                    j = int(r_[0])
+                    n_ref_anchor += 1
+            stop = int(c_end[sl][j])
             pos1 = np.arange(1, len(valid) + 1)          # 1-based transcript position
             downstream = pos1 > stop
 
@@ -173,6 +194,10 @@ def main():
 
     print(f"\n  transcripts used {n_used:,}"
           + (f"   (skipped, no selectable stop: {n_no_stop:,})" if n_no_stop else ""))
+    print(f"  region anchor: {a.region_anchor}"
+          + (f"   ({n_ref_anchor:,} transcripts anchored on an annotated ORF, "
+             f"the rest on max p_select)" if a.region_anchor == "reference" else
+             "   (every transcript on the ORF the model commits to)"))
 
     ref = None
     print(f"\n  {'scoring':<9} {'region':<11} {'fg k-mers':>11} {'bg k-mers':>12} "
