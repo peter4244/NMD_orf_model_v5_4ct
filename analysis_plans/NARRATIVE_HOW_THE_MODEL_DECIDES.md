@@ -70,6 +70,17 @@ exactly*, and fill saturation alone is a **47× marker** for the real ORF (11.1%
 0.24%). Whether the head exploits it is `[unclaimed]`, and the question is closed to tiling
 because downstream tiles already sit below the receptive field. *Retrain item 3.*
 
+**The head runs both components, and which one prevails depends on the candidate:**
+
+| | position | fill confound | dominates for |
+|---|---|---|---|
+| initiation-proximal | fixed at −13, in all four bands | **none** — 99.6% filled | **short ORFs**, 0.413 against 0.220 |
+| length-tracking | moves, +12 → +87 | unresolved | **long ORFs**, 0.590 against 0.275 |
+
+**This is the same regime split §3 finds by a different route.** Where the ORF is long, the
+head reads length. Where it is short — where uORFs compete — the clean initiation-proximal
+signal is the larger of the two. Two instruments, one boundary.
+
 ## 3. What the picker is actually selecting for
 
 **In aggregate, length — and length is not what initiation biology would nominate. But the
@@ -173,10 +184,41 @@ a readout of the feature it was given. *Retrain item 8.*
 **It never learned to read the stop codon it is anchored on.** Every candidate had one by
 construction, so there was no negative example and no gradient. *Retrain item 6.*
 
-**It has a composition preference 3′ of the stop** that survives mass stratification — keto
-enrichment 1.084–1.150 across all eight mass bands, 5 of 5 seeds, with nothing comparable at
-5′. **Bound: a single PWM explains 1.73% of importance variance**, so whatever this is, it
-is not one motif.
+**It has a composition preference 3′ of the stop, and it is specific.** Taking the top 1% of
+positions per transcript by decay sensitivity (job 8896445, 4,999 transcripts, 110,631
+elevated positions):
+
+| | |
+|---|---|
+| keto (G+T) | **1.156×** |
+| amino (A+C) | 0.845× |
+| **G+C** | **1.004×** |
+
+**The enrichment is keto versus amino and it is orthogonal to GC** — G+C is flat to four
+parts in a thousand, so positions are not selected by their own GC status, and since A+T and
+G+C are complementary there is no AU bias either.
+
+**The centre and the flanks are different signatures.** At the sensitive position itself the
+signal is keto and GC-neutral. From ±2 to ±8 it becomes **uridine-rich and cytosine-poor** —
+U runs 1.18–1.41 while **A stays flat at 0.98–1.09**. So it is **uridine-rich, not AU-rich,
+and the canonical ARE reading (AUUUA, A and U together) is not what this is.**
+
+It survives mass stratification — keto 1.084–1.150 across all eight mass bands, 5 of 5
+seeds — and four other controls: a region-matched background inside the 3′UTR (so the
+enrichment is *within* the 3′UTR, not because of it), the stop-anchor definition, five
+independently trained seeds (mean pairwise r 0.753 over all 1,024 5-mers), and a PWM held
+out on disjoint genes that scores **r = 0.1316 held out against 0.1316 in-sample** — the
+sequence→importance relationship generalises.
+
+**Bounds.** A single PWM at width 9 explains **1.73%** of importance variance at best, so
+whatever this is, **it is not one motif**. Nothing here has been compared to a binding
+database, and whether the uridine enrichment causes the model's sensitivity or merely
+accompanies it is untested.
+
+*This is a claim about the model, not about transcript biology: `vals_decay` is the trained
+network's own sensitivity, so every number above says what this network responds to. The
+biology-shaped reading is the more interesting one and therefore the easier one to drift
+into.*
 
 ## 6. How the two stages relate
 
@@ -207,13 +249,15 @@ It was built to pick a frame and judge it. What it does is **gate**: its own pre
 nearly worthless (0.304) and becomes strong (0.793) only through a product that turns
 vetoes into a choice. Over simply taking the first candidate, it is worth **+0.091**.
 
-**What it gates on depends on the contest.** Against background it uses **ORF length**,
-seven times more than initiation context — and part of that length signal is **our own
-window boundary** rather than sequence. Among short ORFs, where uORFs compete and where the
-head has a real choice, the criterion flips to **decay-relevance**: its junction association
-goes from −0.453 to +0.100 and it predicts the judge at +0.362. The aggregate reads as a
-length detector because the short-ORF regime is a minority of the variance, not because the
-head has one rule.
+**What it gates on depends on the contest, and two independent instruments find the same
+boundary.** Against background it uses **ORF length**, seven times more than initiation
+context — and part of that length signal is **our own window boundary** rather than
+sequence. Among short ORFs, where uORFs compete and the head has a real choice, the
+criterion flips to **decay-relevance**: its junction association goes from −0.453 to +0.100
+and it predicts the judge at +0.362. Tiled perturbation says it from the sequence side —
+the clean initiation-proximal signal dominates for short ORFs and length-tracking dominates
+for long. The aggregate reads as a length detector because the short-ORF regime is a
+minority of the variance, not because the head has one rule.
 
 The decay judge, handed the EJC count outright, is not a readout of it, never learned stop
 codons because we gave it no negative examples, and carries a real but diffuse composition
