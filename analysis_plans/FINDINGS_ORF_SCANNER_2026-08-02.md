@@ -133,6 +133,49 @@ representation.
 
 ---
 
+## The head fails where initiation biology says context decides
+
+*Pete, 2026-08-02: "it is kind of interesting that NMD does not arise from these
+many short ORFs." The pool is 69.1% ORFs under 200 nt, median 81. Background
+biology: most produce no decay because ribosomes do not USE them — leaky scanning
+past weak start codons, and reinitiation after a short uORF. Suppressing that mass
+is exactly what `p_capture` exists to do.*
+
+Predictions registered before the run; outcome **A**, length-driven (job 8900114):
+
+| | accuracy | n |
+|---|---|---|
+| reference ORF **long** (≥200 nt) | 0.735 | 3,088 |
+| reference ORF **short** (<200 nt) | **0.276** | 294 |
+| NMD transcripts only, short reference | 0.294 | 153 |
+
+    capture ~ kozak,  ORFs < 200 nt    +0.061
+    capture ~ length, ORFs < 200 nt    +0.429      length beats kozak 7x
+
+**The head does not read initiation context where biology says context decides.**
+A strong Kozak rescues a short reference ORF only weakly — 0.311 against 0.193.
+
+### ATF4: right answer, right reasons, wrong mechanism
+
+Both ATF4 transcripts in the bank are NMD-labelled. For `ENST00000674920.3`:
+
+    ranked by PRIOR      1055-nt main ORF   p_sel 0.4765   d 0.011   -> 0.0053
+    ranked by POSTERIOR   179-nt uORF       p_sel 0.4742   d 0.203   -> 0.0964
+
+**The prior picks the main ORF; the posterior flips to the uORF by 18×**, and 93%
+of the NMD signal lands there. That is the textbook ATF4 mechanism, recovered.
+
+The *reasons* are genuine — an upstream ORF terminating with a junction behind it
+is why ATF4 is a substrate. **The mechanism is not initiation modelling.** That
+uORF is 179 nt, squarely in the class the head suppresses. It survives because it
+is **upstream**, so stick-breaking hands it queue priority before any sequence
+quality is assessed, and the decay term then re-weights it.
+
+*Caveat against overstating it:* `P(NMD)` is 0.107 and 0.104 for the two
+transcripts. The model attributes correctly and predicts weakly.
+
+---
+
 ## Bounds, and what is not established
 
 - **The PWM ceiling stands over everything**: a single position weight matrix
