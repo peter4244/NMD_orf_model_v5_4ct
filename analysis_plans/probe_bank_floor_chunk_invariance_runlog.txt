@@ -1,0 +1,145 @@
+
+$ /Users/petecastaldi/miniforge3/envs/nmd_model_local/bin/python /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/build_ism_bank.py --tensor results_tensor_v6 --checkpoint results_interp_all/v6_checkpoints/b8_s100.pt --split results_ism_v6/ism_subset.tsv --out /private/tmp/claude-502/-Users-petecastaldi/7ff9a515-9f23-491d-94d2-c28dfa993eb5/scratchpad/floor2/cr4096.h5 --chunk-rows 4096 --device cpu --only ENST00000466568.1,ENST00000492005.1,ENST00000237889.9
+   [    1/3] ENST00000237889.9                K= 10 P=   493 valid=   493 floor=1.73e-08  (28s)
+   [    3/3] ENST00000492005.1                K=  4 P=   437 valid=   437 floor=9.93e-09  (31s)
+   batch-shape offset REMOVED by the same-chunk baseline: max 9.400e-07 over 1,396 positions in 3 transcripts
+
+$ /Users/petecastaldi/miniforge3/envs/nmd_model_local/bin/python /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/build_ism_bank.py --tensor results_tensor_v6 --checkpoint results_interp_all/v6_checkpoints/b8_s100.pt --split results_ism_v6/ism_subset.tsv --out /private/tmp/claude-502/-Users-petecastaldi/7ff9a515-9f23-491d-94d2-c28dfa993eb5/scratchpad/floor2/cr512.h5 --chunk-rows 512 --device cpu --only ENST00000466568.1,ENST00000492005.1,ENST00000237889.9
+   [    1/3] ENST00000237889.9                K= 10 P=   493 valid=   493 floor=6.19e-10  (23s)
+   [    3/3] ENST00000492005.1                K=  4 P=   437 valid=   437 floor=9.93e-09  (25s)
+   batch-shape offset REMOVED by the same-chunk baseline: max 9.400e-07 over 1,396 positions in 3 transcripts
+
+$ /Users/petecastaldi/miniforge3/envs/nmd_model_local/bin/python /Users/petecastaldi/claude_projects/NMD_orf_model_v5_4ct/build_ism_bank.py --tensor results_tensor_v6 --checkpoint results_interp_all/v6_checkpoints/b8_s100.pt --split results_ism_v6/ism_subset.tsv --out /private/tmp/claude-502/-Users-petecastaldi/7ff9a515-9f23-491d-94d2-c28dfa993eb5/scratchpad/floor2/cr4.h5 --chunk-rows 4 --device cpu --only ENST00000466568.1,ENST00000492005.1,ENST00000237889.9
+   [    1/3] ENST00000237889.9                K= 10 P=   493 valid=   493 floor=1.70e-08  (24s)
+   [    3/3] ENST00000492005.1                K=  4 P=   437 valid=   437 floor=9.93e-09  (28s)
+   batch-shape offset REMOVED by the same-chunk baseline: max 4.700e-07 over 1,396 positions in 3 transcripts
+
+3 transcripts, reference chunk_rows=4096
+
+ENST00000237889.9   K=10   base_logit -3.702713   shipped chunk_offset max 1.726e-08
+  array            vs cr  n finite  n differ   max|diff|  x chunk_offset
+  vals               512     1,479        24   3.427e-07           19.85
+  vals_capture       512     1,479        18   3.912e-08            2.27
+  vals_decay         512     1,479        23   3.353e-07           19.42
+  dsel               512     1,479         7   1.397e-08            0.81
+  dstart             512     1,479        12   4.321e-07           25.03
+  chunk_offset       512       493         7   1.721e-08            1.00
+  mass               512       493         0   0.000e+00            0.00
+  noop               512   1.726243e-08 -> 6.185372e-10
+  vals                 4     1,479        90   3.427e-07           19.85
+  vals_capture         4     1,479        82   3.912e-08            2.27
+  vals_decay           4     1,479        72   3.353e-07           19.42
+  dsel                 4     1,479        71   1.397e-08            0.81
+  dstart               4     1,479        76   4.321e-07           25.03
+  chunk_offset         4       493        26   1.144e-08            0.66
+  mass                 4       493         0   0.000e+00            0.00
+  noop                 4   1.726243e-08 -> 1.695306e-08
+
+ENST00000466568.1   K=1   base_logit -7.066687   shipped chunk_offset max 9.400e-07
+  array            vs cr  n finite  n differ   max|diff|  x chunk_offset
+  vals               512     1,398        12   1.391e-06            1.48
+  vals_capture       512     1,398        11   9.388e-07            1.00
+  vals_decay         512     1,398         3   4.505e-07            0.48
+  dsel               512     1,398         5   3.696e-09            0.00
+  dstart             512     1,398         0   0.000e+00            0.00
+  chunk_offset       512       466         3   4.700e-07            0.50
+  mass               512       466         0   0.000e+00            0.00
+  vals                 4     1,398       936   1.390e-06            1.48
+  vals_capture         4     1,398       549   9.462e-07            1.01
+  vals_decay           4     1,398       513   9.015e-07            0.96
+  dsel                 4     1,398       319   8.498e-09            0.01
+  dstart               4     1,398        36   5.684e-14            0.00
+  chunk_offset         4       466       361   4.700e-07            0.50
+  mass                 4       466         0   0.000e+00            0.00
+  noop                 4   9.399664e-07 -> 4.699832e-07
+
+ENST00000492005.1   K=4   base_logit -2.785368   shipped chunk_offset max 9.926e-09
+  array            vs cr  n finite  n differ   max|diff|  x chunk_offset
+  vals               512     1,311        11   1.770e-08            1.78
+  vals_capture       512     1,311         9   1.816e-08            1.83
+  vals_decay         512     1,311         6   9.313e-10            0.09
+  dsel               512     1,311         6   8.848e-09            0.89
+  dstart             512     1,311         6   7.357e-08            7.41
+  chunk_offset       512       437         2   9.564e-09            0.96
+  mass               512       437         0   0.000e+00            0.00
+  vals                 4     1,311       129   1.770e-08            1.78
+  vals_capture         4     1,311       154   1.816e-08            1.83
+  vals_decay           4     1,311       143   1.863e-09            0.19
+  dsel                 4     1,311        93   8.848e-09            0.89
+  dstart               4     1,311        93   7.357e-08            7.41
+  chunk_offset         4       437        51   9.564e-09            0.96
+  mass                 4       437         0   0.000e+00            0.00
+
+comparing existing builds at chunk_rows [4096, 512, 4]
+
+3 transcripts, reference chunk_rows=4096
+
+ENST00000237889.9   K=10   base_logit -3.702713   shipped chunk_offset max 1.726e-08
+  array            vs cr  n finite  n differ   max|diff|  x chunk_offset
+  vals               512     1,479        24   3.427e-07           19.85
+  vals_capture       512     1,479        18   3.912e-08            2.27
+  vals_decay         512     1,479        23   3.353e-07           19.42
+  dsel               512     1,479         7   1.397e-08            0.81
+  dstart             512     1,479        12   4.321e-07           25.03
+  chunk_offset       512       493         7   1.721e-08            1.00
+  mass               512       493         0   0.000e+00            0.00
+  noop               512   1.726243e-08 -> 6.185372e-10
+  vals                 4     1,479        90   3.427e-07           19.85
+  vals_capture         4     1,479        82   3.912e-08            2.27
+  vals_decay           4     1,479        72   3.353e-07           19.42
+  dsel                 4     1,479        71   1.397e-08            0.81
+  dstart               4     1,479        76   4.321e-07           25.03
+  chunk_offset         4       493        26   1.144e-08            0.66
+  mass                 4       493         0   0.000e+00            0.00
+  noop                 4   1.726243e-08 -> 1.695306e-08
+
+ENST00000466568.1   K=1   base_logit -7.066687   shipped chunk_offset max 9.400e-07
+  array            vs cr  n finite  n differ   max|diff|  x chunk_offset
+  vals               512     1,398        12   1.391e-06            1.48
+  vals_capture       512     1,398        11   9.388e-07            1.00
+  vals_decay         512     1,398         3   4.505e-07            0.48
+  dsel               512     1,398         5   3.696e-09            0.00
+  dstart             512     1,398         0   0.000e+00            0.00
+  chunk_offset       512       466         3   4.700e-07            0.50
+  mass               512       466         0   0.000e+00            0.00
+  vals                 4     1,398       936   1.390e-06            1.48
+  vals_capture         4     1,398       549   9.462e-07            1.01
+  vals_decay           4     1,398       513   9.015e-07            0.96
+  dsel                 4     1,398       319   8.498e-09            0.01
+  dstart               4     1,398        36   5.684e-14            0.00
+  chunk_offset         4       466       361   4.700e-07            0.50
+  mass                 4       466         0   0.000e+00            0.00
+  noop                 4   9.399664e-07 -> 4.699832e-07
+
+ENST00000492005.1   K=4   base_logit -2.785368   shipped chunk_offset max 9.926e-09
+  array            vs cr  n finite  n differ   max|diff|  x chunk_offset
+  vals               512     1,311        11   1.770e-08            1.78
+  vals_capture       512     1,311         9   1.816e-08            1.83
+  vals_decay         512     1,311         6   9.313e-10            0.09
+  dsel               512     1,311         6   8.848e-09            0.89
+  dstart             512     1,311         6   7.357e-08            7.41
+  chunk_offset       512       437         2   9.564e-09            0.96
+  mass               512       437         0   0.000e+00            0.00
+  vals                 4     1,311       129   1.770e-08            1.78
+  vals_capture         4     1,311       154   1.816e-08            1.83
+  vals_decay           4     1,311       143   1.863e-09            0.19
+  dsel                 4     1,311        93   8.848e-09            0.89
+  dstart               4     1,311        93   7.357e-08            7.41
+  chunk_offset         4       437        51   9.564e-09            0.96
+  mass                 4       437         0   0.000e+00            0.00
+
+==============================================================================
+absolute floor, and the censoring it implies
+
+  transcript             K  |logit|    3 ulp32  floor vals  floor cap  floor dec
+  ENST00000237889.9     10    3.703   7.15e-07   3.427e-07  3.912e-08  3.353e-07
+  ENST00000466568.1      1    7.067   1.43e-06   1.391e-06  9.462e-07  9.015e-07
+  ENST00000492005.1      4    2.785   7.15e-07   1.770e-08  1.816e-08  1.863e-09
+
+  pooled over 4,188 substitutions at chunk_rows=4096
+    vals          median 1.022e-02   above 3e-06 100.0%   above 1e-05  99.9%
+    vals_capture  median 9.119e-05   above 3e-06  56.8%   above 1e-05  55.9%
+    vals_decay    median 6.202e-03   above 3e-06  99.9%   above 1e-05  99.8%
+
+  Read the capture row against the other two. The split is sound arithmetically;
+  what differs is dynamic range, and that is what decides whether it is readable.

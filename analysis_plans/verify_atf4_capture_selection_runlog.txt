@@ -1,0 +1,33 @@
+averaging over 5 checkpoints: ['b8_s100.pt', 'b8_s200.pt', 'b8_s300.pt', 'b8_s400.pt', 'b8_s500.pt']
+
+ENST00000674920.3   split=train   candidates=11   annotated start=283
+  sum P(select) over candidates = 0.9997  (residual mass escaping every candidate = 0.0003)
+  mass upstream 0.581   on overlapping 0.572   on annotated 0.262
+  rank  orf_start   orf_end    len  p_capture  P(select)  position
+     1        186       365    180      0.577      0.572  OVERLAPPING
+     2        283     1,338  1,056      0.662      0.262  annotated
+     3        292     1,338  1,047      0.810      0.120  downstream
+     4        547     1,338    792      0.957      0.031  downstream
+     5         87        98     12      0.009      0.009  upstream
+     6        462       593    132      0.133      0.003  downstream
+     7        604     1,338    735      0.893      0.002  downstream
+     8        422       556    135      0.007      0.000  downstream
+     9        512       556     45      0.006      0.000  downstream
+    10        476       556     81      0.005      0.000  downstream
+    11        611       622     12      0.005      0.000  downstream
+  highest capture of any candidate: 0.957 at orf_start 547  (annotated start capture = 0.662)
+
+ENST00000337304.2   split=train   candidates=8   annotated start=883
+  sum P(select) over candidates = 0.9868  (residual mass escaping every candidate = 0.0132)
+  mass upstream 0.700   on overlapping 0.476   on annotated 0.211
+  rank  orf_start   orf_end    len  p_capture  P(select)  position
+     1        695       886    192      0.551      0.447  OVERLAPPING
+     2        883     1,938  1,056      0.771      0.211  annotated
+     3        483       644    162      0.196      0.195  upstream
+     4        892     1,938  1,047      0.905      0.090  downstream
+     5        734       886    153      0.115      0.029  OVERLAPPING
+     6        184       192      9      0.013      0.013  upstream
+     7         85        96     12      0.009      0.009  upstream
+     8        762       779     18      0.031      0.007  upstream
+  highest capture of any candidate: 0.905 at orf_start 892  (annotated start capture = 0.771)
+

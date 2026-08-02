@@ -1,0 +1,25 @@
+test split from the tensor: n=10,520  n_nmd=2,405  prevalence=0.2286
+legacy comparator declares  n=10520     n_nmd=2405
+match: n OK, n_nmd OK
+
+cached logits (5, 10520) from test_logits_interp_c32_b8.npz
+
+=== per member ===
+    member 0    AUC 0.9301   AUPRC 0.8597
+    member 1    AUC 0.9280   AUPRC 0.8539
+    member 2    AUC 0.9237   AUPRC 0.8515
+    member 3    AUC 0.9248   AUPRC 0.8529
+    member 4    AUC 0.9260   AUPRC 0.8577
+
+=== ensemble ===
+mean logit        (the rule the legacy comparator declares)
+    AUC    mannwhitney 0.932680   trapezoid 0.932680   sklearn 0.932680   (max spread 0.00e+00)
+    AUPRC  stepwise    0.868400   sklearn   0.868400   (gap 1.72e-08)
+    reported 0.9327 / 0.8684  ->  MATCHES
+
+mean probability  (the rule the model window chose first)
+    AUC    mannwhitney 0.932218   trapezoid 0.932218   sklearn 0.932218   (max spread 1.11e-16)
+    AUPRC  stepwise    0.867857   sklearn   0.867857   (gap 1.93e-08)
+    reported 0.9322 / 0.8679  ->  MATCHES
+
+exact ties in the mean-logit score: 1 of 10,520

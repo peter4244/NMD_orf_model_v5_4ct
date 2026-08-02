@@ -1,0 +1,22 @@
+regenerating b8_s100.pt (row 0 of the cache)
+  checkpoint args: conv_channels=32 n_bins=8 epoch=2 stored_val_auc=0.9491660539915431
+  batch 1/104
+  batch 11/104
+  batch 21/104
+  batch 31/104
+  batch 41/104
+  batch 51/104
+  batch 61/104
+  batch 71/104
+  batch 81/104
+  batch 91/104
+  batch 101/104
+
+max |fresh - cached| = 0.000e+00   median 0.000e+00
+identical to 1e-5: True
+
+seed 100 from the fresh pass:  AUC 0.9301   AUPRC 0.8597
+seed 100 from the cache:       AUC 0.9301   AUPRC 0.8597
+
+ensemble with the fresh row swapped in (mean logit): AUC 0.9327   AUPRC 0.8684
+reported: AUC 0.9327   AUPRC 0.8684
