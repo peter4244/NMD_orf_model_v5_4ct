@@ -84,6 +84,19 @@ because each one was learned by hitting it — see `analysis_plans/HANDOFF_INTER
 - **Namespace everything**, including cluster scratch scripts — outputs `interp_*` / `model_*`, jobs
   `hi_*` / `md_*`. Two windows once wrote `autocorr.py` to the same cluster directory and the second
   silently replaced the first.
+- **Conference protocol.** A **conference** is called by Pete on a **specific topic**.
+  While it is open, **every message goes to all conference members**, not just to
+  whoever asked the question. Exceptions can be made per message; this is the
+  default. **Communication reverts to baseline once the topic is deemed addressed** —
+  and someone has to say so, or the conference never ends.
+
+  *Why it exists, from 2026-08-02:* the results window sent a narrative-process
+  design to the interpretability window without copying the model window, which
+  owned the work; and the interpretability window summarised state for Pete using a
+  framing the model window had already retracted, which the results window could not
+  catch because they had never seen it. Both are bilateral-routing failures and both
+  are what all-members messaging prevents.
+
 - **Ask before every Explorer login.** A loaded ssh-agent is not standing authorization.
 - **Where a document does not cover what you hit, add a row.** None of this structure was designed;
   it is a record of failures, so it stops exactly where our failures stopped. Do not work around a
