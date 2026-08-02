@@ -1,0 +1,8 @@
+parameter	value	authority	note
+KOZAK_FLOOR	-1.2507921188400943	the initiation floor admitting a candidate to the pool	Appears as KOZAK_FLOOR or FLOOR. One script carries a 5-significant-figure rounding of it; see the checker output.
+DEAD_CUT	1e-08	SEQUENCE_ENRICHMENT_APPROACH.md :: the unresponsive-stratum cut	Below this an ISM value is treated as unresponsive. Note W221: this stratum is not a valid instrumental control, which is a separate question from the cut's value.
+ATG_LEFT	900	results_tensor_v6/nmd_tensor.h5 attrs (atg_left)	Start window upstream extent. The tensor attr is authoritative; code restating it must match.
+KETO	(2, 3)	SEQUENCE_ENRICHMENT_APPROACH.md :: 0. Defined terms	Base-channel indices for G and T.
+AMINO	(0, 1)	SEQUENCE_ENRICHMENT_APPROACH.md :: 0. Defined terms	Base-channel indices for A and C.
+GC_WIN	50	the GC channel's averaging half-window	Channel 5 averages over +/-25; GC_WIN is the full window.
+PTC_MIN_NT	50	the 50-nt rule	Distance from the stop to the last junction below which decay is not triggered.
