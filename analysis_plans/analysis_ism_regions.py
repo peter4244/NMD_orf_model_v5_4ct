@@ -109,7 +109,7 @@ def runs_of(mask):
     return np.flatnonzero(d == -1) - np.flatnonzero(d == 1)
 
 
-def load_h5(path):
+def load_h5(path, limit=0):
     """One record per transcript from an assembled bank, sliced row by row.
 
     NEVER `f["vals"][:]`. The assembled arrays are padded to the longest
@@ -138,7 +138,7 @@ def load_h5(path):
                else [""] * len(tx))
         wt = (f["sampling_weight"][:] if "sampling_weight" in f
               else np.ones(len(tx), np.float32))
-        for i in range(len(tx)):
+        for i in range(len(tx) if not limit else min(limit, len(tx))):
             lo, n_k = int(cand_off[i]), int(cand_cnt[i])
             r = np.flatnonzero(is_ref[lo:lo + n_k] == 1)
             # ANCHORING ON THE REFERENCE CANDIDATE ALONE IS A DIFFERENTIAL
@@ -188,10 +188,10 @@ def load_h5(path):
     return out
 
 
-def load_bank(path, pool):
+def load_bank(path, pool, limit=0):
     """A shard directory or an assembled .h5 — same records either way."""
     p = Path(path)
-    return load_shards(p, pool) if p.is_dir() else load_h5(p)
+    return load_shards(p, pool) if p.is_dir() else load_h5(p, limit)
 
 
 def load_effect_tracks(path, column):
@@ -221,7 +221,7 @@ def load_effect_tracks(path, column):
     return out
 
 
-def across_members(paths, column, fold, rng):
+def across_members(paths, column, fold, rng, top_frac=0.01):
     """Check 1 of the six: does a feature survive across independently trained
     members, or is it one member's private solution?
 
@@ -256,7 +256,16 @@ def across_members(paths, column, fold, rng):
         sr = [np.corrcoef(rank[i], rank[j])[0, 1]
               for i in range(len(X)) for j in range(i + 1, len(X))]
         r_p.append(np.mean(pr)); r_s.append(np.mean(sr))
-        hi = [x >= fold * np.median(x) for x in X]
+        # SAME TOP-FRACTION RULE as Q1, and for the same reason: a fold-over-median
+        # cut selects a different fraction of positions in every transcript, so a
+        # Jaccard built on it compares sets of unequal and uncontrolled size across
+        # members. Fixing the fraction makes the overlap a statement about WHICH
+        # positions rather than about how many each member happened to flag.
+        if top_frac > 0:
+            k = max(1, int(round(top_frac * X.shape[1])))
+            hi = [x >= np.partition(x, -k)[-k] for x in X]
+        else:
+            hi = [x >= fold * np.median(x) for x in X]
         n_pos = ok.sum()
         for i in range(len(X)):
             for j in range(i + 1, len(X)):
@@ -272,8 +281,8 @@ def across_members(paths, column, fold, rng):
         return
     print(f"\n  effect track, mean over member pairs, median over transcripts")
     print(f"    pearson  {np.median(r_p):+.4f}    spearman {np.median(r_s):+.4f}")
-    print(f"\n  agreement on WHICH positions are elevated (>= {fold:.0f}x), "
-          f"Jaccard")
+    lab = (f"top {100*top_frac:g}%" if top_frac > 0 else f">= {fold:.0f}x median")
+    print(f"\n  agreement on WHICH positions are elevated ({lab}), Jaccard")
     print(f"    observed {np.median(jac):.4f}    random placement "
           f"{np.median(jac0):.4f}")
     print(f"    a feature that does not clear the random line is one member's "
@@ -316,7 +325,18 @@ def main():
                     choices=["vals", "cap", "dec"],
                     help="vals = the transcript logit; dec = the decay branch")
     ap.add_argument("--fold", type=float, default=10.0,
-                    help="elevation threshold, as a fold over the transcript median")
+                    help="elevation threshold as a fold over the transcript median. "
+                         "DEPRECATED as a headline: it is self-normalising for "
+                         "magnitude but NOT for tail shape, so it selected 1.7%% of "
+                         "positions on a short-transcript pilot and 10.7%% on real "
+                         "full-length banks. Kept only to reproduce older runs.")
+    ap.add_argument("--top-frac", type=float, default=0.01,
+                    help="elevation as the top FRACTION of each transcript's own "
+                         "valid positions. Fixes the elevated count by construction, "
+                         "so the random-placement null is matched exactly and the "
+                         "run-length comparison measures clustering rather than the "
+                         "interaction of tail shape with a fold rule. This is the "
+                         "headline; set 0 to fall back to --fold.")
     ap.add_argument("--anchor", default="reference",
                     choices=["reference", "model", "all"],
                     help="which transcripts to use. 'reference' is the primary: "
@@ -325,6 +345,12 @@ def main():
                          "which keeps the mechanism cell whole but makes the "
                          "coordinate system the model's own choice. Never pool "
                          "them without saying so.")
+    ap.add_argument("--limit", type=int, default=0,
+                    help="read only the first N transcripts. For smoke-testing a "
+                         "copied-up script against a real bank before submitting "
+                         "the job that needs it; NOT for analysis, since the bank "
+                         "order is the stratified subset order and a prefix is not "
+                         "a sample of it.")
     ap.add_argument("--seed", type=int, default=20260801)
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
@@ -347,7 +373,10 @@ def main():
         pool = pd.read_csv(pool_tsv, sep="\t",
                            usecols=["isoform_id", "slot", "orf_start", "orf_end",
                                     "is_ref_cds"])
-    recs = load_bank(paths[0], pool)
+    recs = load_bank(paths[0], pool, args.limit)
+    if args.limit:
+        print(f"*** --limit {args.limit}: a PREFIX of the stratified subset order, "
+              f"not a sample. Smoke test only. ***")
     if not recs:
         sys.exit(f"no usable transcripts in {paths[0]}")
 
@@ -388,7 +417,7 @@ def main():
         print("=" * 78)
         print("CHECK 1 OF SIX  Does it survive across independently trained "
               "members?\n")
-        across_members(paths, args.column, args.fold, rng)
+        across_members(paths, args.column, args.fold, rng, args.top_frac)
         print()
 
     # ================================================================== Q1
@@ -403,8 +432,17 @@ def main():
         e = eff[ok]
         med = np.median(e)
         above_floor = (e > np.maximum(r["floor"][ok] * 2, FLOOR_ABS)).mean()
-        hi = eff >= args.fold * med
-        hi &= ok
+        # TOP-FRACTION, NOT FOLD-OVER-MEDIAN. See --top-frac: the fold rule's
+        # selectivity depends on the tail shape of each transcript's effect
+        # distribution, which differs between short and full-length transcripts by
+        # sixfold. Fixing the fraction makes "elevated" mean the same thing in
+        # every transcript and makes the null exactly matched.
+        if args.top_frac > 0:
+            k = max(1, int(round(args.top_frac * ok.sum())))
+            cut = np.partition(e, -k)[-k]
+            hi = (eff >= cut) & ok
+        else:
+            hi = (eff >= args.fold * med) & ok
         run_real.append(runs_of(hi))
         # NULL for "is it a region": same COUNT of elevated positions, placed at
         # random among the valid ones. Preserves how many, destroys where.
@@ -433,8 +471,9 @@ def main():
 
     rr = np.concatenate(run_real) if run_real else np.zeros(0)
     rn = np.concatenate(run_null) if run_null else np.zeros(0)
-    print(f"  ARE THEY REGIONS OR SCATTERED BASES?  positions at >= "
-          f"{args.fold:.0f}x the transcript median,")
+    rule = (f"top {100*args.top_frac:g}% of each transcript's own positions"
+            if args.top_frac > 0 else f">= {args.fold:.0f}x the transcript median")
+    print(f"  ARE THEY REGIONS OR SCATTERED BASES?  elevated = {rule},")
     print(f"  against the same count placed at random in the same transcripts:\n")
     print(f"    {'run length':<12} {'observed':>10} {'random':>10}")
     for L in range(1, 11):
@@ -751,7 +790,12 @@ def main():
         med = np.median(eff[ok])
         if med <= 0:
             continue
-        hi = ok & (eff >= args.fold * med)
+        if args.top_frac > 0:
+            k = max(1, int(round(args.top_frac * ok.sum())))
+            cut = np.partition(eff[ok], -k)[-k]
+            hi = ok & (eff >= cut)
+        else:
+            hi = ok & (eff >= args.fold * med)
         v, g = np.abs(r[key]), r["dgc"]
         neutral = (g == 0) & np.isfinite(v)
         changing = (g != 0) & np.isfinite(v)
@@ -799,7 +843,12 @@ def main():
         if ok.sum() < 50:
             continue
         med = np.median(eff[ok])
-        hi = ok & (eff >= args.fold * med)
+        if args.top_frac > 0:
+            k = max(1, int(round(args.top_frac * ok.sum())))
+            cut = np.partition(eff[ok], -k)[-k]
+            hi = ok & (eff >= cut)
+        else:
+            hi = ok & (eff >= args.fold * med)
         o = r["obs"]
         for b in range(4):
             base_hi[b] += int(((o == b) & hi).sum())
