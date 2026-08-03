@@ -43,7 +43,19 @@ def resolve_path(key, config_path=None, must_exist=False):
     if not val:
         raise KeyError(f"no path configured for '{key}': "
                        f"set ${env} or add paths.{key} to {cfg_path}")
+    # A RELATIVE PATH IS RELATIVE TO THE CONFIG FILE, NOT THE WORKING DIRECTORY (2026-08-03).
+    #
+    # Values used to resolve against CWD, so a relative path meant different files depending on
+    # where you stood -- and these scripts are invoked from two places, the repo root and the
+    # model repo. The R side has always anchored to the repo root (R/load_config.R), so this
+    # brings the two languages to the same rule instead of leaving one of them cwd-dependent.
+    #
+    # It is what lets config_dn.yaml name the DEPOSIT portably. An absolute path there would pin
+    # the deposit-native config to one machine, which is the exact defect config.yaml's own
+    # header describes it having had.
     p = Path(val).expanduser()
+    if not p.is_absolute():
+        p = (cfg_path.resolve().parent / p).resolve()
     if must_exist and not p.exists():
         raise FileNotFoundError(
             f"{key} does not exist:\n    {p}\n  (from {src})\n"

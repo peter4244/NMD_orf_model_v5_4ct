@@ -37,9 +37,22 @@ from paths_config import resolve_path
 # tree -- and invisibly: 0 of 24 isoforms that the rebuilt structures.rds added appear in the
 # resulting tx_summary.tsv (measured 2026-07-26). A path only changeable by editing code is a
 # path nobody changes.
-CACHE_DIR = resolve_path("isopair_cache")
-SQANTI_CLASS_PATH = resolve_path("sqanti_class")
-FASTA_PATH = resolve_path("sqanti_fasta")
+# RESOLVED AT CALL TIME, AGAINST THE CONFIG THE CALLER NAMED (2026-08-03).
+#
+# These were module-level constants, so they were computed at IMPORT -- before argparse ran -- and
+# resolve_path() with no config argument always reads config.yaml. The effect was that
+# `--config config_dn.yaml` could not influence a path no matter what it said: the deposit-native
+# config was decorative, and a clean-room run died on
+# "/projects/talisman/.../nmd_lungcells_corrected.fasta not found" while that file sat in the
+# deposit. A flag that cannot change what it names is worse than no flag, because it reads as
+# configured.
+#
+# CACHE_DIR is gone rather than deferred: it was assigned here and referenced nowhere, so it only
+# ever served to fail early on a path this script does not use.
+def _paths(config):
+    """The input paths for one run, from the config that run was given."""
+    return {"sqanti_class": resolve_path("sqanti_class", config_path=config),
+            "sqanti_fasta": resolve_path("sqanti_fasta", config_path=config)}
 
 MAX_ORFS = 5
 WINDOW_SIZES = [100, 500, 1000, 2000]
@@ -471,7 +484,7 @@ def load_paralog_genes(results_dir, which="test"):
     return genes
 
 
-def load_cds_atg_positions(results_dir):
+def load_cds_atg_positions(results_dir, sqanti_class_path):
     """Load reference and SQANTI CDS ATG positions (1-based, transcript-relative)."""
     # Reference CDS ATG: ref_utr5_length is 0-based → ATG at ref_utr5_length + 1
     ref = pd.read_csv(results_dir / "ref_cds_features.tsv", sep="\t",
@@ -484,7 +497,7 @@ def load_cds_atg_positions(results_dir):
     print(f"  Reference CDS ATG positions: {len(ref_map):,} isoforms")
 
     # SQANTI CDS ATG: CDS_start is 1-based transcript-relative
-    sqanti = pd.read_csv(SQANTI_CLASS_PATH, sep="\t", engine="python",
+    sqanti = pd.read_csv(sqanti_class_path, sep="\t", engine="python",
                           dtype={"isoform": str},
                           usecols=["isoform", "coding", "CDS_start"])
     sqanti = sqanti[sqanti["coding"] == "coding"].drop_duplicates("isoform")
@@ -648,7 +661,7 @@ def orf_coverage_diagnostics(orf_df, tx_summary, max_k=MAX_ORFS):
 # =============================================================================
 # Main dataset assembly
 # =============================================================================
-def build_dataset(results_dir, n_workers=8):
+def build_dataset(results_dir, n_workers=8, paths=None):
     # Load all data
     orf_df = load_orf_features(results_dir)
     tx_summary = load_tx_summary(results_dir)
@@ -659,7 +672,7 @@ def build_dataset(results_dir, n_workers=8):
 
     # Load sequences from FASTA (filtered to transcripts in tx_summary)
     target_ids = set(tx_summary["isoform_id"].values)
-    seq_dict = load_fasta(FASTA_PATH, target_ids)
+    seq_dict = load_fasta(paths["sqanti_fasta"], target_ids)
 
     # Diagnostics
     diag = orf_coverage_diagnostics(orf_df, tx_summary, MAX_ORFS)
@@ -669,7 +682,7 @@ def build_dataset(results_dir, n_workers=8):
 
     # Load CDS ATG positions BEFORE ORF selection (needed for priority inclusion)
     print("\nLoading CDS ATG positions ...")
-    ref_atg_map, sqanti_atg_map = load_cds_atg_positions(results_dir)
+    ref_atg_map, sqanti_atg_map = load_cds_atg_positions(results_dir, paths["sqanti_class"])
 
     # Select ORFs with priority CDS inclusion
     orf_selected = select_priority_orfs(orf_df, ref_atg_map, sqanti_atg_map, MAX_ORFS)
@@ -993,7 +1006,13 @@ def main():
     parser = argparse.ArgumentParser(description="Build HDF5 dataset for NMD ORF model")
     parser.add_argument("--results-dir", type=Path, default=Path("results_4ct"))
     parser.add_argument("--workers", type=int, default=8)
+    # --config REACHES THE PATHS NOW. It did not exist here at all, so every path came from
+    # config.yaml regardless of which config a caller believed they had selected.
+    parser.add_argument("--config", default="config.yaml",
+                        help="Config whose paths: block names the inputs. config_dn.yaml points "
+                             "at the deposit; config.yaml at the Channing tree.")
     args = parser.parse_args()
+    paths = _paths(args.config)
 
     required = ["orf_features.tsv", "tx_summary.tsv", "ref_cds_features.tsv",
                 "junctions.tsv", "paralog_genes.tsv"]
@@ -1001,10 +1020,10 @@ def main():
         p = args.results_dir / fname
         if not p.exists():
             sys.exit(f"ERROR: {p} not found. Run export_rds.R first.")
-    if not FASTA_PATH.exists():
-        sys.exit(f"ERROR: {FASTA_PATH} not found.")
+    if not paths["sqanti_fasta"].exists():
+        sys.exit(f"ERROR: {paths['sqanti_fasta']} not found (from --config {args.config}).")
 
-    build_dataset(args.results_dir, n_workers=args.workers)
+    build_dataset(args.results_dir, n_workers=args.workers, paths=paths)
 
 
 if __name__ == "__main__":
