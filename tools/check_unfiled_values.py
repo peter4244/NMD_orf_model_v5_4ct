@@ -39,20 +39,32 @@ REPO = Path(__file__).resolve().parent.parent
 RECORDS = REPO / "claim_records"
 
 
-def filed_keys():
-    """Every (quantity, value) a filed row carries, with the row it came from.
+def filed_index():
+    """Map (run_id, quantity) -> [(value, r_id), ...] across every filed row.
 
-    Keyed on the pair rather than on value alone. Two producers legitimately emit the same number
-    for different quantities, and treating a value as filed because some unrelated quantity shares
-    it is the false-resolution failure that made check_d50.py's `resolved` count meaningless."""
+    RE-KEYED 2026-08-02 on Harold's second pass. The first version keyed on (quantity, value) and
+    was wrong in two ways:
+
+      VINTAGE.  If any earlier run emitted the same quantity at the same value and was filed, this
+                run's emission read as filed. That is exactly the mixing D66(b) keys run_id
+                against, and claim_emit's docstring warns about it directly.
+      TWO FAILURES, ONE MARKER.  Including `value` in the key means a re-run producing a NEW value
+                reports as [unclaimed] -- "never filed" -- when the truth is "filed, and the row
+                is stale". This file's own docstring argues that one marker for two failures is
+                noise, and it was committing that error inside the argument against it.
+
+    So existence is keyed on (run_id, quantity) and the value is compared SEPARATELY, giving three
+    outcomes rather than two: unfiled, filed-and-agrees, and filed-at-a-different-value. The third
+    is the stale-row case and nothing else in the system sees it."""
     out = {}
     if not RECORDS.exists():
         return out
     for p in sorted(RECORDS.glob("R*.json")):
         d = json.loads(p.read_text())
         for v in d.get("values", []):
-            out.setdefault((str(v.get("quantity", "")).strip(),
-                            str(v.get("value", "")).strip()), []).append(d["id"])
+            key = (str(v.get("run_id", d.get("run_id", ""))).strip(),
+                   str(v.get("quantity", "")).strip())
+            out.setdefault(key, []).append((str(v.get("value", "")).strip(), d["id"]))
     return out
 
 
@@ -104,17 +116,22 @@ def main():
         sys.exit(f"not a directory: {d}")
 
     files, rows, bad = emitted(d)
-    filed = filed_keys()
+    filed = filed_index()
 
-    unfiled = []
+    unfiled, stale = [], []
     for r in rows:
-        key = (str(r.get("quantity", "")).strip(), str(r.get("value", "")).strip())
-        if key not in filed:
+        key = (str(r.get("run_id", "")).strip(), str(r.get("quantity", "")).strip())
+        got = filed.get(key)
+        if not got:
             unfiled.append(r)
+            continue
+        emitted_v = str(r.get("value", "")).strip()
+        if not any(fv == emitted_v for fv, _ in got):
+            stale.append((r, got))
 
     print(f"\n  unfiled measurements — {len(files)} values file(s) in {d.name}, "
           f"{len(rows)} emitted value(s)")
-    print(f"  {len(filed)} (quantity, value) pair(s) filed across "
+    print(f"  {len(filed)} (run_id, quantity) key(s) filed across "
           f"{len(list(RECORDS.glob('R*.json'))) if RECORDS.exists() else 0} result row(s)")
     if bad:
         print(f"\n  {len(bad)} values file(s) COULD NOT BE READ — reported, not skipped:")
@@ -135,8 +152,17 @@ def main():
             print(f"    … and {len(unfiled) - 25} more")
     else:
         print("    nothing emitted is unfiled.")
+
+    print(f"\n  FILED AT A DIFFERENT VALUE {len(stale)}")
+    if stale:
+        print("    the run and the quantity are filed, and the filed value is not what this run")
+        print("    emitted. The row is STALE, which is a different failure from never filed —")
+        print("    it needs superseding, not filing.")
+        for r, got in stale[:25]:
+            shown = ", ".join(f"{fv} in {rid}" for fv, rid in got[:3])
+            print(f"    {r.get('quantity','?')}: run emitted {r.get('value','?')}, filed {shown}")
     print()
-    if a.strict and unfiled:
+    if a.strict and (unfiled or stale):
         sys.exit(1)
 
 

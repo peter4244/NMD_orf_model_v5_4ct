@@ -30,7 +30,7 @@ that this script accepted any TSV. So: a values file must be demonstrably claim_
 its run_id must match the run being filed, and every row must carry the fields whose absence
 is claim_emit's signature of not having produced it.
 
-Four refusals, each named after something measured:
+Six refusals, each named after something measured:
 
   values not from claim_emit   producer_file/producer_line empty is the signature. Harold's
                                fabricated row had both empty and filed green.
@@ -45,6 +45,14 @@ Four refusals, each named after something measured:
                                guard". If the producer has uncommitted changes then producer_sha
                                does not describe the code that ran, and the row records a
                                version it does not have.
+  producer_file mismatch       Added on Harold's SECOND pass, and it is the one that closes
+                               fabrication rather than slowing it. With a valid header, a matching
+                               run_id and every field populated, a hand-written TSV still filed
+                               cleanly against a producer computing nothing of the sort -- because
+                               producer_file was never compared to --producer. claim_emit writes
+                               producer_file from the ACTUAL CALL FRAME, so a disagreement is
+                               close to proof.
+  trace misses a real .h5      See below.
 
 ## THE SHORT-TRACE GUARD
 
@@ -56,8 +64,14 @@ trace of any of them looks perfectly clean while omitting the one file that matt
 Harold's correction: refusing only at zero reads is the wrong threshold, because the failure
 produces zero events only when the h5 is the producer's SOLE input -- one config file alongside
 it gives a trace of length 1 that passes. So the check is now AIMED AT THE MEASURED FAILURE
-rather than at a guessed floor: if the producer's source mentions an HDF5 path, an HDF5 file
-must appear in the trace. The zero-read refusal is kept as the coarse backstop.
+rather than at a guessed floor: if the producer actually READS HDF5, an HDF5 file must appear in
+the trace. The zero-read refusal is kept as the coarse backstop.
+
+NARROWED AGAIN on Harold's second pass, because his own steer implemented literally false-
+positived: matching any mention of h5 refused a producer whose only reference was the docstring
+explaining this guard. It now requires an I/O site -- an h5py.File call, a read_hdf, or a quoted
+path literal ending .h5/.hdf5 -- with comments and triple-quoted blocks stripped first, so prose
+can never trigger it.
 
 ## IDENTITY, AND WHY IDS CARRY A FILER
 
@@ -90,7 +104,15 @@ ID_RE = re.compile(r"^R-([a-z]{2})-(\d{4})\.json$")
 # claim_emit's own columns. A file missing any of these was not written by it.
 EMIT_COLS = ("claim_id", "quantity", "value", "n", "population",
              "producer_file", "producer_line", "run_id")
-H5_HINT = re.compile(r"\.h5\b|h5py|HDF5", re.I)
+# NARROWED 2026-08-02. The first version matched any mention of h5 anywhere in the source, and so
+# refused a producer whose only reference was a DOCSTRING explaining this very guard. Harold's
+# steer, his defect, and he reported it. Now it looks for an actual I/O site: an h5py call, or a
+# quoted path ending .h5/.hdf5. A comment or a prose mention no longer counts.
+H5_HINT = re.compile(
+    r"""h5py\s*\.\s*File            # h5py.File(...)
+      | \bpd\s*\.\s*read_hdf       # pandas.read_hdf
+      | ['"][^'"\n]*\.(?:h5|hdf5)['"]  # a quoted path literal
+    """, re.X | re.I)
 
 
 def sh(cmd, cwd=None, check=True):
@@ -126,7 +148,7 @@ def read_trace(path):
     return reads, writes
 
 
-def read_values(path, run_id):
+def read_values(path, run_id, producer):
     """Carry the emitted values across, refusing anything that is not claim_emit output.
 
     `population` is read rather than retyped because it is known at the emit call site and
@@ -142,7 +164,11 @@ def read_values(path, run_id):
         sys.exit(f"REFUSED: {path} is not claim_emit output — missing column(s): "
                  f"{', '.join(missing)}.\nEmission is required at filing (D66). Wire "
                  "claim_emit.emit() into the producer and re-run it; do not hand-write this file.")
-    keep = ("claim_id", "quantity", "value", "n", "population", "producer_file", "producer_line")
+    # run_id is carried PER VALUE, not just on the row. Harold, 2026-08-02: a values file can span
+    # two runs, so the row-level run_id is not a substitute, and check_unfiled_values.py cannot key
+    # on (run_id, quantity) unless it is here.
+    keep = ("claim_id", "quantity", "value", "n", "population",
+            "producer_file", "producer_line", "run_id")
     out, bad = [], []
     for i, ln in enumerate(lines[1:], 2):
         row = dict(zip(head, ln.split("\t")))
@@ -152,6 +178,15 @@ def read_values(path, run_id):
         rr = str(row.get("run_id", "")).strip()
         if rr and rr != str(run_id):
             bad.append(f"  line {i}: run_id {rr!r} != --run-id {run_id!r}")
+        # THE CHEAPEST REMAINING REFUSAL, and it closes the fabrication path Harold left open on
+        # his second pass. With a valid header, a matching run_id and every field populated, a
+        # hand-written TSV still filed cleanly against a producer that computes nothing of the
+        # sort -- because producer_file was never compared to --producer. claim_emit writes
+        # producer_file from the ACTUAL CALL FRAME, so a disagreement is close to proof that the
+        # named producer did not emit these values.
+        pf = str(row.get("producer_file", "")).strip()
+        if pf and Path(pf).name != Path(producer).name:
+            bad.append(f"  line {i}: producer_file {pf!r} is not --producer {producer!r}")
         out.append({k: row.get(k, "") for k in keep})
     if bad:
         sys.exit("REFUSED: the values file does not carry what claim_emit writes.\n"
@@ -169,7 +204,10 @@ def check_trace_reaches_h5(producer, reads):
     Aimed at the measured failure rather than a guessed floor. The audit hook records nothing
     for h5py, so a producer whose central input is an .h5 yields a trace that looks clean."""
     src = (REPO / producer).read_text(errors="replace")
-    if not H5_HINT.search(src):
+    # Remove comments and triple-quoted blocks first: a docstring is prose, not an I/O site.
+    stripped = re.sub(r'(?s)""".*?"""|\'\'\'.*?\'\'\'', "", src)
+    stripped = re.sub(r"(?m)#.*$", "", stripped)
+    if not H5_HINT.search(stripped):
         return
     if not any(p.lower().endswith((".h5", ".hdf5")) for p in reads):
         sys.exit(
@@ -214,7 +252,7 @@ def main():
                  "which, then re-file with --allow-short-trace --short-trace-reason '...'. "
                  "Do not pass the flag to move on.")
 
-    values = read_values(a.values, a.run_id)
+    values = read_values(a.values, a.run_id, a.producer)
 
     RECORDS.mkdir(exist_ok=True)
     rid = next_id(a.filer)

@@ -35,10 +35,30 @@ Pete, 2026-08-02:
                         fire on something real, and it is not automatically an error — a legitimate
                         two-population comparison looks identical and must be declared.
 
-  disagreement precision   the COARSER row's precision. Not ruled explicitly; taken as the default
-                           because it is the convention already in force — the manuscript reports
-                           2 dp, so a 3 dp shift is not a disagreement. Stated here rather than
-                           buried, so it can be overridden.
+  disagreement precision   FULL precision. No tolerance.
+
+REVERSED 2026-08-02 on Harold's second pass, and the reason I first gave was worse than the default
+it justified. I took the coarser row's precision because it is "the convention already in force" —
+but that convention belongs to the BACKWARD system, where one operand is a manuscript quote rounded
+by a human. Here BOTH operands come from claim_emit, whose docstring forbids exactly that: the value
+is "the number, as computed. Not rounded to the manuscript's precision: rounding here would hide a
+disagreement that only shows in the third decimal."
+
+So the tolerance protected a case the emit contract already prohibits, and its only reachable effect
+was that a row filed at low precision could never disagree with anything — file 0.9 and it silently
+absorbs 0.8834. The emit-contract violation was being rewarded by the check that should surface it.
+A filed value with suspiciously few decimals is now its own flag instead.
+
+WORTH WRITING DOWN, because the reasoning will be reapplied. Rounding the fine operand to the coarse
+one is the SAME SHAPE as the defect in check_d50.py's matches(). What made it survivable here and
+fatal there is the QUANTIFIER: matches() is existential over a haystack of hundreds, this is pairwise
+over two rows already sharing an exact quantity string. "The convention already in force" was never
+the reason — the quantifier is.
+
+AND THE TWO FLAGS ARE INDEPENDENT, not an if/elif chain. A pair differing in BOTH value and
+population previously reported only the value flag, so the reader was never shown that the sets
+differ — which is precisely the recovery-numbers diagnosis, two values that disagree BECAUSE the
+populations differ.
 
 ## WHAT IT CANNOT DO
 
@@ -98,10 +118,13 @@ def main():
                     vy = float(str(y["value"]).replace(",", ""))
                 except ValueError:
                     continue
-                d = min(dp(x["value"]), dp(y["value"]))          # the coarser row
-                if round(vx, d) != round(vy, d):
-                    value_flags.append((q, x, y, d))
-                elif x["population"] != y["population"]:
+                # INDEPENDENT, not elif. Harold: an `elif` meant a pair differing in BOTH value
+                # and population reported only the value flag, so the reader was never shown that
+                # the populations differ -- which is precisely the recovery-numbers diagnosis, two
+                # values that disagree BECAUSE the sets differ.
+                if vx != vy:
+                    value_flags.append((q, x, y, max(dp(x["value"]), dp(y["value"]))))
+                if x["population"] != y["population"]:
                     pop_flags.append((q, x, y))
 
     print(f"\n  quantity identity — {len(rows)} filed value(s), "
@@ -112,12 +135,22 @@ def main():
         print(f"    {q!r}")
         print(f"      {x['r_id']}  {x['value']}  ({x['population'] or 'no population'})")
         print(f"      {y['r_id']}  {y['value']}  ({y['population'] or 'no population'})")
-        print(f"      compared at {d} dp — the coarser of the two")
+        print(f"      compared at full precision ({d} dp is the finer of the two)")
+
+    lowp = [r for r in rows if r["value"] and dp(r["value"]) == 1]
+    if lowp:
+        print(f"\n  FILED AT ONE DECIMAL   {len(lowp)}")
+        print("    claim_emit records the number as computed, not rounded. A single decimal is")
+        print("    usually a hand-written row or a rounded one, and it cannot disagree with much.")
+        for r in lowp[:10]:
+            print(f"    {r['r_id']}  {r['quantity']} = {r['value']}")
 
     print(f"\n  ONE QUANTITY, TWO POPULATIONS   {len(pop_flags)}")
     if pop_flags:
-        print("    values agree; the sets do not. Declare the comparison or reconcile the sets —")
-        print("    this is the shape of a bank statistic quoted as a population statistic.")
+        print("    one quantity measured over different sets. Declare the comparison or reconcile")
+        print("    the sets — this is the shape of a bank statistic quoted as a population one.")
+        print("    A pair listed HERE AND ABOVE is the worst case: the values disagree BECAUSE the")
+        print("    populations do, which is the recovery-numbers diagnosis exactly.")
     for q, x, y in pop_flags[:20]:
         print(f"    {q!r}  {x['value']}")
         print(f"      {x['r_id']}  {x['population'] or 'no population'}")

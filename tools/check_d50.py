@@ -159,9 +159,25 @@ def matches(v, dp, pool):
     Harold's alternative -- match at the FINER precision -- was rejected because it would break
     the legitimate case above: 0.88 against 0.8834 at 4 dp is not a match, and quoting a rounded
     number is normal in prose.
+
+    ## INTEGERS DO NOT RESOLVE, and the reason is stronger than "uninformative"
+
+    Exact integer matching was still wrong, and Harold measured why on the second pass. Of 1,609
+    integer literals counted as resolved, 1,395 -- 86.7% -- had magnitude under 100, and only TWO
+    were >= 1,000. A bare `| **1** |` in a table's first column. A `100` inside a tensor-shape
+    expression. Small integers collide by nature against a pool that is mostly counts.
+
+    So those ~1,395 were numbers NOBODY FILED being reported as filed: false negatives in the half
+    this tool calls the honest one, which means `resolved` was not merely uninformative, it was
+    corrupting UNRESOLVED. A threshold of >= 1,000 would have kept two cases, so it is not worth a
+    magic number: an integer does not resolve by value alone, full stop.
+
+    THE COST, which is real and belongs in front of Pete rather than buried here: this moves about
+    1,395 numbers into the backlog, and that makes the exemption table load-bearing rather than
+    optional. A count, a chromosome, a window width and a year all need declaring.
     """
     if dp == 0:
-        return any(float(x).is_integer() and int(x) == int(v) for x, _ in pool)
+        return False          # see INTEGERS DO NOT RESOLVE, above
     return any(round(x, dp) == round(v, dp) for x, _ in pool)
 
 
@@ -231,8 +247,22 @@ def main():
     # of resolutions were bare integers, the single number read as coverage and was noise.
     by_dp = {"integer": [0, 0], "1-2 dp": [0, 0], ">=3 dp": [0, 0]}
 
+    # FENCED CODE BLOCKS ARE SKIPPED. Harold measured 186 literals inside them in this repo's
+    # analysis_plans/, 93 of which counted as unresolved: SEEDS = [100, 200, 300, 400, 500],
+    # B = 2000  # bootstrap resamples, RSEED = 20260730. Configuration and pasted output, not
+    # claims. strip_exempt handles single-backtick spans and is LINE-SCOPED, so it structurally
+    # cannot see a fence -- the tracking has to be here, in the caller. The analysis repo's
+    # documents have few such blocks; analysis_plans/ is full of them.
+    fenced = 0
     for rel in docs:
+        in_fence = False
         for i, raw in enumerate((repo / rel).read_text(errors="replace").splitlines(), 1):
+            if raw.lstrip().startswith("```") or raw.lstrip().startswith("~~~"):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                fenced += len(literals(strip_exempt(raw)))
+                continue
             line = strip_exempt(raw)
             if not STATE_NUM.search(line):
                 continue
@@ -255,17 +285,14 @@ def main():
     if not EXEMPTIONS.exists():
         print(f"  no exemption table yet ({EXEMPTIONS.relative_to(MODEL_REPO)}) — every "
               "threshold and approximation will read as unresolved")
-    print(f"\n  resolved   {resolved}    <- NOT a coverage figure. See the split.")
+    print(f"\n  UNRESOLVED {len(unresolved)}      <- the number to quote")
+    print(f"  exempt     {exempted}")
+    print(f"  skipped inside fenced code blocks   {fenced}")
+    print("\n  resolution by precision (integers never resolve by value alone — see matches()):")
     for k in ("integer", "1-2 dp", ">=3 dp"):
         r, n = by_dp[k]
         if n:
             print(f"      {k:9} {r:5}/{n:<5} = {100 * r / n:4.1f}%")
-    print("      the integer row is not evidence of anything. Exact integer matching removed")
-    print("      the rounding window (56.5% -> 49.3% when measured), but small integers collide")
-    print("      by nature: a chromosome number matches a count, a year matches an n. Value")
-    print("      matching without context cannot separate them. Quote UNRESOLVED, not resolved.")
-    print(f"  exempt     {exempted}")
-    print(f"  UNRESOLVED {len(unresolved)}")
     if unresolved:
         print("\n  a number stated in a shared document with no filed result behind it:")
         for rel, i, lit in unresolved[:25]:

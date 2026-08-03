@@ -41,7 +41,7 @@ QVIEW = RECORDS / "quantities.tsv"
 
 COLS = ["id", "state", "rung", "assertion", "producer", "producer_sha", "run_id",
         "n_inputs", "n_outputs", "n_values", "seed", "filed", "filer", "supersedes"]
-QCOLS = ["quantity", "value", "n", "population", "claim_id", "r_id", "state", "producer"]
+QCOLS = ["quantity", "value", "n", "population", "run_id", "claim_id", "r_id", "state", "producer"]
 
 
 def cell(v):
@@ -60,6 +60,11 @@ def build_quantities():
                 "value": cell(v.get("value", "")),
                 "n": cell(v.get("n", "")),
                 "population": cell(v.get("population", "")),
+                # PER-VALUE run_id, not the row's. A values file can span two runs, so the
+                # row-level id is not a substitute -- that is the vintage-mixing case D66(b)
+                # keys against and check_unfiled_values.py needs it to distinguish
+                # "never filed" from "filed at a different value".
+                "run_id": cell(v.get("run_id", d.get("run_id", ""))),
                 "claim_id": cell(v.get("claim_id", "")),
                 "r_id": d["id"],
                 "state": cell(d.get("state", "")),
