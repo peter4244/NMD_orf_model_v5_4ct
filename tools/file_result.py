@@ -3,7 +3,7 @@
 
     python3 tools/file_result.py --assertion "..." --producer analysis_plans/x.py \
         --run-id 8896445 --runlog <path> --trace <path> --seed 100 \
-        --values /path/to/claim_values.<run>.tsv --filer interpretability
+        --values /path/to/claim_values.<run>.tsv --filer hi
 
 SCOPE IS PROVENANCE ONLY (D65). What goes in a row is exactly what is needed to build the
 data-to-claims graph: the assertion, the producer and its commit, the files read and written,
@@ -12,34 +12,68 @@ null a result was measured against, the caveat that must travel with it, which g
 its paper disposition -- is a SEPARATE review process and deliberately has no field here. Do
 not add one; that decision has a D-number.
 
-ONE FILE PER ROW, AND WHY. D66 puts this ledger in the model repo, which is worktree-split:
-master, interp and results are three checkouts. A single append-only TSV here would take
-concurrent writes from three windows and merge inside a generated table -- the failure D53
-avoided by refusing to split the analysis repo. One JSON file per row means two windows filing
-at once touch different files and there is nothing to resolve. tools/build_results_view.py
-regenerates the flat view over the directory.
+## WHY THE REFUSALS ARE THE WHOLE SECURITY MODEL
 
-DIRECTORY NAME. `claim_records/`, deliberately NOT `results_rows/`. Every results_* directory
-in this repo is gitignored data; a ledger that vanishes under a future glob is not a risk worth
-taking for a tidier name.
+Rewritten 2026-08-02 after Harold's review, which found the defect that matters: **filing a
+result silences check_d50.py.** He filed the assertion "keto ratio is 1.148x" with --producer
+pointing at THIS script, which computes no such thing, and a hand-written one-line values file
+with population, producer_file and producer_line all empty. Nothing refused it, and 1.148
+disappeared from the gate's report.
 
-INPUTS ARE TRACED, NEVER TYPED. D27: backward walking answers only which file produces a claim;
-forward execution answers what it reads, completely, in one run. Hand-resolved read-sets were
-wrong three times running, each miss costing a 25-agent fan-out. So this reads the trace rather
-than accepting a list.
+That is exactly what 1.148x was -- a number carrying authority it never earned -- so the gate
+failed against its own founding case. And the adoption test ("filing must be faster than not
+filing") makes the silencing path the CHEAP one.
 
-THE SHORT-TRACE GUARD, and the failure it is named after. trace_reads.py's audit hook is blind
-to HDF5 -- h5py opens through the HDF5 C library and never touches CPython's file API, so ZERO
-events fire. `results_4ct/nmd_orf_data.h5` is THE central input of evaluate.py,
-11_kernel_shap_branches.py and infer_uorf_attention.py, so an unpatched trace of any of them
-looks perfectly clean while omitting the one file that matters. h5py is patched because it was
-measured; the next C extension will not be. C34 states the principle: a trace is complete only
-over the call surface it wraps, so a SHORT trace is suspect. A trace with no reads is refused
-here rather than warned about, because a warning on the happy path is a warning nobody reads.
+The gate resolves document numbers against filed values, so **the gate's integrity is entirely
+this file's refusals.** claim_emit.emit() already raises on a blank population; the hole was
+that this script accepted any TSV. So: a values file must be demonstrably claim_emit output,
+its run_id must match the run being filed, and every row must carry the fields whose absence
+is claim_emit's signature of not having produced it.
+
+Four refusals, each named after something measured:
+
+  values not from claim_emit   producer_file/producer_line empty is the signature. Harold's
+                               fabricated row had both empty and filed green.
+  run_id mismatch              D66(b) keys claim_values by run_id, and claim_emit's docstring
+                               warns that appending to a stale file silently mixes vintages.
+  blank population             Unstated populations are the dominant defect class here, about
+                               one per manuscript section. The spec promised this guard as
+                               "an empty field is visibly incomplete" and did not implement it.
+  producer dirty               Was a warning that still wrote, which contradicted this file's
+                               own two calibrations -- "a warning on the happy path is a warning
+                               nobody reads" and "a guard that cannot fail is worse than no
+                               guard". If the producer has uncommitted changes then producer_sha
+                               does not describe the code that ran, and the row records a
+                               version it does not have.
+
+## THE SHORT-TRACE GUARD
+
+trace_reads.py's audit hook is blind to HDF5 -- h5py opens through the HDF5 C library and never
+touches CPython's file API, so ZERO events fire. results_4ct/nmd_orf_data.h5 is THE central
+input of evaluate.py, 11_kernel_shap_branches.py and infer_uorf_attention.py, so an unpatched
+trace of any of them looks perfectly clean while omitting the one file that matters.
+
+Harold's correction: refusing only at zero reads is the wrong threshold, because the failure
+produces zero events only when the h5 is the producer's SOLE input -- one config file alongside
+it gives a trace of length 1 that passes. So the check is now AIMED AT THE MEASURED FAILURE
+rather than at a guessed floor: if the producer's source mentions an HDF5 path, an HDF5 file
+must appear in the trace. The zero-read refusal is kept as the coarse backstop.
+
+## IDENTITY, AND WHY IDS CARRY A FILER
+
+D66 puts this ledger in the model repo, which is worktree-split: master, interp and results are
+three checkouts. One file per row defeats CONTENT conflict. Harold showed it does not defeat
+IDENTITY conflict -- RECORDS resolves per checkout, so two windows filing concurrently both
+scan their own directory, both allocate R0007, and both write that path with different content.
+
+Pete's ruling, 2026-08-02: **filer-prefixed R-numbers.** Each filer allocates inside its own
+namespace, so two windows never collide. The residual is one filer working in two worktrees at
+once, which is why the write is O_EXCL rather than a plain open -- if the path exists, stop.
 """
 import argparse
 import datetime
 import json
+import os
 import re
 import subprocess
 import sys
@@ -47,25 +81,40 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 RECORDS = REPO / "claim_records"
-ID_RE = re.compile(r"^R(\d{4})\.json$")
+
+# Namespacing follows the repo convention for cluster jobs and outputs: hi = interpretability,
+# md = model. gu = guardian/organizer, st = storyteller.
+FILERS = {"hi": "interpretability", "md": "model", "gu": "guardian", "st": "storyteller"}
+ID_RE = re.compile(r"^R-([a-z]{2})-(\d{4})\.json$")
+
+# claim_emit's own columns. A file missing any of these was not written by it.
+EMIT_COLS = ("claim_id", "quantity", "value", "n", "population",
+             "producer_file", "producer_line", "run_id")
+H5_HINT = re.compile(r"\.h5\b|h5py|HDF5", re.I)
 
 
-def sh(cmd, cwd=None):
-    """Run and return stdout. Never suppresses stderr -- a guard that cannot fail is worse
-    than no guard, and `git merge --ff-only -q 2>/dev/null` reporting success for hours while
-    doing nothing is the logged instance (W240)."""
+def sh(cmd, cwd=None, check=True):
+    """Run and return stdout. NEVER suppresses stderr -- `git merge --ff-only -q 2>/dev/null`
+    reporting success for hours while doing nothing is the logged instance (W240)."""
     r = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=cwd)
-    if r.returncode != 0:
+    if check and r.returncode != 0:
         sys.exit(f"FAILED: {cmd}\n{r.stderr.strip()}")
     return r.stdout.strip()
 
 
-def next_id():
-    """Allocate the lowest unused R number. Scans the directory rather than keeping a counter:
-    a counter file is a second place the state lives, and two worktrees would both increment it."""
-    used = {int(m.group(1)) for p in RECORDS.glob("R*.json")
+def next_id(filer):
+    """Allocate the lowest id not yet used BY THIS FILER.
+
+    Scans the directory rather than keeping a counter: a counter file is a second place the
+    state lives, and two worktrees would both increment it. Genuinely lowest-unused, not
+    max+1 -- the previous docstring said one and the code did the other, which is the exact
+    class of defect this project exists to complain about."""
+    used = {int(m.group(2)) for p in RECORDS.glob(f"R-{filer}-*.json")
             if (m := ID_RE.match(p.name))}
-    return f"R{(max(used) + 1 if used else 1):04d}"
+    n = 1
+    while n in used:
+        n += 1
+    return f"R-{filer}-{n:04d}"
 
 
 def read_trace(path):
@@ -77,35 +126,73 @@ def read_trace(path):
     return reads, writes
 
 
-def read_values(path):
-    """Carry the emitted values across. `population` is mandatory at the emit call site and is
-    the reason this is read rather than retyped -- it is known there and nowhere else."""
-    lines = Path(path).read_text().splitlines()
-    if not lines:
-        return []
+def read_values(path, run_id):
+    """Carry the emitted values across, refusing anything that is not claim_emit output.
+
+    `population` is read rather than retyped because it is known at the emit call site and
+    nowhere else -- claim_emit's docstring makes that argument and raises on a blank one. This
+    function is the second half of that guarantee: it verifies the file it was handed actually
+    came from there."""
+    lines = [ln for ln in Path(path).read_text().splitlines() if ln.strip()]
+    if len(lines) < 2:
+        sys.exit(f"REFUSED: {path} has no value rows.")
     head = lines[0].split("\t")
+    missing = [c for c in EMIT_COLS if c not in head]
+    if missing:
+        sys.exit(f"REFUSED: {path} is not claim_emit output — missing column(s): "
+                 f"{', '.join(missing)}.\nEmission is required at filing (D66). Wire "
+                 "claim_emit.emit() into the producer and re-run it; do not hand-write this file.")
     keep = ("claim_id", "quantity", "value", "n", "population", "producer_file", "producer_line")
-    out = []
-    for ln in lines[1:]:
-        if not ln.strip():
-            continue
+    out, bad = [], []
+    for i, ln in enumerate(lines[1:], 2):
         row = dict(zip(head, ln.split("\t")))
+        for col in ("producer_file", "producer_line", "population", "quantity", "value"):
+            if not str(row.get(col, "")).strip():
+                bad.append(f"  line {i}: blank `{col}`")
+        rr = str(row.get("run_id", "")).strip()
+        if rr and rr != str(run_id):
+            bad.append(f"  line {i}: run_id {rr!r} != --run-id {run_id!r}")
         out.append({k: row.get(k, "") for k in keep})
+    if bad:
+        sys.exit("REFUSED: the values file does not carry what claim_emit writes.\n"
+                 + "\n".join(bad[:12])
+                 + "\n\nBlank producer_file/producer_line is the signature of a hand-written "
+                   "row. A blank population is the dominant defect class in this manuscript. "
+                   "A run_id mismatch means the file mixes vintages, which claim_emit's own "
+                   "docstring warns about.")
     return out
+
+
+def check_trace_reaches_h5(producer, reads):
+    """If the producer's source mentions HDF5, an HDF5 file must appear in the trace.
+
+    Aimed at the measured failure rather than a guessed floor. The audit hook records nothing
+    for h5py, so a producer whose central input is an .h5 yields a trace that looks clean."""
+    src = (REPO / producer).read_text(errors="replace")
+    if not H5_HINT.search(src):
+        return
+    if not any(p.lower().endswith((".h5", ".hdf5")) for p in reads):
+        sys.exit(
+            f"REFUSED: {producer} references HDF5 but its trace records no .h5 read.\n"
+            "trace_reads.py's audit hook does not fire for h5py — it opens through the HDF5 C\n"
+            "library and never touches CPython's file API — so this is the signature of a\n"
+            "trace that looks complete and omitted the producer's central input.\n"
+            "Confirm the h5py wrapper is active, then re-run the trace.")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--assertion", required=True, help="what is claimed. The only human field.")
     ap.add_argument("--producer", required=True, help="repo-relative path to the script")
-    ap.add_argument("--run-id", required=True, help="job id, or a run identifier")
+    ap.add_argument("--run-id", required=True)
     ap.add_argument("--runlog", required=True, help="path to what the run printed")
     ap.add_argument("--trace", required=True, help="trace_reads output for this run")
-    ap.add_argument("--values", required=True, help="claim_values file for this run")
+    ap.add_argument("--values", required=True, help="claim_emit output for this run")
+    ap.add_argument("--filer", required=True, choices=sorted(FILERS),
+                    help="; ".join(f"{k}={v}" for k, v in sorted(FILERS.items())))
     ap.add_argument("--seed", default="")
-    ap.add_argument("--filer", required=True, help="which window filed it")
-    ap.add_argument("--allow-short-trace", action="store_true",
-                    help="file anyway when the trace records no reads. Records WHY in the row.")
+    ap.add_argument("--supersedes", default="", help="an R-number this replaces")
+    ap.add_argument("--allow-short-trace", action="store_true")
     ap.add_argument("--short-trace-reason", default="")
     a = ap.parse_args()
 
@@ -115,29 +202,27 @@ def main():
         if not Path(f).exists():
             sys.exit(f"not found: {f}")
 
+    if sh(f"git status --porcelain -- {a.producer}", cwd=REPO):
+        sys.exit(f"REFUSED: {a.producer} has uncommitted changes, so the recorded "
+                 "producer_sha would not describe the code that ran. Commit it, then file.")
+
     reads, writes = read_trace(a.trace)
+    check_trace_reaches_h5(a.producer, reads)
     if not reads and not a.allow_short_trace:
-        sys.exit(
-            f"REFUSED: the trace records ZERO reads ({a.trace}).\n"
-            "That is the exact signature of the h5py blindness -- a clean-looking trace that\n"
-            "omitted the one file that mattered. Either the producer genuinely read nothing,\n"
-            "or the tracer could not see its I/O route. Confirm which, then re-file with\n"
-            "--allow-short-trace --short-trace-reason '...'. Do not pass the flag to move on.")
+        sys.exit(f"REFUSED: the trace records ZERO reads ({a.trace}). Either the producer "
+                 "genuinely read nothing, or the tracer could not see its I/O route. Confirm "
+                 "which, then re-file with --allow-short-trace --short-trace-reason '...'. "
+                 "Do not pass the flag to move on.")
 
-    values = read_values(a.values)
-    if not values:
-        sys.exit(f"REFUSED: no emitted values in {a.values}. Emission is required at filing "
-                 "(D66) -- a result whose producer emitted nothing has no machine-checkable "
-                 "number behind it.")
+    values = read_values(a.values, a.run_id)
 
-    rid = next_id()
     RECORDS.mkdir(exist_ok=True)
+    rid = next_id(a.filer)
     row = {
         "id": rid,
         "assertion": a.assertion,
         "producer": a.producer,
         "producer_sha": sh("git rev-parse HEAD", cwd=REPO),
-        "producer_dirty": bool(sh("git status --porcelain -- " + a.producer, cwd=REPO)),
         "inputs": reads,
         "outputs": writes,
         "values": values,
@@ -147,17 +232,25 @@ def main():
         "seed": a.seed,
         "state": "live",
         "rung": "asserted",
-        "supersedes": "",
+        "supersedes": a.supersedes,
         "filed": datetime.date.today().isoformat(),
         "filer": a.filer,
     }
     if not reads:
         row["short_trace_reason"] = a.short_trace_reason
-    (RECORDS / f"{rid}.json").write_text(json.dumps(row, indent=2) + "\n")
+
+    # O_EXCL, not a plain write. Filer-prefixed ids stop two WINDOWS colliding; this stops one
+    # filer in two worktrees from silently overwriting itself.
+    target = RECORDS / f"{rid}.json"
+    try:
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    except FileExistsError:
+        sys.exit(f"REFUSED: {target.name} already exists. Another filing raced this one; "
+                 "re-run and it will take the next id.")
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps(row, indent=2) + "\n")
+
     print(f"  filed {rid}  ({len(reads)} reads, {len(writes)} writes, {len(values)} values)")
-    if row["producer_dirty"]:
-        print("  WARNING: producer has uncommitted changes, so producer_sha does not describe "
-              "the code that ran. Commit it and re-file.")
     print("  regenerate the view: python3 tools/build_results_view.py")
 
 
