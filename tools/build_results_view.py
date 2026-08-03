@@ -17,6 +17,17 @@ WHAT THE VIEW DELIBERATELY OMITS: inputs and outputs. A row can carry hundreds o
 and flattening them into a cell produces a table nobody can read and a diff nobody can review.
 The count is shown instead; the paths stay in the row, which is where a graph builder reads
 them from anyway.
+
+TWO VIEWS, NOT ONE, added 2026-08-02 on Harold's finding. index.tsv is one line per R-row, so it
+cannot carry `quantity` -- a row holds several values and a single cell would have to pick one.
+So quantities.tsv is one line per VALUE: (quantity, value, population, n, R-id). That is the
+table tools/check_quantity_identity.py joins on, and it is the shape a graph builder wants
+anyway, since the claim node is the value and not the filing.
+
+WHY THIS MATTERS MORE THAN IT LOOKS. "One quantity, two values over different sets" is the first
+section of the analysis repo's CLAUDE.md -- this project's declared signature defect -- and the
+forward system could not see it. `quantity` was carried from claim_emit, preserved through
+filing, and keyed on by nothing.
 """
 import argparse
 import json
@@ -26,9 +37,37 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 RECORDS = REPO / "claim_records"
 VIEW = RECORDS / "index.tsv"
+QVIEW = RECORDS / "quantities.tsv"
 
 COLS = ["id", "state", "rung", "assertion", "producer", "producer_sha", "run_id",
         "n_inputs", "n_outputs", "n_values", "seed", "filed", "filer", "supersedes"]
+QCOLS = ["quantity", "value", "n", "population", "claim_id", "r_id", "state", "producer"]
+
+
+def cell(v):
+    """Tabs and newlines would shift every later field, the way one stray tab in the analysis
+    repo's worklog silently misaligned a row. Normalise; do not trust the writer."""
+    return " ".join(str(v).split())
+
+
+def build_quantities():
+    rows = []
+    for p in sorted(RECORDS.glob("R*.json")):
+        d = json.loads(p.read_text())
+        for v in d.get("values", []):
+            rows.append({
+                "quantity": cell(v.get("quantity", "")),
+                "value": cell(v.get("value", "")),
+                "n": cell(v.get("n", "")),
+                "population": cell(v.get("population", "")),
+                "claim_id": cell(v.get("claim_id", "")),
+                "r_id": d["id"],
+                "state": cell(d.get("state", "")),
+                "producer": cell(d.get("producer", "")),
+            })
+    rows.sort(key=lambda r: (r["quantity"], r["r_id"]))
+    out = ["\t".join(QCOLS)] + ["\t".join(r[c] for c in QCOLS) for r in rows]
+    return "\n".join(out) + "\n", len(rows)
 
 
 def build():
@@ -65,14 +104,19 @@ def main():
     if not RECORDS.exists():
         sys.exit("claim_records/ does not exist — nothing filed yet")
     text, n = build()
+    qtext, qn = build_quantities()
     if a.check:
-        cur = VIEW.read_text() if VIEW.exists() else ""
-        if cur != text:
-            sys.exit("STALE — run: python3 tools/build_results_view.py")
-        print(f"  ok  claim_records/index.tsv current ({n} rows)")
+        stale = [name for name, path, want in
+                 (("index.tsv", VIEW, text), ("quantities.tsv", QVIEW, qtext))
+                 if (path.read_text() if path.exists() else "") != want]
+        if stale:
+            sys.exit(f"STALE ({', '.join(stale)}) — run: python3 tools/build_results_view.py")
+        print(f"  ok  claim_records/ views current ({n} rows, {qn} values)")
         return
     VIEW.write_text(text)
+    QVIEW.write_text(qtext)
     print(f"  wrote claim_records/index.tsv ({n} rows)")
+    print(f"  wrote claim_records/quantities.tsv ({qn} values)")
 
 
 if __name__ == "__main__":
