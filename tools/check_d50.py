@@ -33,11 +33,17 @@ that is filed but filed WRONG — a bank statistic carrying a population field t
 wrong question.
 """
 import argparse
+import fnmatch
 import json
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+try:
+    import yaml
+except ImportError:                       # scope can still be passed with --scope
+    yaml = None
 
 TRACK_A = Path.home() / "claude_projects" / "nmd_lung_longread_2026"
 sys.path.insert(0, str(TRACK_A / "tools"))
@@ -130,27 +136,100 @@ def exemptions():
 
 
 def matches(v, dp, pool):
-    """A document number matches an emitted one at the document's OWN precision — the
-    manuscript reports 2 dp, so a 3 dp shift is not a disagreement."""
+    """Does a document number correspond to a filed one?
+
+    REWRITTEN 2026-08-02 on Harold's measurement. The previous rule rounded the POOL value to
+    the DOCUMENT's precision, so a coarse document number matched any fine pool value near it.
+    Measured over 48 documents against a 241-value pool: bare integers resolved at 56.5%
+    (2,884 of 5,103) against 8.0% (84 of 1,056) for literals with three or more decimals, and
+    2,884 of the 3,357 total resolutions -- 86% -- were bare integers. Line numbers, page
+    counts and chromosome numbers were "resolving" against unrelated claim values, and the rate
+    climbs toward 100% as the pool grows.
+
+    The split, and why it is not simply "ignore low precision":
+
+      the document literal has decimals   round both to the COARSER precision. This is the
+                                          rounding tolerance that has to exist -- a manuscript
+                                          reporting 0.88 against a producer's 0.8834 is a
+                                          match, not a disagreement.
+      the document literal is an integer  require EXACT equality against an integer pool value.
+                                          No rounding window at all. An n of 10,520 still
+                                          matches; a line number 593 no longer matches 0.883.
+
+    Harold's alternative -- match at the FINER precision -- was rejected because it would break
+    the legitimate case above: 0.88 against 0.8834 at 4 dp is not a match, and quoting a rounded
+    number is normal in prose.
+    """
+    if dp == 0:
+        return any(float(x).is_integer() and int(x) == int(v) for x, _ in pool)
     return any(round(x, dp) == round(v, dp) for x, _ in pool)
+
+
+def in_scope(path, globs):
+    """Depth-aware, copied in behaviour from check.py's function of the same name: Python's
+    fnmatch lets `*` match `/`, so a bare `*.md` scope swallows every nested README. A pattern
+    matches only paths at its own depth."""
+    return any(g.count("/") == path.count("/") and fnmatch.fnmatch(path, g) for g in globs)
+
+
+def scope_for(repo, override):
+    """Which documents count as 'a document another window reads'.
+
+    NOT INVENTED HERE. Harold's steer, accepted: take the globs from artifacts.yml rather than
+    building a second scoping mechanism, because a second mechanism is the restatement failure
+    this project keeps paying for.
+
+    AND FAIL CLOSED WHEN THERE IS NO DECLARATION. The analysis repo declares `scope` in
+    config/artifacts.yml. This repo does not, and I am deliberately NOT guessing which of its 48
+    tracked documents are current -- BUGFIX_STOP_CODON_2026-03-31.md sits at depth 0 and matches
+    the analysis repo's `*.md` glob, so borrowing that scope would not have excluded it anyway.
+    Deciding it here would be resolving an ambiguity inside an implementation, which is invisible
+    to review and is the origin of most errors on this project. The owning windows declare it,
+    with --scope or by adding a declaration.
+    """
+    if override:
+        return [g.strip() for g in override.split(",") if g.strip()], "--scope"
+    cfg = repo / "config" / "artifacts.yml"
+    if cfg.exists() and yaml is not None:
+        d = yaml.safe_load(cfg.read_text())
+        if isinstance(d, dict) and d.get("scope"):
+            return list(d["scope"]), str(cfg.relative_to(repo))
+    return None, None
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", default=str(MODEL_REPO))
+    ap.add_argument("--scope", default="",
+                    help="comma-separated globs, e.g. 'analysis_plans/*.md'. Required for a repo "
+                         "with no config/artifacts.yml scope declaration.")
     ap.add_argument("--strict", action="store_true")
     a = ap.parse_args()
     repo = Path(a.repo).resolve()
 
+    globs, src = scope_for(repo, a.scope)
+    if globs is None:
+        sys.exit(
+            f"NO SCOPE DECLARED for {repo.name}.\n"
+            "D50 concerns documents another window reads NOW, not every document ever tracked —\n"
+            "scanning this repo's history reported 4,498 unresolved numbers from files like\n"
+            "BUGFIX_STOP_CODON_2026-03-31.md. Which documents are current is the owning windows'\n"
+            "call, not this tool's.\n\n"
+            "  declare it:  config/artifacts.yml  ->  scope: [...]      (as the analysis repo does)\n"
+            "  or pass:     --scope 'analysis_plans/*.md,*.md'")
+
     r = subprocess.run("git ls-files '*.md'", shell=True, capture_output=True, text=True, cwd=repo)
     if r.returncode != 0:
         sys.exit(f"git ls-files failed in {repo}:\n{r.stderr.strip()}")
-    docs = [d for d in r.stdout.split() if d]
+    docs = [d for d in r.stdout.split() if d and in_scope(d, globs)]
 
     pool = emitted_values() + claim_values()
     exempt = exemptions()
     resolved = exempted = 0
     unresolved = []
+    # Broken out by precision so `resolved` cannot be quoted without its composition. When 86%
+    # of resolutions were bare integers, the single number read as coverage and was noise.
+    by_dp = {"integer": [0, 0], "1-2 dp": [0, 0], ">=3 dp": [0, 0]}
 
     for rel in docs:
         for i, raw in enumerate((repo / rel).read_text(errors="replace").splitlines(), 1):
@@ -158,21 +237,33 @@ def main():
             if not STATE_NUM.search(line):
                 continue
             for lit, v, dp in literals(line):
+                b = by_dp["integer" if dp == 0 else ("1-2 dp" if dp <= 2 else ">=3 dp")]
+                b[1] += 1
                 if matches(v, dp, pool):
                     resolved += 1
+                    b[0] += 1
                 elif any(round(x, dp) == round(v, dp) and (sc in ("*", rel))
                          for x, sc, _ in exempt):
                     exempted += 1
                 else:
                     unresolved.append((rel, i, lit))
 
-    print(f"\n  D50 gate — {repo.name}, {len(docs)} tracked documents")
+    print(f"\n  D50 gate — {repo.name}, {len(docs)} document(s) in scope "
+          f"({', '.join(globs)} from {src})")
     print(f"  {len(pool)} value(s) in the resolution pool "
           f"({len(emitted_values())} emitted, {len(claim_values())} from the claim ledger)")
     if not EXEMPTIONS.exists():
         print(f"  no exemption table yet ({EXEMPTIONS.relative_to(MODEL_REPO)}) — every "
               "threshold and approximation will read as unresolved")
-    print(f"\n  resolved   {resolved}")
+    print(f"\n  resolved   {resolved}    <- NOT a coverage figure. See the split.")
+    for k in ("integer", "1-2 dp", ">=3 dp"):
+        r, n = by_dp[k]
+        if n:
+            print(f"      {k:9} {r:5}/{n:<5} = {100 * r / n:4.1f}%")
+    print("      the integer row is not evidence of anything. Exact integer matching removed")
+    print("      the rounding window (56.5% -> 49.3% when measured), but small integers collide")
+    print("      by nature: a chromosome number matches a count, a year matches an n. Value")
+    print("      matching without context cannot separate them. Quote UNRESOLVED, not resolved.")
     print(f"  exempt     {exempted}")
     print(f"  UNRESOLVED {len(unresolved)}")
     if unresolved:
