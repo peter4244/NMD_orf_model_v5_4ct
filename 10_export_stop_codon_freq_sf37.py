@@ -32,6 +32,12 @@ Columns:
     pct            — n / population_total * 100 (rounded to 1 decimal)
     population_total — total transcripts in that population
 
+Second output: `<results-dir>/stop_codon_test_sf37_<split>.tsv` — the NMD-vs-Control
+Fisher test per codon, with counts, both percentages, odds ratio and p. It exists
+because the manuscript sentence asserts a p-value, and a p-value computed at a prompt
+and typed into prose has no producer. ALL THREE codons are tested, so quoting UGA is
+visibly a choice rather than the only thing that was measured.
+
 Usage (on Explorer):
     cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
     python 10_export_stop_codon_freq_sf37.py \
@@ -164,7 +170,7 @@ def main():
     df["stop_rna"] = df[stop_col].apply(normalize_stop)
     df = df.dropna(subset=["stop_rna"])
 
-    print(f"[join] {len(df):,} priority-ORF test transcripts with a valid stop codon")
+    print(f"[join] {len(df):,} priority-ORF transcripts in split={args.split} with a valid stop codon")
 
     # ALL THREE UNIVERSES, EVERY TIME (D78). The pooled row is not decoration: without it a reader
     # comparing this table to another has no way to tell whether a percentage is over everything or
@@ -190,6 +196,38 @@ def main():
     out.to_csv(OUT_TSV, sep="\t", index=False)
     print(f"[wrote] {OUT_TSV}")
     print(out.to_string(index=False))
+
+    # THE TEST GETS A PRODUCER TOO. The manuscript sentence this feeds is not only two
+    # percentages -- it asserts a p-value -- and a number computed at a prompt and typed into prose
+    # has no provenance. Every codon is tested, not just the one the sentence happens to quote, so
+    # picking UGA afterwards is visibly a choice rather than the only thing measured.
+    try:
+        from scipy.stats import fisher_exact
+    except ImportError:
+        sys.exit("[ERROR] scipy is required for the NMD-vs-Control test. Refusing to write a table "
+                 "of percentages whose accompanying p-value would then have to be computed by hand.")
+
+    nmd, ctl = df[df["label"] == 1], df[df["label"] == 0]
+    trows = []
+    for stop in ("UGA", "UAA", "UAG"):
+        a = int((nmd["stop_rna"] == stop).sum()); b = len(nmd) - a
+        c = int((ctl["stop_rna"] == stop).sum()); d = len(ctl) - c
+        odds, p = fisher_exact([[a, b], [c, d]])
+        trows.append({
+            "split":      args.split,
+            "stop_codon": stop,
+            "nmd_n": a, "nmd_total": len(nmd),
+            "nmd_pct": round(100.0 * a / len(nmd), 1) if len(nmd) else 0.0,
+            "control_n": c, "control_total": len(ctl),
+            "control_pct": round(100.0 * c / len(ctl), 1) if len(ctl) else 0.0,
+            "odds_ratio": round(float(odds), 4),
+            "p_value": float(p),
+        })
+    tout = pd.DataFrame(trows)
+    test_path = OUT_TSV.parent / f"stop_codon_test_sf37_{args.split}.tsv"
+    tout.to_csv(test_path, sep="\t", index=False)
+    print(f"[wrote] {test_path}")
+    print(tout.to_string(index=False))
 
 
 if __name__ == "__main__":
