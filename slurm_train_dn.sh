@@ -43,7 +43,14 @@ echo "=== EVALUATE ==="
 # that selected the published window config. Routine monitoring scores VAL; the test set is
 # a deliberate one-time act needing --final, shown commented below so it cannot happen by
 # habit.
-$PY evaluate.py --config config_dn.yaml --results-dir results_4ct_dn --atg-window 500 --stop-window 500 --split val
+# --member-seed NAMES THE CHECKPOINT 03_train.py JUST WROTE (fixed 2026-08-02, job 8905160).
+# 03_train.py writes best_model_{tag}_seed{N}.pt, one file per ensemble member, so
+# resolve_checkpoint refuses to load an unqualified best_model_{tag}.pt when members exist -- by
+# design, since guessing would report one member's number as the ensemble's. This line had never
+# been updated for that naming, so a SUCCESSFUL train (exit 0) was always followed by an evaluate
+# that died with FileNotFoundError. Keep the two seeds in step: training.seed in config_dn.yaml
+# determines the filename, and --member-seed selects it.
+$PY evaluate.py --config config_dn.yaml --results-dir results_4ct_dn --atg-window 500 --stop-window 500 --member-seed 42 --split val
 # FINAL evaluation, run deliberately and once the config is settled:
 # $PY evaluate.py --config config_dn.yaml --results-dir results_4ct_dn --atg-window 500 --stop-window 500 --split test_clean --final
 echo "=== evaluate exit: $? ==="
