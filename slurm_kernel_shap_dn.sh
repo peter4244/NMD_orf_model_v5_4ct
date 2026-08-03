@@ -30,5 +30,5 @@ PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
 echo "=== node $(hostname) ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
 $PY 11_kernel_shap_branches.py --config config_dn.yaml --results-dir results_4ct_dn \
-    --tag atg500_stop500 --n-background 500 --seed 42 --explain-split all
+    --tag atg500_stop500 --n-background 500 --seed 42 --member-seed 42 --explain-split all
 echo "=== kernel_shap exit: $? ==="

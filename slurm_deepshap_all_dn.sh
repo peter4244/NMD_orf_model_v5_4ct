@@ -52,6 +52,7 @@ for MODE in "joint" "structural" "atg stop"; do
         --stop-window 500 \
         --seed ${SEED} \
         --run-id ${SLURM_ARRAY_TASK_ID} \
+        --member-seed 42 \
         --branches ${MODE}
     rc=$?
     echo "--- branches ${MODE} exit: $rc ---"
