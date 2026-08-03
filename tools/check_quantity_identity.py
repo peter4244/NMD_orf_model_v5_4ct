@@ -47,7 +47,11 @@ disagreement that only shows in the third decimal."
 So the tolerance protected a case the emit contract already prohibits, and its only reachable effect
 was that a row filed at low precision could never disagree with anything — file 0.9 and it silently
 absorbs 0.8834. The emit-contract violation was being rewarded by the check that should surface it.
-A filed value with suspiciously few decimals is now its own flag instead.
+A LOW-PRECISION FLAG WAS TRIED AND REMOVED. It was 2-for-2 false positives on the only real emitted
+data in existence — both hits were integer medians carrying a numpy `.0` — and the distribution is
+bimodal, counts at 0 dp and statistics at 3+ dp with essentially nothing between. No population for
+it to catch, so it was noise with a plausible rationale. What survived is the `dp()` fix: a sole
+trailing zero now reads as an integer.
 
 WORTH WRITING DOWN, because the reasoning will be reapplied. Rounding the fine operand to the coarse
 one is the SAME SHAPE as the defect in check_d50.py's matches(). What made it survivable here and
@@ -82,7 +86,13 @@ def dp(lit):
     s = str(lit).strip().replace(",", "")
     if "." not in s:
         return 0
-    return len(s.split(".")[1].split("e")[0].split("E")[0])
+    frac = s.split(".")[1].split("e")[0].split("E")[0]
+    # A SOLE TRAILING ZERO IS A FORMATTING ARTIFACT, NOT PRECISION. Harold measured this on the
+    # only real claim_emit output in existence: both 1-dp values in 118 emissions were 831.0 and
+    # 66.0 -- medians of integer ORF lengths, which numpy returns carrying a `.0`. Reading those
+    # as "one decimal of precision" made every median, count and length in the ledger look
+    # rounded.
+    return 0 if frac.rstrip("0") == "" else len(frac)
 
 
 def load():
@@ -136,14 +146,6 @@ def main():
         print(f"      {x['r_id']}  {x['value']}  ({x['population'] or 'no population'})")
         print(f"      {y['r_id']}  {y['value']}  ({y['population'] or 'no population'})")
         print(f"      compared at full precision ({d} dp is the finer of the two)")
-
-    lowp = [r for r in rows if r["value"] and dp(r["value"]) == 1]
-    if lowp:
-        print(f"\n  FILED AT ONE DECIMAL   {len(lowp)}")
-        print("    claim_emit records the number as computed, not rounded. A single decimal is")
-        print("    usually a hand-written row or a rounded one, and it cannot disagree with much.")
-        for r in lowp[:10]:
-            print(f"    {r['r_id']}  {r['quantity']} = {r['value']}")
 
     print(f"\n  ONE QUANTITY, TWO POPULATIONS   {len(pop_flags)}")
     if pop_flags:
