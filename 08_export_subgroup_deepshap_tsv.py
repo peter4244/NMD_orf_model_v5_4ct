@@ -18,7 +18,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pandas as pd
-from utils import member_tag
+from utils import member_tag, split_indices
 
 
 # ---------------------------------------------------------------------------
@@ -354,18 +354,28 @@ def main():
     td2_features = pd.read_csv(results_dir / "td2_features.tsv", sep="\t")
     preds = pd.read_csv(results_dir / f"predictions_{mtag}_{args.split}.tsv", sep="\t")
 
-    # ── Load test set isoform IDs from HDF5 ──
-    print("Loading test set isoform IDs from HDF5 ...")
+    # ── Load the split's isoform IDs from HDF5 ──
+    # THIS WAS `splits == "test"`, HARDCODED (fixed 2026-08-03). Not a filename problem like the
+    # rest of this script's stale assumptions: the population was welded into how the HDF5 was
+    # read, so asking it for the full cohort produced a shape mismatch, 41,765 predictions against
+    # 10,520 rows, at the alignment assert below. Now it goes through utils.split_indices, which is
+    # where split names are DEFINED -- same names, same meanings and the same val_clean guard as
+    # NMDDataset, because both go through _split_mask. Restating the mask here is what made the two
+    # able to disagree.
+    print(f"Loading isoform IDs for split={args.split} from HDF5 ...")
+    idx = split_indices(h5_path, args.split)
     with h5py.File(h5_path, "r") as f:
-        splits = np.array([s.decode() if isinstance(s, bytes) else s for s in f["split"][:]])
         all_ids = np.array([s.decode() if isinstance(s, bytes) else s for s in f["isoform_id"][:]])
-        test_mask = splits == "test"
-        test_indices = np.where(test_mask)[0]
-        test_ids = all_ids[test_indices]
+    test_indices = idx
+    test_ids = all_ids[test_indices]
 
-    # Verify alignment with predictions
+    # Verify alignment with predictions. Kept as an assert rather than softened: if the HDF5 rows
+    # and the predictions file disagree, every subgroup below is attached to the wrong isoform.
+    assert len(test_ids) == len(preds), (
+        f"split={args.split} gives {len(test_ids)} HDF5 rows but the predictions file has "
+        f"{len(preds)}. These must be the same population.")
     assert np.all(test_ids == preds["isoform_id"].values), \
-        "HDF5 test set order does not match predictions file!"
+        f"HDF5 order for split={args.split} does not match the predictions file!"
 
     # ── Assign subgroups ──
     subgroup_map = assign_subgroups(

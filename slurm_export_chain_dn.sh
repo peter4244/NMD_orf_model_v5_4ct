@@ -48,8 +48,11 @@ step () {                       # step <label> <command...>
   return 0
 }
 
-step "06 deepshap tsv"        $PY 06_export_deepshap_tsv.py --results-dir "$RES" --tag "$MTAG"
-step "07 motif analysis"      $PY 07_motif_analysis.py --results-dir "$RES" --tag "$MTAG"
+# 06 needs --run-id EXPLICITLY: its default is None, which means "the un-suffixed npz", and no
+# such file exists once replicates are written as _run{N}. 07 defaults to 1 and is passed it
+# anyway so the two are visibly on the same replicate rather than coincidentally so.
+step "06 deepshap tsv"        $PY 06_export_deepshap_tsv.py --results-dir "$RES" --tag "$MTAG" --run-id 1
+step "07 motif analysis"      $PY 07_motif_analysis.py --results-dir "$RES" --tag "$MTAG" --run-id 1
 step "08 subgroup deepshap"   $PY 08_export_subgroup_deepshap_tsv.py --results-dir "$RES" \
                                   --atg 500 --stop 500 --n-runs 5 --member-seed 42 --split all
 step "09 gc content"          $PY 09_export_gc_content.py --config "$CFG" --results-dir "$RES" --tag "$MTAG"
