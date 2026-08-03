@@ -227,10 +227,10 @@ def main():
     if globs is None:
         sys.exit(
             f"NO SCOPE DECLARED for {repo.name}.\n"
-            "D50 concerns documents another window reads NOW, not every document ever tracked —\n"
-            "scanning this repo's history reported 4,498 unresolved numbers from files like\n"
-            "BUGFIX_STOP_CODON_2026-03-31.md. Which documents are current is the owning windows'\n"
-            "call, not this tool's.\n\n"
+            "D50 concerns documents another window reads NOW, not every document ever tracked.\n"
+            "Scanning a whole repo's history sweeps in superseded records and bug notes, whose\n"
+            "numbers were never claims. Which documents are current is the owning windows' call,\n"
+            "not this tool's.\n\n"
             "  declare it:  config/artifacts.yml  ->  scope: [...]      (as the analysis repo does)\n"
             "  or pass:     --scope 'analysis_plans/*.md,*.md'")
 
