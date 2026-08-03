@@ -18,6 +18,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pandas as pd
+from utils import member_tag
 
 
 # ---------------------------------------------------------------------------
@@ -333,9 +334,17 @@ def main():
     parser.add_argument("--stop", type=int, default=500)
     parser.add_argument("--n-runs", type=int, default=5)
     parser.add_argument("--results-dir", type=str, default="results_4ct")
+    # THIS SCRIPT BUILDS ITS OWN TAG from --atg/--stop and has no --tag, so the member seed
+    # cannot be smuggled in through it the way it can elsewhere. Both are needed: the seed
+    # names the DeepSHAP arrays, the split names the predictions file.
+    parser.add_argument("--member-seed", type=int, default=None,
+                        help="Ensemble member, by training seed. Composes the filenames "
+                             "that 03_train.py and deepshap.py wrote.")
+    parser.add_argument("--split", default="all", help="Which universe the predictions file describes. 'all' is the full cohort (D74/D77). The split is part of the filename evaluate.py writes, so this is not cosmetic -- the wrong value reads a different population or no file at all.")
     args = parser.parse_args()
 
     tag = f"atg{args.atg}_stop{args.stop}"
+    mtag = member_tag(tag, args.member_seed)   # the stem deepshap.py and evaluate.py wrote
     results_dir = Path(args.results_dir)
     h5_path = results_dir / "nmd_orf_data.h5"
 
@@ -343,7 +352,7 @@ def main():
     print("Loading reference data ...")
     ref_features = pd.read_csv(results_dir / "ref_cds_features.tsv", sep="\t")
     td2_features = pd.read_csv(results_dir / "td2_features.tsv", sep="\t")
-    preds = pd.read_csv(results_dir / f"predictions_{tag}.tsv", sep="\t")
+    preds = pd.read_csv(results_dir / f"predictions_{mtag}_{args.split}.tsv", sep="\t")
 
     # ── Load test set isoform IDs from HDF5 ──
     print("Loading test set isoform IDs from HDF5 ...")
@@ -384,8 +393,8 @@ def main():
         print(f"Processing run {run}/{args.n_runs}")
         print(f"{'='*50}")
 
-        atg_path = results_dir / f"deepshap_atg_{tag}_run{run}.npz"
-        stop_path = results_dir / f"deepshap_stop_{tag}_run{run}.npz"
+        atg_path = results_dir / f"deepshap_atg_{mtag}_run{run}.npz"
+        stop_path = results_dir / f"deepshap_stop_{mtag}_run{run}.npz"
 
         if not atg_path.exists() or not stop_path.exists():
             print(f"  SKIP: {atg_path} or {stop_path} not found")
