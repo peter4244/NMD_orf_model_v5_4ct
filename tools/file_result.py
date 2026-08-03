@@ -64,14 +64,17 @@ trace of any of them looks perfectly clean while omitting the one file that matt
 Harold's correction: refusing only at zero reads is the wrong threshold, because the failure
 produces zero events only when the h5 is the producer's SOLE input -- one config file alongside
 it gives a trace of length 1 that passes. So the check is now AIMED AT THE MEASURED FAILURE
-rather than at a guessed floor: if the producer actually READS HDF5, an HDF5 file must appear in
-the trace. The zero-read refusal is kept as the coarse backstop.
+rather than at a guessed floor: if the producer IMPORTS h5py, an HDF5 file must appear in its
+trace. The zero-read refusal is kept as the coarse backstop.
 
-NARROWED AGAIN on Harold's second pass, because his own steer implemented literally false-
-positived: matching any mention of h5 refused a producer whose only reference was the docstring
-explaining this guard. It now requires an I/O site -- an h5py.File call, a read_hdf, or a quoted
-path literal ending .h5/.hdf5 -- with comments and triple-quoted blocks stripped first, so prose
-can never trigger it.
+NARROWED TWICE. Harold's steer implemented literally refused a producer whose only reference was
+the docstring explaining this guard. The next attempt looked for a quoted `.h5` path with comments
+and docstrings stripped -- and still refused THIS file, because the guard's own
+`endswith((".h5", ".hdf5"))` is itself a quoted .h5 literal. A source-text scan is the wrong shape
+however carefully it is narrowed.
+
+So it detects the IMPORT: h5py being imported is what makes the audit hook blind, which is the
+condition that correlates with the failure instead of a proxy for it.
 
 ## IDENTITY, AND WHY IDS CARRY A FILER
 
@@ -104,15 +107,16 @@ ID_RE = re.compile(r"^R-([a-z]{2})-(\d{4})\.json$")
 # claim_emit's own columns. A file missing any of these was not written by it.
 EMIT_COLS = ("claim_id", "quantity", "value", "n", "population",
              "producer_file", "producer_line", "run_id")
-# NARROWED 2026-08-02. The first version matched any mention of h5 anywhere in the source, and so
-# refused a producer whose only reference was a DOCSTRING explaining this very guard. Harold's
-# steer, his defect, and he reported it. Now it looks for an actual I/O site: an h5py call, or a
-# quoted path ending .h5/.hdf5. A comment or a prose mention no longer counts.
-H5_HINT = re.compile(
-    r"""h5py\s*\.\s*File            # h5py.File(...)
-      | \bpd\s*\.\s*read_hdf       # pandas.read_hdf
-      | ['"][^'"\n]*\.(?:h5|hdf5)['"]  # a quoted path literal
-    """, re.X | re.I)
+# NARROWED TWICE, 2026-08-02. Version 1 matched any mention of h5 anywhere and refused a producer
+# whose only reference was a DOCSTRING explaining this guard (Harold's steer, implemented literally).
+# Version 2 stripped comments and docstrings and looked for a quoted `.h5` path -- and still refused
+# THIS file, because the guard's own `endswith((".h5", ".hdf5"))` IS a quoted .h5 literal. A
+# source-text scan is simply the wrong shape.
+#
+# So: detect the IMPORT, not the mention. h5py being imported is what makes trace_reads.py's audit
+# hook blind, so it is the condition that actually correlates with the failure rather than a proxy
+# for it. pandas' read_hdf is included because it reaches HDF5 without the caller importing h5py.
+H5_IMPORT = re.compile(r"(?m)^\s*(?:import\s+h5py|from\s+h5py\b)|\bread_hdf\s*\(")
 
 
 def sh(cmd, cwd=None, check=True):
@@ -204,14 +208,15 @@ def check_trace_reaches_h5(producer, reads):
     Aimed at the measured failure rather than a guessed floor. The audit hook records nothing
     for h5py, so a producer whose central input is an .h5 yields a trace that looks clean."""
     src = (REPO / producer).read_text(errors="replace")
-    # Remove comments and triple-quoted blocks first: a docstring is prose, not an I/O site.
+    # Comments and triple-quoted blocks removed anyway: an import inside a docstring is prose.
     stripped = re.sub(r'(?s)""".*?"""|\'\'\'.*?\'\'\'', "", src)
     stripped = re.sub(r"(?m)#.*$", "", stripped)
-    if not H5_HINT.search(stripped):
+    if not H5_IMPORT.search(stripped):
         return
     if not any(p.lower().endswith((".h5", ".hdf5")) for p in reads):
         sys.exit(
-            f"REFUSED: {producer} references HDF5 but its trace records no .h5 read.\n"
+            f"REFUSED: {producer} imports h5py (or calls read_hdf) and its trace records no\n"
+            "HDF5 read.\n"
             "trace_reads.py's audit hook does not fire for h5py — it opens through the HDF5 C\n"
             "library and never touches CPython's file API — so this is the signature of a\n"
             "trace that looks complete and omitted the producer's central input.\n"
