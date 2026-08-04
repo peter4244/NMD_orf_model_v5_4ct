@@ -54,6 +54,31 @@ def _paths(config):
     return {"sqanti_class": resolve_path("sqanti_class", config_path=config),
             "sqanti_fasta": resolve_path("sqanti_fasta", config_path=config)}
 
+# HDF5 FILTERS, MEASURED NOT ASSUMED (2026-08-04). Was compression="lzf" everywhere.
+#
+# The window arrays are float16 and only ~23% non-zero -- close to the worst case for lzf and
+# close to the best case for the byte-shuffle filter. Benchmarked on a real 2,048-transcript
+# slice of w500/atg_windows (92.2 MB uncompressed):
+#
+#   lzf (was)        12.5 MB   1.00x   read 0.69 s
+#   lzf+shuffle       9.8 MB   1.28x   read 0.75 s
+#   gzip1             7.1 MB   1.76x   read 0.86 s
+#   gzip1+shuffle     5.6 MB   2.23x   read 0.66 s
+#   gzip4+shuffle     4.3 MB   2.89x   read 0.71 s
+#
+# The read penalty people assume for gzip does not appear: less I/O pays for the decompression.
+# gzip4+shuffle is ~2.9x smaller with read time within 3% of lzf, so the whole file goes from
+# ~2.74 GB to ~0.95 GB. Write is ~5x slower, paid once per build.
+#
+# LOSSLESS, AND THAT IS THE POINT. compression/shuffle/chunks change only the bytes on disk; the
+# array that comes back is identical element for element. dtype is the lossy knob and float16 is
+# NOT touched here -- that quantization is baked into what section 5 reports.
+#
+# Caveat on the read numbers: measured with sequential 256-row slices, whereas training uses
+# fancy indexing over NMDDataset.indices. The size ratios are solid; "gzip1+shuffle is FASTER
+# than lzf" is within cache noise and is not claimed as a finding.
+H5_COMPRESSION = {"compression": "gzip", "compression_opts": 4, "shuffle": True}
+
 MAX_ORFS = 5
 WINDOW_SIZES = [100, 500, 1000, 2000]
 N_SEQ_CHANNELS = 9  # 4 nuc + junction + rolling GC + 3 frame position (one-hot)
@@ -966,13 +991,37 @@ def build_dataset(results_dir, n_workers=8, paths=None, config_path=None):
                 _st = _tp.stat()
                 f.attrs[f"table_{_t}"] = f"{os.path.realpath(_tp)}|{_st.st_size}"
         f.attrs["n_transcripts"] = int(n_tx)
+        # CODE PROVENANCE (2026-08-04, review finding F3). The first version recorded only
+        # `git rev-parse HEAD`, and the very first real build proved why that is not enough: it
+        # stamped eadb797 -- the remote repo's HEAD from 2026-07-31 -- while the data_prep.py
+        # that actually ran had been copied in and lives at 6a3db10. A clean hash pointing at
+        # code that never ran is worse than no hash, in the one field whose whole job is
+        # establishing what produced the file.
+        #
+        # So the AUTHORITATIVE identifier is the sha256 of this source file, which is true
+        # regardless of git state, copies, worktrees or dirty trees. The git fields are context.
+        # git_dirty is recorded explicitly because a commit hash silently ignores uncommitted
+        # edits, and every failure path is now recorded as a reason rather than collapsing to a
+        # bare "UNKNOWN" that reads as deliberate.
+        import hashlib
+        import subprocess
+        _src = Path(__file__).resolve()
+        f.attrs["code_file"] = str(_src)
+        f.attrs["code_sha256"] = hashlib.sha256(_src.read_bytes()).hexdigest()
         try:
-            import subprocess
-            f.attrs["git_commit"] = subprocess.run(
-                ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "HEAD"],
-                capture_output=True, text=True, timeout=10).stdout.strip() or "UNKNOWN"
-        except Exception:
-            f.attrs["git_commit"] = "UNKNOWN"
+            _g = lambda *a: subprocess.run(["git", "-C", str(_src.parent), *a],
+                                           capture_output=True, text=True, timeout=10)
+            _head = _g("rev-parse", "HEAD")
+            f.attrs["git_commit"] = _head.stdout.strip() or f"UNAVAILABLE: rc={_head.returncode} {_head.stderr.strip()[:120]}"
+            _st = _g("status", "--porcelain", "--", _src.name)
+            f.attrs["git_dirty"] = bool(_st.stdout.strip())
+            f.attrs["git_toplevel"] = _g("rev-parse", "--show-toplevel").stdout.strip() or "UNAVAILABLE"
+        except Exception as _e:
+            f.attrs["git_commit"] = f"UNAVAILABLE: {type(_e).__name__}: {_e}"
+            f.attrs["git_dirty"] = "UNAVAILABLE"
+            f.attrs["git_toplevel"] = "UNAVAILABLE"
+        print(f"  [provenance] code_sha256={f.attrs['code_sha256'][:16]}... "
+              f"git={str(f.attrs['git_commit'])[:12]} dirty={f.attrs['git_dirty']}")
         print(f"  [provenance] config={f.attrs['config_path']}")
         for _k in sorted(_paths_used):
             print(f"  [provenance] {_k} -> {_paths_used[_k]}")
@@ -984,11 +1033,11 @@ def build_dataset(results_dir, n_workers=8, paths=None, config_path=None):
             chunk_tx = min(256, n_tx) if win_size <= 500 else min(32, n_tx)
             grp.create_dataset("atg_windows",
                                shape=(n_tx, MAX_ORFS, N_SEQ_CHANNELS, win_size),
-                               dtype=np.float16, compression="lzf",
+                               dtype=np.float16, **H5_COMPRESSION,
                                chunks=(chunk_tx, MAX_ORFS, N_SEQ_CHANNELS, win_size))
             grp.create_dataset("stop_windows",
                                shape=(n_tx, MAX_ORFS, N_SEQ_CHANNELS, win_size),
-                               dtype=np.float16, compression="lzf",
+                               dtype=np.float16, **H5_COMPRESSION,
                                chunks=(chunk_tx, MAX_ORFS, N_SEQ_CHANNELS, win_size))
 
         # Process in batches with multiprocessing
@@ -1014,8 +1063,8 @@ def build_dataset(results_dir, n_workers=8, paths=None, config_path=None):
             print(f"  w{win_size}: atg={shape}, stop={shape}")
 
         # Non-window data
-        f.create_dataset("orf_features", data=orf_feat_array, compression="lzf")
-        f.create_dataset("orf_mask", data=orf_mask, compression="lzf")
+        f.create_dataset("orf_features", data=orf_feat_array, **H5_COMPRESSION)
+        f.create_dataset("orf_mask", data=orf_mask, **H5_COMPRESSION)
         # v5: no tx_features dataset
         # Labels and chr from tx_summary (keyed by master tx_ids order)
         tx_sum_indexed = tx_summary.set_index("isoform_id")
@@ -1041,6 +1090,17 @@ def build_dataset(results_dir, n_workers=8, paths=None, config_path=None):
         f.attrs["holdout_chrs"] = json.dumps(sorted(HOLDOUT_CHRS))
         f.attrs["val_chrs"] = json.dumps(sorted(VAL_CHRS))
         f.attrs["n_transcripts"] = n_tx
+
+        # COMPLETION MARKER, AND IT MUST BE THE LAST WRITE (2026-08-04, review finding F4).
+        # Observed, not hypothetical: job 8934670 wrote the provenance attrs, then died before
+        # finishing, leaving an HDF5 that carried a complete and entirely correct-looking
+        # provenance block -- config, resolved inputs, results_dir, table sizes, n_transcripts --
+        # over partly-unwritten window data. Nothing in the file said it was incomplete, and the
+        # only thing that would have caught it downstream was an incidental KeyError.
+        #
+        # A stamp that survives a failed build is worse than no stamp, because it lends a partial
+        # artifact the appearance of provenance. Consumers should require this attr.
+        f.attrs["build_complete"] = True
 
     file_size_mb = os.path.getsize(h5_path) / 1e6
     print(f"\n  -> {h5_path} ({file_size_mb:.0f} MB)")
