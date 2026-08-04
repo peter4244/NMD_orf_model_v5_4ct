@@ -342,7 +342,7 @@ def main():
     sys.stdout.reconfigure(line_buffering=True)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", required=True)
     # Parameterised 2026-07-27 for the same reason as 03_train.py: hardcoded, this reads the
     # PUBLISHED checkpoint and overwrites the PUBLISHED kernel_shap TSV -- the artifacts the
     # deposit-native run exists to be compared against. Default unchanged.

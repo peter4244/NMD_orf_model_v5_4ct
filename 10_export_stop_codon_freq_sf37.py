@@ -68,7 +68,11 @@ RESULTS = HERE / "results_4ct"
 SELECTED = RESULTS / "selected_orfs.tsv"
 # Derived, not a literal: this path silently pinned the script to atg500_stop500 even when
 # --tag named a different configuration (2026-07-29).
-PREDS    = RESULTS / f"predictions_{selected_tag(load_config(HERE / 'config.yaml'))}.tsv"
+# MODULE-LEVEL DEFAULT REMOVED 2026-08-04. This read config.yaml (Channing) at import
+# time regardless of --config, and is superseded by the PREDS built inside main() from
+# the caller's config. Kept as None so a stale reference fails loudly instead of
+# silently naming a Channing-derived file.
+PREDS    = None
 OUT_TSV  = RESULTS / "stop_codon_freq_by_class_sf37.tsv"
 
 # Map DNA → RNA notation for display (T → U in the stop codon).
@@ -97,7 +101,7 @@ def main():
     ap.add_argument("--tag", default=None,
                                         help="Window-config tag. Default: the `selected:` block in --config. "
                                              "Never a hardcoded literal -- see utils.selected_tag.")
-    ap.add_argument("--config", default="config.yaml",
+    ap.add_argument("--config", required=True,
                        help="Where the selected window configuration is read from")
     ap.add_argument("--split", required=True,
                        help="Which universe to compute over, naming the predictions file to read. "

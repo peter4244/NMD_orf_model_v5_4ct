@@ -168,7 +168,7 @@ class JointBranchWrapper(nn.Module):
         return cls_logits
 
 
-def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
+def run_deepshap(config_path, n_explain=2000, n_background=100,
                   atg_window=None, stop_window=None, seed=None, run_id=None,
                   branches=None, orf_index=0,
                  results_dir="results_4ct", member_seed=None, split=None,
@@ -737,7 +737,7 @@ def run_deepshap(config_path="config.yaml", n_explain=2000, n_background=100,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", required=True)
     parser.add_argument("--results-dir", default="results_4ct",
                         help="where the checkpoint is read and outputs written")
     parser.add_argument("--n-explain", type=int, default=2000)

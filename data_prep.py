@@ -1008,7 +1008,7 @@ def main():
     parser.add_argument("--workers", type=int, default=8)
     # --config REACHES THE PATHS NOW. It did not exist here at all, so every path came from
     # config.yaml regardless of which config a caller believed they had selected.
-    parser.add_argument("--config", default="config.yaml",
+    parser.add_argument("--config", required=True,
                         help="Config whose paths: block names the inputs. config_dn.yaml points "
                              "at the deposit; config.yaml at the Channing tree.")
     args = parser.parse_args()

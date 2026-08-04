@@ -113,7 +113,7 @@ def eval_epoch(model, loader, criterion, device, use_amp):
     return metrics
 
 
-def train(config_path="config.yaml", atg_window=None, stop_window=None,
+def train(config_path, atg_window=None, stop_window=None,
           results_dir="results_4ct", seed=None):
     config = load_config(config_path)
     # SEED IS RESOLVED ONCE, HERE, AND THEN NAMES EVERY ARTIFACT THIS RUN WRITES (2026-07-29).
@@ -266,7 +266,7 @@ def train(config_path="config.yaml", atg_window=None, stop_window=None,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", required=True)
     parser.add_argument("--results-dir", default="results_4ct",
                         help="where checkpoints and logs are written")
     parser.add_argument("--atg-window", type=int, default=None,

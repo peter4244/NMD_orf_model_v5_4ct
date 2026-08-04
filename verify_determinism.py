@@ -99,7 +99,7 @@ def one_run(cfg, steps, device, seed):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--steps", type=int, default=5)
-    ap.add_argument("--config", default="config.yaml")
+    ap.add_argument("--config", required=True)
     ap.add_argument("--seed", type=int, default=None, help="defaults to config training.seed")
     # MUST BE TESTABLE AT THE REAL TRAINING CONFIG, not just config.yaml's defaults.
     # SequenceCNN sets mid_pool = MaxPool1d(4) only when window_size > 100, and kernel sizes

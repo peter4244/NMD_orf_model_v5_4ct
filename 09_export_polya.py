@@ -23,7 +23,7 @@ def main():
     parser.add_argument("--tag", default=None,
                                             help="Window-config tag. Default: the `selected:` block in --config. "
                                                  "Never a hardcoded literal -- see utils.selected_tag.")
-    parser.add_argument("--config", default="config.yaml",
+    parser.add_argument("--config", required=True,
                            help="Where the selected window configuration is read from")
     # Default resolved from config.yaml `paths:` / $NMD_SQANTI_CLASS rather than baked in.
     parser.add_argument("--sqanti-classification",

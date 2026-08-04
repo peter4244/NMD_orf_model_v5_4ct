@@ -28,7 +28,7 @@ def main():
     parser.add_argument("--tag", default=None,
                                             help="Window-config tag. Default: the `selected:` block in --config. "
                                                  "Never a hardcoded literal -- see utils.selected_tag.")
-    parser.add_argument("--config", default="config.yaml",
+    parser.add_argument("--config", required=True,
                            help="Where the selected window configuration is read from")
     parser.add_argument("--run", type=int, default=1)
     parser.add_argument("--branch", choices=("atg", "stop"), default="stop",

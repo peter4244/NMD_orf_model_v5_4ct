@@ -47,7 +47,7 @@ from utils import NMDDataset, load_config, member_tag, resolve_checkpoint, set_s
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--config", default=str(REPO / "config.yaml"))
+    p.add_argument("--config", required=True)
     p.add_argument("--atg-window", type=int, default=None)
     p.add_argument("--stop-window", type=int, default=None)
     p.add_argument("--results-dir", default=None,

@@ -172,7 +172,7 @@ def shapley_from_subsets(v):
 def main():
     sys.stdout.reconfigure(line_buffering=True)
     p = argparse.ArgumentParser()
-    p.add_argument("--config", default="config.yaml")
+    p.add_argument("--config", required=True)
     p.add_argument("--results-dir", default="results_4ct")
     p.add_argument("--checkpoint-dir", default=None)
     p.add_argument("--tag", default=None)

@@ -33,7 +33,18 @@ PATH_ENV = {
 def resolve_path(key, config_path=None, must_exist=False):
     """environment variable > config.yaml. `must_exist` is opt-in: a caller that only
     reports the configured location must not fail where the input is absent."""
-    cfg_path = Path(config_path) if config_path else REPO / "config.yaml"
+    # NO SILENT FALLBACK TO config.yaml (2026-08-04). This defaulted to REPO/"config.yaml",
+    # which is the Channing config -- so a caller that forgot to thread its --config through
+    # resolved its INPUT DATA from /projects/talisman while believing it was deposit-native.
+    # That is the more dangerous half of the load_config() default documented below it: this
+    # function is the one that decides which files are read.
+    if not config_path:
+        raise ValueError(
+            f"resolve_path({key!r}) requires an explicit config_path; there is no default.\n"
+            "  config.yaml     -- Channing paths (/projects/talisman/...)\n"
+            "  config_dn.yaml  -- deposit-native paths\n"
+            "Thread the caller's --config through to this call.")
+    cfg_path = Path(config_path)
     env = PATH_ENV.get(key)
     val = os.environ.get(env) if env else None
     src = f"${env}" if val else str(cfg_path)
@@ -63,13 +74,42 @@ def resolve_path(key, config_path=None, must_exist=False):
     return p
 
 
-def load_config(config_path="config.yaml"):
+def load_config(config_path=None):
     """Read a config file. Lives here, not in utils, because utils imports torch.
 
     Moved 2026-07-29: seven export scripts (09*, 10*) need only the selected window tag and
     have no other reason to load a deep-learning framework. Importing utils for it made them
     depend on torch at module level.
+
+    NO DEFAULT, AS OF 2026-08-04. It used to be `config_path="config.yaml"`, and that one
+    default is the single root of a failure that has now recurred at least three times.
+
+    config.yaml is the CHANNING config: its paths block points at /projects/talisman/... .
+    config_dn.yaml is the deposit-native one. A script invoked without --config silently took
+    the Channing config, and the outcome depends entirely on where it ran:
+
+      * OFF Channing, the paths do not exist, so it fails loudly. That is what happened to
+        data_prep.py in the first clean-room chain run and it looked like a stale path.
+      * ON Explorer, /projects/talisman IS MOUNTED, so it SUCCEEDS -- reading Channing data
+        while writing into a directory named results_4ct_dn. That is how the "deposit-native"
+        HDF5 came to be built from Channing inputs (slurm_build_h5_dn.sh, job 8828427,
+        2026-07-30), and every number computed from it inherited the wrong universe. It was
+        found only by reading a five-day-old build log, and the log DID say
+        `Loading /projects/talisman/...` in plain text. Printing was not enough. Nobody reads
+        a log that scrolled past on a night the job exited 0.
+
+    So the rule is enforced rather than announced: there is no default, and a caller that does
+    not name a config gets an exception instead of the Channing one. This is the same principle
+    selected_tag() states below -- an unstated selection must be loud -- applied to the
+    selection that determines which DATA the run reads.
     """
+    if config_path is None:
+        raise ValueError(
+            "load_config() requires an explicit config path; there is no default.\n"
+            "  config.yaml     -- Channing paths (/projects/talisman/...)\n"
+            "  config_dn.yaml  -- deposit-native paths\n"
+            "Pass --config explicitly. A silent default here built an HDF5 labelled "
+            "deposit-native from Channing inputs; see the note in load_config().")
     with open(config_path) as f:
         return yaml.safe_load(f)
 
@@ -111,7 +151,7 @@ if __name__ == "__main__":
     _ap = argparse.ArgumentParser(description="Query the repo's path/selection config.")
     _ap.add_argument("--selected-tag", action="store_true",
                      help="print the selected window-configuration tag and exit")
-    _ap.add_argument("--config", default="config.yaml")
+    _ap.add_argument("--config", required=True)
     _a = _ap.parse_args()
     if _a.selected_tag:
         print(selected_tag(load_config(_a.config)))

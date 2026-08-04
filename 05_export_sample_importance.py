@@ -32,7 +32,7 @@ from utils import (NMDDataset, load_config, resolve_checkpoint, selected_tag,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", required=True)
     parser.add_argument("--tag", default=None,
                         help="Window-config tag. Default: the `selected:` block in "
                              "--config. Was the literal atg100_stop500 -- a configuration "

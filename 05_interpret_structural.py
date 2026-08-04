@@ -188,7 +188,7 @@ def summarize_by_rank_and_cds(orf_gxi, labels, masks, orf_feat_names,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", required=True)
     # W76: this script had NO --results-dir while 03_train/evaluate/11/deepshap/export_rds
     # all take one, so a deposit-native run loaded the PUBLISHED checkpoint here and wrote
     # its structural-importance tables back over the published ones.

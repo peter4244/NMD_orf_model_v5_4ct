@@ -33,7 +33,7 @@ if cmp -s "$CKPT" results_4ct/best_model_atg500_stop500.pt; then
   echo "FATAL: dn checkpoint is byte-identical to the published one -- wrong tree"; exit 1
 fi
 echo "checkpoint present and differs from published: OK"
-NMD_RESULTS_DIR=results_4ct_dn $PY infer_uorf_attention.py --results-dir results_4ct_dn --member-seed 42
+NMD_RESULTS_DIR=results_4ct_dn $PY infer_uorf_attention.py --config config_dn.yaml --results-dir results_4ct_dn --member-seed 42
 rc=$?
 echo "=== infer_uorf_attention exit: $rc ==="
 exit $rc

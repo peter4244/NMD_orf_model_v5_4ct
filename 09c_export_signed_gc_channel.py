@@ -91,7 +91,7 @@ def main():
     ap.add_argument("--tag", default=None,
                                         help="Window-config tag. Default: the `selected:` block in --config. "
                                              "Never a hardcoded literal -- see utils.selected_tag.")
-    ap.add_argument("--config", default="config.yaml",
+    ap.add_argument("--config", required=True,
                        help="Where the selected window configuration is read from")
     ap.add_argument("--results-dir", default="results_4ct")
     ap.add_argument("--n-runs", type=int, default=5)

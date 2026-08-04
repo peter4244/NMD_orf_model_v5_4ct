@@ -22,7 +22,7 @@ PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
 
 echo "=== Building DEPOSIT-NATIVE HDF5 ==="
 $PY -V
-$PY data_prep.py --results-dir results_4ct_dn --workers 8
+$PY data_prep.py --config config_dn.yaml --results-dir results_4ct_dn --workers 8
 
 echo "=== Verifying ==="
 $PY -c "

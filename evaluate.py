@@ -114,7 +114,7 @@ def enforce_split_gate(parser, args):
                      f"split. Drop it.")
 
 
-def evaluate(config_path="config.yaml", atg_window=None, stop_window=None,
+def evaluate(config_path, atg_window=None, stop_window=None,
              results_dir="results_4ct", member_seed=None, split=None):
     config = load_config(config_path)
     set_seed(config["training"]["seed"])
@@ -273,7 +273,7 @@ def evaluate(config_path="config.yaml", atg_window=None, stop_window=None,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", required=True)
     parser.add_argument("--results-dir", default="results_4ct",
                         help="where the checkpoint is read and outputs written")
     parser.add_argument("--atg-window", type=int, default=None,
