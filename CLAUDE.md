@@ -181,6 +181,14 @@ because each one was learned by hitting it — see `analysis_plans/HANDOFF_INTER
   are what all-members messaging prevents.
 
 - **Ask before every Explorer login.** A loaded ssh-agent is not standing authorization.
+- **Never use `/tmp` on Explorer. It is a shared multi-user filesystem.** Write under
+  `$HOME/cc/` or `/scratch/p.castaldi/`, and namespace the filename. On 2026-08-04 a redirect to
+  `/tmp/collect.txt` failed with "Permission denied" because that path already existed owned by
+  another user — and the `cat` that followed printed **their** file, a pytest run from an
+  unrelated project, which was read in full before anyone noticed it was not ours. Two failures
+  in one line: our output went nowhere, and we read someone else's data. Neither announced
+  itself; the command exited and produced plausible-looking text. The same collision can
+  silently overwrite another user's file when the permissions happen to allow it.
 - **Where a document does not cover what you hit, add a row.** None of this structure was designed;
   it is a record of failures, so it stops exactly where our failures stopped. Do not work around a
   gap and do not assume the omission was considered.
