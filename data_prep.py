@@ -661,7 +661,7 @@ def orf_coverage_diagnostics(orf_df, tx_summary, max_k=MAX_ORFS):
 # =============================================================================
 # Main dataset assembly
 # =============================================================================
-def build_dataset(results_dir, n_workers=8, paths=None):
+def build_dataset(results_dir, n_workers=8, paths=None, config_path=None):
     # Load all data
     orf_df = load_orf_features(results_dir)
     tx_summary = load_tx_summary(results_dir)
@@ -929,6 +929,37 @@ def build_dataset(results_dir, n_workers=8, paths=None):
     print(f"\nBuilding HDF5 at {h5_path} ...")
 
     with h5py.File(h5_path, "w") as f:
+        # ── PROVENANCE STAMP (2026-08-04) ─────────────────────────────────────────────────
+        # An H5 could not say which config built it, and that is why a dataset built from
+        # CHANNING inputs sat in a directory named results_4ct_dn for five days while every
+        # downstream number inherited the wrong universe. Finding it required reading a
+        # five-day-old SLURM log; by then four different isoform universes were in play
+        # (10,131 / 10,597 / 10,520 / 10,522 test rows) and no artifact could be matched to
+        # the run that produced it.
+        #
+        # So the file now carries its own provenance. This is the DETECTION half of the fix --
+        # load_config()/resolve_path() removing their defaults is the PREVENTION half, and
+        # prevention alone leaves every artifact already on disk unattributable.
+        #
+        # Deliberately recorded: the config actually used, the resolved input paths (not the
+        # configured ones -- an env var can override), the counts, and the code vintage.
+        _paths_used = paths or {}
+        f.attrs["built_by"] = "data_prep.py"
+        f.attrs["config_path"] = str(config_path) if config_path else "UNKNOWN"
+        for _k, _v in sorted(_paths_used.items()):
+            f.attrs[f"input_{_k}"] = str(_v)
+        f.attrs["n_transcripts"] = int(n_tx)
+        try:
+            import subprocess
+            f.attrs["git_commit"] = subprocess.run(
+                ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "HEAD"],
+                capture_output=True, text=True, timeout=10).stdout.strip() or "UNKNOWN"
+        except Exception:
+            f.attrs["git_commit"] = "UNKNOWN"
+        print(f"  [provenance] config={f.attrs['config_path']}")
+        for _k in sorted(_paths_used):
+            print(f"  [provenance] {_k} -> {_paths_used[_k]}")
+
         # Pre-create window datasets
         for win_size in WINDOW_SIZES:
             grp = f.create_group(f"w{win_size}")
@@ -1023,7 +1054,8 @@ def main():
     if not paths["sqanti_fasta"].exists():
         sys.exit(f"ERROR: {paths['sqanti_fasta']} not found (from --config {args.config}).")
 
-    build_dataset(args.results_dir, n_workers=args.workers, paths=paths)
+    build_dataset(args.results_dir, n_workers=args.workers, paths=paths,
+                  config_path=args.config)
 
 
 if __name__ == "__main__":
