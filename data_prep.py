@@ -540,8 +540,18 @@ def select_priority_orfs(orf_df, ref_atg_map, sqanti_atg_map, max_k=MAX_ORFS):
     assert "orf_start" in orf_df.columns, "orf_start column required"
 
     # Sort by Kozak within each transcript (for tie-breaking and filling)
-    orf_df = orf_df.sort_values(["isoform_id", "kozak_score"],
-                                ascending=[True, False]).copy()
+    # DETERMINISTIC TIEBREAK (2026-08-04, review finding F2). kozak_score takes only THREE
+    # distinct values over ~1.5M ORFs, and 36,216 of 41,225 multi-ORF transcripts tie exactly
+    # at the K=5 boundary -- so which ORFs survive was decided by the input ROW ORDER of
+    # orf_features.tsv, with no tiebreaker. Measured: shuffling that row order changes the
+    # selected top-5 for 34,331 of 42,043 transcripts (82%). The resulting H5 has identical
+    # shape, labels, splits, config and resolved input paths, and 82% different ORF content --
+    # invisible to the provenance stamp, and exactly the class of silent divergence that put
+    # four isoform universes in play. orf_start breaks the tie by position, and mergesort is
+    # stable so the ordering is fully determined.
+    orf_df = orf_df.sort_values(["isoform_id", "kozak_score", "orf_start"],
+                                ascending=[True, False, True],
+                                kind="mergesort").copy()
 
     # Pre-compute CDS matches per transcript (vectorized)
     orf_df["_is_ref_match"] = (
@@ -948,6 +958,13 @@ def build_dataset(results_dir, n_workers=8, paths=None, config_path=None):
         f.attrs["config_path"] = str(config_path) if config_path else "UNKNOWN"
         for _k, _v in sorted(_paths_used.items()):
             f.attrs[f"input_{_k}"] = str(_v)
+        f.attrs["results_dir"] = str(Path(results_dir).resolve())
+        for _t in ("tx_summary.tsv", "orf_features.tsv", "ref_cds_features.tsv",
+                   "junctions.tsv", "paralog_genes.tsv", "val_paralog_genes.tsv"):
+            _tp = Path(results_dir) / _t
+            if _tp.exists():
+                _st = _tp.stat()
+                f.attrs[f"table_{_t}"] = f"{os.path.realpath(_tp)}|{_st.st_size}"
         f.attrs["n_transcripts"] = int(n_tx)
         try:
             import subprocess
@@ -1035,7 +1052,13 @@ def build_dataset(results_dir, n_workers=8, paths=None, config_path=None):
 # =============================================================================
 def main():
     parser = argparse.ArgumentParser(description="Build HDF5 dataset for NMD ORF model")
-    parser.add_argument("--results-dir", type=Path, default=Path("results_4ct"))
+    # REQUIRED, NOT DEFAULTED (2026-08-04, review finding F1). This is the MORE important of
+    # the two unstated selections: the config supplies only the FASTA and the SQANTI
+    # classification, while the isoform universe itself comes from this tree's tx_summary /
+    # orf_features / junctions / paralog tables. Defaulting it to results_4ct meant a driver
+    # that named --config correctly could still read the published tables and write an H5 that
+    # is indistinguishable in provenance from a deposit-native build.
+    parser.add_argument("--results-dir", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=8)
     # --config REACHES THE PATHS NOW. It did not exist here at all, so every path came from
     # config.yaml regardless of which config a caller believed they had selected.
