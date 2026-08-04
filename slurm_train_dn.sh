@@ -39,7 +39,8 @@ RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 # If the sweep selects anything else, every one of them keeps training and reading 500/500 at
 # exit 0. paths_config.py --selected-tag is the torch-free entry point that already exists for
 # exactly this and no driver used it.
-TAG=$($PY paths_config.py --selected-tag)
+TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || { echo "cannot read selected tag"; exit 1; }
+[ -n "$TAG" ] || { echo "selected tag empty"; exit 1; }
 ATG=${TAG#atg}; ATG=${ATG%%_*}
 STOP=${TAG##*stop}
 echo "selected configuration: $TAG (atg=$ATG stop=$STOP)"
@@ -71,5 +72,5 @@ echo "=== EVALUATE ==="
 # determines the filename, and --member-seed selects it.
 $PY evaluate.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window "$ATG" --stop-window "$STOP" --member-seed 42 --split val_clean
 # FINAL evaluation, run deliberately and once the config is settled:
-# $PY evaluate.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window "$ATG" --stop-window "$STOP" --split test_clean --final
+# $PY evaluate.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window "$ATG" --stop-window "$STOP" --member-seed 42 --split test_clean --final
 echo "=== evaluate exit: $? ==="

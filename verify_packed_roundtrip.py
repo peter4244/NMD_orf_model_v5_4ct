@@ -110,7 +110,13 @@ def main():
                             c, ph = pack_window(dref[i, k])
                             got[i, k] = unpack_window(c, ph, dtype=np.float16)
                 else:
-                    got, kind = windows_of(fp[g], anchor, rows_p)
+                    # h5py fancy indexing REQUIRES increasing indices. rows_p is in dense-file
+                    # order, so reading it directly raises TypeError precisely when the row
+                    # orders differ -- the only case id-matching exists for. Sort, read, unsort.
+                    order = np.argsort(rows_p)
+                    got_s, kind = windows_of(fp[g], anchor, rows_p[order])
+                    got = np.empty_like(got_s)
+                    got[order] = got_s
                     if kind != "packed":
                         sys.exit("FAIL: %s/%s holds dense arrays, not codes" % (a.packed, g))
 

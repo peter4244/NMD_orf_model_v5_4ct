@@ -80,6 +80,8 @@ def build_synthetic_h5(path, n_tx, k_orfs, n_chan, windows, seed=0):
         f.attrs["window_sizes"] = json.dumps(list(windows))
         f.attrs["max_orfs"] = k_orfs
         f.attrs["n_seq_channels"] = n_chan
+        f.attrs["build_complete"] = True  # NMDDataset requires it; the synthetic file must
+        # honour the same contract as a real one or the smoke test tests a fiction.
         f.attrs["n_transcripts"] = n_tx
     return path
 
