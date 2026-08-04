@@ -168,7 +168,7 @@ def main():
     parser.add_argument("--config", required=True,
                            help="Where the selected window configuration is read from")
     parser.add_argument("--n-runs", type=int, default=5)
-    parser.add_argument("--results-dir", default="results_4ct")
+    parser.add_argument("--results-dir", required=True)
     parser.add_argument("--split", default="all", help="Which universe the predictions file describes. 'all' is the full cohort (D74/D77). The split is part of the filename evaluate.py writes, so this is not cosmetic -- the wrong value reads a different population or no file at all.")
     args = parser.parse_args()
 

@@ -105,7 +105,7 @@ def score_member(loader, cfg, ws_atg, ws_stop, ckpt_path, device):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
-    ap.add_argument("--results-dir", default="results_4ct")
+    ap.add_argument("--results-dir", required=True)
     ap.add_argument("--atg-window", type=int, required=True)
     ap.add_argument("--stop-window", type=int, required=True)
     ap.add_argument("--seeds", default="100,200,300,400,500",

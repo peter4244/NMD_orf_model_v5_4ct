@@ -274,7 +274,7 @@ def analysis_4_noptc_attention(attn_merged, preds, results_dir, tag=""):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--results-dir", type=Path, default=Path("results_4ct"))
+    parser.add_argument("--results-dir", type=Path, required=True)
     parser.add_argument("--tag", default="atg20_stop500")
     args = parser.parse_args()
 

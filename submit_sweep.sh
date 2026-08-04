@@ -50,7 +50,7 @@ done
 
 [ "$ONE_SEED" = 1 ] && SEEDS=(100)
 
-mkdir -p results_4ct_sweep
+mkdir -p ${SWEEP_OUT:-results_sweep_dn_2026-08-04}
 
 # ORDER MATTERS WHEN THROUGHPUT IS NEAR-SERIAL (2026-07-29). Measured: this cluster grants me
 # roughly one slot at a time, so 60 cells run in ~3 hours essentially in submission order --
@@ -93,7 +93,7 @@ while read -r atg stop seed; do
       # RESUMABLE. Skip a cell whose metrics file already exists, so a reorder or a
       # resubmission after a partial run cannot duplicate finished work -- and cannot produce a
       # second copy of an output under the same name.
-      if [ -f "results_4ct_sweep/metrics_atg${atg}_stop${stop}_seed${seed}_val_clean.json" ]; then
+      if [ -f "${SWEEP_OUT:-results_sweep_dn_2026-08-04}/metrics_atg${atg}_stop${stop}_seed${seed}_val_clean.json" ]; then
         skipped=$((skipped + 1)); return 0
       fi
       name="sw_${atg}_${stop}_s${seed}"
@@ -117,8 +117,8 @@ if [ "$DRY" = 1 ]; then
   echo "DRY RUN: $((n - skipped)) cells would be submitted individually; $skipped already complete."
 else
   echo "submitted $((n - skipped)) jobs; skipped $skipped already-complete cell(s)"
-  printf '%s\n' "${ids[@]}" > results_4ct_sweep/sweep_job_ids.txt
-  echo "job ids -> results_4ct_sweep/sweep_job_ids.txt"
+  printf '%s\n' "${ids[@]}" > ${SWEEP_OUT:-results_sweep_dn_2026-08-04}/sweep_job_ids.txt
+  echo "job ids -> ${SWEEP_OUT:-results_sweep_dn_2026-08-04}/sweep_job_ids.txt"
   echo "monitor : squeue -u \$USER -o '%.12i %.14j %.9T %.7M'"
   echo "collect : python3 collect_sweep.py"
 fi

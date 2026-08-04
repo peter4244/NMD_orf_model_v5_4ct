@@ -93,7 +93,7 @@ def main():
                                              "Never a hardcoded literal -- see utils.selected_tag.")
     ap.add_argument("--config", required=True,
                        help="Where the selected window configuration is read from")
-    ap.add_argument("--results-dir", default="results_4ct")
+    ap.add_argument("--results-dir", required=True)
     ap.add_argument("--n-runs", type=int, default=5)
     args = ap.parse_args()
 

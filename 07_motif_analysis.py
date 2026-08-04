@@ -506,7 +506,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tag", default="atg100_stop500")
     parser.add_argument("--run-id", type=int, default=1)
-    parser.add_argument("--results-dir", default="results_4ct")
+    parser.add_argument("--results-dir", required=True)
     parser.add_argument("--k", type=int, default=8, help="k-mer size for approach B")
     args = parser.parse_args()
 

@@ -106,7 +106,7 @@ def main():
     parser.add_argument("--config", required=True,
                            help="Where the selected window configuration is read from")
     parser.add_argument("--run", type=int, default=1)
-    parser.add_argument("--results-dir", default="results_4ct")
+    parser.add_argument("--results-dir", required=True)
     parser.add_argument("--gc-window", type=int, default=50)
     parser.add_argument("--gc-step", type=int, default=10)
     args = parser.parse_args()

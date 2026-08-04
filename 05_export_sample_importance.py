@@ -37,7 +37,7 @@ def main():
                         help="Window-config tag. Default: the `selected:` block in "
                              "--config. Was the literal atg100_stop500 -- a configuration "
                              "that was never the selected one.")
-    parser.add_argument("--results-dir", default="results_4ct",
+    parser.add_argument("--results-dir", required=True,
                         help="where the checkpoint is read and outputs written. This was "
                              "hardcoded, making it the ONE script of eight that could not "
                              "be pointed at the deposit-native tree (C2).")

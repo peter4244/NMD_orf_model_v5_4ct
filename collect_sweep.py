@@ -210,7 +210,7 @@ def report(metric, key, cells, tags, seeds, alpha):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--results-dir", default="results_4ct_sweep")
+    ap.add_argument("--results-dir", required=True)
     ap.add_argument("--split", default="val_clean")
     ap.add_argument("--alpha", type=float, default=0.05)
     a = ap.parse_args()

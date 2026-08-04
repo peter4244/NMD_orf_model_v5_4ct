@@ -346,7 +346,7 @@ def main():
     # Parameterised 2026-07-27 for the same reason as 03_train.py: hardcoded, this reads the
     # PUBLISHED checkpoint and overwrites the PUBLISHED kernel_shap TSV -- the artifacts the
     # deposit-native run exists to be compared against. Default unchanged.
-    parser.add_argument("--results-dir", default="results_4ct",
+    parser.add_argument("--results-dir", required=True,
                         help="where the checkpoint is read and the SHAP table written")
     parser.add_argument("--tag", default=None,
                         help="Window-config tag. Default: the `selected:` block in "

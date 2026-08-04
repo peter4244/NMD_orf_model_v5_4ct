@@ -261,8 +261,16 @@ def _read_windows(f, win_size, anchor, indices):
     grp = f[f"w{win_size}"]
     if f"{anchor}_codes" in grp:
         from window_codec import unpack_batch
+        # DECODE AT float16, THEN UPCAST -- not directly to float32 (2026-08-04).
+        # data_prep STORES channel 5 as float32-computed GC rounded to float16. unpack
+        # RECOMPUTES it in the caller's dtype, so decoding straight to float32 keeps precision
+        # the dense file threw away and the two disagree: measured 445 of 452 filled positions,
+        # max |delta| 2.4e-4, channel 5 only. Small, and entirely beside the point -- the claim
+        # that licenses replacing the dense arrays is bit-identity, and "close" is a different
+        # and much weaker claim. Rounding to float16 first reproduces exactly what was stored.
         return unpack_batch(grp[f"{anchor}_codes"][indices],
-                            grp[f"{anchor}_phase"][indices], dtype=np.float32)
+                            grp[f"{anchor}_phase"][indices],
+                            dtype=np.float16).astype(np.float32)
     if f"{anchor}_windows" in grp:
         return grp[f"{anchor}_windows"][indices].astype(np.float32)
     raise KeyError(
@@ -317,6 +325,18 @@ class NMDDataset(Dataset):
                 # them -- so ordering carries no meaning to preserve.
                 self.indices = self.indices[np.sort(sel)]
             n = len(self.indices)
+            # A PARTIAL HDF5 MUST NOT TRAIN ANYTHING (2026-08-04). data_prep writes its
+            # provenance attrs at file OPEN and build_complete as the LAST statement inside the
+            # with-block, so a build killed mid-encode leaves a file carrying a complete and
+            # correct-looking provenance block over partly-unwritten windows. That has already
+            # happened once (job 8934670). data_prep says "consumers should require this attr"
+            # and no consumer did; requiring it here covers every one of them at a single point,
+            # which is the same reason load_config lost its default.
+            if not f.attrs.get("build_complete", False):
+                raise ValueError(
+                    f"{h5_path} has no build_complete attr: it was written by a build that did "
+                    "not finish, or by data_prep predating the marker. Rebuild rather than "
+                    "training on partly-zero windows.")
 
             # Load window data into RAM
             # ONE READER FOR BOTH LAYOUTS (2026-08-04). New HDF5s store one uint8 per position

@@ -738,7 +738,7 @@ def run_deepshap(config_path, n_explain=2000, n_background=100,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
-    parser.add_argument("--results-dir", default="results_4ct",
+    parser.add_argument("--results-dir", required=True,
                         help="where the checkpoint is read and outputs written")
     parser.add_argument("--n-explain", type=int, default=2000)
     parser.add_argument("--n-background", type=int, default=100)

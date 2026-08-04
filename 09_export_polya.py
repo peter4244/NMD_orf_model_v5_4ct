@@ -31,7 +31,7 @@ def main():
     # --results-dir, the ninth script in this repo to need it. Without it this hardcoded
     # results_4ct, so pointed at a deposit-native question it read the PUBLISHED run and exited 0
     # reporting it -- the failure mode is silence, not an error.
-    parser.add_argument("--results-dir", default="results_4ct")
+    parser.add_argument("--results-dir", required=True)
     parser.add_argument("--split", default="all",
                         help="Which universe the predictions file describes. 'all' is the full "
                              "cohort (D74/D77). The split is part of the filename evaluate.py "

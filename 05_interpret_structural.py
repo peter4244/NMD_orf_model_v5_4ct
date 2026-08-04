@@ -192,7 +192,7 @@ def main():
     # W76: this script had NO --results-dir while 03_train/evaluate/11/deepshap/export_rds
     # all take one, so a deposit-native run loaded the PUBLISHED checkpoint here and wrote
     # its structural-importance tables back over the published ones.
-    parser.add_argument("--results-dir", default="results_4ct",
+    parser.add_argument("--results-dir", required=True,
                         help="results_4ct_dn for the deposit-native rebuild "
                              "(default: %(default)s)")
     parser.add_argument("--tag", default=None,

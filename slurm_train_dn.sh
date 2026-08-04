@@ -12,7 +12,7 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=dn_train
-#SBATCH --output=results_4ct_dn/train_dn_%j.log
+#SBATCH --output=results_deposit_h5_2026-08-04/train_dn_%j.log
 
 # DEPOSIT-NATIVE RETRAIN, ATG=500 STOP=500 (2026-07-27).
 #
@@ -34,11 +34,27 @@ PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
 # ONE VARIABLE for the results tree, for the reason the build script needed it: the train
 # and the evaluate below must not be able to name different directories.
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+# WINDOWS COME FROM THE CONFIG, NOT FROM THIS FILE (2026-08-04). They were the literals
+# --atg-window "$ATG" --stop-window "$STOP", and there are 39 such literals across 26 shell scripts.
+# If the sweep selects anything else, every one of them keeps training and reading 500/500 at
+# exit 0. paths_config.py --selected-tag is the torch-free entry point that already exists for
+# exactly this and no driver used it.
+TAG=$($PY paths_config.py --selected-tag)
+ATG=${TAG#atg}; ATG=${ATG%%_*}
+STOP=${TAG##*stop}
+echo "selected configuration: $TAG (atg=$ATG stop=$STOP)"
 echo "=== node $(hostname) ==="; nvidia-smi --query-gpu=name --format=csv,noheader
 
 echo "=== TRAIN (deposit-native) ==="
-$PY 03_train.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window 500 --stop-window 500
-echo "=== train exit: $? ==="
+# rc CAPTURED. This script has no `set -e` deliberately, so evaluate used to run even after a
+# failed train -- and resolve_checkpoint would then find an EARLIER checkpoint with the same
+# tag and seed and score it. Plausible numbers, wrong model, exit 0. That is the failure
+# resolve_checkpoint's own docstring exists to prevent and cannot, since it only tests
+# existence.
+$PY 03_train.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window "$ATG" --stop-window "$STOP"
+TRAIN_RC=$?
+echo "=== train exit: $TRAIN_RC ==="
+if [ "$TRAIN_RC" -ne 0 ]; then echo "TRAIN FAILED -- not evaluating a stale checkpoint"; exit "$TRAIN_RC"; fi
 
 echo "=== EVALUATE ==="
 # --split IS NOW REQUIRED (2026-07-29). evaluate.py used to hardcode split="test_clean",
@@ -53,7 +69,7 @@ echo "=== EVALUATE ==="
 # been updated for that naming, so a SUCCESSFUL train (exit 0) was always followed by an evaluate
 # that died with FileNotFoundError. Keep the two seeds in step: training.seed in config_dn.yaml
 # determines the filename, and --member-seed selects it.
-$PY evaluate.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window 500 --stop-window 500 --member-seed 42 --split val
+$PY evaluate.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window "$ATG" --stop-window "$STOP" --member-seed 42 --split val_clean
 # FINAL evaluation, run deliberately and once the config is settled:
-# $PY evaluate.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window 500 --stop-window 500 --split test_clean --final
+# $PY evaluate.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window "$ATG" --stop-window "$STOP" --split test_clean --final
 echo "=== evaluate exit: $? ==="

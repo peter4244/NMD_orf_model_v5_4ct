@@ -334,7 +334,7 @@ def process_replicates(results_dir, tag):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tag", default="atg100_stop500")
-    parser.add_argument("--results-dir", default="results_4ct")
+    parser.add_argument("--results-dir", required=True)
     parser.add_argument("--run-id", type=int, default=None,
                         help="If set, process a specific replicate run")
     args = parser.parse_args()

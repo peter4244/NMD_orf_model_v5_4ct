@@ -97,7 +97,7 @@ def main():
     # results_4ct_dn, and a hardcoded results_4ct silently measures the PUBLISHED run instead.
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--results-dir", default="results_4ct")
+    ap.add_argument("--results-dir", required=True)
     ap.add_argument("--tag", default=None,
                                         help="Window-config tag. Default: the `selected:` block in --config. "
                                              "Never a hardcoded literal -- see utils.selected_tag.")

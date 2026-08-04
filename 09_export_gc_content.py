@@ -22,7 +22,7 @@ from paths_config import load_config, selected_tag
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--results-dir", default="results_4ct",
+    parser.add_argument("--results-dir", required=True,
                         help="results tree to read and write "
                              "(results_4ct_dn for the deposit-native rebuild)")
     parser.add_argument("--tag", default=None,

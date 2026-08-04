@@ -274,7 +274,7 @@ def evaluate(config_path, atg_window=None, stop_window=None,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
-    parser.add_argument("--results-dir", default="results_4ct",
+    parser.add_argument("--results-dir", required=True,
                         help="where the checkpoint is read and outputs written")
     parser.add_argument("--atg-window", type=int, default=None,
                         help="Override window_size_atg from config")

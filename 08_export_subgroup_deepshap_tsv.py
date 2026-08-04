@@ -333,7 +333,7 @@ def main():
     parser.add_argument("--atg", type=int, default=500)
     parser.add_argument("--stop", type=int, default=500)
     parser.add_argument("--n-runs", type=int, default=5)
-    parser.add_argument("--results-dir", type=str, default="results_4ct")
+    parser.add_argument("--results-dir", type=str, required=True)
     # THIS SCRIPT BUILDS ITS OWN TAG from --atg/--stop and has no --tag, so the member seed
     # cannot be smuggled in through it the way it can elsewhere. Both are needed: the seed
     # names the DeepSHAP arrays, the split names the predictions file.

@@ -36,7 +36,7 @@
 # 2:50 to 11:59, graded by window size -- stop=2000 moves 20x the data of stop=100, which is why
 # a single "~3 min per cell" figure was misleading.
 #SBATCH --job-name=sw
-#SBATCH --output=results_4ct_sweep/sweep_%j.log
+#SBATCH --output=results_sweep_dn_2026-08-04/sweep_%j.log
 #
 # ONE cell of the window sweep: one (atg, stop) configuration at one seed, on CPU.
 # Submitted 60 times by submit_sweep.sh -- NOT as an array. See that script for why.
@@ -71,7 +71,7 @@ export PYTHONUNBUFFERED=1
 : "${SW_STOP:?SW_STOP not set}"
 : "${SW_SEED:?SW_SEED not set}"
 
-OUT=results_4ct_sweep
+OUT=${SWEEP_OUT:-results_sweep_dn_2026-08-04}
 mkdir -p "$OUT"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 export MKL_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
