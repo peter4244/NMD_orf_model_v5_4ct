@@ -16,7 +16,10 @@ Usage (on Explorer, from ~/cc/nmd_orf_model_v5_4ct):
         --atg-window 500 --stop-window 500
 
 Output:
-    results_4ct/predictions_all_atg500_stop500.tsv   # one row per isoform
+    results_4ct/predictions_atg500_stop500_all.tsv   # one row per isoform
+    # member_tag(tag, seed) + "_" + split. With --member-seed N the stem becomes
+    # atg500_stop500_seedN, so ensemble members no longer overwrite one another.
+    # Renamed 2026-08-04; see the note at the write site and W295.
 """
 import argparse
 import sys
@@ -39,7 +42,7 @@ for cand in (HERE, HERE.parent, Path("~/cc/nmd_orf_model_v5_4ct").expanduser()):
 sys.path.insert(0, str(REPO))
 
 from model import build_model
-from utils import NMDDataset, load_config, resolve_checkpoint, set_seed
+from utils import NMDDataset, load_config, member_tag, resolve_checkpoint, set_seed
 
 
 def main():
@@ -122,7 +125,24 @@ def main():
         "logit":       logits,
         "prob":        probs,
     })
-    out_path = results_dir / f"predictions_{args.split}_{tag}.tsv"
+    # NAME CHANGED 2026-08-04 (W295), from predictions_{split}_{tag}.tsv. Two defects in one
+    # f-string, and the second is the dangerous one:
+    #
+    #   1. It disagreed with every consumer. evaluate.py builds
+    #      stem = member_tag(tag, seed) + "_" + split, and 08/09/09b/10 read
+    #      predictions_{tag}_{split}.tsv. This wrote the components in the OPPOSITE order, so
+    #      10_export_stop_codon_freq_sf37.py looked for predictions_atg500_stop500_all.tsv and
+    #      nothing on disk had ever been called that.
+    #
+    #   2. It had NO MEMBER SLOT. The tag here is a plain atg{n}_stop{n} (line 63), so every
+    #      ensemble member writes to ONE predictions file -- the exact collision member_tag was
+    #      written to prevent for checkpoints, reproduced for predictions. Five members would
+    #      leave one file and look like agreement.
+    #
+    # Aligned onto evaluate.py's convention rather than the other way round (Pete, 2026-08-04):
+    # matching the consumers to THIS name would have locked defect 2 in. With seed omitted,
+    # member_tag returns the bare tag, so the legacy name is unchanged for single-model runs.
+    out_path = results_dir / f"predictions_{member_tag(tag, args.member_seed)}_{args.split}.tsv"
     df.to_csv(out_path, sep="\t", index=False)
     print(f"[infer-all] wrote {out_path}  (n={len(df):,})")
 

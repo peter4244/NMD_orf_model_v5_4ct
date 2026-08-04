@@ -169,6 +169,7 @@ def main():
                            help="Where the selected window configuration is read from")
     parser.add_argument("--n-runs", type=int, default=5)
     parser.add_argument("--results-dir", default="results_4ct")
+    parser.add_argument("--split", default="all", help="Which universe the predictions file describes. 'all' is the full cohort (D74/D77). The split is part of the filename evaluate.py writes, so this is not cosmetic -- the wrong value reads a different population or no file at all.")
     args = parser.parse_args()
 
     # Resolve the tag from the ONE place that names the selected configuration.
@@ -179,7 +180,7 @@ def main():
 
     # ── Subgroup classifications ──
     print("Loading test predictions and reference/TD2 features ...")
-    preds = pd.read_csv(results_dir / f"predictions_{tag}.tsv", sep="\t",
+    preds = pd.read_csv(results_dir / f"predictions_{tag}_{args.split}.tsv", sep="\t",
                         dtype={"isoform_id": str})
     ref = pd.read_csv(results_dir / "ref_cds_features.tsv", sep="\t",
                       dtype={"isoform_id": str})

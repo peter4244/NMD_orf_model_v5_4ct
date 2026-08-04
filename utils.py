@@ -196,7 +196,7 @@ def resolve_checkpoint(results_dir, tag, seed=None):
         raise FileNotFoundError(
             f"{legacy} does not exist, but {len(members)} ensemble member(s) do:\n  "
             + "\n  ".join(p.name for p in members)
-            + "\nPass --seed to name the member you mean. Refusing to guess: silently "
+            + "\nPass --member-seed to name the member you mean. Refusing to guess: silently "
               "picking one would report a single member's number as the ensemble's.")
     raise FileNotFoundError(f"No checkpoint found: {legacy} (and no seeded members either).")
 

@@ -32,7 +32,7 @@ import sys
 import torch
 import torch.nn as nn
 
-from model import build_model, verify_pool_equivalence
+from model import build_model, verify_pool_determinism_gain, verify_pool_equivalence
 from utils import load_config, set_seed
 
 
@@ -128,8 +128,21 @@ def main():
     # deterministic CUDA backward. model.py claimed a test for that equivalence and there was
     # none until 2026-07-29 -- the claim was checked by nobody. Cheap, so it runs first: if the
     # substitution is not equivalent, nothing below is worth measuring.
-    verify_pool_equivalence()
-    print("  pool equivalence: max(dim=-1) == AdaptiveMaxPool1d(1), forward and gradient routing")
+    # ON THE REAL DEVICE (2026-08-02). This called verify_pool_equivalence() with no argument, so
+    # it built CPU tensors even here, where `device` is already known to be cuda -- the check ran
+    # where the nondeterministic kernel does not exist. Passing device is the whole fix.
+    verify_pool_equivalence(device=device)
+    print(f"  pool equivalence: max(dim=-1) == AdaptiveMaxPool1d(1) on {device}, "
+          "forward and gradient routing")
+    if device == "cuda":
+        pool_refused, _ = verify_pool_determinism_gain(device=device)
+        if pool_refused:
+            print("  pool substitution is load-bearing: AdaptiveMaxPool1d backward refuses under "
+                  "deterministic mode, max is bitwise repeatable")
+        else:
+            print("  NOTE: AdaptiveMaxPool1d backward did NOT refuse under deterministic mode on "
+                  "this build. The substitution may no longer be needed here; re-read the reason\n"
+                  "        in SequenceCNN.forward against this build rather than assuming it holds.")
     print(f"  torch {torch.__version__} | device {device} | "
           f"cuda {torch.version.cuda if torch.cuda.is_available() else 'n/a'}")
     if device == "cpu":

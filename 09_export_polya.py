@@ -28,17 +28,27 @@ def main():
     # Default resolved from config.yaml `paths:` / $NMD_SQANTI_CLASS rather than baked in.
     parser.add_argument("--sqanti-classification",
                         default=str(resolve_path("sqanti_class")))
+    # --results-dir, the ninth script in this repo to need it. Without it this hardcoded
+    # results_4ct, so pointed at a deposit-native question it read the PUBLISHED run and exited 0
+    # reporting it -- the failure mode is silence, not an error.
+    parser.add_argument("--results-dir", default="results_4ct")
+    parser.add_argument("--split", default="all",
+                        help="Which universe the predictions file describes. 'all' is the full "
+                             "cohort (D74/D77). The split is part of the filename evaluate.py "
+                             "writes, so the wrong value reads a different population.")
     args = parser.parse_args()
 
     # Resolve the tag from the ONE place that names the selected configuration.
     if args.tag is None:
         args.tag = selected_tag(load_config(args.config))
-    results_dir = Path("results_4ct")
+    results_dir = Path(args.results_dir)
 
-    # Load predictions (test set)
-    preds = pd.read_csv(results_dir / f"predictions_{args.tag}.tsv", sep="\t",
+    # Load predictions for the requested universe -- the file IS the population, so nothing is
+    # filtered here.
+    preds = pd.read_csv(results_dir / f"predictions_{args.tag}_{args.split}.tsv", sep="\t",
                         dtype={"isoform_id": str})
-    print(f"Predictions: {len(preds)} test transcripts ({int(preds['label'].sum())} NMD)")
+    print(f"Predictions: {len(preds)} transcripts in split={args.split} "
+          f"({int(preds['label'].sum())} NMD)")
 
     # Load SQANTI classification (poly(A) columns)
     print(f"Loading SQANTI classification: {args.sqanti_classification}")

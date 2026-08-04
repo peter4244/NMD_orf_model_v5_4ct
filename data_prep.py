@@ -37,9 +37,22 @@ from paths_config import resolve_path
 # tree -- and invisibly: 0 of 24 isoforms that the rebuilt structures.rds added appear in the
 # resulting tx_summary.tsv (measured 2026-07-26). A path only changeable by editing code is a
 # path nobody changes.
-CACHE_DIR = resolve_path("isopair_cache")
-SQANTI_CLASS_PATH = resolve_path("sqanti_class")
-FASTA_PATH = resolve_path("sqanti_fasta")
+# RESOLVED AT CALL TIME, AGAINST THE CONFIG THE CALLER NAMED (2026-08-03).
+#
+# These were module-level constants, so they were computed at IMPORT -- before argparse ran -- and
+# resolve_path() with no config argument always reads config.yaml. The effect was that
+# `--config config_dn.yaml` could not influence a path no matter what it said: the deposit-native
+# config was decorative, and a clean-room run died on
+# "/projects/talisman/.../nmd_lungcells_corrected.fasta not found" while that file sat in the
+# deposit. A flag that cannot change what it names is worse than no flag, because it reads as
+# configured.
+#
+# CACHE_DIR is gone rather than deferred: it was assigned here and referenced nowhere, so it only
+# ever served to fail early on a path this script does not use.
+def _paths(config):
+    """The input paths for one run, from the config that run was given."""
+    return {"sqanti_class": resolve_path("sqanti_class", config_path=config),
+            "sqanti_fasta": resolve_path("sqanti_fasta", config_path=config)}
 
 MAX_ORFS = 5
 WINDOW_SIZES = [100, 500, 1000, 2000]
@@ -471,7 +484,7 @@ def load_paralog_genes(results_dir, which="test"):
     return genes
 
 
-def load_cds_atg_positions(results_dir):
+def load_cds_atg_positions(results_dir, sqanti_class_path):
     """Load reference and SQANTI CDS ATG positions (1-based, transcript-relative)."""
     # Reference CDS ATG: ref_utr5_length is 0-based → ATG at ref_utr5_length + 1
     ref = pd.read_csv(results_dir / "ref_cds_features.tsv", sep="\t",
@@ -484,7 +497,7 @@ def load_cds_atg_positions(results_dir):
     print(f"  Reference CDS ATG positions: {len(ref_map):,} isoforms")
 
     # SQANTI CDS ATG: CDS_start is 1-based transcript-relative
-    sqanti = pd.read_csv(SQANTI_CLASS_PATH, sep="\t", engine="python",
+    sqanti = pd.read_csv(sqanti_class_path, sep="\t", engine="python",
                           dtype={"isoform": str},
                           usecols=["isoform", "coding", "CDS_start"])
     sqanti = sqanti[sqanti["coding"] == "coding"].drop_duplicates("isoform")
@@ -527,8 +540,18 @@ def select_priority_orfs(orf_df, ref_atg_map, sqanti_atg_map, max_k=MAX_ORFS):
     assert "orf_start" in orf_df.columns, "orf_start column required"
 
     # Sort by Kozak within each transcript (for tie-breaking and filling)
-    orf_df = orf_df.sort_values(["isoform_id", "kozak_score"],
-                                ascending=[True, False]).copy()
+    # DETERMINISTIC TIEBREAK (2026-08-04, review finding F2). kozak_score takes only THREE
+    # distinct values over ~1.5M ORFs, and 36,216 of 41,225 multi-ORF transcripts tie exactly
+    # at the K=5 boundary -- so which ORFs survive was decided by the input ROW ORDER of
+    # orf_features.tsv, with no tiebreaker. Measured: shuffling that row order changes the
+    # selected top-5 for 34,331 of 42,043 transcripts (82%). The resulting H5 has identical
+    # shape, labels, splits, config and resolved input paths, and 82% different ORF content --
+    # invisible to the provenance stamp, and exactly the class of silent divergence that put
+    # four isoform universes in play. orf_start breaks the tie by position, and mergesort is
+    # stable so the ordering is fully determined.
+    orf_df = orf_df.sort_values(["isoform_id", "kozak_score", "orf_start"],
+                                ascending=[True, False, True],
+                                kind="mergesort").copy()
 
     # Pre-compute CDS matches per transcript (vectorized)
     orf_df["_is_ref_match"] = (
@@ -648,7 +671,7 @@ def orf_coverage_diagnostics(orf_df, tx_summary, max_k=MAX_ORFS):
 # =============================================================================
 # Main dataset assembly
 # =============================================================================
-def build_dataset(results_dir, n_workers=8):
+def build_dataset(results_dir, n_workers=8, paths=None, config_path=None):
     # Load all data
     orf_df = load_orf_features(results_dir)
     tx_summary = load_tx_summary(results_dir)
@@ -659,7 +682,7 @@ def build_dataset(results_dir, n_workers=8):
 
     # Load sequences from FASTA (filtered to transcripts in tx_summary)
     target_ids = set(tx_summary["isoform_id"].values)
-    seq_dict = load_fasta(FASTA_PATH, target_ids)
+    seq_dict = load_fasta(paths["sqanti_fasta"], target_ids)
 
     # Diagnostics
     diag = orf_coverage_diagnostics(orf_df, tx_summary, MAX_ORFS)
@@ -669,7 +692,7 @@ def build_dataset(results_dir, n_workers=8):
 
     # Load CDS ATG positions BEFORE ORF selection (needed for priority inclusion)
     print("\nLoading CDS ATG positions ...")
-    ref_atg_map, sqanti_atg_map = load_cds_atg_positions(results_dir)
+    ref_atg_map, sqanti_atg_map = load_cds_atg_positions(results_dir, paths["sqanti_class"])
 
     # Select ORFs with priority CDS inclusion
     orf_selected = select_priority_orfs(orf_df, ref_atg_map, sqanti_atg_map, MAX_ORFS)
@@ -916,6 +939,44 @@ def build_dataset(results_dir, n_workers=8):
     print(f"\nBuilding HDF5 at {h5_path} ...")
 
     with h5py.File(h5_path, "w") as f:
+        # ── PROVENANCE STAMP (2026-08-04) ─────────────────────────────────────────────────
+        # An H5 could not say which config built it, and that is why a dataset built from
+        # CHANNING inputs sat in a directory named results_4ct_dn for five days while every
+        # downstream number inherited the wrong universe. Finding it required reading a
+        # five-day-old SLURM log; by then four different isoform universes were in play
+        # (10,131 / 10,597 / 10,520 / 10,522 test rows) and no artifact could be matched to
+        # the run that produced it.
+        #
+        # So the file now carries its own provenance. This is the DETECTION half of the fix --
+        # load_config()/resolve_path() removing their defaults is the PREVENTION half, and
+        # prevention alone leaves every artifact already on disk unattributable.
+        #
+        # Deliberately recorded: the config actually used, the resolved input paths (not the
+        # configured ones -- an env var can override), the counts, and the code vintage.
+        _paths_used = paths or {}
+        f.attrs["built_by"] = "data_prep.py"
+        f.attrs["config_path"] = str(config_path) if config_path else "UNKNOWN"
+        for _k, _v in sorted(_paths_used.items()):
+            f.attrs[f"input_{_k}"] = str(_v)
+        f.attrs["results_dir"] = str(Path(results_dir).resolve())
+        for _t in ("tx_summary.tsv", "orf_features.tsv", "ref_cds_features.tsv",
+                   "junctions.tsv", "paralog_genes.tsv", "val_paralog_genes.tsv"):
+            _tp = Path(results_dir) / _t
+            if _tp.exists():
+                _st = _tp.stat()
+                f.attrs[f"table_{_t}"] = f"{os.path.realpath(_tp)}|{_st.st_size}"
+        f.attrs["n_transcripts"] = int(n_tx)
+        try:
+            import subprocess
+            f.attrs["git_commit"] = subprocess.run(
+                ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "HEAD"],
+                capture_output=True, text=True, timeout=10).stdout.strip() or "UNKNOWN"
+        except Exception:
+            f.attrs["git_commit"] = "UNKNOWN"
+        print(f"  [provenance] config={f.attrs['config_path']}")
+        for _k in sorted(_paths_used):
+            print(f"  [provenance] {_k} -> {_paths_used[_k]}")
+
         # Pre-create window datasets
         for win_size in WINDOW_SIZES:
             grp = f.create_group(f"w{win_size}")
@@ -991,9 +1052,21 @@ def build_dataset(results_dir, n_workers=8):
 # =============================================================================
 def main():
     parser = argparse.ArgumentParser(description="Build HDF5 dataset for NMD ORF model")
-    parser.add_argument("--results-dir", type=Path, default=Path("results_4ct"))
+    # REQUIRED, NOT DEFAULTED (2026-08-04, review finding F1). This is the MORE important of
+    # the two unstated selections: the config supplies only the FASTA and the SQANTI
+    # classification, while the isoform universe itself comes from this tree's tx_summary /
+    # orf_features / junctions / paralog tables. Defaulting it to results_4ct meant a driver
+    # that named --config correctly could still read the published tables and write an H5 that
+    # is indistinguishable in provenance from a deposit-native build.
+    parser.add_argument("--results-dir", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=8)
+    # --config REACHES THE PATHS NOW. It did not exist here at all, so every path came from
+    # config.yaml regardless of which config a caller believed they had selected.
+    parser.add_argument("--config", required=True,
+                        help="Config whose paths: block names the inputs. config_dn.yaml points "
+                             "at the deposit; config.yaml at the Channing tree.")
     args = parser.parse_args()
+    paths = _paths(args.config)
 
     required = ["orf_features.tsv", "tx_summary.tsv", "ref_cds_features.tsv",
                 "junctions.tsv", "paralog_genes.tsv"]
@@ -1001,10 +1074,11 @@ def main():
         p = args.results_dir / fname
         if not p.exists():
             sys.exit(f"ERROR: {p} not found. Run export_rds.R first.")
-    if not FASTA_PATH.exists():
-        sys.exit(f"ERROR: {FASTA_PATH} not found.")
+    if not paths["sqanti_fasta"].exists():
+        sys.exit(f"ERROR: {paths['sqanti_fasta']} not found (from --config {args.config}).")
 
-    build_dataset(args.results_dir, n_workers=args.workers)
+    build_dataset(args.results_dir, n_workers=args.workers, paths=paths,
+                  config_path=args.config)
 
 
 if __name__ == "__main__":

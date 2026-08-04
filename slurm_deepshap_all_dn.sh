@@ -1,7 +1,11 @@
 #!/bin/bash
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:v100-sxm2:1
-#SBATCH --time=03:30:00   # measured 1:06:46; ~3-4x headroom. Right-sized 2026-07-29:
+#SBATCH --time=08:00:00   # RAISED 2026-08-02 FOR FULL COHORT. The 03:30 below it was sized
+#   from a measured 1:06:46 on the TEST split (10,520 rows). Interpretation now runs over
+#   --split all: 41,765 rows, ~3.97x, so the same work is ~4:25 and 03:30 would have been
+#   killed mid-run with nothing written. Old note kept for the measurement it records:
+#   measured 1:06:46; ~3-4x headroom. Right-sized 2026-07-29:
 #   an oversized request is excluded from Slurm backfill, which is what kept job
 #   8826175 at PENDING(Priority) for an hour with 14 suitable nodes idle.
 #SBATCH --mem=32G
@@ -52,6 +56,8 @@ for MODE in "joint" "structural" "atg stop"; do
         --stop-window 500 \
         --seed ${SEED} \
         --run-id ${SLURM_ARRAY_TASK_ID} \
+        --member-seed 42 \
+        --split all --full-cohort \
         --branches ${MODE}
     rc=$?
     echo "--- branches ${MODE} exit: $rc ---"

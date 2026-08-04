@@ -18,6 +18,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pandas as pd
+from utils import member_tag, split_indices
 
 
 # ---------------------------------------------------------------------------
@@ -333,9 +334,17 @@ def main():
     parser.add_argument("--stop", type=int, default=500)
     parser.add_argument("--n-runs", type=int, default=5)
     parser.add_argument("--results-dir", type=str, default="results_4ct")
+    # THIS SCRIPT BUILDS ITS OWN TAG from --atg/--stop and has no --tag, so the member seed
+    # cannot be smuggled in through it the way it can elsewhere. Both are needed: the seed
+    # names the DeepSHAP arrays, the split names the predictions file.
+    parser.add_argument("--member-seed", type=int, default=None,
+                        help="Ensemble member, by training seed. Composes the filenames "
+                             "that 03_train.py and deepshap.py wrote.")
+    parser.add_argument("--split", default="all", help="Which universe the predictions file describes. 'all' is the full cohort (D74/D77). The split is part of the filename evaluate.py writes, so this is not cosmetic -- the wrong value reads a different population or no file at all.")
     args = parser.parse_args()
 
     tag = f"atg{args.atg}_stop{args.stop}"
+    mtag = member_tag(tag, args.member_seed)   # the stem deepshap.py and evaluate.py wrote
     results_dir = Path(args.results_dir)
     h5_path = results_dir / "nmd_orf_data.h5"
 
@@ -343,20 +352,30 @@ def main():
     print("Loading reference data ...")
     ref_features = pd.read_csv(results_dir / "ref_cds_features.tsv", sep="\t")
     td2_features = pd.read_csv(results_dir / "td2_features.tsv", sep="\t")
-    preds = pd.read_csv(results_dir / f"predictions_{tag}.tsv", sep="\t")
+    preds = pd.read_csv(results_dir / f"predictions_{mtag}_{args.split}.tsv", sep="\t")
 
-    # ── Load test set isoform IDs from HDF5 ──
-    print("Loading test set isoform IDs from HDF5 ...")
+    # ── Load the split's isoform IDs from HDF5 ──
+    # THIS WAS `splits == "test"`, HARDCODED (fixed 2026-08-03). Not a filename problem like the
+    # rest of this script's stale assumptions: the population was welded into how the HDF5 was
+    # read, so asking it for the full cohort produced a shape mismatch, 41,765 predictions against
+    # 10,520 rows, at the alignment assert below. Now it goes through utils.split_indices, which is
+    # where split names are DEFINED -- same names, same meanings and the same val_clean guard as
+    # NMDDataset, because both go through _split_mask. Restating the mask here is what made the two
+    # able to disagree.
+    print(f"Loading isoform IDs for split={args.split} from HDF5 ...")
+    idx = split_indices(h5_path, args.split)
     with h5py.File(h5_path, "r") as f:
-        splits = np.array([s.decode() if isinstance(s, bytes) else s for s in f["split"][:]])
         all_ids = np.array([s.decode() if isinstance(s, bytes) else s for s in f["isoform_id"][:]])
-        test_mask = splits == "test"
-        test_indices = np.where(test_mask)[0]
-        test_ids = all_ids[test_indices]
+    test_indices = idx
+    test_ids = all_ids[test_indices]
 
-    # Verify alignment with predictions
+    # Verify alignment with predictions. Kept as an assert rather than softened: if the HDF5 rows
+    # and the predictions file disagree, every subgroup below is attached to the wrong isoform.
+    assert len(test_ids) == len(preds), (
+        f"split={args.split} gives {len(test_ids)} HDF5 rows but the predictions file has "
+        f"{len(preds)}. These must be the same population.")
     assert np.all(test_ids == preds["isoform_id"].values), \
-        "HDF5 test set order does not match predictions file!"
+        f"HDF5 order for split={args.split} does not match the predictions file!"
 
     # ── Assign subgroups ──
     subgroup_map = assign_subgroups(
@@ -384,8 +403,8 @@ def main():
         print(f"Processing run {run}/{args.n_runs}")
         print(f"{'='*50}")
 
-        atg_path = results_dir / f"deepshap_atg_{tag}_run{run}.npz"
-        stop_path = results_dir / f"deepshap_stop_{tag}_run{run}.npz"
+        atg_path = results_dir / f"deepshap_atg_{mtag}_run{run}.npz"
+        stop_path = results_dir / f"deepshap_stop_{mtag}_run{run}.npz"
 
         if not atg_path.exists() or not stop_path.exists():
             print(f"  SKIP: {atg_path} or {stop_path} not found")

@@ -1,3 +1,17 @@
+# PATHS FOR THE DEPOSIT-NATIVE RUN.
+#
+# config_dn.yaml had NO paths block, so every consumer fell through to config.yaml -- whose
+# defaults are absolute /projects/talisman/... locations, deliberately, so that behaviour is
+# unchanged where they exist. In a clean room they do not exist, and data_prep.py stopped with
+# "nmd_lungcells_corrected.fasta not found" while the file sat in the deposit all along.
+#
+# These are RELATIVE TO THIS FILE (paths_config.resolve_path anchors them there, as the R side
+# always has), so the deposit-native config is not pinned to one machine. Environment variables
+# still win, which is how a run against a different tree overrides without editing anything.
+paths:
+  sqanti_class:  ../data_deposit/source_data/sqanti/nmd_lungcells_classification.txt
+  sqanti_fasta:  ../data_deposit/source_data/sqanti/nmd_lungcells_corrected.fasta
+
 # WHICH CONFIGURATION WAS SELECTED — the single source of truth. See config.yaml for the
 # full rationale; kept in step with it deliberately, since a deposit-native run that
 # selected a different window config than the published one would be a silent confound.

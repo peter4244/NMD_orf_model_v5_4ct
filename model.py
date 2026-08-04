@@ -264,13 +264,20 @@ class NMDOrfModel(nn.Module):
         return cls_logits
 
 
-def verify_pool_equivalence(n=64, channels=32, lengths=(1, 2, 7, 100, 125, 500), seed=0):
-    """Assert x.max(dim=-1).values == AdaptiveMaxPool1d(1) + squeeze, exactly.
+def verify_pool_equivalence(n=64, channels=32, lengths=(1, 2, 7, 100, 125, 500), seed=0,
+                            device="cpu"):
+    """Assert x.max(dim=-1).values == AdaptiveMaxPool1d(1) + squeeze, exactly, ON `device`.
 
     SequenceCNN.forward substitutes the former for the latter so that training can run under
     torch.use_deterministic_algorithms(True) -- adaptive_max_pool2d_backward_cuda has no
     deterministic kernel. The substitution is only safe if the two compute the same function,
     and until 2026-07-29 the code claimed a test for that which did not exist.
+
+    THE `device` PARAMETER IS NOT COSMETIC (added 2026-08-02). Until it existed this built CPU
+    tensors unconditionally, so the check ran on the one backend where the problem it guards
+    against CANNOT OCCUR, while training and DeepSHAP -- whose backward passes produce section
+    5's SHAP values -- run on the one where it can. A check that cannot fail is worse than no
+    check. Callers on a GPU machine must pass device="cuda"; verify_determinism.py does.
 
     Checks the FORWARD values bitwise, and that the gradient reaches the same single input
     element, since the backward path is the whole reason for the change. Includes length 1 and 2
@@ -279,9 +286,9 @@ def verify_pool_equivalence(n=64, channels=32, lengths=(1, 2, 7, 100, 125, 500),
     like a plain max.
     """
     torch.manual_seed(seed)
-    pool = nn.AdaptiveMaxPool1d(1)
+    pool = nn.AdaptiveMaxPool1d(1).to(device)
     for L in lengths:
-        x = torch.randn(n, channels, L)
+        x = torch.randn(n, channels, L, device=device)
         a = pool(x).squeeze(-1)
         b = x.max(dim=-1).values
         if not torch.equal(a, b):
@@ -297,6 +304,51 @@ def verify_pool_equivalence(n=64, channels=32, lengths=(1, 2, 7, 100, 125, 500),
         if not torch.equal(xa.grad != 0, xb.grad != 0):
             raise AssertionError(f"pool gradient routing differs at length {L}")
     return True
+
+
+def verify_pool_determinism_gain(device="cuda", n=64, channels=32, length=500, seed=0):
+    """Check the substitution's REASON, rather than restating it in a comment.
+
+    Separate from verify_pool_equivalence on purpose: that one asks "do the two compute the same
+    function", this one asks "is the replacement actually buying determinism here". A single
+    function mixing them would make a failure ambiguous about which property broke.
+
+    Two halves, and both are informative:
+      * AdaptiveMaxPool1d's backward should REFUSE under use_deterministic_algorithms(True). If
+        it does not, the substitution is not load-bearing on this torch/CUDA build and the
+        stated reason has gone stale -- reported, not raised, because a newer kernel gaining a
+        deterministic implementation is good news that should not fail a build.
+      * x.max(dim=-1) backward must be bitwise repeatable. If it is not, the substitution is not
+        sufficient either, and that IS a failure.
+
+    Measured 2026-08-02 on Tesla V100-SXM2-32GB, torch 2.5.1+cu121: pooling refuses, max is
+    repeatable. Returns (pool_refused, max_repeatable).
+    """
+    torch.use_deterministic_algorithms(True)
+    try:
+        torch.manual_seed(seed)
+        x = torch.randn(n, channels, length, device=device)
+
+        pool_refused = False
+        try:
+            xp = x.clone().requires_grad_(True)
+            nn.AdaptiveMaxPool1d(1).to(device)(xp).squeeze(-1).sum().backward()
+        except RuntimeError:
+            pool_refused = True
+
+        grads = []
+        for _ in range(2):
+            xm = x.clone().requires_grad_(True)
+            xm.max(dim=-1).values.sum().backward()
+            grads.append(xm.grad.clone())
+        max_repeatable = torch.equal(grads[0], grads[1])
+        if not max_repeatable:
+            raise AssertionError(
+                f"max(dim=-1) backward is NOT bitwise repeatable on {device} under "
+                "deterministic mode -- the pooling substitution does not achieve what it exists for")
+        return pool_refused, max_repeatable
+    finally:
+        torch.use_deterministic_algorithms(False)
 
 
 def count_parameters(model):

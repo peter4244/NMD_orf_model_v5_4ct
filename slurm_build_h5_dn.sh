@@ -6,12 +6,12 @@
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=dn_h5
-#SBATCH --output=results_4ct_dn/build_h5_%j.log
+#SBATCH --output=results_deposit_h5_2026-08-04/build_h5_%j.log
 
 # DEPOSIT-NATIVE HDF5 build (2026-07-27).
 #
 # Differs from slurm_build_h5.sh in two ways, both deliberate:
-#   1. --results-dir results_4ct_dn, so the published results_4ct and the old 6-CT tree
+#   1. --results-dir results_deposit_h5_2026-08-04, so the published results_4ct and the old 6-CT tree
 #      it symlinks into are untouched. Every input here was regenerated from the deposit.
 #   2. the conda env python is called by ABSOLUTE PATH rather than `conda activate`.
 #      Conda init is being OOM-killed on the login node (.bashrc:33); an absolute path
@@ -22,7 +22,7 @@ PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
 
 echo "=== Building DEPOSIT-NATIVE HDF5 ==="
 $PY -V
-$PY data_prep.py --results-dir results_4ct_dn --workers 8
+$PY data_prep.py --config config_dn.yaml --results-dir results_deposit_h5_2026-08-04 --workers 8
 
 echo "=== Verifying ==="
 $PY -c "
