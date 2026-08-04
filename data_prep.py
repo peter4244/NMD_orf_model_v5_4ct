@@ -27,6 +27,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from paths_config import resolve_path
+from window_codec import pack_window
 
 # =============================================================================
 # Constants
@@ -1031,14 +1032,29 @@ def build_dataset(results_dir, n_workers=8, paths=None, config_path=None):
             grp = f.create_group(f"w{win_size}")
             # Scale chunk size down for large windows to keep chunks < ~10 MB
             chunk_tx = min(256, n_tx) if win_size <= 500 else min(32, n_tx)
-            grp.create_dataset("atg_windows",
-                               shape=(n_tx, MAX_ORFS, N_SEQ_CHANNELS, win_size),
-                               dtype=np.float16, **H5_COMPRESSION,
-                               chunks=(chunk_tx, MAX_ORFS, N_SEQ_CHANNELS, win_size))
-            grp.create_dataset("stop_windows",
-                               shape=(n_tx, MAX_ORFS, N_SEQ_CHANNELS, win_size),
-                               dtype=np.float16, **H5_COMPRESSION,
-                               chunks=(chunk_tx, MAX_ORFS, N_SEQ_CHANNELS, win_size))
+            # PACKED, NOT DENSE (2026-08-04). Nine float16 channels per position cost 18
+            # bytes to carry about 3 bits; window_codec stores one uint8 -- bits 0-2 fill
+            # state, bit 3 junction -- and rebuilds the channels on read. Measured on this
+            # repo's own data: 19x against the previous lzf layout, 6.65x on top of the
+            # gzip4+shuffle filters, ~0.97 GB -> ~0.15 GB for the whole file.
+            #
+            # Lossless HERE and not in general: channel 5 is a rolling GC computed from
+            # seq_uint8[w_start:w_end], the filled region only, so it depends on no base the
+            # byte does not carry. verify_packed_roundtrip.py compares decoded against dense
+            # element for element -- 10,240 windows, all four groups, both anchors, 0
+            # mismatches -- and that test, not the ratio, is what licenses this.
+            #
+            # The phase arrays carry what a byte per position cannot: channels 6-8 are a frame
+            # grid anchored on the candidate's own start, which is not a property of any single
+            # position. int8, ~418 KB, against gigabytes.
+            for _a in ("atg", "stop"):
+                grp.create_dataset(f"{_a}_codes",
+                                   shape=(n_tx, MAX_ORFS, win_size), dtype=np.uint8,
+                                   **H5_COMPRESSION,
+                                   chunks=(chunk_tx, MAX_ORFS, win_size))
+                grp.create_dataset(f"{_a}_phase",
+                                   shape=(n_tx, MAX_ORFS), dtype=np.int8,
+                                   fillvalue=-1)
 
         # Process in batches with multiprocessing
         batch_size = 1000
@@ -1055,11 +1071,21 @@ def build_dataset(results_dir, n_workers=8, paths=None, config_path=None):
             for win_size in WINDOW_SIZES:
                 atg_batch = np.stack([r[win_size][0] for r in results])
                 stop_batch = np.stack([r[win_size][1] for r in results])
-                f[f"w{win_size}/atg_windows"][start:end] = atg_batch
-                f[f"w{win_size}/stop_windows"][start:end] = stop_batch
+                # Encode dense -> packed at write time. The encoder still produces the nine
+                # channels; only the STORAGE changes, so encode_window_v5 is untouched and the
+                # round-trip test compares against exactly what it produced.
+                for _a, _b in (("atg", atg_batch), ("stop", stop_batch)):
+                    _n, _k = _b.shape[0], _b.shape[1]
+                    _codes = np.zeros((_n, _k, win_size), dtype=np.uint8)
+                    _phase = np.full((_n, _k), -1, dtype=np.int8)
+                    for _i in range(_n):
+                        for _j in range(_k):
+                            _codes[_i, _j], _phase[_i, _j] = pack_window(_b[_i, _j])
+                    f[f"w{win_size}/{_a}_codes"][start:end] = _codes
+                    f[f"w{win_size}/{_a}_phase"][start:end] = _phase
 
         for win_size in WINDOW_SIZES:
-            shape = f[f"w{win_size}/atg_windows"].shape
+            shape = f[f"w{win_size}/atg_codes"].shape
             print(f"  w{win_size}: atg={shape}, stop={shape}")
 
         # Non-window data

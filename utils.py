@@ -251,6 +251,24 @@ def split_indices(h5_path, split):
     return np.where(_split_mask(splits, split))[0]
 
 
+def _read_windows(f, win_size, anchor, indices):
+    """Return (n, K, 9, W) float32 from either the packed or the dense layout.
+
+    Raises rather than guessing if a group carries neither -- an HDF5 that answers this
+    question ambiguously is exactly the kind of artifact this project has spent time
+    disentangling, and a silent empty array would train a model on zeros at exit 0.
+    """
+    grp = f[f"w{win_size}"]
+    if f"{anchor}_codes" in grp:
+        from window_codec import unpack_batch
+        return unpack_batch(grp[f"{anchor}_codes"][indices],
+                            grp[f"{anchor}_phase"][indices], dtype=np.float32)
+    if f"{anchor}_windows" in grp:
+        return grp[f"{anchor}_windows"][indices].astype(np.float32)
+    raise KeyError(
+        f"w{win_size} contains neither {anchor}_codes (packed) nor {anchor}_windows (dense); "
+        f"found {sorted(grp.keys())}")
+
 class NMDDataset(Dataset):
     """
     v5: PyTorch dataset — loads windows + minimal ORF features from HDF5.
@@ -301,8 +319,18 @@ class NMDDataset(Dataset):
             n = len(self.indices)
 
             # Load window data into RAM
-            self.atg_windows = f[f"w{window_size_atg}"]["atg_windows"][self.indices].astype(np.float32)
-            self.stop_windows = f[f"w{window_size_stop}"]["stop_windows"][self.indices].astype(np.float32)
+            # ONE READER FOR BOTH LAYOUTS (2026-08-04). New HDF5s store one uint8 per position
+            # plus a phase, and window_codec rebuilds the nine channels here; older ones store
+            # the nine channels densely. Reading both is deliberate rather than transitional:
+            # the dense file is the REFERENCE the round-trip test compares against, so a reader
+            # that could not open it would remove the only evidence that packing is lossless.
+            #
+            # Consumers see exactly what they saw before -- (n, K, 9, W) float32 -- so
+            # 03_train.py, evaluate.py, deepshap.py and the export scripts are untouched. The
+            # decode is bit-identical to the dense arrays (verify_packed_roundtrip.py), so a
+            # checkpoint trained on either file is trained on the same numbers.
+            self.atg_windows = _read_windows(f, window_size_atg, "atg", self.indices)
+            self.stop_windows = _read_windows(f, window_size_stop, "stop", self.indices)
 
             self.orf_features = f["orf_features"][self.indices].astype(np.float32)
             self.orf_mask = f["orf_mask"][self.indices]

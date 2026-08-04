@@ -82,8 +82,19 @@ def main():
         print(f"window    : {W}   transcripts: {take:,} of {n_tx:,}")
 
         mask = f["orf_mask"][:take]
-        atg = f[grp]["atg_windows"][:take]
-        stop = f[grp]["stop_windows"][:take]
+        # BOTH LAYOUTS (2026-08-04). New HDF5s store packed uint8 codes; this guard checks the
+        # midpoint clip, which is what stops the ATG and stop heads sharing bases, so it must
+        # keep working across the storage change rather than KeyError into silence.
+        def _w(anchor):
+            g = f[grp]
+            if f"{anchor}_codes" in g:
+                from window_codec import unpack_batch
+                return unpack_batch(g[f"{anchor}_codes"][:take],
+                                    g[f"{anchor}_phase"][:take], dtype=np.float16)
+            return g[f"{anchor}_windows"][:take]
+
+        atg = _w("atg")
+        stop = _w("stop")
 
     sums, atg_w, stop_w = [], [], []
     bad_contig = bad_edge = 0
