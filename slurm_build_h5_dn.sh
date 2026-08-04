@@ -6,7 +6,7 @@
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=dn_h5
-#SBATCH --output=results_4ct_dn/build_h5_%j.log
+#SBATCH --output=results_deposit_h5_2026-08-04/build_h5_%j.log
 
 # DEPOSIT-NATIVE HDF5 build (2026-07-27).
 #
@@ -22,12 +22,19 @@ PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
 
 echo "=== Building DEPOSIT-NATIVE HDF5 ==="
 $PY -V
-$PY data_prep.py --config config_dn.yaml --results-dir results_4ct_dn --workers 8
+RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+# ONE VARIABLE (2026-08-04). The build wrote to one directory and the verify block below
+# read a DIFFERENT hardcoded one, so job 8934670 built a complete, correct HDF5 and then
+# exited 1 on a stale path -- reporting FAILED for a run that succeeded. A job that
+# misreports its outcome is the same defect class as one that exits 0 on a broken tree,
+# and it is worse here because the honest signal is the only thing distinguishing this
+# rebuild from the one it replaces.
+$PY data_prep.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --workers 8
 
 echo "=== Verifying ==="
 $PY -c "
 import h5py, json, collections
-with h5py.File(\"results_4ct_dn/nmd_orf_data.h5\",\"r\") as f:
+with h5py.File(\"$RESULTS_DIR/nmd_orf_data.h5\",\"r\") as f:
     print(\"Keys:\", list(f.keys()))
     print(\"orf_features:\", f[\"orf_features\"].shape)
     print(\"n isoforms:\", f[\"orf_mask\"].shape[0])
