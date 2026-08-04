@@ -22,7 +22,7 @@
 #   sequences  proven byte-identical to the deposit FASTA for all 42,043 (digest
 #              16b3d11d7755c3338021c350f34732f8 on both sides)
 #
-# --results-dir results_4ct_dn keeps the PUBLISHED results_4ct intact; the whole point is
+# --results-dir "$RESULTS_DIR" keeps the PUBLISHED results_4ct intact; the whole point is
 # to compare against it, and 03_train.py used to hardcode the path and would have
 # overwritten the checkpoint and metrics it is being compared with.
 #
@@ -31,10 +31,13 @@
 # No `set -e`: a non-zero exit is a RESULT to read in the log, not something to hide.
 cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+# ONE VARIABLE for the results tree, for the reason the build script needed it: the train
+# and the evaluate below must not be able to name different directories.
+RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 echo "=== node $(hostname) ==="; nvidia-smi --query-gpu=name --format=csv,noheader
 
 echo "=== TRAIN (deposit-native) ==="
-$PY 03_train.py --config config_dn.yaml --results-dir results_4ct_dn --atg-window 500 --stop-window 500
+$PY 03_train.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window 500 --stop-window 500
 echo "=== train exit: $? ==="
 
 echo "=== EVALUATE ==="
@@ -50,7 +53,7 @@ echo "=== EVALUATE ==="
 # been updated for that naming, so a SUCCESSFUL train (exit 0) was always followed by an evaluate
 # that died with FileNotFoundError. Keep the two seeds in step: training.seed in config_dn.yaml
 # determines the filename, and --member-seed selects it.
-$PY evaluate.py --config config_dn.yaml --results-dir results_4ct_dn --atg-window 500 --stop-window 500 --member-seed 42 --split val
+$PY evaluate.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window 500 --stop-window 500 --member-seed 42 --split val
 # FINAL evaluation, run deliberately and once the config is settled:
-# $PY evaluate.py --config config_dn.yaml --results-dir results_4ct_dn --atg-window 500 --stop-window 500 --split test_clean --final
+# $PY evaluate.py --config config_dn.yaml --results-dir "$RESULTS_DIR" --atg-window 500 --stop-window 500 --split test_clean --final
 echo "=== evaluate exit: $? ==="

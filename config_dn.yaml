@@ -20,7 +20,12 @@ selected:
   window_size_stop: 500
 
 data:
-  hdf5_path: results_4ct_dn/nmd_orf_data.h5
+  # REPOINTED 2026-08-04. results_4ct_dn held an HDF5 built from CHANNING inputs (the
+  # driver omitted --config, so load_config defaulted to config.yaml and /projects/talisman
+  # is mounted on Explorer, so it succeeded). That tree is under deprecated_2026-08-04/.
+  # This one is deposit-native and says so in its own attrs: config_path, resolved inputs,
+  # results_dir, code_sha256, build_complete.
+  hdf5_path: results_deposit_h5_2026-08-04/nmd_orf_data.h5
   max_orfs_per_tx: 5
   # THE SWEEP GRID'S STARTING POINT, NOT THE SELECTION — see `selected:` above.
   window_size_atg: 100   # sweep over {100, 500, 1000}
