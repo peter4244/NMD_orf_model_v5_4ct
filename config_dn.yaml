@@ -16,8 +16,32 @@ paths:
 # full rationale; kept in step with it deliberately, since a deposit-native run that
 # selected a different window config than the published one would be a silent confound.
 selected:
-  window_size_atg: 500
-  window_size_stop: 500
+  # RE-SELECTED ON THE DEPOSIT-NATIVE UNIVERSE, 2026-08-04. Pete's decision, and his rationale:
+  # among the top performers on BOTH metrics, and a balanced window size.
+  #
+  # The 60-cell sweep (12 configurations x 5 paired seeds, scored on val_clean) ranks this
+  # 3rd of 12 on AUC (0.93211) and 5th on AUPRC (0.81688), and it is inside BOTH simultaneous
+  # 95% sets. Symmetric windows also mean the two heads see equal extents, rather than an
+  # asymmetry that would confound a branch decomposition.
+  #
+  # WHAT THE SWEEP DID NOT DO, recorded here because the number alone would imply otherwise:
+  # it did not identify a winner. Top-two spacing was 0.00179 on AUC and 0.00082 on AUPRC
+  # against exclusion thresholds of 0.00484 and 0.01401 -- margins 3x to 17x below the noise
+  # floor. Seven configurations are inseparable on AUC, ten on AUPRC, and the two metrics
+  # disagree sharply: the AUC leader (atg1000_stop2000) is 8th on AUPRC and the AUPRC leader
+  # (atg500_stop2000) is 6th on AUC. So this is a defensible choice among statistically
+  # equivalent ones, not a measured optimum. collect_sweep.py says it plainly: whatever
+  # tie-break is applied is what selects the configuration.
+  #
+  # The only real signal is negative: all four atg100_* configurations are last on both
+  # metrics. A 100 nt start window is genuinely worse.
+  #
+  # SUPERSEDES atg500_stop500, which the manuscript reports. That selection was made on the
+  # CHANNING universe (W307) -- the sweep behind it read an HDF5 built from Channing inputs --
+  # and it ranks 8th on AUC here, outside that 95% set, 4th on AUPRC, inside it. Changing the
+  # published configuration is a manuscript-level change and is Pete's and Yul's call (D50).
+  window_size_atg: 1000
+  window_size_stop: 1000
 
 data:
   # REPOINTED 2026-08-04. results_4ct_dn held an HDF5 built from CHANNING inputs (the
