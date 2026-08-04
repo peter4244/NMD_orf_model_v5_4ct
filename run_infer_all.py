@@ -50,7 +50,7 @@ def main():
     p.add_argument("--config", required=True)
     p.add_argument("--atg-window", type=int, default=None)
     p.add_argument("--stop-window", type=int, default=None)
-    p.add_argument("--results-dir", default=None,
+    p.add_argument("--results-dir", required=True,
                    help="override; default reads config['data']['results_dir'] or results_4ct")
     p.add_argument("--split", default="all",
                    help="NMDDataset split (default: 'all')")
@@ -61,10 +61,20 @@ def main():
     set_seed(config["training"]["seed"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    ws_atg = args.atg_window or config["data"]["window_size_atg"]
-    ws_stop = args.stop_window or config["data"]["window_size_stop"]
+    # FALL BACK TO THE SELECTION, NOT THE GRID'S STARTING POINT (2026-08-04). This read
+    # config["data"]["window_size_*"], which in config_dn.yaml is 100/1000 -- the sweep grid's
+    # first cell, a configuration matching no artifact anyone uses. So this script run without
+    # window flags silently built tag atg100_stop1000 and hunted a checkpoint that does not
+    # exist. selected_tag() is the single source of truth for "which configuration did we
+    # choose" and raises if the config does not state one.
+    if args.atg_window and args.stop_window:
+        ws_atg, ws_stop = args.atg_window, args.stop_window
+    else:
+        _sel = config.get("selected") or {}
+        ws_atg = args.atg_window or _sel["window_size_atg"]
+        ws_stop = args.stop_window or _sel["window_size_stop"]
     tag = f"atg{ws_atg}_stop{ws_stop}"
-    results_dir = Path(args.results_dir or "results_4ct")
+    results_dir = Path(args.results_dir)
     if not results_dir.is_absolute():
         results_dir = REPO / results_dir
 

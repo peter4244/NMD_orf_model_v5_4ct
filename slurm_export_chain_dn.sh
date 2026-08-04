@@ -5,7 +5,7 @@
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=dn_exports
-#SBATCH --output=results_4ct_dn/export_chain_%j.log
+#SBATCH --output=results_deposit_h5_2026-08-04/export_chain_%j.log
 #
 # The section 5 export chain on the post-clip model, full cohort (D74/D77).
 #
@@ -26,10 +26,15 @@
 # non-zero if any failed. One broken step should not hide the status of the nine after it -- the
 # whole point of running these together is to learn which work in a single pass.
 PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+# Windows and tag come from the config, never from literals here -- 39 such literals
+# across 26 drivers would otherwise keep reading 500/500 after a re-selection.
+TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || exit 1
+ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
 cd "$SLURM_SUBMIT_DIR" || exit 1
-RES=results_4ct_dn
+RES=${RESULTS_DIR:-results_deposit_h5_2026-08-04}
 CFG=config_dn.yaml
-MTAG=atg500_stop500_seed42
+MTAG=${TAG}_seed42
 
 echo "=== node $(hostname) ==="
 nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || true
@@ -54,7 +59,7 @@ step () {                       # step <label> <command...>
 step "06 deepshap tsv"        $PY 06_export_deepshap_tsv.py --results-dir "$RES" --tag "$MTAG" --run-id 1
 step "07 motif analysis"      $PY 07_motif_analysis.py --results-dir "$RES" --tag "$MTAG" --run-id 1
 step "08 subgroup deepshap"   $PY 08_export_subgroup_deepshap_tsv.py --results-dir "$RES" \
-                                  --atg 500 --stop 500 --n-runs 5 --member-seed 42 --split all
+                                  --atg "$ATG" --stop "$STOP" --n-runs 5 --member-seed 42 --split all
 step "09 gc content"          $PY 09_export_gc_content.py --config "$CFG" --results-dir "$RES" --tag "$MTAG"
 step "09 junction ordinal"    $PY 09_export_junction_ordinal.py --config "$CFG" --results-dir "$RES" --tag "$MTAG"
 step "09 polya"               $PY 09_export_polya.py --config "$CFG" --results-dir "$RES" --tag "$MTAG" --split all

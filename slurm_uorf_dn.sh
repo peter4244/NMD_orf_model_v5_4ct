@@ -5,7 +5,7 @@
 #SBATCH --mem=48G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=dn_uorf
-#SBATCH --output=results_4ct_dn/uorf_dn_%j.log
+#SBATCH --output=results_deposit_h5_2026-08-04/uorf_dn_%j.log
 #
 # uORF attention inference on the POST-CLIP model, for claim 5.4.3.
 #
@@ -24,16 +24,21 @@
 #     holding one quantity under different names is the defect this project keeps paying for.
 set -euo pipefail
 PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+# Windows and tag come from the config, never from literals here -- 39 such literals
+# across 26 drivers would otherwise keep reading 500/500 after a re-selection.
+TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || exit 1
+ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
 cd "$SLURM_SUBMIT_DIR"
 echo "=== node $(hostname) ==="
 nvidia-smi --query-gpu=name --format=csv,noheader || true
-CKPT=results_4ct_dn/best_model_atg500_stop500_seed42.pt
+CKPT=${RESULTS_DIR:-results_deposit_h5_2026-08-04}/best_model_${TAG}_seed42.pt
 test -e "$CKPT" || { echo "FATAL: $CKPT missing"; exit 1; }
 if cmp -s "$CKPT" results_4ct/best_model_atg500_stop500.pt; then
   echo "FATAL: dn checkpoint is byte-identical to the published one -- wrong tree"; exit 1
 fi
 echo "checkpoint present and differs from published: OK"
-NMD_RESULTS_DIR=results_4ct_dn $PY infer_uorf_attention.py --config config_dn.yaml --results-dir results_4ct_dn --member-seed 42
+NMD_RESULTS_DIR=${RESULTS_DIR:-results_deposit_h5_2026-08-04} $PY infer_uorf_attention.py --config config_dn.yaml --results-dir ${RESULTS_DIR:-results_deposit_h5_2026-08-04} --member-seed 42
 rc=$?
 echo "=== infer_uorf_attention exit: $rc ==="
 exit $rc

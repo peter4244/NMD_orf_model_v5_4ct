@@ -5,7 +5,7 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=dn_final
-#SBATCH --output=results_4ct_dn/eval_final_%j.log
+#SBATCH --output=results_deposit_h5_2026-08-04/eval_final_%j.log
 #
 # THE ONE-SHOT HELD-OUT EVALUATION. Claims 5.2.1 and 5.6.4 -- the only two section 5 numbers that
 # are test-only. Everything interpretive is full cohort (D74/D77); performance is not.
@@ -23,12 +23,17 @@
 # here. Naming the split by its meaning, not reconstructing it, is why this cannot drift.
 set -euo pipefail
 PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+# Windows and tag come from the config, never from literals here -- 39 such literals
+# across 26 drivers would otherwise keep reading 500/500 after a re-selection.
+TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || exit 1
+ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
 cd "$SLURM_SUBMIT_DIR"
 echo "=== node $(hostname) ==="
 nvidia-smi --query-gpu=name --format=csv,noheader || true
 $PY -c "import torch; print('torch', torch.__version__, 'cuda', torch.version.cuda)"
-$PY evaluate.py --config config_dn.yaml --results-dir results_4ct_dn \
-    --atg-window 500 --stop-window 500 --member-seed 42 --split test_clean --final
+$PY evaluate.py --config config_dn.yaml --results-dir ${RESULTS_DIR:-results_deposit_h5_2026-08-04} \
+    --atg-window "$ATG" --stop-window "$STOP" --member-seed 42 --split test_clean --final
 rc=$?
 echo "=== evaluate exit: $rc ==="
 exit $rc
