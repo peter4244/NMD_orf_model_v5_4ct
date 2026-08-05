@@ -7,12 +7,16 @@
 #   than the oversized job it replaced. Eligibility, not gap size, is the binding constraint.
 #   For SHORT work unpinning is free: the wall below covers the ~5x slow draw. Long jobs
 #   (joint/atg-stop/all-modes) stay pinned, since unpinned they would need 2-6h walls.
-#SBATCH --time=01:15:00   # 9:42 on the fast family, ~49m on the slow one; this
+#SBATCH --time=04:00:00   # 9:42 on the fast family, ~49m on the slow one; this
 #   wall survives EITHER draw, which is what makes unpinning safe.
-#SBATCH --mem=16G
+#SBATCH --mem=48G   # RAISED from 16G 2026-08-05. Every DeepSHAP replicate on this
+#   same cohort measured 42-50 GB against a 32G request and one was OOM-killed, so a
+#   16G request for a full-cohort run at DOUBLE the window width is not a margin.
+#   11_kernel_shap_branches.py documents a 2.10 GiB peak at atg1000_stop1000 after its
+#   chunking fix, so this should be ample -- the point is that it is no longer a guess.
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=dn_kshap
-#SBATCH --output=results_4ct_dn/kshap_dn_%j.log
+#SBATCH --output=results_deposit_h5_2026-08-04/kshap_dn_%j.log
 
 # DEPOSIT-NATIVE KernelSHAP branch decomposition, full cohort (2026-07-27).
 #
@@ -27,10 +31,16 @@
 # No `set -e`: a non-zero exit is a RESULT to read in the log, not something to hide.
 cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+# Results tree and tag from the config, never literals. This driver named results_4ct_dn --
+# now segregated because its HDF5 was Channing-built -- and the tag atg500_stop500, which
+# stopped being the selection when the deposit-native sweep chose atg1000_stop1000.
+RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || exit 1
+echo "results-dir=$RESULTS_DIR  tag=$TAG"
 echo "=== node $(hostname) ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
-$PY 11_kernel_shap_branches.py --config config_dn.yaml --results-dir results_4ct_dn \
-    --tag atg500_stop500 --n-background 500 --seed 42 --member-seed 42 --explain-split all --full-cohort
+$PY 11_kernel_shap_branches.py --config config_dn.yaml --results-dir "$RESULTS_DIR" \
+    --tag "$TAG" --n-background 500 --seed 42 --member-seed 42 --explain-split all --full-cohort
 rc=$?
 echo "=== kernel_shap exit: $rc ==="
 # PROPAGATE IT (fixed 2026-08-02, job 8905262). The last command used to be the echo, so the JOB
