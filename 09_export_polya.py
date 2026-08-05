@@ -25,9 +25,13 @@ def main():
                                                  "Never a hardcoded literal -- see utils.selected_tag.")
     parser.add_argument("--config", required=True,
                            help="Where the selected window configuration is read from")
-    # Default resolved from config.yaml `paths:` / $NMD_SQANTI_CLASS rather than baked in.
-    parser.add_argument("--sqanti-classification",
-                        default=str(resolve_path("sqanti_class")))
+    # RESOLVED AFTER PARSING, NOT AS AN ARGPARSE DEFAULT (2026-08-04). This was
+    # default=str(resolve_path("sqanti_class")), which is evaluated at PARSE time -- before
+    # --config exists -- so it resolved against whatever resolve_path defaulted to. Once that
+    # default was removed it raised outright, which is how it was found. Same defect class as
+    # data_prep.py's module-level path constants: a path resolved before the caller has said
+    # which config to resolve it against is a path the --config flag cannot influence.
+    parser.add_argument("--sqanti-classification", default=None)
     # --results-dir, the ninth script in this repo to need it. Without it this hardcoded
     # results_4ct, so pointed at a deposit-native question it read the PUBLISHED run and exited 0
     # reporting it -- the failure mode is silence, not an error.
@@ -37,6 +41,8 @@ def main():
                              "cohort (D74/D77). The split is part of the filename evaluate.py "
                              "writes, so the wrong value reads a different population.")
     args = parser.parse_args()
+    if args.sqanti_classification is None:
+        args.sqanti_classification = str(resolve_path("sqanti_class", config_path=args.config))
 
     # Resolve the tag from the ONE place that names the selected configuration.
     if args.tag is None:
