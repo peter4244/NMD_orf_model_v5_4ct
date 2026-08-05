@@ -79,6 +79,9 @@ NORM_STD  = np.array([0.26555353, 0.26279053, 0.3435218, 0.39381742, 3.6128473],
 # results_4ct was hardcoded four times here and this script took no arguments, so there was
 # no way to point it at the deposit-native rebuild. W76.
 _ap = argparse.ArgumentParser(description=__doc__.split("\n")[1] if __doc__ else None)
+_ap.add_argument("--config", required=True,
+                 help="Which config states the selected window configuration. Required: "
+                      "config.yaml is Channing, config_dn.yaml is deposit-native.")
 _ap.add_argument("--results-dir", required=True,
                  help="relative to this script's directory; results_4ct_dn for the "
                       "deposit-native rebuild. Falls back to $NMD_RESULTS_DIR, then "
@@ -95,7 +98,13 @@ print(f"[results-dir] {RES}")
 # made this the one script that would keep loading the atg500_stop500 checkpoint after a
 # sweep selected a different window config -- silently, since the file exists. It now reads
 # the one place that names the selection.
-config = load_config(os.path.join(REPO, "config.yaml"))
+# WHICH CONFIG, NOT JUST WHICH TAG (2026-08-04). The note above records making TAG
+# config-derived instead of a literal -- and then hardcoded config.yaml to derive it FROM.
+# config.yaml is the CHANNING config and its selected: block still reads 500/500, so after the
+# deposit-native sweep chose atg1000_stop1000 this script would have loaded the old tag, hunted
+# a checkpoint under the old name and built the model with 500/500 windows. Half a fix reads
+# exactly like a whole one. The config is now named by the caller, like everywhere else.
+config = load_config(_args.config)
 TAG   = selected_tag(config)
 CKPT  = resolve_checkpoint(RES, TAG, _args.member_seed)
 H5    = os.path.join(RES, "nmd_orf_data.h5")
