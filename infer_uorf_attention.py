@@ -63,7 +63,7 @@ import torch
 REPO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, REPO)
 from model import build_model
-from utils import load_config, resolve_checkpoint, selected_tag
+from utils import _read_windows, load_config, resolve_checkpoint, selected_tag
 
 # ── v5_4ct training-set normalization stats ──
 # EXTRACTED FROM THE PUBLISHED results_4ct HDF5 AND NOT SELECTED BY --results-dir. See the
@@ -185,8 +185,21 @@ with h5py.File(H5, "r") as f:
     n_done = 0
     for start in range(0, len(keep_idx), BATCH):
         chunk = keep_idx[start:start + BATCH]
-        atg  = f[f"w{WS_ATG}/atg_windows"][chunk].astype(np.float32)
-        stp  = f[f"w{WS_STOP}/stop_windows"][chunk].astype(np.float32)
+        # READ THROUGH THE CODEC, NOT THE DENSE DATASET DIRECTLY (2026-08-04). This was
+        # f[f"w{WS}/atg_windows"][chunk], which is the only place in the repo still reaching
+        # past utils for window data -- and it broke the moment the HDF5 went packed:
+        # KeyError: object 'atg_windows' doesn't exist.
+        #
+        # It survived the packing change because the search that was supposed to catch it
+        # looked for the literal ["atg_windows"], which matches the DataLoader dict keys in
+        # 03_train.py and five other files and hid this f-string form among them. The grep
+        # returned hits, they all looked benign, and the conclusion "only utils and data_prep
+        # touch the datasets" was drawn from a pattern that could not have found the exception.
+        #
+        # _read_windows returns (n, K, 9, W) float32 from EITHER layout, decoding at float16
+        # and upcasting so the values match what the dense file stored.
+        atg  = _read_windows(f, WS_ATG, "atg", chunk)
+        stp  = _read_windows(f, WS_STOP, "stop", chunk)
         ofs  = f["orf_features"][chunk].astype(np.float32)
         msk  = f["orf_mask"][chunk].astype(bool)
 
