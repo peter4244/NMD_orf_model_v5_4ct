@@ -45,9 +45,43 @@ def assign_subgroup(row):
     return "NMD other"
 
 
-def load_runs(results_dir, tag, n_runs):
-    """Load all run NPZs, returning averaged shap and inputs as per-branch arrays."""
-    n_ch, w_atg, w_stop, n_feat = 9, 500, 500, 5
+def load_runs(results_dir, tag, n_runs, w_atg=None, w_stop=None):
+    """Load all run NPZs, returning averaged shap and inputs as per-branch arrays.
+
+    WINDOW GEOMETRY IS DERIVED, NOT ASSUMED (2026-08-05). This line read
+
+        n_ch, w_atg, w_stop, n_feat = 9, 500, 500, 5
+
+    with no argparse option and no config read, so --tag and --config could not influence it.
+    The joint SHAP array is laid out [atg | stop | structural] and is 2*n_ch*W + n_feat wide:
+    9005 at 500/500, 18005 at 1000/1000. Slicing an 18005-column array with 500-wide offsets
+    put 9005 columns into struct_shap and the DataFrame construction failed --
+
+        ValueError: Shape of passed values is (41776, 9005), indices imply (41776, 5)
+
+    which is the lucky outcome. Had n_feat happened to divide the surplus, this would have
+    produced a full-width table of misaligned numbers at exit 0.
+
+    W now comes from the ARRAY ITSELF, so it cannot drift from the file being read, and is
+    cross-checked against what the caller says the selection is. Disagreement raises rather
+    than picking one, because a file and a config that disagree about window width is exactly
+    the confusion this rebuild exists to remove.
+    """
+    n_ch, n_feat = 9, 5
+    first = results_dir / f"deepshap_joint_{tag}_run1.npz"
+    with np.load(first, allow_pickle=True) as _d:
+        ncol = _d["shap_values"].squeeze(-1).shape[1]
+    derived, rem = divmod(ncol - n_feat, 2 * n_ch)
+    if rem:
+        raise ValueError(
+            f"{first.name} has {ncol} columns; (cols - {n_feat}) is not divisible by "
+            f"2*{n_ch}, so the [atg|stop|structural] layout does not hold")
+    if w_atg is not None and w_stop is not None:
+        if (w_atg, w_stop) != (derived, derived):
+            raise ValueError(
+                f"window mismatch: the config says atg={w_atg} stop={w_stop}, but "
+                f"{first.name} has {ncol} columns implying {derived}/{derived}")
+    w_atg = w_stop = derived
     atg_size = n_ch * w_atg
     stop_size = n_ch * w_stop
 
@@ -197,7 +231,12 @@ def main():
 
     # ── Load DeepSHAP NPZs averaged across runs ──
     print(f"\nLoading {args.n_runs} joint DeepSHAP NPZs for tag={tag} ...")
-    meta = load_runs(results_dir, tag, args.n_runs)
+    # Cross-check the derived geometry against what the config says was selected, so a
+    # config/file disagreement raises here rather than producing a plausible table.
+    _sel = (load_config(args.config).get("selected") or {}) if args.config else {}
+    meta = load_runs(results_dir, tag, args.n_runs,
+                     w_atg=_sel.get("window_size_atg"),
+                     w_stop=_sel.get("window_size_stop"))
 
     # NPZ explain_indices were verified to be 0..N-1 sorted, so NPZ row i ↔ preds row i.
     isoform_ids = preds["isoform_id"].values
