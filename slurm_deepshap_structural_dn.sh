@@ -12,7 +12,7 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=dn_dshap
-#SBATCH --output=results_4ct_dn/deepshap_dn_%A_%a.log
+#SBATCH --output=results_deposit_h5_2026-08-04/deepshap_dn_%A_%a.log
 #SBATCH --array=1-5
 
 # DEPOSIT-NATIVE structural DeepSHAP, 5 replicates (2026-07-27).
@@ -25,23 +25,28 @@
 # NOTE what these replicates vary: the SHAP BACKGROUND SAMPLING, not model training. They are
 # not a training-seed sweep, and D11 stands.
 #
-# --results-dir results_4ct_dn reads the deposit-native checkpoint and writes beside it, so the
+# --results-dir ${RESULTS_DIR} reads the deposit-native checkpoint and writes beside it, so the
 # published deepshap_* npz and summary TSVs stay intact for comparison. Without it deepshap.py
 # hardcodes results_4ct and would overwrite exactly those.
 #
 # No `set -e`: a non-zero exit is a RESULT to read in the log.
 cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+# Results tree and windows from the config, never literals: the selection moved to
+# atg1000_stop1000 on 2026-08-04 and results_4ct_dn is segregated under deprecated_.
+RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || exit 1
+ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
 SEED=$((SLURM_ARRAY_TASK_ID * 100))
 echo "=== node $(hostname) | run ${SLURM_ARRAY_TASK_ID}, seed=${SEED}, structural, all test, 500 bg ==="
 nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null
 $PY deepshap.py \
     --config config_dn.yaml \
-    --results-dir results_4ct_dn \
+    --results-dir ${RESULTS_DIR} \
     --n-explain 0 \
     --n-background 500 \
-    --atg-window 500 \
-    --stop-window 500 \
+    --atg-window "$ATG" \
+    --stop-window "$STOP" \
     --seed ${SEED} \
     --run-id ${SLURM_ARRAY_TASK_ID} \
     --branches structural

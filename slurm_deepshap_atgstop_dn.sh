@@ -7,13 +7,13 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=dn_atgstop
-#SBATCH --output=results_4ct_dn/deepshap_atgstop_dn_%A_%a.log
+#SBATCH --output=results_deposit_h5_2026-08-04/deepshap_atgstop_dn_%A_%a.log
 #SBATCH --array=1-5
 
 # DEPOSIT-NATIVE **ATG + STOP** DeepSHAP, 5 replicates. 2026-07-27.
 #
 # WHY THIS EXISTS. The deposit-native campaign ran --branches joint and --branches structural
-# and stopped there, so results_4ct_dn holds deepshap_joint_* and deepshap_structural_* npz and
+# and stopped there, so ${RESULTS_DIR} holds deepshap_joint_* and deepshap_structural_* npz and
 # NOTHING ELSE. The 06-10 export chain consumes deepshap_{atg,stop}_{tag}[_runN].npz -- see
 # 06_export_deepshap_tsv.py:5 -- so it cannot run deposit-native at all: it exits with "NPZ
 # files not found". Every one of the twelve section-5 export elements downstream of it
@@ -37,17 +37,22 @@ export NMD_ALLOW_NONDETERMINISM=1
 
 cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
 PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+# Results tree and windows from the config, never literals: the selection moved to
+# atg1000_stop1000 on 2026-08-04 and results_4ct_dn is segregated under deprecated_.
+RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || exit 1
+ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
 SEED=$((SLURM_ARRAY_TASK_ID * 100))
 echo "=== node $(hostname) | ATG+STOP run ${SLURM_ARRAY_TASK_ID}, seed=${SEED}, all test, 500 bg ==="
 nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null
 
 $PY deepshap.py \
     --config config_dn.yaml \
-    --results-dir results_4ct_dn \
+    --results-dir ${RESULTS_DIR} \
     --n-explain 0 \
     --n-background 500 \
-    --atg-window 500 \
-    --stop-window 500 \
+    --atg-window "$ATG" \
+    --stop-window "$STOP" \
     --seed ${SEED} \
     --run-id ${SLURM_ARRAY_TASK_ID} \
     --branches atg stop
