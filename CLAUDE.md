@@ -5,7 +5,16 @@ Deep learning model predicting nonsense-mediated mRNA decay (NMD) visibility fro
 
 The model architecture is identical to the original v5: multi-branch transformer processing up to K=5 candidate ORFs per transcript through shared-weight CNN encoders (ATG window + stop window + structural features), aggregated via learned attention.
 
-**Primary model configuration:** ATG=500, STOP=500.
+**Primary model configuration: ATG=1000, STOP=1000, member seed 42.** The deposit carries
+`best_model_atg1000_stop1000_seed42.pt`, and every section 5 figure and number is now built from
+it. Corrected 2026-08-06.
+
+**500/500 IS WHAT THE MANUSCRIPT SAYS AND IT IS NOT WHAT WE SHIP.** The published text reads "500nt
+windows around both the start and stop sites"; the deposit-native sweep RE-SELECTED 1000/1000, and
+D67 in the paper repo governs how the Methods will say so. `config.yaml` still defaults to 500, so
+a run that does not pass `--atg-window 1000 --stop-window 1000` silently builds tensors of the
+wrong shape for the deposited checkpoint. Anyone serving or re-scoring this model — a website, a
+re-evaluation, a reader — hits this first and the manuscript points them the wrong way.
 
 ## Key Differences from Original v5 (nmd_orf_model_v5)
 - **Cell types:** AT, DD, FB, MV only (was AT, DD, DO, FB, MV)
@@ -60,7 +69,9 @@ Pointers to it also sit at the top of `03_train.py` and `train_v6.py`, because a
 can be started from either direction. **The file is the single copy — add findings there.**
 
 ## Working Conventions
-- Best model tag: `atg500_stop500`
+- Best model tag: `atg1000_stop1000_seed42` — the deposited checkpoint. `atg500_stop500` was the
+  tag through 2026-08-04 and appears throughout older logs, runlogs and report text; it is the
+  PUBLISHED configuration, not the deposited one
 - All output goes to `results_4ct/`
 - Original v5 project at `../nmd_orf_model_v5/` — do not modify
 
