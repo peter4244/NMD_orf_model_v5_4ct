@@ -30,16 +30,41 @@ from paths_config import load_config, selected_tag
 
 
 N_CHANNELS = 9
-WINDOW = 500
-PER_WINDOW = N_CHANNELS * WINDOW
+N_STRUCT = 5
 IS_REF_CDS_STRUCT_IDX = 2   # 5-feature block: frac_start, frac_stop, is_ref_cds, is_sqanti_cds, n_downstream_ejc
+
+# WINDOW IS DERIVED FROM THE ARRAY, NEVER TYPED (fixed 2026-08-06).
+#
+# It was `WINDOW = 500`, and on the 1000nt model that silently produced GARBAGE rather than an
+# error. The joint array is (N, 9*W + 9*W + 5), so at W=1000 it is (N, 18005) while PER_WINDOW
+# still said 4500. Three things then went wrong at once, none of them raising:
+#
+#   * `inputs[:, :4500].reshape(N, 9, 500)` takes the first half of the ATG window and reshapes it
+#     against the wrong stride. The real layout is channel-major -- cols 0:1000 are channel A's
+#     1000 positions -- so row 1 of the result is A[500:1000] and row 2 is C[0:500]. The G and C
+#     channel indices then address two DIFFERENT channels at different offsets.
+#   * G+C is therefore the sum of two independent one-hot values, which is 0, 1 or 2. That is
+#     precisely how mean_gc came out at 1.066 in
+#     gc_content_across_stop_window_refaug_only_atg1000_stop1000_seed42.tsv (11 of 92 rows > 1.0).
+#   * `struct = inputs[:, 9000:]` picked up 9,005 columns of window data instead of the 5
+#     structural features, so `is_ref_cds` -- the entire point of this script -- was noise.
+#
+# The ATG output looked plausible (0.306-0.548) and was equally wrong; only the stop branch
+# happened to land outside [0,1] and give the game away. Deriving W removes the whole class.
+def _derive_window(n_cols):
+    w, rem = divmod(n_cols - N_STRUCT, 2 * N_CHANNELS)
+    if rem or w <= 0:
+        raise SystemExit(
+            f"cannot derive the window size: {n_cols} columns is not 2*{N_CHANNELS}*W + {N_STRUCT} "
+            f"for any integer W. Refusing to reshape on a guess -- a wrong stride here does not "
+            f"raise, it returns scrambled channels.")
+    return w
 
 
 def load_joint_run(results_dir, tag, run=1):
-    """Load one joint DeepSHAP NPZ. The joint file lays out shap_values and inputs
-    as (N, 9005) where the first 9*500 cols are the ATG window, the next 9*500
-    are the stop window, and the trailing 5 cols are per-ORF structural features
-    (for ORF0 = priority ORF)."""
+    """Load one joint DeepSHAP NPZ. The joint file lays out shap_values and inputs as
+    (N, 9*W + 9*W + 5): the ATG window, then the stop window, then the trailing 5 per-ORF
+    structural features (for ORF0 = priority ORF). W is read off the array, not assumed."""
     path = results_dir / f"deepshap_joint_{tag}_run{run}.npz"
     print(f"Loading {path}")
     d = np.load(path, allow_pickle=True)
@@ -48,9 +73,15 @@ def load_joint_run(results_dir, tag, run=1):
     channel_names = list(d["channel_names"])
     N = inputs.shape[0]
 
-    atg_inp  = inputs[:, :PER_WINDOW].reshape(N, N_CHANNELS, WINDOW)
-    stop_inp = inputs[:, PER_WINDOW:2 * PER_WINDOW].reshape(N, N_CHANNELS, WINDOW)
-    struct   = inputs[:, 2 * PER_WINDOW:]     # (N, 5)
+    window = _derive_window(inputs.shape[1])
+    per_window = N_CHANNELS * window
+    print(f"  derived window = {window} nt ({inputs.shape[1]} cols, {N:,} rows)")
+
+    atg_inp  = inputs[:, :per_window].reshape(N, N_CHANNELS, window)
+    stop_inp = inputs[:, per_window:2 * per_window].reshape(N, N_CHANNELS, window)
+    struct   = inputs[:, 2 * per_window:]     # (N, 5)
+    if struct.shape[1] != N_STRUCT:
+        raise SystemExit(f"structural block is {struct.shape[1]} wide, expected {N_STRUCT}")
     is_ref_cds = struct[:, IS_REF_CDS_STRUCT_IDX] > 0.5
 
     return dict(atg_inp=atg_inp, stop_inp=stop_inp,
@@ -70,8 +101,17 @@ def emit_gc(bundle, branch, gc_window, gc_step, out_path):
     g_idx = channel_names.index("G")
     c_idx = channel_names.index("C")
     gc_per_pos = inp[:, g_idx, :] + inp[:, c_idx, :]   # (N, W), one-hot so 0/1
+    # The one-hot claim above is an ASSUMPTION, and when it broke it broke silently -- a
+    # mis-strided reshape made this the sum of two different channels, giving values of 2.
+    # Assert it here, where it is cheap, rather than discovering it as mean_gc = 1.066.
+    if gc_per_pos.max() > 1.0 + 1e-6:
+        raise SystemExit(
+            f"{branch}: G+C reaches {float(gc_per_pos.max()):.3f} at some position, so the "
+            f"channels are not one-hot as assumed -- almost always a wrong window/stride.")
 
-    codon_pos = WINDOW // 2
+    # W from the array, not a module constant. See _derive_window.
+    window = inp.shape[2]
+    codon_pos = window // 2
     rows = []
     for class_label, mask in [
         ("NMD",     (labels == 1) & is_ref_cds),
@@ -81,7 +121,7 @@ def emit_gc(bundle, branch, gc_window, gc_step, out_path):
         n_class = gc_class.shape[0]
         if n_class == 0:
             continue
-        for start in range(0, WINDOW - gc_window + 1, gc_step):
+        for start in range(0, window - gc_window + 1, gc_step):
             end = start + gc_window
             rel_mid = ((start + end) / 2) - codon_pos
             sample_gc = gc_class[:, start:end].mean(axis=1)
