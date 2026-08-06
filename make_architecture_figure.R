@@ -9,6 +9,39 @@
 library(ggplot2)
 
 # ---------------------------------------------------------------------------
+# WINDOW SIZE IS DERIVED, NEVER TYPED (2026-08-06)
+# ---------------------------------------------------------------------------
+# This diagram carried "9ch x 500" in three places and "4,500 -> 32-dim" in two more, as literals.
+# When the model moved to 1000nt windows the schematic kept saying 500 and rendered without any
+# error -- a figure that contradicts its own methods section, and one nothing checks. The panel
+# validators measure layout, not truth, so this had to be designed out.
+#
+# Resolution order: $NMD_WINDOW_NT, else the window_size_atg in the deposited metrics JSON. If
+# neither resolves it STOPS. A default here would be the defect coming straight back, because the
+# wrong number would once again render cleanly.
+NMD_WINDOW_NT <- local({
+  env <- Sys.getenv("NMD_WINDOW_NT", "")
+  if (nzchar(env)) return(as.integer(env))
+  cand <- Sys.glob(file.path(
+    path.expand("~/claude_projects/nmd_lung_longread_2026/data_deposit/source_data/model"),
+    "metrics_atg*_stop*_test_clean.json"))
+  if (length(cand) != 1L)
+    stop("cannot resolve the window size: set NMD_WINDOW_NT, or make exactly one deposited ",
+         "metrics_atg*_stop*_test_clean.json resolvable (found ", length(cand), "). ",
+         "Refusing to draw an architecture diagram with a guessed window size.")
+  j <- paste(readLines(cand[1], warn = FALSE), collapse = " ")
+  w <- as.integer(sub('.*"window_size_atg"\\s*:\\s*([0-9]+).*', "\\1", j))
+  if (is.na(w)) stop("no window_size_atg in ", cand[1])
+  w
+})
+N_CHANNELS <- 9L
+WIN_LABEL  <- sprintf("9ch × %d", NMD_WINDOW_NT)
+FLAT_LABEL <- sprintf("%s → 32-dim",
+                      formatC(N_CHANNELS * NMD_WINDOW_NT, big.mark = ",", format = "d"))
+message(sprintf("[architecture] window = %d nt; flattened = %s",
+                NMD_WINDOW_NT, FLAT_LABEL))
+
+# ---------------------------------------------------------------------------
 # Color palette — semantic groups
 # ---------------------------------------------------------------------------
 col_atg      <- "#4ECDC4"   # teal   — ATG branch
@@ -94,7 +127,7 @@ p <- p +
            fill = col_prep, color = "grey50", linewidth = 0.8) +
   annotate("text", x = 12.7, y = prep_title_y, label = "Per-ORF Encoding",
            size = 5.5, fontface = "bold") +
-  annotate("text", x = 12.7, y = prep_detail_y, label = "9ch \u00D7 500 + 5 features",
+  annotate("text", x = 12.7, y = prep_detail_y, label = paste0(WIN_LABEL, " + 5 features"),
            size = 4, color = "grey40")
 
 # =========================================================================
@@ -174,7 +207,7 @@ p <- p +
   annotate("text", x = 2.5, y = strip_top + 0.35,
            label = "ATG window", size = 5.5, fontface = "bold", color = "grey40") +
   annotate("text", x = 2.5, y = strip_top + 0.7,
-           label = "9ch \u00D7 500", size = 3.8, color = "grey50")
+           label = WIN_LABEL, size = 3.8, color = "grey50")
 
 for (i in 1:9) {
   sy <- strip_base + (i - 0.5) * ch_h
@@ -201,7 +234,7 @@ p <- p +
   annotate("text", x = 7.0, y = strip_top + 0.35,
            label = "STOP window", size = 5.5, fontface = "bold", color = "grey40") +
   annotate("text", x = 7.0, y = strip_top + 0.7,
-           label = "9ch \u00D7 500", size = 3.8, color = "grey50")
+           label = WIN_LABEL, size = 3.8, color = "grey50")
 
 # --- Visual feature table for Structural branch (x centered at 11.5) ---
 feat_x1 <- 10.0; feat_x2 <- 13.0
@@ -246,7 +279,7 @@ p <- p +
            size = 7, fontface = "bold") +
   annotate("text", x = 2.5, y = 17.5, label = "Conv1D \u00D72 + Pool",
            size = 5, color = "grey30") +
-  annotate("text", x = 2.5, y = 17.1, label = "4,500 \u2192 32-dim",
+  annotate("text", x = 2.5, y = 17.1, label = FLAT_LABEL,
            size = 5, color = "grey30") +
 
   annotate("rect", xmin = 5.3, xmax = 8.7, ymin = enc_y1, ymax = enc_y2,
@@ -255,7 +288,7 @@ p <- p +
            size = 7, fontface = "bold") +
   annotate("text", x = 7.0, y = 17.5, label = "Conv1D \u00D72 + Pool",
            size = 5, color = "grey30") +
-  annotate("text", x = 7.0, y = 17.1, label = "4,500 \u2192 32-dim",
+  annotate("text", x = 7.0, y = 17.1, label = FLAT_LABEL,
            size = 5, color = "grey30") +
 
   annotate("rect", xmin = 9.8, xmax = 13.2, ymin = enc_y1, ymax = enc_y2,
