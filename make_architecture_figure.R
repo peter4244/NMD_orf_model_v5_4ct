@@ -19,12 +19,34 @@ library(ggplot2)
 # Resolution order: $NMD_WINDOW_NT, else the window_size_atg in the deposited metrics JSON. If
 # neither resolves it STOPS. A default here would be the defect coming straight back, because the
 # wrong number would once again render cleanly.
+#
+# THE DEPOSIT ROOT IS CONFIGURABLE, AND IT WAS NOT UNTIL 2026-08-11. This globbed
+# path.expand("~/claude_projects/nmd_lung_longread_2026/data_deposit/source_data/model") -- one
+# person's home layout, hardcoded. Every other deposit reader in the citable export resolves
+# $DEPOSIT or config/paths.yml, so a reader who placed the deposit exactly where REPRODUCTION.md
+# says still got the stop below. Found by section 3.2 of the citable-repo plan, which asserts that
+# the exported tree contains no path under a home directory.
+#
+# $DEPOSIT first (the same variable derive_section5_numbers.py and data_export_deposit.py read),
+# then data_deposit/ relative to this file's repository, then the historical absolute path so an
+# existing checkout keeps working. Still no default window size: the stop is the point.
 NMD_WINDOW_NT <- local({
   env <- Sys.getenv("NMD_WINDOW_NT", "")
   if (nzchar(env)) return(as.integer(env))
-  cand <- Sys.glob(file.path(
-    path.expand("~/claude_projects/nmd_lung_longread_2026/data_deposit/source_data/model"),
-    "metrics_atg*_stop*_test_clean.json"))
+  roots <- c(Sys.getenv("DEPOSIT", ""),
+             file.path(getwd(), "data_deposit", "source_data", "model"),
+             path.expand("~/claude_projects/nmd_lung_longread_2026/data_deposit/source_data/model"))
+  roots <- roots[nzchar(roots)]
+  # FIRST ROOT THAT RESOLVES WINS, rather than pooling every root's matches. Pooling looked
+  # equivalent and is not: data_deposit/ is a SYMLINK, so $DEPOSIT and the historical path name the
+  # SAME file by two strings, unique() does not collapse them, and length(cand) == 2 tripped the
+  # exactly-one guard below -- the fix stopping the script it was meant to unblock. Caught by
+  # testing the three roots before committing rather than after.
+  cand <- character(0)
+  for (r in roots) {
+    hit <- Sys.glob(file.path(r, "metrics_atg*_stop*_test_clean.json"))
+    if (length(hit)) { cand <- hit; break }
+  }
   if (length(cand) != 1L)
     stop("cannot resolve the window size: set NMD_WINDOW_NT, or make exactly one deposited ",
          "metrics_atg*_stop*_test_clean.json resolvable (found ", length(cand), "). ",
