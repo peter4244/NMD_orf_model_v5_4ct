@@ -20,21 +20,15 @@ are in GEO (**GSE329233**). Nothing under `results_4ct/` is version-controlled �
 | | |
 |---|---|
 | Checkpoint | `best_model_atg1000_stop1000_seed42.pt` |
-| Start window | 1000 nt |
-| Stop window | 1000 nt |
+| Start / stop window | 1000 nt each |
 | Member seed | 42 |
-| Epoch selected | 5 (early stopping on validation AUC) |
-| Validation AUC | 0.932 |
-| Trainable parameters | 34,310 (12,866 in each of the two sequence CNNs) |
 
-Held-out test set (chr1, chr3, chr5, chr7 — never seen in training or validation):
-
-| | |
-|---|---|
-| AUC | 0.926 |
-| AUPRC | 0.818 |
-| Isoforms scored | 10,522 |
-| NMD susceptible | 2,405 |
+Held-out performance, the dataset splits and the class balance are **not restated here**. They are
+properties of the deposited artifacts and are read from them:
+`metrics_atg1000_stop1000_seed42_test_clean.json` for the test metrics, and
+`predictions_atg1000_stop1000_seed42_all.tsv` for the split sizes and label counts. A number copied
+into this file is a number that can go stale while the artifact stays right, which has already
+happened once.
 
 > **`config.yaml` does not state the model's window sizes, and running without the flags builds
 > the wrong tensors.** `data.window_size_atg` / `data.window_size_stop` in that file are the
@@ -43,22 +37,10 @@ Held-out test set (chr1, chr3, chr5, chr7 — never seen in training or validati
 > tensors are built at a shape the checkpoint cannot consume. The selected values are recorded
 > inside the checkpoint itself under `config.selected`, which is the authoritative copy.
 
-## Dataset
+## Labels
 
-Isoforms are split by chromosome, so no gene appears in more than one split.
-
-| Split | Chromosomes | Isoforms | NMD | Non-NMD |
-|---|---|---:|---:|---:|
-| Train | all others (19) | 26,720 | 5,959 | 20,761 |
-| Validation | chr2, chr4 | 4,356 | 927 | 3,429 |
-| Test | chr1, chr3, chr5, chr7 | 10,522 | 2,405 | 8,117 |
-| **Total** | | **41,776** | **9,321** | **32,455** |
-
-Class ratio 1:3.5 (NMD : non-NMD). Counts are those of the deposited model's own prediction table,
-`predictions_atg1000_stop1000_seed42_all.tsv`.
-
-**Labels.** Isoform-level NMD calls come from multivariate adaptive shrinkage (mashr) across the
-four cell types:
+Isoform-level NMD calls come from multivariate adaptive shrinkage (mashr) across the four cell
+types. Isoforms are split by chromosome, so no gene appears in more than one split.
 
 - **NMD susceptible** — the union across cell types of isoforms with `nmd_responsive == TRUE`
   (lfsr < 0.05 and posterior mean logFC > 0).
@@ -71,30 +53,20 @@ paralog leakage screen — ill-defined.
 
 ## Architecture
 
-Up to K=5 candidate ORFs per transcript pass through an `ORFEncoder` whose weights are shared
-across the K ORFs, and are aggregated by learned attention.
+Up to K=5 candidate ORFs per transcript pass through an `ORFEncoder` with weights shared across the
+K ORFs, aggregated by learned attention. Within each encoder, three sub-encoders run in parallel and
+share no weights: a CNN over the start window, a CNN over the stop window, and a structural branch
+over the per-ORF features.
 
-Within each `ORFEncoder` three sub-encoders run in parallel and do **not** share weights with one
-another: a CNN over the 9-channel start window, a CNN over the 9-channel stop window, and a
-structural branch (`Linear(5, 32) → ReLU`) over the 5 per-ORF features. The three 32-dim
-sub-embeddings are concatenated and fused (`Linear(96, 64) → ReLU → Dropout(0.2)`). The K ORF
-embeddings are pooled by a learned attention layer (softmax over valid ORFs) and passed to a
-classification head (`Linear(64,32) → ReLU → Dropout(0.3) → Linear(32,1)`). Training uses
-`BCEWithLogitsLoss` with dynamic `pos_weight`.
-
-Each sequence CNN is `Conv1d(9, 32, k1) → BatchNorm → ReLU → MaxPool(4) → Conv1d(32, 32, k2) →
-BatchNorm → ReLU → max over the length axis → Linear(32, 32)`, with `k1, k2 = 15, 7` at this
-window size.
+Full methods are the paper's Supplemental Methods, section "Deep Learning Model", and the layer
+definitions are `model.py`. This file deliberately keeps neither a second copy. Read
+`RETRAIN_ARCHITECTURE_CHANGES.md` before changing anything about the architecture or retraining.
 
 **One consequence matters for reading the interpretation outputs.** The first convolution spans all
 nine input channels at once, so no channel has an independent pathway through a branch. The branch
 decomposition therefore attributes importance to **regions** — start window, stop window,
 structural — and not to modalities; each region's share already includes its own GC and junction
 content.
-
-Full methods are the paper's Supplemental Methods, section "Deep Learning Model" — this repository
-does not keep a second copy. Read `RETRAIN_ARCHITECTURE_CHANGES.md` before changing anything about
-the architecture or retraining.
 
 ### A note on names
 
@@ -106,20 +78,6 @@ does not extend to the code.
 
 Cell types are likewise `AT` and `DD` in code and in the feature tables, for AT2 and LAE
 respectively.
-
-## Pipeline
-
-```
-export_rds.R                # Isopair RDS -> the eight feature tables
-data_prep.py                # Build HDF5 dataset
-03_train.py                 # Train
-evaluate.py                 # Evaluate on the test set
-04_interpret_attention.py   # Attention analysis
-05_interpret_structural.py  # Structural feature importance
-deepshap.py                 # DeepSHAP (5 independent runs)
-06-09_export_*.py           # Export interpretation TSVs
-11_kernel_shap_branches.py  # Branch-level Shapley values
-```
 
 ## Repository layout
 
@@ -140,10 +98,10 @@ Nothing was deleted in this reorganization. The tree archived at
 [10.5281/zenodo.21536501](https://doi.org/10.5281/zenodo.21536501) v2.0.0 is unaffected, and git
 history carries every path as it was.
 
-## Build order (intermediate TSVs feeding the report)
+## Build order
 
-The report `orf_model_report_v5.Rmd` consumes intermediate TSVs that are not produced directly by
-the numbered pipeline scripts. Build order:
+Fifteen steps, in order. The report `orf_model_report_v5.Rmd` is the last of them and consumes
+intermediate TSVs that the earlier steps write:
 
 ```
 1. export_rds.R                                     (Isopair RDS → the eight feature tables:
