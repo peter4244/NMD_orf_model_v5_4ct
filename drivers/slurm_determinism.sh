@@ -17,5 +17,8 @@ cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 echo "=== node: $(hostname) ==="
 nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null
-$PY verify_determinism.py --steps 5 --atg 500 --stop 500
+# --config is REQUIRED; without it argparse exits 2 before anything is tested. This driver
+# reproduces the PUBLISHED run, whose selection was 500/500, so config.yaml is the right one --
+# the deposit-native gate uses config_dn.yaml and 1000/1000.
+$PY verify_determinism.py --config config.yaml --steps 5 --atg 500 --stop 500
 echo "=== verify_determinism exit: $? ==="

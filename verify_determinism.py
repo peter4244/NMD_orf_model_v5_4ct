@@ -110,8 +110,8 @@ def main():
     # branch's pool IS exercised at the default. What a default-config run leaves untested is the
     # START branch's pool and the larger kernels. Same false-precision class as the
     # verify_pool_equivalence citation in model.py: a specific claim nobody checked.
-    ap.add_argument("--atg", type=int, default=None, help="override window_size_atg (real run: 500)")
-    ap.add_argument("--stop", type=int, default=None, help="override window_size_stop (real run: 500)")
+    ap.add_argument("--atg", type=int, default=None, help="override window_size_atg; the selection lives in config.selected -- see paths_config.py --selected-tag")
+    ap.add_argument("--stop", type=int, default=None, help="override window_size_stop; the selection lives in config.selected -- see paths_config.py --selected-tag")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
