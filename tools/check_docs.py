@@ -43,6 +43,14 @@ READER_DOCS = ["README.md", "METHODS.md", "CLAUDE.md", "RETRAIN_ARCHITECTURE_CHA
 # Run outputs. Gitignored by design; naming one is not a broken reference.
 OUTPUT_PREFIXES = ("runs/", "results_", "deprecated_", "tmp/", "logs/", "slurm_logs/")
 
+# Outputs named WITHOUT a directory, which the prefix test cannot catch. These are produced by the
+# pipeline into a results tree, so they exist on a machine that has run it and in no clone.
+OUTPUT_NAMES = {"nmd_orf_data.h5", "selected_orfs.tsv", "tx_summary.tsv", "orf_features.tsv",
+                "tx_summary_provenance.json", "junctions.tsv", "paralog_genes.tsv",
+                "val_paralog_genes.tsv", "synthetic_cds.tsv", "td2_features.tsv",
+                "ref_cds_features.tsv", "orf_scan_metadata.json", "orfik_scan.rds",
+                "selected_orfs_fixed.tsv", "orf_pool.tsv", "structures.rds"}
+
 EXEMPT: dict[str, str] = {
     "autocorr.py":
         "CLAUDE.md names it in an ANECDOTE -- two windows once wrote this filename to the same "
@@ -54,20 +62,37 @@ RX_TICKED = re.compile(r"`([A-Za-z0-9_][A-Za-z0-9_./+-]*\.(?:R|Rmd|py|sh|yml|yam
 RX_BARE = re.compile(r"\b((?:slurm|submit)_[A-Za-z0-9_]+\.sh|[0-9]{2}[a-z]?_[A-Za-z0-9_]+\.py)\b")
 
 
+def _tracked(root: Path) -> set[str]:
+    """Files a FRESH CLONE of `root` contains. Resolving against the working tree instead was a
+    false pass: this check reported OK locally and failed in a clone, because untracked pipeline
+    outputs happened to be sitting on this machine. That is the same shape as a driver that works
+    only on the account it was written on -- exactly what this repository spent 2026-08-12 removing.
+    """
+    import subprocess
+    if not (root / ".git").exists():
+        return set()
+    r = subprocess.run(["git", "-C", str(root), "ls-files"], capture_output=True, text=True)
+    return set(r.stdout.split()) if r.returncode == 0 else set()
+
+
+_TRACKED_HERE = None
+_TRACKED_REPRO = None
+
+
 def resolves(ref: str) -> bool:
-    if ref.startswith(OUTPUT_PREFIXES) or ref in EXEMPT:
+    global _TRACKED_HERE, _TRACKED_REPRO
+    if ref.startswith(OUTPUT_PREFIXES) or ref in EXEMPT or Path(ref).name in OUTPUT_NAMES:
         return True
     name = Path(ref).name
-    for root in (HERE, DEPOSIT, DEPOSIT / "source_data", REPRO):
-        if not root.is_dir():
-            continue
-        if (root / ref).exists():
+    if _TRACKED_HERE is None:
+        _TRACKED_HERE = _tracked(HERE)
+        _TRACKED_REPRO = _tracked(REPRO)
+    for tracked in (_TRACKED_HERE, _TRACKED_REPRO):
+        if ref in tracked or any(t.endswith("/" + name) or t == name for t in tracked):
             return True
-        try:
-            if any(root.rglob(name)):
-                return True
-        except OSError:
-            pass
+    for root in (DEPOSIT, DEPOSIT / "source_data"):
+        if root.is_dir() and ((root / ref).exists() or any(root.rglob(name))):
+            return True
     return False
 
 
