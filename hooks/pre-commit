@@ -23,6 +23,14 @@ cd "$repo_root" || exit 1
 
 python3 check_drivers.py
 rc=$?
+
+# The reader-facing documents may not name what is not here. Runs on every commit rather than at
+# release time because this repository ships whole -- there is no publish step to hang it on, and
+# the defect it catches (the build order naming a driver retired at v3.1.0) is introduced by a
+# commit, not by a publish.
+if [ -f tools/check_docs.py ]; then
+    python3 tools/check_docs.py || rc=1
+fi
 if [ $rc -ne 0 ]; then
     echo ""
     echo "pre-commit: a deposit-native driver names something that should come from the config."
