@@ -73,19 +73,5 @@
       "affiliation": "Channing Division of Network Medicine, Mass General Brigham, Harvard Medical School, Boston, MA, USA"
     }
   ],
-  "description": "<p>Deep-learning model predicting nonsense-mediated decay (NMD) susceptibility from sequence around the start and stop codons together with per-ORF structural features, for Leshem et al., <em>Long Read RNA Sequencing in Primary Lung Cell Types Reveals Principles of Nonsense-Mediated Decay</em>. Covers training, evaluation, and attention- and SHAP-based interpretability.</p><p><strong>Code only.</strong> The trained checkpoint, its per-isoform predictions and the full interpretability export are in the Zenodo source-data record (DOI 10.5281/zenodo.21544336); the starting sequencing data are in NCBI GEO under GSE329233.</p><p>The analysis code for the rest of the paper is <a href=\"https://github.com/peter4244/nmd_lung_longread_reproduction\">nmd_lung_longread_reproduction</a>.</p>",
-  "related_identifiers": [
-    {
-      "identifier": "10.5281/zenodo.21544336",
-      "relation": "isSupplementedBy",
-      "scheme": "doi",
-      "resource_type": "dataset"
-    },
-    {
-      "identifier": "GSE329233",
-      "relation": "isSupplementTo",
-      "scheme": "other",
-      "resource_type": "dataset"
-    }
-  ]
+  "description": "<p>Deep-learning model predicting nonsense-mediated decay (NMD) susceptibility from sequence around the start and stop codons together with per-ORF structural features, for Leshem et al., <em>Long Read RNA Sequencing in Primary Lung Cell Types Reveals Principles of Nonsense-Mediated Decay</em>. Covers training, evaluation, and attention- and SHAP-based interpretability.</p><p><strong>Code only.</strong> The trained checkpoint, its per-isoform predictions and the full interpretability export are in the Zenodo source-data record (DOI 10.5281/zenodo.21544336); the starting sequencing data are in NCBI GEO under GSE329233.</p><p>The analysis code for the rest of the paper is <a href=\"https://github.com/peter4244/nmd_lung_longread_reproduction\">nmd_lung_longread_reproduction</a>.</p>"
 }
