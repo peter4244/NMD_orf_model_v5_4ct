@@ -35,8 +35,8 @@
 # warning, which is the disclosure wanted.
 export NMD_ALLOW_NONDETERMINISM=1
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 # Results tree and windows from the config, never literals: the selection moved to
 # atg1000_stop1000 on 2026-08-04 and results_4ct_dn is segregated under deprecated_.
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"

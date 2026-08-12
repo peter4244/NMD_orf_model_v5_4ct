@@ -12,7 +12,7 @@
 #
 # Prereq: deepshap_joint_atg500_stop500_run1.npz already exists.
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

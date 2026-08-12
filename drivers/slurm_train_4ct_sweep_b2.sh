@@ -16,7 +16,7 @@
 #SBATCH --array=1-4
 
 # 4ct window sweep batch 2: ATG=1000 × STOP ∈ {100, 500, 1000, 2000}
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

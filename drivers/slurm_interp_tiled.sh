@@ -23,7 +23,7 @@
 
 set -eo pipefail
 cd ~/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 
 echo "=== code provenance (the sha is what ran, not the branch) ==="
 sha256sum analysis_plans/interp_tiled_perturbation.py

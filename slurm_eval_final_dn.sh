@@ -22,7 +22,7 @@
 # paralog-straddling transcripts carried under their own test_paralog label rather than filtered
 # here. Naming the split by its meaning, not reconstructing it, is why this cannot drift.
 set -euo pipefail
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 # Windows and tag come from the config, never from literals here -- 39 such literals
 # across 26 drivers would otherwise keep reading 500/500 after a re-selection.

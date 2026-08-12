@@ -25,7 +25,7 @@
 # NO `set -e`, DELIBERATELY. Each step's exit code is captured and reported, and the job exits
 # non-zero if any failed. One broken step should not hide the status of the nine after it -- the
 # whole point of running these together is to learn which work in a single pass.
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 # Windows and tag come from the config, never from literals here -- 39 such literals
 # across 26 drivers would otherwise keep reading 500/500 after a re-selection.

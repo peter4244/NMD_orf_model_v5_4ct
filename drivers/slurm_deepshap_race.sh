@@ -28,8 +28,8 @@
 # Everything else is identical to slurm_deepshap_structural_dn.sh -- same seed rule
 # (task x 100), same --n-explain 0, --n-background 500, windows 500/500, branches structural.
 # A race copy that differs in any parameter is not a substitute for the run it replaces.
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 SEED=$((SLURM_ARRAY_TASK_ID * 100))
 echo "=== RACE node $(hostname) | run ${SLURM_ARRAY_TASK_ID}, seed=${SEED} ==="
 nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null

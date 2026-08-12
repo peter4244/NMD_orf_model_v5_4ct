@@ -64,13 +64,13 @@ MEMBER=${SEEDS[$(((i % 25) / 5))]}
 RUN=${DRAWS[$(((i % 25) % 5))]}
 CHUNK=${CHUNK:-2048}
 
-PROJECT=/home/p.castaldi/cc/nmd_orf_model_v5_4ct
+PROJECT="${PROJECT:-$(cd "$(dirname "$0")/.." && pwd)}"
 OUTDIR=${OUTDIR:-results_interp_all}
 
 cd "$PROJECT" || exit 1
 mkdir -p "$OUTDIR" slurm_logs
 
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 TIMER=""
 [ -x /usr/bin/time ] && TIMER="/usr/bin/time -v"
 

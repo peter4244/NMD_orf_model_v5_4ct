@@ -44,7 +44,7 @@ TAG=${TAG:-atg2000_stop2000}
 MEMBER=${MEMBER:-100}
 RUN=${RUN:-1}
 CHUNK=${CHUNK:-2048}
-PROJECT=/home/p.castaldi/cc/nmd_orf_model_v5_4ct
+PROJECT="${PROJECT:-$(cd "$(dirname "$0")/.." && pwd)}"
 # If OUTDIR is not given, the probes are separated BY PARTITION -- so an unset SLURM_JOB_PARTITION
 # would resolve both jobs to one directory and let one silently overwrite the other, which is the
 # collision this separation exists to prevent. Refuse rather than default to a shared name.
@@ -57,7 +57,7 @@ fi
 cd "$PROJECT" || exit 1
 mkdir -p "$OUTDIR" slurm_logs
 
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 TIMER=""
 [ -x /usr/bin/time ] && TIMER="/usr/bin/time -v"
 

@@ -55,8 +55,8 @@
 # leak from test to validation rather than remove it, so it is not offered here.
 
 set -euo pipefail
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 
 # UNBUFFERED, so a killed cell still leaves a diagnostic trail (2026-07-30).
 # Jobs 8828520/21/22 were SIGKILLed at 8:42 and their logs ended at the "=== TRAIN ===" banner

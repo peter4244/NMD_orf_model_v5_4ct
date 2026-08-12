@@ -15,7 +15,7 @@
 # gives us everything needed to rebuild SF40 with both metrics (SHAP fraction
 # and raw GC content) at both windows.
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

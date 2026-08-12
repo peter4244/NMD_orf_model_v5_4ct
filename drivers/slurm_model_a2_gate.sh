@@ -19,8 +19,8 @@
 # run after and are separate invocations so a failure in one does not lose the
 # other.
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 
 echo "=== code (sha256) ==="
 sha256sum analysis_plans/model_a2_gate.py

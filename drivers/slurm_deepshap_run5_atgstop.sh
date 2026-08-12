@@ -25,8 +25,8 @@
 # from a distribution and this is another.
 export NMD_ALLOW_NONDETERMINISM=1
 set -uo pipefail
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 RESULTS_DIR=results_deposit_h5_2026-08-04
 
 # Windows from the config, never literals -- the selection moved to atg1000_stop1000.

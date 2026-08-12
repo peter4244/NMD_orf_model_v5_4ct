@@ -14,7 +14,7 @@
 #   motif_logo_{atg,stop}_subgroup_joint_{tag}.tsv (feeds §9.7, §9.8)
 # Prereq: 5x deepshap_joint_{tag}_run{1..5}.npz produced by slurm_deepshap_joint.sh
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

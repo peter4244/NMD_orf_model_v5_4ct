@@ -7,6 +7,6 @@
 #SBATCH --output=results_4ct/export_subgroup_%j.log
 
 source activate nmd_model
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 
 python 08_export_subgroup_deepshap_tsv.py --atg 500 --stop 500 --n-runs 5

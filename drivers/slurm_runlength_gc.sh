@@ -15,8 +15,8 @@
 # C<->G) -- verified in the bank, 3 finite entries per position of which 1 is
 # GC-neutral. If clustering survives on that one, GC smoothing is not the driver.
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 echo "=== code actually running (sha256, first 16) ==="
 sha256sum analysis_runlength_replicate.py | awk '{print "  " substr($1,1,16), $2}'
 echo ""

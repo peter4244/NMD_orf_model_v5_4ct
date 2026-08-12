@@ -12,7 +12,7 @@
 # All test samples, 500 background, 5 replicates
 # Gives additive SHAP decomposition across ATG + stop + structural
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

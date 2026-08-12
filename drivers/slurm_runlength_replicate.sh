@@ -15,8 +15,8 @@
 #      than accept it. A retraction taken on trust is not verified.
 #   2. the fixed-fraction rule, swept, which is the corrected statistic.
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 echo "=== code actually running (sha256, first 16) ==="
 sha256sum analysis_runlength_replicate.py | awk '{print "  " substr($1,1,16), $2}'
 echo "=== git HEAD on this clone is NOT the provenance: $(git rev-parse --short HEAD) ==="

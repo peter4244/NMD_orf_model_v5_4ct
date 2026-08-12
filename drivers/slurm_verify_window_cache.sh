@@ -21,8 +21,8 @@
 # No `set -e` around the checks themselves: a failure is a result to read. But a
 # later step must not run on an earlier step's failure, so each gates the next.
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 SC=results_ism_v6/cache_check
 mkdir -p $SC
 

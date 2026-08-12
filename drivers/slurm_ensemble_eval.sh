@@ -22,8 +22,8 @@
 #   ENS_ATG=2000 ENS_STOP=2000 sbatch slurm_ensemble_eval.sh
 #   ENS_SPLIT=val_clean ENS_RESULTS=results_4ct_sweep sbatch slurm_ensemble_eval.sh
 set -euo pipefail
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 export PYTHONUNBUFFERED=1
 
 # Defaults are the PRIMARY model selected 2026-07-30 (atg2000_stop100), overridable per invocation

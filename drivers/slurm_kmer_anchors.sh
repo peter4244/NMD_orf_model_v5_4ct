@@ -18,8 +18,8 @@
 # control. The elevated set is not GC-biased under normal scoring (0.503 vs 0.501),
 # so the confound it was built for does not apply.
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 echo "=== code actually running (sha256, first 16) ==="
 sha256sum analysis_kmer_controlled.py | awk '{print "  " substr($1,1,16), $2}'
 echo ""

@@ -35,8 +35,8 @@
 # cpu` (:117) and AMP is gated on device.type == "cuda" (:147), so both fall back correctly.
 
 set -euo pipefail
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 
 OUT=results_4ct_dn_cpu
 mkdir -p "$OUT"

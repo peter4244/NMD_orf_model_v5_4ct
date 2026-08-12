@@ -47,8 +47,8 @@
 # overwrite the existing single-model best_model_atg500_stop500.pt (utils.member_tag).
 
 set -euo pipefail
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 
 SEED=$((SLURM_ARRAY_TASK_ID * 100))
 

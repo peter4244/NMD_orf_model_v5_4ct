@@ -17,7 +17,7 @@
 # its AUC auc_mixed_in_sample, so a consumer cannot read this as generalization. The TEST split is
 # untouched here and is scored ONCE, at the end, with --final.
 set -euo pipefail
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 # Windows and tag come from the config, never from literals here -- 39 such literals
 # across 26 drivers would otherwise keep reading 500/500 after a re-selection.

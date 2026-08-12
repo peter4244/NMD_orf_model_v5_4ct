@@ -10,7 +10,7 @@
 # DeepSHAP NPZs. Feeds SF40 in the manuscript supplement. Prereq: same
 # NPZs already required by 09b (which you've already run today).
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 eval "$(conda shell.bash hook)"
 conda activate nmd_model
 

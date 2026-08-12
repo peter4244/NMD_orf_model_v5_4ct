@@ -17,8 +17,8 @@
 #      Conda init is being OOM-killed on the login node (.bashrc:33); an absolute path
 #      cannot be killed by a shell-init that never runs.
 set -euo pipefail
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 
 echo "=== Building DEPOSIT-NATIVE HDF5 ==="
 $PY -V

@@ -29,8 +29,8 @@
 # Determinism was verified on a V100 at THIS window config before this job existed
 # (verify_determinism.py --atg 500 --stop 500: two seeded runs bit-identical).
 # No `set -e`: a non-zero exit is a RESULT to read in the log, not something to hide.
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 # ONE VARIABLE for the results tree, for the reason the build script needed it: the train
 # and the evaluate below must not be able to name different directories.
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"

@@ -13,8 +13,8 @@
 # One pass builds the per-transcript live log-mass; the 9 (band, floor)
 # combinations are then computed in memory, so the bank is read once.
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 
 echo "=== code (sha256) ==="
 sha256sum analysis_plans/model_a2_exclusion_check.py

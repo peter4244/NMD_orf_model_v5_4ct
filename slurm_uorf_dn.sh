@@ -23,7 +23,7 @@
 #     --split all --full-cohort already produced predictions_{tag}_seed42_all.tsv, and two files
 #     holding one quantity under different names is the defect this project keeps paying for.
 set -euo pipefail
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 # Windows and tag come from the config, never from literals here -- 39 such literals
 # across 26 drivers would otherwise keep reading 500/500 after a re-selection.

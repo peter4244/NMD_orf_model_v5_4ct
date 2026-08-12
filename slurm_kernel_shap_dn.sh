@@ -29,8 +29,8 @@
 # this script hardcodes results_4ct and would overwrite exactly that file.
 #
 # No `set -e`: a non-zero exit is a RESULT to read in the log, not something to hide.
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 # Results tree and tag from the config, never literals. This driver named results_4ct_dn --
 # now segregated because its HDF5 was Channing-built -- and the tag atg500_stop500, which
 # stopped being the selection when the deposit-native sweep chose atg1000_stop1000.

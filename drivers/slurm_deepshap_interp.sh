@@ -23,8 +23,8 @@
 # also meant no diagnostic for why. slurm_logs/ is created once and committed with a .gitkeep, so
 # it is never the reason a job fails.
 set -euo pipefail
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 export PYTHONUNBUFFERED=1
 
 # DETERMINISM OFF, AND THIS IS CORRECT RATHER THAN A WORKAROUND.

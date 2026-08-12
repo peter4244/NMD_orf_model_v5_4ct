@@ -9,8 +9,8 @@
 # Does the 5' scanner beat position alone? Metadata read only -- p_capture,
 # p_select and the candidate features. Does not touch vals_decay.
 
-cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
-PY=/home/p.castaldi/.conda/envs/nmd_model/bin/python
+cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 echo "=== code (sha256) ==="
 sha256sum analysis_plans/model_cancellation_channel.py
 echo ""
