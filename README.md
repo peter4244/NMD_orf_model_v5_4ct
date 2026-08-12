@@ -121,6 +121,25 @@ deepshap.py                 # DeepSHAP (5 independent runs)
 11_kernel_shap_branches.py  # Branch-level Shapley values
 ```
 
+## Repository layout
+
+The build is fifteen steps. Everything needed to run them is at the top level; work that is not
+part of that build sits in a folder, so the pipeline is what a reader sees first.
+
+| where | what |
+|---|---|
+| top level | the pipeline — the numbered scripts, `model.py`/`utils.py`, both configs, `export_rds.R`, the report, the verification harnesses, and the fourteen `slurm_*_dn.sh` deposit-native drivers |
+| `drivers/` | the other SLURM drivers, including the ones that reproduce the **published** run. Kept because the deposit-native rebuild exists to be compared against it |
+| `ism/` | in-silico mutagenesis bank machinery. Not used by any result in the paper |
+| `v6/` | a separate architecture explored after v5. Not the published model |
+| `exploration/` | one-off analyses — cross-seed floor, k-mer controlled, run-length replicate |
+| `analysis_plans/` | the plans those analyses were written from, with their run logs |
+| `superseded/` | replaced code, kept rather than deleted |
+
+Nothing was deleted in this reorganization. The tree archived at
+[10.5281/zenodo.21536501](https://doi.org/10.5281/zenodo.21536501) v2.0.0 is unaffected, and git
+history carries every path as it was.
+
 ## Build order (intermediate TSVs feeding the report)
 
 The report `orf_model_report_v5.Rmd` consumes intermediate TSVs that are not produced directly by
@@ -133,23 +152,23 @@ the numbered pipeline scripts. Build order:
                                                      ref_cds_features.tsv, td2_features.tsv,
                                                      junctions.tsv, paralog_genes.tsv,
                                                      val_paralog_genes.tsv, synthetic_cds.tsv)
-2. slurm_build_h5.sh                                (data_prep.py → nmd_orf_data.h5, selected_orfs.tsv)
+2. drivers/slurm_build_h5.sh                                (data_prep.py → nmd_orf_data.h5, selected_orfs.tsv)
 3. slurm_patch_selected_orfs.sh                     (scripts/patch_stop_codon.py — fixes stop codon
                                                      column off-by-one; required for §4.1 χ² test)
-4. slurm_train_4ct.sh / slurm_train_4ct_sweep*.sh   (03_train.py)
-5. slurm_interpret_v5.sh                            (evaluate.py, 04_, 05_)
-6. slurm_deepshap_joint.sh                          (deepshap.py × 5 runs → deepshap_joint_*_run{1..5}.npz)
-7. slurm_deepshap_structural.sh                     (deepshap.py --branches structural × 5 runs)
-8. slurm_export_motif_v5.sh                         (06_, 07_ — marginal motif logos, fallback path)
-9. slurm_export_joint_motif_logos.sh                (scripts/export_joint_motif_logos.py — preferred
+4. drivers/slurm_train_4ct.sh / drivers/slurm_train_4ct_sweep*.sh   (03_train.py)
+5. drivers/slurm_interpret_v5.sh                            (evaluate.py, 04_, 05_)
+6. drivers/slurm_deepshap_joint.sh                          (deepshap.py × 5 runs → deepshap_joint_*_run{1..5}.npz)
+7. drivers/slurm_deepshap_structural.sh                     (deepshap.py --branches structural × 5 runs)
+8. drivers/slurm_export_motif_v5.sh                         (06_, 07_ — marginal motif logos, fallback path)
+9. drivers/slurm_export_joint_motif_logos.sh                (scripts/export_joint_motif_logos.py — preferred
                                                      5-run pooled motif logos for §3.1, §4.1)
-10. slurm_export_subgroup_profiles_09b.sh           (09b_export_subgroup_profiles.py — feeds §3.1, §4.1,
+10. drivers/slurm_export_subgroup_profiles_09b.sh           (09b_export_subgroup_profiles.py — feeds §3.1, §4.1,
                                                      §7.2, §9.4, §9.6, §9.7, §9.8)
-11. slurm_export_features_09.sh                     (09_ GC, polya, junction-ordinal)
-12. slurm_export_subgroup_v5.sh                     (08_ subgroup-specific marginal SHAP)
-13. slurm_export_importance_v5.sh                   (05b_, 05c_ structural rollups)
-14. slurm_kernel_shap.sh                            (11_ KernelSHAP branch decomposition)
-15. slurm_render_v5.sh                              (renders orf_model_report_v5.Rmd)
+11. drivers/slurm_export_features_09.sh                     (09_ GC, polya, junction-ordinal)
+12. drivers/slurm_export_subgroup_v5.sh                     (08_ subgroup-specific marginal SHAP)
+13. drivers/slurm_export_importance_v5.sh                   (05b_, 05c_ structural rollups)
+14. drivers/slurm_kernel_shap.sh                            (11_ KernelSHAP branch decomposition)
+15. drivers/slurm_render_v5.sh                              (renders orf_model_report_v5.Rmd)
 ```
 
 The `slurm_*_dn.sh` wrappers are the corresponding chain for a rebuild against the deposited
@@ -164,8 +183,8 @@ been broken twice — nine drivers after the 2026-08-04 re-selection, and two mo
 2026-08-11, one exporting subgroup DeepSHAP at 500/500 for a 1000/1000 checkpoint and one
 writing into the deprecated `results_4ct_dn`. Every instance exited 0 and produced numbers.
 
-The published-chain drivers are deliberately **not** checked: `slurm_train_4ct.sh`,
-`slurm_interpret_v5.sh`, `slurm_kernel_shap.sh` and the rest pin 500/500 correctly, because they
+The published-chain drivers are deliberately **not** checked: `drivers/slurm_train_4ct.sh`,
+`drivers/slurm_interpret_v5.sh`, `drivers/slurm_kernel_shap.sh` and the rest pin 500/500 correctly, because they
 reproduce a fixed historical run whose selection was 500/500.
 
 It runs as a pre-commit hook. Git does not version `.git/hooks`, so enable it once per clone:
@@ -198,7 +217,7 @@ ORFik scan). It also writes `tx_summary_provenance.json` beside `tx_summary.tsv`
 > isoforms added by a rebuilt `structures.rds` reached `tx_summary.tsv` and nothing said so.
 
 The HDF5 dataset (`nmd_orf_data.h5`) and `selected_orfs.tsv` are built by **`data_prep.py`** (see
-`slurm_build_h5.sh`) and patched by **`scripts/patch_stop_codon.py`**.
+`drivers/slurm_build_h5.sh`) and patched by **`scripts/patch_stop_codon.py`**.
 
 To render `orf_model_report_v5.Rmd` you must run the full build order first — the report reads
 regenerated `results_4ct/` exports that are not shipped.
