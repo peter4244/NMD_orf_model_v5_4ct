@@ -9,12 +9,22 @@ The model architecture is identical to the original v5: multi-branch transformer
 `best_model_atg1000_stop1000_seed42.pt`, and every section 5 figure and number is now built from
 it. Corrected 2026-08-06.
 
-**500/500 IS WHAT THE MANUSCRIPT SAYS AND IT IS NOT WHAT WE SHIP.** The published text reads "500nt
-windows around both the start and stop sites"; the deposit-native sweep RE-SELECTED 1000/1000, and
-D67 in the paper repo governs how the Methods will say so. `config.yaml` still defaults to 500, so
-a run that does not pass `--atg-window 1000 --stop-window 1000` silently builds tensors of the
-wrong shape for the deposited checkpoint. Anyone serving or re-scoring this model — a website, a
-re-evaluation, a reader — hits this first and the manuscript points them the wrong way.
+**THE MANUSCRIPT AND THE DEPOSIT AGREE: BOTH ARE 1000/1000.** Checked against the submission text
+2026-08-11 — "1000nt sequence windows around the translational start and stop sites", with "AUC of
+0.93 and AUPRC of 0.82 on the held-out test set (n = 10,522 isoforms, 2,405 NMD susceptible)". The
+deposited checkpoint scores AUC 0.9257 / AUPRC 0.8175 on n=10,522 with 2,405 NMD, which is that
+sentence to the stated precision.
+
+*This paragraph previously asserted, in bold, that the manuscript said 500/500 and contradicted the
+deposit. It was wrong, and it was believed and repeated by a later window before anyone read the
+manuscript. It is corrected rather than deleted because a confident false claim about another
+document is the failure mode worth keeping visible: the fix is `grep` the manuscript, not trust a
+summary of it.*
+
+**What IS still a trap: `config.yaml` does not state the model's windows.** Its
+`data.window_size_*` are the sweep's starting grid point (100/1000), so a run that does not pass
+`--atg-window 1000 --stop-window 1000` silently builds tensors of the wrong shape for the deposited
+checkpoint. The authoritative copy is inside the checkpoint itself, under `config.selected`.
 
 ## Key Differences from Original v5 (nmd_orf_model_v5)
 - **Cell types:** AT, DD, FB, MV only (was AT, DD, DO, FB, MV)

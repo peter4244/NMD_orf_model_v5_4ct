@@ -1,82 +1,129 @@
-# NMD ORF Model v5 — 4 Cell Type Retrain
+# NMD ORF Model — Four Primary Lung Cell Types
 
-Deep learning model predicting nonsense-mediated mRNA decay (NMD) from ORF sequence context, retrained using only 4 primary lung cell types (AT, DD, FB, MV).
+A deep learning model that predicts nonsense-mediated decay (NMD) from transcript sequence around
+the start codon and the stop codon, together with per-ORF structural features. It is trained on NMD
+classifications derived from four primary lung cell types: alveolar type 2 (AT2), large airway
+epithelial (LAE), fibroblast (FB) and microvascular endothelial (MV).
 
-## Motivation
+The architecture is built for interpretability as well as accuracy: each candidate ORF is scored
+through separate start-window, stop-window and structural branches, and a learned attention layer
+exposes which ORF the model used for each isoform.
 
-The original v5 model ([NMD_orf_model_v5](https://github.com/peter4244/NMD_orf_model_v5)) used NMD classifications derived from 6 cell types via multivariate adaptive shrinkage (mashr). Two cell types were subsequently excluded:
+**This repository ships code only.** The trained checkpoint, its predictions and every
+interpretation export live in the Zenodo record (concept DOI
+[10.5281/zenodo.21544336](https://doi.org/10.5281/zenodo.21544336)); the starting sequencing data
+are in GEO (**GSE329233**). Nothing under `results_4ct/` is version-controlled — see
+**Inputs and regeneration**.
 
-- **DD_ALI** — near-zero logFC correlation between short-read and long-read DGE (r = 0.002)
-- **DO** — insufficient statistical power (n=2 donors after outlier removal)
+## The model
 
-Because mashr jointly estimates effect sizes across conditions, removing these cell types changes the shrinkage for all remaining cell types. This required re-running mashr with only the 4 retained cell types and retraining the model from scratch.
+| | |
+|---|---|
+| Checkpoint | `best_model_atg1000_stop1000_seed42.pt` |
+| Start window | 1000 nt |
+| Stop window | 1000 nt |
+| Member seed | 42 |
+| Epoch selected | 5 (early stopping on validation AUC) |
+| Validation AUC | 0.932 |
+| Trainable parameters | 34,310 (12,866 in each of the two sequence CNNs) |
 
-## Model Performance
+Held-out test set (chr1, chr3, chr5, chr7 — never seen in training or validation):
 
-Window size sweep (3 x 4 grid), sorted by AUPRC:
+| | |
+|---|---|
+| AUC | 0.926 |
+| AUPRC | 0.818 |
+| Isoforms scored | 10,522 |
+| NMD susceptible | 2,405 |
 
-| ATG | STOP | AUC | AUPRC |
-|-----|------|-----|-------|
-| 500 | 1000 | 0.928 | 0.839 |
-| **500** | **500** | **0.931** | **0.833** |
-| 100 | 500 | 0.921 | 0.829 |
-| 1000 | 1000 | 0.928 | 0.828 |
-| 1000 | 500 | 0.929 | 0.824 |
-| 100 | 1000 | 0.924 | 0.823 |
-| 1000 | 100 | 0.925 | 0.817 |
-| 500 | 2000 | 0.928 | 0.810 |
-| 500 | 100 | 0.922 | 0.810 |
-| 100 | 100 | 0.923 | 0.809 |
-| 1000 | 2000 | 0.924 | 0.803 |
-| 100 | 2000 | 0.919 | 0.797 |
-
-**Selected configuration: ATG=500, STOP=500** (best AUC, consistent with original v5).
-
-Compared to original v5 (AUC=0.93, AUPRC=0.78), AUPRC improved substantially (0.83), likely due to less imbalanced class ratio.
+> **`config.yaml` does not state the model's window sizes, and running without the flags builds
+> the wrong tensors.** `data.window_size_atg` / `data.window_size_stop` in that file are the
+> *sweep's starting grid point*, not the selected configuration. Any run that reproduces or serves
+> this checkpoint must pass `--atg-window 1000 --stop-window 1000` explicitly; otherwise the
+> tensors are built at a shape the checkpoint cannot consume. The selected values are recorded
+> inside the checkpoint itself under `config.selected`, which is the authoritative copy.
 
 ## Dataset
 
-| | 4ct Model | Original v5 |
-|---|---|---|
-| Cell types | AT, DD, FB, MV | AT, DD, DO, FB, MV |
-| NMD isoforms | 8,840 | 9,274 |
-| Non-NMD isoforms | 31,098 | 52,395 |
-| Total | 39,938 | 61,669 |
-| NMD:non-NMD ratio | 1:3.5 | 1:5.6 |
-| Non-NMD threshold | adj.P > 0.30 | adj.P > 0.50 |
-| Test set (chr 1,3,5,7) | 10,131 | 15,584 |
+Isoforms are split by chromosome, so no gene appears in more than one split.
 
-The non-NMD threshold was lowered from 0.50 to 0.30 to account for changed p-value distributions under 4-cell-type mashr shrinkage.
+| Split | Chromosomes | Isoforms | NMD | Non-NMD |
+|---|---|---:|---:|---:|
+| Train | all others (19) | 26,720 | 5,959 | 20,761 |
+| Validation | chr2, chr4 | 4,356 | 927 | 3,429 |
+| Test | chr1, chr3, chr5, chr7 | 10,522 | 2,405 | 8,117 |
+| **Total** | | **41,776** | **9,321** | **32,455** |
+
+Class ratio 1:3.5 (NMD : non-NMD). Counts are those of the deposited model's own prediction table,
+`predictions_atg1000_stop1000_seed42_all.tsv`.
+
+**Labels.** Isoform-level NMD calls come from multivariate adaptive shrinkage (mashr) across the
+four cell types:
+
+- **NMD susceptible** — the union across cell types of isoforms with `nmd_responsive == TRUE`
+  (lfsr < 0.05 and posterior mean logFC > 0).
+- **Non-NMD** — the intersection across all four cell types of isoforms with `adj.P.Val > 0.30`.
+- Isoforms in neither set are excluded from training. None fell into both.
+
+Read-through loci are excluded: their `gene_id` values are composites of two adjacent genes
+transcribed as one unit, which makes every gene-level operation on them — split assignment, the
+paralog leakage screen — ill-defined.
 
 ## Architecture
 
-Multi-branch transformer identical to original v5:
-- Up to K=5 candidate ORFs per transcript
-- Shared-weight CNN encoders (ATG window + stop window)
-- Per-ORF structural features (5 features)
-- Learned attention aggregation across ORFs
-- BCEWithLogitsLoss with dynamic pos_weight
+Up to K=5 candidate ORFs per transcript pass through an `ORFEncoder` whose weights are shared
+across the K ORFs, and are aggregated by learned attention.
 
-See `METHODS.md` for full details.
+Within each `ORFEncoder` three sub-encoders run in parallel and do **not** share weights with one
+another: a CNN over the 9-channel start window, a CNN over the 9-channel stop window, and a
+structural branch (`Linear(5, 32) → ReLU`) over the 5 per-ORF features. The three 32-dim
+sub-embeddings are concatenated and fused (`Linear(96, 64) → ReLU → Dropout(0.2)`). The K ORF
+embeddings are pooled by a learned attention layer (softmax over valid ORFs) and passed to a
+classification head (`Linear(64,32) → ReLU → Dropout(0.3) → Linear(32,1)`). Training uses
+`BCEWithLogitsLoss` with dynamic `pos_weight`.
+
+Each sequence CNN is `Conv1d(9, 32, k1) → BatchNorm → ReLU → MaxPool(4) → Conv1d(32, 32, k2) →
+BatchNorm → ReLU → max over the length axis → Linear(32, 32)`, with `k1, k2 = 15, 7` at this
+window size.
+
+**One consequence matters for reading the interpretation outputs.** The first convolution spans all
+nine input channels at once, so no channel has an independent pathway through a branch. The branch
+decomposition therefore attributes importance to **regions** — start window, stop window,
+structural — and not to modalities; each region's share already includes its own GC and junction
+content.
+
+See `METHODS.md` for full detail, and `RETRAIN_ARCHITECTURE_CHANGES.md` before changing anything
+about the architecture or retraining.
+
+### A note on names
+
+Prose here calls the two sequence windows the **start window** and the **stop window**, after the
+codon each is anchored on. Code identifiers retain `atg` — the HDF5 key `atg_windows`, the
+`--atg-window` flag, `window_size_atg` in config, and the `atg` element of file names. Renaming
+them would change the HDF5 schema and break already-deposited artifacts, so the prose terminology
+does not extend to the code.
+
+Cell types are likewise `AT` and `DD` in code and in the feature tables, for AT2 and LAE
+respectively.
 
 ## Pipeline
 
 ```
-export_rds.R               # Isopair RDS -> the eight feature tables
-data_prep.py               # Build HDF5 dataset
-03_train.py                # Train model
-evaluate.py                # Evaluate on test set
+export_rds.R                # Isopair RDS -> the eight feature tables
+data_prep.py                # Build HDF5 dataset
+03_train.py                 # Train
+evaluate.py                 # Evaluate on the test set
 04_interpret_attention.py   # Attention analysis
 05_interpret_structural.py  # Structural feature importance
-deepshap.py                # DeepSHAP (5 independent runs)
+deepshap.py                 # DeepSHAP (5 independent runs)
 06-09_export_*.py           # Export interpretation TSVs
 11_kernel_shap_branches.py  # Branch-level Shapley values
 ```
 
 ## Build order (intermediate TSVs feeding the report)
 
-The report `orf_model_report_v5.Rmd` consumes a number of intermediate TSVs that
-are not produced directly by the numbered pipeline scripts. Build order:
+The report `orf_model_report_v5.Rmd` consumes intermediate TSVs that are not produced directly by
+the numbered pipeline scripts. Build order:
 
 ```
 1. export_rds.R                                     (Isopair RDS → the eight feature tables:
@@ -85,12 +132,8 @@ are not produced directly by the numbered pipeline scripts. Build order:
                                                      ref_cds_features.tsv, td2_features.tsv,
                                                      junctions.tsv, paralog_genes.tsv,
                                                      val_paralog_genes.tsv, synthetic_cds.tsv)
-                                                     NOTE relabel_tx_summary_4ct.R is RETIRED
-                                                     (D18) and is deliberately NOT a build step:
-                                                     export_rds.R is the sole writer of
-                                                     tx_summary.tsv.
 2. slurm_build_h5.sh                                (data_prep.py → nmd_orf_data.h5, selected_orfs.tsv)
-3. slurm_patch_selected_orfs.sh                     (scripts/patch_stop_codon.py — fixes stop_codon
+3. slurm_patch_selected_orfs.sh                     (scripts/patch_stop_codon.py — fixes stop codon
                                                      column off-by-one; required for §4.1 χ² test)
 4. slurm_train_4ct.sh / slurm_train_4ct_sweep*.sh   (03_train.py)
 5. slurm_interpret_v5.sh                            (evaluate.py, 04_, 05_)
@@ -108,14 +151,16 @@ are not produced directly by the numbered pipeline scripts. Build order:
 15. slurm_render_v5.sh                              (renders orf_model_report_v5.Rmd)
 ```
 
+The `slurm_*_dn.sh` wrappers are the corresponding chain for a rebuild against the deposited
+starting data rather than the working tree.
+
 ## Inputs and regeneration (code-only deposit)
 
-This repository ships **code only**. Nothing under `results_4ct/` is version-controlled
-(see `.gitignore`); the HDF5 feature file, all input TSVs, and every interpretation export
-are regenerated by running the pipeline in the **Build order** above. Starting data lives in
-GEO (**GSE329233**).
+Nothing under `results_4ct/` is version-controlled (see `.gitignore`); the HDF5 feature file, all
+input TSVs, and every interpretation export are regenerated by running the pipeline in the
+**Build order** above.
 
-The per-ORF/structural input TSVs (`orf_features.tsv`, `tx_summary.tsv`,
+The per-ORF and structural input TSVs (`orf_features.tsv`, `tx_summary.tsv`,
 `ref_cds_features.tsv`, `td2_features.tsv`, `synthetic_cds.tsv`, `junctions.tsv`,
 `paralog_genes.tsv`, `orf_scan_metadata.json`) are produced in-repo by **`export_rds.R`**, which
 reads the Isopair `Version_6.0/isopair_wrapper/data_mashr/analysis_cache` objects
@@ -123,37 +168,24 @@ reads the Isopair `Version_6.0/isopair_wrapper/data_mashr/analysis_cache` object
 ORFik scan). It also writes `tx_summary_provenance.json` beside `tx_summary.tsv`, which
 `data_prep.py` requires before it will build an HDF5.
 
-> **`relabel_tx_summary_4ct.R` is RETIRED (D18) and must not be reinstated as a build step.**
-> `export_rds.R` is the sole writer of `tx_summary.tsv`, so there is one writer per artifact and
-> the labels are unambiguously the scan's. What was NOT recorded is *which* scan — the hazard this
-> file's own header documents, where 0 of 24 isoforms added by a rebuilt `structures.rds` reached
-> `tx_summary.tsv` and nothing said so. The provenance sidecar records the scan's identity and
-> class counts so a stale universe is detectable rather than assumed. It asserts nothing about
-> mashr: `export_rds.R` never reads those CSVs.
+> **`export_rds.R` is the sole writer of `tx_summary.tsv`**, so there is one writer per artifact and
+> the labels are unambiguously the scan's. What is *not* implied by that is **which** scan — the
+> hazard `tx_summary_provenance.json` exists to close. It records the scan's identity and class
+> counts, so a stale isoform universe is detectable rather than assumed. Without it, 0 of 24
+> isoforms added by a rebuilt `structures.rds` reached `tx_summary.tsv` and nothing said so.
 
-The HDF5 dataset
-(`nmd_orf_data.h5`) and `selected_orfs.tsv` are built by **`data_prep.py`** (see
+The HDF5 dataset (`nmd_orf_data.h5`) and `selected_orfs.tsv` are built by **`data_prep.py`** (see
 `slurm_build_h5.sh`) and patched by **`scripts/patch_stop_codon.py`**.
 
-> Earlier revisions symlinked `ref_cds_features.tsv`/`td2_features.tsv` from a sibling
-> `nmd_orf_model` tree; those symlinks were dangling and have been removed. `export_rds.R`
-> is the single in-repo producer.
+To render `orf_model_report_v5.Rmd` you must run the full build order first — the report reads
+regenerated `results_4ct/` exports that are not shipped.
 
-To render `orf_model_report_v5.Rmd` you must run the full Build order first — the report
-reads regenerated `results_4ct/` exports that are not shipped.
+## Data provenance
 
-## Data Provenance
-
-- **Sequences:** SQANTI-corrected FASTA from Isopair pipeline v6.0
-- **ORF/structural features:** `export_rds.R` from the Isopair `Version_6.0` analysis cache (ORFik scan shared with original v5)
-- **NMD labels:** carried by the ORFik scan and written by `export_rds.R`; vintage recorded in
-  `tx_summary_provenance.json`. The *published* labels came from 4-cell-type mashr DE results at
-  `/projects/talisman/shared-data/nmd/mashr/` via `relabel_tx_summary_4ct.R`, which is now
-  retired (D18) and is not a build step.
+- **Sequences:** SQANTI-corrected FASTA from the Isopair pipeline v6.0
+- **ORF and structural features:** `export_rds.R`, from the Isopair `Version_6.0` analysis cache
+- **NMD labels:** carried by the ORFik scan and written by `export_rds.R`; the scan's vintage is
+  recorded in `tx_summary_provenance.json`
 - **Starting data:** GEO **GSE329233**
-- **Original v5:** [peter4244/NMD_orf_model_v5](https://github.com/peter4244/NMD_orf_model_v5) — deprecated (6-CT scope; do not cite)
-
-## superseded/
-
-Non-canonical files kept for provenance (QC session logs, redundant slurm wrappers) live in
-`superseded/`; nothing there is needed to run the pipeline. See `superseded/README.md`.
+- **Trained model and interpretation exports:** Zenodo, concept DOI
+  [10.5281/zenodo.21544336](https://doi.org/10.5281/zenodo.21544336)
