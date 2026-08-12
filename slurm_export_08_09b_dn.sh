@@ -4,7 +4,7 @@
 #SBATCH --time=02:00:00
 #SBATCH --mem=96G
 #SBATCH --cpus-per-task=4
-#SBATCH --output=results_4ct_dn/export_08_09b_dn_%j.log
+#SBATCH --output=results_deposit_h5_2026-08-04/export_08_09b_dn_%j.log
 
 # The two deposit-native exports that will not run on a login node.
 #
@@ -30,13 +30,18 @@ conda activate nmd_model
 # the old artifacts still exist. Torch-free, so it costs milliseconds.
 TAG="$(python3 paths_config.py --selected-tag --config config_dn.yaml)"
 if [ -z "$TAG" ]; then echo "FATAL: could not resolve selected tag" >&2; exit 1; fi
-RES="results_4ct_dn"
-echo "=== node $(hostname) | tag=${TAG} | results=${RES} ==="
+# The windows come from the tag for the same reason the tag does: 08_ defaults --atg/--stop to
+# 500, which is the SUPERSEDED selection, and it exits 0 while exporting the wrong window.
+ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
+# results_4ct_dn is the DEPRECATED tree -- its HDF5 was built from Channing inputs
+# (config_dn.yaml, "REPOINTED 2026-08-04") and it now sits under deprecated_2026-08-04/.
+RES="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+echo "=== node $(hostname) | tag=${TAG} | atg=${ATG} stop=${STOP} | results=${RES} ==="
 
 overall=0
 
 echo "--- 08_export_subgroup_deepshap_tsv ---"
-python3 08_export_subgroup_deepshap_tsv.py --atg 500 --stop 500 --results-dir "${RES}"
+python3 08_export_subgroup_deepshap_tsv.py --atg "${ATG}" --stop "${STOP}" --results-dir "${RES}"
 rc=$?; echo "--- 08 exit: $rc ---"; [ $rc -ne 0 ] && overall=$rc
 
 echo "--- 09b_export_subgroup_profiles ---"

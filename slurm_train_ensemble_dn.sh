@@ -12,7 +12,7 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=dn_ens
-#SBATCH --output=results_4ct_dn/train_ens_dn_%A_%a.log
+#SBATCH --output=results_deposit_h5_2026-08-04/train_ens_dn_%A_%a.log
 #SBATCH --array=1-5
 #
 # Train the 5-member deposit-native ensemble at the SELECTED window configuration.
@@ -62,13 +62,16 @@ echo "=== node $(hostname) | member ${SLURM_ARRAY_TASK_ID}, seed=${SEED}, ${TAG}
 nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null
 
 echo "=== TRAIN member ${SLURM_ARRAY_TASK_ID} ==="
-$PY 03_train.py --config config_dn.yaml --results-dir results_4ct_dn \
+# results_4ct_dn is the DEPRECATED tree -- its HDF5 was built from Channing inputs
+# (config_dn.yaml, "REPOINTED 2026-08-04"), and it now sits under deprecated_2026-08-04/.
+RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+$PY 03_train.py --config config_dn.yaml --results-dir "$RESULTS_DIR" \
     --atg-window "${ATG}" --stop-window "${STOP}" --seed "${SEED}"
 echo "=== train exit: $? ==="
 
 # Scored on VAL. Not test: the ensemble's test performance is a single final number and
 # belongs in one deliberate --final run after the members exist, not five times here.
 echo "=== EVALUATE member ${SLURM_ARRAY_TASK_ID} on val ==="
-$PY evaluate.py --config config_dn.yaml --results-dir results_4ct_dn \
-    --atg-window "${ATG}" --stop-window "${STOP}" --member-seed "${SEED}" --split val
+$PY evaluate.py --config config_dn.yaml --results-dir "$RESULTS_DIR" \
+    --atg-window "${ATG}" --stop-window "${STOP}" --member-seed "${SEED}" --split val_clean
 echo "=== evaluate exit: $? ==="
