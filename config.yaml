@@ -28,8 +28,9 @@ paths:
 # audit_report.R -- and NOWHERE authoritative. `data.window_size_*` below does NOT say it:
 # those are the sweep's starting grid point (atg=100, stop=1000), so `python 03_train.py`
 # with no flags trains a configuration that matches no artifact anyone uses. Every real
-# invocation passes --atg-window 500 --stop-window 500 explicitly
-# (slurm_train_4ct.sh:17, slurm_train_dn.sh:30, and the sweep driver).
+# invocation passed the window explicitly. THIS FILE IS THE SUPERSEDED CONFIGURATION: the
+# published model is 1000/1000 and lives in config_dn.yaml. config.yaml is retained because the
+# sweep-era artifacts were produced under it, not because anything current reads it.
 #
 # Re-selecting the window configuration therefore meant editing every one of those strings
 # and hoping none was missed -- 217 occurrences across 69 files, of which the `--tag`

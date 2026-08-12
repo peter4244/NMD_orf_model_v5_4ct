@@ -36,10 +36,16 @@ selected:
   # The only real signal is negative: all four atg100_* configurations are last on both
   # metrics. A 100 nt start window is genuinely worse.
   #
-  # SUPERSEDES atg500_stop500, which the manuscript reports. That selection was made on the
-  # CHANNING universe (W307) -- the sweep behind it read an HDF5 built from Channing inputs --
-  # and it ranks 8th on AUC here, outside that 95% set, 4th on AUPRC, inside it. Changing the
-  # published configuration is a manuscript-level change and is Pete's and Yul's call (D50).
+  # THIS IS THE PUBLISHED CONFIGURATION. Pete, 2026-08-12: the 1000/1000 model is what the paper
+  # reports and the earlier selection is superseded. The manuscript reads "1000nt sequence windows
+  # around the translational start and stop sites", the deposit carries
+  # best_model_atg1000_stop1000_seed42.pt, and its metrics are what section 5 quotes. The D50
+  # question this comment used to raise -- whether adopting 1000/1000 was a manuscript-level
+  # change owed to Pete and Yul -- is answered: it was made, and the manuscript reflects it.
+  #
+  # The earlier selection was made on the CHANNING universe (W307): the sweep behind it read an
+  # HDF5 built from Channing inputs. On the deposit-native universe it ranks 8th on AUC, outside
+  # the 95% set, and 4th on AUPRC.
   window_size_atg: 1000
   window_size_stop: 1000
 

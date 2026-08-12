@@ -142,8 +142,7 @@ been broken twice — nine drivers after the 2026-08-04 re-selection, and two mo
 writing into the deprecated `results_4ct_dn`. Every instance exited 0 and produced numbers.
 
 Every driver is now deposit-native, so the check applies to all of them. It previously exempted a
-`drivers/` directory holding the sweep-era chain, which pinned 500/500 correctly because it
-reproduced the earlier selection; those drivers were retired on 2026-08-12.
+`drivers/` directory holding the sweep-era chain, retired on 2026-08-12.
 
 It runs as a pre-commit hook. Git does not version `.git/hooks`, so enable it once per clone:
 
