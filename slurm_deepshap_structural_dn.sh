@@ -31,7 +31,14 @@
 #
 # No `set -e`: a non-zero exit is a RESULT to read in the log.
 cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+# PY resolves in three steps so it works off this machine without changing behaviour on it:
+# the authoring env if present, else whatever python3 is on PATH, else a loud failure. It
+# previously defaulted to the authoring path unconditionally, which resolves for one account
+# and silently points everyone else at a path that does not exist.
 PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
+[ -x "$PY" ] || PY="$(command -v python3 || true)"
+[ -x "$PY" ] || { echo "FATAL: no python found. Set PY to one with torch and shap installed "\
+                       "(see environment-model.yml)." >&2; exit 1; }
 # Results tree and windows from the config, never literals: the selection moved to
 # atg1000_stop1000 on 2026-08-04 and results_4ct_dn is segregated under deprecated_.
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
@@ -50,4 +57,9 @@ $PY deepshap.py \
     --seed ${SEED} \
     --run-id ${SLURM_ARRAY_TASK_ID} \
     --branches structural
-echo "=== deepshap run ${SLURM_ARRAY_TASK_ID} exit: $? ==="
+# CAPTURE THE STATUS BEFORE ANYTHING ELSE RUNS. This previously echoed $? without exiting on it, so
+# the job's status was the echo's -- SLURM reported COMPLETED 0:0 for array runs in which all five
+# tasks had died. Its joint sibling exits correctly; the two disagreed on the same failure.
+rc=$?
+echo "=== deepshap run ${SLURM_ARRAY_TASK_ID} exit: $rc ==="
+exit $rc

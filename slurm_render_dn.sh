@@ -13,7 +13,14 @@
 
 set -o pipefail
 cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+# PY resolves in three steps so it works off this machine without changing behaviour on it:
+# the authoring env if present, else whatever python3 is on PATH, else a loud failure. It
+# previously defaulted to the authoring path unconditionally, which resolves for one account
+# and silently points everyone else at a path that does not exist.
 PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
+[ -x "$PY" ] || PY="$(command -v python3 || true)"
+[ -x "$PY" ] || { echo "FATAL: no python found. Set PY to one with torch and shap installed "\
+                       "(see environment-model.yml)." >&2; exit 1; }
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 # The window and tag come from the config, never from literals here.
 TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || { echo "cannot read selected tag" >&2; exit 1; }

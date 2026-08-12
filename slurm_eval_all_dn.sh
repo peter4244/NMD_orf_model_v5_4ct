@@ -17,7 +17,14 @@
 # its AUC auc_mixed_in_sample, so a consumer cannot read this as generalization. The TEST split is
 # untouched here and is scored ONCE, at the end, with --final.
 set -euo pipefail
+# PY resolves in three steps so it works off this machine without changing behaviour on it:
+# the authoring env if present, else whatever python3 is on PATH, else a loud failure. It
+# previously defaulted to the authoring path unconditionally, which resolves for one account
+# and silently points everyone else at a path that does not exist.
 PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
+[ -x "$PY" ] || PY="$(command -v python3 || true)"
+[ -x "$PY" ] || { echo "FATAL: no python found. Set PY to one with torch and shap installed "\
+                       "(see environment-model.yml)." >&2; exit 1; }
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 # Windows and tag come from the config, never from literals here -- 39 such literals
 # across 26 drivers would otherwise keep reading 500/500 after a re-selection.

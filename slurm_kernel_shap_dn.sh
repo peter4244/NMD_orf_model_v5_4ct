@@ -30,7 +30,14 @@
 #
 # No `set -e`: a non-zero exit is a RESULT to read in the log, not something to hide.
 cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+# PY resolves in three steps so it works off this machine without changing behaviour on it:
+# the authoring env if present, else whatever python3 is on PATH, else a loud failure. It
+# previously defaulted to the authoring path unconditionally, which resolves for one account
+# and silently points everyone else at a path that does not exist.
 PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
+[ -x "$PY" ] || PY="$(command -v python3 || true)"
+[ -x "$PY" ] || { echo "FATAL: no python found. Set PY to one with torch and shap installed "\
+                       "(see environment-model.yml)." >&2; exit 1; }
 # Results tree and tag from the config, never literals. This driver named results_4ct_dn --
 # now segregated because its HDF5 was Channing-built -- and the tag atg500_stop500, which
 # stopped being the selection when the deposit-native sweep chose atg1000_stop1000.
