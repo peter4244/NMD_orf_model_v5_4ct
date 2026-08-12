@@ -92,8 +92,9 @@ decomposition therefore attributes importance to **regions** — start window, s
 structural — and not to modalities; each region's share already includes its own GC and junction
 content.
 
-See `METHODS.md` for full detail, and `RETRAIN_ARCHITECTURE_CHANGES.md` before changing anything
-about the architecture or retraining.
+Full methods are the paper's Supplemental Methods, section "Deep Learning Model" — this repository
+does not keep a second copy. Read `RETRAIN_ARCHITECTURE_CHANGES.md` before changing anything about
+the architecture or retraining.
 
 ### A note on names
 
