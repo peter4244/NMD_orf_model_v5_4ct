@@ -1,0 +1,91 @@
+{
+  "title": "NMD_orf_model_v5_4ct: deep-learning model of nonsense-mediated decay from ORF sequence context",
+  "upload_type": "software",
+  "license": "mit-license",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Leshem, Yul",
+      "affiliation": "Channing Division of Network Medicine, Mass General Brigham, Harvard Medical School, Boston, MA, USA"
+    },
+    {
+      "name": "Kasai, Yoshiyuki",
+      "affiliation": "Marsico Lung Institute, University of North Carolina at Chapel Hill, Chapel Hill, NC, USA"
+    },
+    {
+      "name": "Eskandar, Masih",
+      "affiliation": "Department of Electrical and Computer Engineering, Northeastern University, Boston, MA, USA"
+    },
+    {
+      "name": "Thakur, Sanika M.",
+      "affiliation": "The Institute for Experiential AI, Northeastern University, Boston, MA, USA"
+    },
+    {
+      "name": "Santos Cabrera, Jose",
+      "affiliation": "Channing Division of Network Medicine, Mass General Brigham, Harvard Medical School, Boston, MA, USA"
+    },
+    {
+      "name": "Runyan, Matthew",
+      "affiliation": "The Institute for Experiential AI, Northeastern University, Boston, MA, USA"
+    },
+    {
+      "name": "Paul, Ayan",
+      "affiliation": "The Institute for Experiential AI, Northeastern University, Boston, MA, USA"
+    },
+    {
+      "name": "Ziniti, John",
+      "affiliation": "Channing Division of Network Medicine, Mass General Brigham, Harvard Medical School, Boston, MA, USA"
+    },
+    {
+      "name": "Boueiz, Adel",
+      "affiliation": "Channing Division of Network Medicine, Mass General Brigham, Harvard Medical School, Boston, MA, USA"
+    },
+    {
+      "name": "Saferali, Aabida",
+      "affiliation": "Channing Division of Network Medicine, Mass General Brigham, Harvard Medical School, Boston, MA, USA"
+    },
+    {
+      "name": "De Marzio, Margherita",
+      "affiliation": "Channing Division of Network Medicine, Mass General Brigham, Harvard Medical School, Boston, MA, USA"
+    },
+    {
+      "name": "Dy, Jennifer",
+      "affiliation": "Department of Electrical and Computer Engineering, Northeastern University, Boston, MA, USA"
+    },
+    {
+      "name": "Laederach, Alain",
+      "affiliation": "Department of Biology, University of North Carolina at Chapel Hill, Chapel Hill, NC, USA"
+    },
+    {
+      "name": "Tata, Aleksandra",
+      "affiliation": "Division of Surgical Sciences, Department of Surgery, Duke University, Durham, NC, USA"
+    },
+    {
+      "name": "Tata, Purushothama Rao",
+      "affiliation": "Departments of Cell Biology and Medicine, Duke University, Durham, NC, USA"
+    },
+    {
+      "name": "Randell, Scott H.",
+      "affiliation": "Marsico Lung Institute, University of North Carolina at Chapel Hill, Chapel Hill, NC, USA"
+    },
+    {
+      "name": "Castaldi, Peter J.",
+      "affiliation": "Channing Division of Network Medicine, Mass General Brigham, Harvard Medical School, Boston, MA, USA"
+    }
+  ],
+  "description": "<p>Deep-learning model predicting nonsense-mediated decay (NMD) susceptibility from sequence around the start and stop codons together with per-ORF structural features, for Leshem et al., <em>Long Read RNA Sequencing in Primary Lung Cell Types Reveals Principles of Nonsense-Mediated Decay</em>. Covers training, evaluation, and attention- and SHAP-based interpretability.</p><p><strong>Code only.</strong> The trained checkpoint, its per-isoform predictions and the full interpretability export are in the Zenodo source-data record (DOI 10.5281/zenodo.21544336); the starting sequencing data are in NCBI GEO under GSE329233.</p><p>The analysis code for the rest of the paper is <a href=\"https://github.com/peter4244/nmd_lung_longread_reproduction\">nmd_lung_longread_reproduction</a>.</p>",
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.21544336",
+      "relation": "isSupplementedBy",
+      "scheme": "doi",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "GSE329233",
+      "relation": "isSupplementTo",
+      "scheme": "other",
+      "resource_type": "dataset"
+    }
+  ]
+}
