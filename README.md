@@ -87,7 +87,6 @@ part of that build sits in a folder, so the pipeline is what a reader sees first
 | where | what |
 |---|---|
 | top level | the pipeline — the numbered scripts, `model.py`/`utils.py`, both configs, `export_rds.R`, the report, the verification harnesses, and the fourteen `slurm_*_dn.sh` deposit-native drivers |
-| `drivers/` | the other SLURM drivers, including the ones that reproduce the **published** run. Kept because the deposit-native rebuild exists to be compared against it |
 | `ism/` | in-silico mutagenesis bank machinery. Not used by any result in the paper |
 | `v6/` | a separate architecture explored after v5. Not the published model |
 | `exploration/` | one-off analyses — cross-seed floor, k-mer controlled, run-length replicate |
@@ -100,37 +99,38 @@ history carries every path as it was.
 
 ## Build order
 
-Fifteen steps, in order. The report `orf_model_report_v5.Rmd` is the last of them and consumes
-intermediate TSVs that the earlier steps write:
+Fifteen steps became eleven when the sweep-era drivers were retired on 2026-08-12. Every stage now
+has a **deposit-native** driver at the top level — `slurm_*_dn.sh`, reading `config_dn.yaml`,
+writing to `results_deposit_h5_2026-08-04`, and taking the window from `paths_config.py
+--selected-tag` rather than a literal. Submit from the repository root.
 
 ```
-1. export_rds.R                                     (Isopair RDS → the eight feature tables:
-                                                     orf_features.tsv, tx_summary.tsv,
-                                                     tx_summary_provenance.json,
-                                                     ref_cds_features.tsv, td2_features.tsv,
-                                                     junctions.tsv, paralog_genes.tsv,
-                                                     val_paralog_genes.tsv, synthetic_cds.tsv)
-2. drivers/slurm_build_h5.sh                                (data_prep.py → nmd_orf_data.h5, selected_orfs.tsv)
-3. slurm_patch_selected_orfs.sh                     (scripts/patch_stop_codon.py — fixes stop codon
-                                                     column off-by-one; required for §4.1 χ² test)
-4. drivers/slurm_train_4ct.sh / drivers/slurm_train_4ct_sweep*.sh   (03_train.py)
-5. drivers/slurm_interpret_v5.sh                            (evaluate.py, 04_, 05_)
-6. drivers/slurm_deepshap_joint.sh                          (deepshap.py × 5 runs → deepshap_joint_*_run{1..5}.npz)
-7. drivers/slurm_deepshap_structural.sh                     (deepshap.py --branches structural × 5 runs)
-8. drivers/slurm_export_motif_v5.sh                         (06_, 07_ — marginal motif logos, fallback path)
-9. drivers/slurm_export_joint_motif_logos.sh                (scripts/export_joint_motif_logos.py — preferred
-                                                     5-run pooled motif logos for §3.1, §4.1)
-10. drivers/slurm_export_subgroup_profiles_09b.sh           (09b_export_subgroup_profiles.py — feeds §3.1, §4.1,
-                                                     §7.2, §9.4, §9.6, §9.7, §9.8)
-11. drivers/slurm_export_features_09.sh                     (09_ GC, polya, junction-ordinal)
-12. drivers/slurm_export_subgroup_v5.sh                     (08_ subgroup-specific marginal SHAP)
-13. drivers/slurm_export_importance_v5.sh                   (05b_, 05c_ structural rollups)
-14. drivers/slurm_kernel_shap.sh                            (11_ KernelSHAP branch decomposition)
-15. drivers/slurm_render_v5.sh                              (renders orf_model_report_v5.Rmd)
+ 1. export_rds.R                     Isopair RDS -> the eight feature tables. Needs a batch
+                                     allocation: it loads orfik_scan.rds (2.3M rows) and is
+                                     OOM-killed on a login node. ~30 s at --mem=96G.
+ 2. slurm_build_h5_dn.sh             data_prep.py -> nmd_orf_data.h5, selected_orfs.tsv  (~13 min)
+ 3. slurm_determinism_dn.sh          verify_determinism.py, at the selected window. Must pass
+                                     before training.
+ 4. slurm_train_dn.sh                03_train.py, then evaluate.py on val_clean
+ 5. slurm_interpret_dn.sh            04_interpret_attention.py, 05_interpret_structural.py
+ 6. slurm_deepshap_joint_dn.sh       deepshap.py --branches joint, 5 runs
+ 7. slurm_deepshap_structural_dn.sh  deepshap.py --branches structural, 5 runs
+ 8. slurm_kernel_shap_dn.sh          11_kernel_shap_branches.py
+ 9. slurm_export_chain_dn.sh         06_, 07_, 08_, 09_ GC/junction/polyA, 09b_, 09c_, 09d_
+10. slurm_export_importance_dn.sh    05_export_sample_importance.py, 05b_
+11. slurm_export_motif_logos_dn.sh   scripts/export_joint_motif_logos.py — the 5-run pooled logos
+12. slurm_eval_final_dn.sh           evaluate.py --split test_clean --final. ONCE, and last.
+13. slurm_render_dn.sh               renders orf_model_report_v5.Rmd
 ```
 
-The `slurm_*_dn.sh` wrappers are the corresponding chain for a rebuild against the deposited
-starting data rather than the working tree.
+`slurm_deepshap_all_dn.sh` does joint, structural and `atg stop` in one job. `slurm_fshap_dn.sh`
+and `slurm_ensemble_eval_dn.sh` cover `12_feature_shap_structural.py` and the ensemble evaluation,
+which are not part of the published figures.
+
+**`scripts/patch_stop_codon.py` is not in this list.** It reads `h5["w500/stop_windows"]`, and a
+current HDF5 carries `w100`/`w1000`/`w2000` with datasets named `atg_codes`/`stop_codes`, so it
+exits 1 on a schema this pipeline no longer produces. It also reports a pre-fix canonical stop rate
+of 100.0% before failing. It fed SF38's stop-codon usage figure and is retained for that history.
 
 ## Repository checks
 
@@ -141,9 +141,9 @@ been broken twice — nine drivers after the 2026-08-04 re-selection, and two mo
 2026-08-11, one exporting subgroup DeepSHAP at 500/500 for a 1000/1000 checkpoint and one
 writing into the deprecated `results_4ct_dn`. Every instance exited 0 and produced numbers.
 
-The published-chain drivers are deliberately **not** checked: `drivers/slurm_train_4ct.sh`,
-`drivers/slurm_interpret_v5.sh`, `drivers/slurm_kernel_shap.sh` and the rest pin 500/500 correctly, because they
-reproduce a fixed historical run whose selection was 500/500.
+Every driver is now deposit-native, so the check applies to all of them. It previously exempted a
+`drivers/` directory holding the sweep-era chain, which pinned 500/500 correctly because it
+reproduced the earlier selection; those drivers were retired on 2026-08-12.
 
 It runs as a pre-commit hook. Git does not version `.git/hooks`, so enable it once per clone:
 
@@ -175,7 +175,7 @@ ORFik scan). It also writes `tx_summary_provenance.json` beside `tx_summary.tsv`
 > isoforms added by a rebuilt `structures.rds` reached `tx_summary.tsv` and nothing said so.
 
 The HDF5 dataset (`nmd_orf_data.h5`) and `selected_orfs.tsv` are built by **`data_prep.py`** (see
-`drivers/slurm_build_h5.sh`) and patched by **`scripts/patch_stop_codon.py`**.
+`slurm_build_h5_dn.sh`).
 
 To render `orf_model_report_v5.Rmd` you must run the full build order first — the report reads
 regenerated `results_4ct/` exports that are not shipped.
