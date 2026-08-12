@@ -155,6 +155,28 @@ the numbered pipeline scripts. Build order:
 The `slurm_*_dn.sh` wrappers are the corresponding chain for a rebuild against the deposited
 starting data rather than the working tree.
 
+## Repository checks
+
+`check_drivers.py` enforces one property: a **deposit-native** driver (`slurm_*_dn.sh`,
+`submit_*_dn.sh`) derives the window, the member tag and the results tree from
+`paths_config.py --selected-tag` rather than naming them. It exists because that property has
+been broken twice — nine drivers after the 2026-08-04 re-selection, and two more found on
+2026-08-11, one exporting subgroup DeepSHAP at 500/500 for a 1000/1000 checkpoint and one
+writing into the deprecated `results_4ct_dn`. Every instance exited 0 and produced numbers.
+
+The published-chain drivers are deliberately **not** checked: `slurm_train_4ct.sh`,
+`slurm_interpret_v5.sh`, `slurm_kernel_shap.sh` and the rest pin 500/500 correctly, because they
+reproduce a fixed historical run whose selection was 500/500.
+
+It runs as a pre-commit hook. Git does not version `.git/hooks`, so enable it once per clone:
+
+```bash
+git config core.hooksPath hooks
+```
+
+A literal that is genuinely right belongs in `EXEMPT_LINES` with its reason, not behind
+`--no-verify`.
+
 ## Inputs and regeneration (code-only deposit)
 
 Nothing under `results_4ct/` is version-controlled (see `.gitignore`); the HDF5 feature file, all

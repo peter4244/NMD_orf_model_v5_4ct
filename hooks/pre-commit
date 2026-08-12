@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Pre-commit gate for the deposit-native drivers.
+#
+# WHY A HOOK AND NOT A NOTE. The invariant this enforces -- a deposit-native driver derives the
+# window, the member tag and the results tree rather than naming them -- has been broken twice
+# after being written down. On 2026-08-04 nine drivers had to be repaired after the sweep
+# re-selected the window, and on 2026-08-11 two more were found still pinned: one exporting
+# subgroup DeepSHAP at 500/500 for a 1000/1000 checkpoint, the other writing into the deprecated
+# results_4ct_dn. Both exited 0. A rule that fails silently is not enforced by documentation.
+#
+# INSTALL, once per clone, because git does not version .git/hooks:
+#     git config core.hooksPath hooks
+#
+# BYPASS deliberately and visibly with `git commit --no-verify` when a literal is genuinely
+# right -- but prefer adding it to EXEMPT_LINES in check_drivers.py with the reason, so the
+# next person sees why rather than wondering.
+set -u
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root" || exit 1
+
+[ -f check_drivers.py ] || exit 0   # nothing to enforce in a tree without it
+
+python3 check_drivers.py
+rc=$?
+if [ $rc -ne 0 ]; then
+    echo ""
+    echo "pre-commit: a deposit-native driver names something that should come from the config."
+    echo "Fix it, add it to EXEMPT_LINES with a reason, or commit with --no-verify if you know why."
+fi
+exit $rc
