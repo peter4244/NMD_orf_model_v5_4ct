@@ -14,7 +14,17 @@
 #SBATCH --job-name=dn_train
 #SBATCH --output=results_deposit_h5_2026-08-04/train_dn_%j.log
 
-# DEPOSIT-NATIVE RETRAIN, ATG=500 STOP=500 (2026-07-27).
+# DEPOSIT-NATIVE RETRAIN, ATG=1000 STOP=1000 (2026-07-27; header corrected 2026-08-13).
+#
+# THE WINDOW SAID 500/500 UNTIL 2026-08-13. The deposit-native re-selection chose 1000/1000 on
+# 2026-08-04 and the deposit carries best_model_atg1000_stop1000_seed42.pt; this header kept
+# announcing the superseded pair. Found by Yul's outside-account run of section 5.7.
+#
+# THE ISOFORM COUNT BELOW IS UNVERIFIED AND THREE VALUES ARE IN CIRCULATION: 42,043 (this header),
+# 41,779 (Yul's run, 2026-08-13) and 41,776 (the manuscript's Figure 5C legend, "all 41,776 scored
+# isoforms"). They may not all describe the same set -- a training universe and a SHAP-scored set
+# need not match -- so it is left as written rather than replaced with a guess. Resolve it against
+# the tree before quoting any of them.
 #
 # Everything it reads was regenerated from the Zenodo deposit:
 #   universe   42,043 isoforms (published 39,938), labels 9,425/32,618 = 1:3.46

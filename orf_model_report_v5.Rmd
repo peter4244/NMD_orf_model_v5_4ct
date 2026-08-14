@@ -142,7 +142,8 @@ all_metrics <- bind_rows(metrics_list) %>% arrange(desc(auprc))
 
 ```{r load-best-model}
 # ── Data provenance ──
-# All files below are for the best model (ATG=500, STOP=500).
+# All files below are for the deposited model (ATG=1000, STOP=1000, member seed 42).
+# Read from best_tag above -- do not restate the window here; that is how this line went stale.
 # Population: Test set = chr 1, 3, 5, 7 (paralog-free holdout).
 # Training/validation used remaining chromosomes.
 

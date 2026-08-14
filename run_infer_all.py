@@ -12,13 +12,13 @@ model's H5 universe.
 
 Usage (on Explorer, from ~/cc/nmd_orf_model_v5_4ct):
     conda activate nmd_model
-    python run_infer_all.py --config config.yaml \
-        --atg-window 500 --stop-window 500
+    python run_infer_all.py --config config_dn.yaml \
+        --atg-window 1000 --stop-window 1000 --member-seed 42
 
 Output:
-    results_4ct/predictions_atg500_stop500_all.tsv   # one row per isoform
+    results_deposit_h5_2026-08-04/predictions_atg1000_stop1000_seed42_all.tsv  # one row per isoform
     # member_tag(tag, seed) + "_" + split. With --member-seed N the stem becomes
-    # atg500_stop500_seedN, so ensemble members no longer overwrite one another.
+    # {tag}_seedN, so ensemble members no longer overwrite one another.
     # Renamed 2026-08-04; see the note at the write site and W295.
 """
 import argparse

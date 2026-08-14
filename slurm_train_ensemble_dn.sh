@@ -44,7 +44,7 @@
 # the better trade for 5 short jobs.
 #
 # Checkpoints land at best_model_{tag}_seed{SEED}.pt -- distinct paths, so this cannot
-# overwrite the existing single-model best_model_atg500_stop500.pt (utils.member_tag).
+# overwrite the existing single-model checkpoint for the selected tag (utils.member_tag).
 
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")" && pwd)}"

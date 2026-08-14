@@ -2,7 +2,7 @@
 """
 infer_uorf_attention.py — Inference for uORF-attention analysis (v5_4ct).
 
-Runs the v5_4ct best checkpoint (ATG=500, STOP=500) over the FULL v5_4ct
+Runs the v5_4ct selected checkpoint -- currently ATG=1000, STOP=1000, seed 42 -- over the FULL v5_4ct
 labeled universe (~40k isoforms, training+val+test), producing per-isoform
 attention weights across the 5 priority ORFs and NMD probability scores.
 
@@ -13,7 +13,9 @@ attention-pattern interpretation, so we use all isoforms the model has
 labels for.
 
 Inputs (all under --results-dir, itself relative to this script's directory):
-  <results-dir>/best_model_atg500_stop500[_seed<N>].pt  — v5_4ct trained weights
+  <results-dir>/best_model_{selected_tag}[_seed<N>].pt  — v5_4ct trained weights.
+  The tag is READ FROM THE CONFIG at run time (TAG = selected_tag(config), L108); this line
+  named atg500_stop500 until 2026-08-13, three days after the code stopped hardcoding it.
       (the _seed<N> form is one ensemble member; select it with --member-seed)
   <results-dir>/tx_summary.tsv                — v5_4ct labels (is_nmd 0/1)
   <results-dir>/nmd_orf_data.h5               — v5 HDF5 inputs (symlinked;
