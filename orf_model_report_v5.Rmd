@@ -2150,8 +2150,13 @@ p_dose <- ejc_summary %>%
   geom_text(aes(y = 0.03, label = sprintf("n=%d", n)), size = 3.5, color = "white", fontface = "bold") +
   scale_y_continuous(limits = c(0, 1.02), labels = percent_format()) +
   labs(title = "A. NMD Prediction by Downstream EJC Count",
-       subtitle = sprintf("Mean P(NMD) +/- SE. n = %s NMD transcripts, STOP=500 model.",
-                          format(n_nmd, big.mark = ",")),
+       # STOP=%d, NOT A LITERAL 500. This subtitle is RENDERED ONTO THE FIGURE, so a hardcoded
+       # window survives into an image and outlives every comment that qualifies it. It read
+       # "STOP=500 model" until 2026-08-13, while the deposited model -- and the manuscript --
+       # is 1000/1000. best_stop is already interpolated exactly this way at lines ~1547 and
+       # ~1568; this was the one site that restated the number instead of reading it.
+       subtitle = sprintf("Mean P(NMD) +/- SE. n = %s NMD transcripts, STOP=%d model.",
+                          format(n_nmd, big.mark = ","), best_stop),
        x = "Number of downstream EJCs (rank-0 ORF)", y = "Mean P(NMD)") +
   theme(panel.grid.minor = element_blank(),
         plot.title = element_text(face = "bold", size = 12))
