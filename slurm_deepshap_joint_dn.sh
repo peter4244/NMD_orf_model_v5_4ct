@@ -50,7 +50,7 @@ RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || exit 1
 ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
 SEED=$((SLURM_ARRAY_TASK_ID * 100))
-echo "=== node $(hostname) | JOINT run ${SLURM_ARRAY_TASK_ID}, seed=${SEED}, all test, 500 bg ==="
+echo "=== node $(hostname) | JOINT run ${SLURM_ARRAY_TASK_ID}, seed=${SEED}, full cohort, 500 bg ==="
 nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null
 
 $PY deepshap.py \
@@ -62,6 +62,8 @@ $PY deepshap.py \
     --stop-window "$STOP" \
     --seed ${SEED} \
     --run-id ${SLURM_ARRAY_TASK_ID} \
+    --member-seed 42 \
+    --split all --full-cohort \
     --branches joint
 rc=$?
 echo "=== joint run ${SLURM_ARRAY_TASK_ID} exit: $rc ==="

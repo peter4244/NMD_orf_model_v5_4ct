@@ -45,7 +45,7 @@ RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || exit 1
 ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
 SEED=$((SLURM_ARRAY_TASK_ID * 100))
-echo "=== node $(hostname) | run ${SLURM_ARRAY_TASK_ID}, seed=${SEED}, structural, all test, 500 bg ==="
+echo "=== node $(hostname) | run ${SLURM_ARRAY_TASK_ID}, seed=${SEED}, structural, full cohort, 500 bg ==="
 nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null
 $PY deepshap.py \
     --config config_dn.yaml \
@@ -56,6 +56,8 @@ $PY deepshap.py \
     --stop-window "$STOP" \
     --seed ${SEED} \
     --run-id ${SLURM_ARRAY_TASK_ID} \
+    --member-seed 42 \
+    --split all --full-cohort \
     --branches structural
 # CAPTURE THE STATUS BEFORE ANYTHING ELSE RUNS. This previously echoed $? without exiting on it, so
 # the job's status was the echo's -- SLURM reported COMPLETED 0:0 for array runs in which all five
