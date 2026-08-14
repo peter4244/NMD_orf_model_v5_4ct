@@ -77,7 +77,10 @@ save_fig <- function(p, name, width = 8, height = 5) {
 # the document -- commandArgs() inside a knit sees the render invocation, not the report's own
 # options. NMD_RESULTS_DIR follows the NMD_<KEY> convention the rest of the project already
 # uses for overrides. W76.
-results_dir <- Sys.getenv("NMD_RESULTS_DIR", unset = "results_4ct")
+# DEFAULT IS THE DEPOSIT-NATIVE TREE, matching best_tag above. It was "results_4ct" -- the
+# PUBLISHED run, whose artifacts are tagged atg500_stop500 -- which paired a 1000/1000 tag with a
+# tree that has no 1000/1000 files. Two halves of one setting must not name different runs.
+results_dir <- Sys.getenv("NMD_RESULTS_DIR", unset = "results_deposit_h5_2026-08-04")
 cat(sprintf("[results-dir] %s\n", normalizePath(results_dir, mustWork = FALSE)))
 ```
 
@@ -85,11 +88,26 @@ cat(sprintf("[results-dir] %s\n", normalizePath(results_dir, mustWork = FALSE)))
 
 ```{r best-model-params}
 # ---------------------------------------------------------------------------
-# Best model: ATG=500, STOP=500 (selected by AUC across window sweep)
-# Methods: METHODS.md § "Model Training and Window Size Sweep"
+# THE DEPOSITED MODEL: ATG=1000, STOP=1000, member seed 42.
+#
+# Pete's re-selection on the deposit-native universe, 2026-08-04, recorded in
+# config_dn.yaml's `selected:` block with his rationale ("among the top performers on BOTH
+# metrics, and a balanced window size"). It is what the manuscript reports -- "1000nt sequence
+# windows around the translational start and stop sites" -- and what the deposit carries as
+# best_model_atg1000_stop1000_seed42.pt.
+#
+# THESE WERE 500/500 UNTIL 2026-08-13, the ORIGINAL window sweep's selection, superseded on
+# 2026-08-04 and left here for nine days. Every one of the ~50 interpretation reads below is
+# built from best_tag, so the stale pair pointed the whole report at the published run while
+# NMD_RESULTS_DIR was parameterised (W76) specifically so it could read the deposit-native one.
+# Kept visible rather than silently swapped, because "500/500" still appears in older logs and
+# runlogs and the next reader needs to know which of the two they are looking at.
+#
+# Methods: the paper's Supplemental Methods, "Deep Learning Model". NOT this repo's METHODS.md,
+# which was retired to a pointer on 2026-08-11 for having drifted from the paper.
 # ---------------------------------------------------------------------------
-best_atg  <- 500
-best_stop <- 500
+best_atg  <- 1000
+best_stop <- 1000
 best_tag  <- paste0("atg", best_atg, "_stop", best_stop)
 cat("Best model:", best_tag, "\n")
 ```
@@ -412,7 +430,7 @@ The model's input is derived from full-length spliced transcript sequences (SQAN
 
 For each selected ORF, the model receives three inputs:
 
-**Two sequence windows** — one centered on the ATG (start codon) and one centered on the stop codon. Each window is 500bp total (±250bp around the middle nucleotide of the codon). Positions outside the transcript are zero-padded. Each position is encoded with 9 channels:
+**Two sequence windows** — one centered on the ATG (start codon) and one centered on the stop codon. Each window is 1000bp total (±500bp around the middle nucleotide of the codon). Positions outside the transcript are zero-padded. Each position is encoded with 9 channels:
 
 | Channel | Name | Type | Description |
 |---------|------|------|-------------|
@@ -431,14 +449,14 @@ For each selected ORF, the model receives three inputs:
 | is_sqanti_cds | Binary | 1 if this ORF's ATG matches the SQANTI/TD2 CDS |
 | n_downstream_ejc | Integer | Exon-exon junctions downstream of this ORF's stop codon |
 
-The downstream EJC count is included as a structural feature because junctions beyond the 500bp stop-codon window boundary are invisible to the sequence CNN. This feature ensures the model has access to the classical NMD trigger (a premature termination codon with downstream exon-exon junctions) regardless of window size. For complete feature definitions, see METHODS.md § "Feature Definitions and CDS Sources."
+The downstream EJC count is included as a structural feature because junctions beyond the 1000bp stop-codon window boundary are invisible to the sequence CNN. This feature ensures the model has access to the classical NMD trigger (a premature termination codon with downstream exon-exon junctions) regardless of window size. For complete feature definitions, see METHODS.md § "Feature Definitions and CDS Sources."
 
 ### Three Levels of the Model
 
 The model processes each transcript through three stages (levels 1–3 in the figure):
 
 1. **Per-ORF encoding** (level 1, shared weights): Each ORF is independently processed by three parallel branches that share weights across all K ORFs:
-    - **ATG CNN:** 9-channel × 500-position sequence window → two Conv1d layers (32 filters each) → adaptive max-pool → **32-dim embedding**
+    - **ATG CNN:** 9-channel × 1000-position sequence window → two Conv1d layers (32 filters each) → adaptive max-pool → **32-dim embedding**
     - **Stop CNN:** Same architecture applied to the stop-codon window → **32-dim embedding**
     - **Structural FC:** 5 features → Linear + ReLU → **32-dim embedding**
 
@@ -452,11 +470,11 @@ The model processes each transcript through three stages (levels 1–3 in the fi
 
 We use four complementary methods, each operating at a different layer of the model (annotated with dashed brackets in the figure):
 
-1. **Joint DeepSHAP** (blue bracket, input layer): Varies all rank-0 ORF inputs simultaneously — both sequence windows and structural features — as a single 9,005-dimensional vector (9×500 + 9×500 + 5). Computes per-position, per-channel attributions through the full model to the output logit. Background: 500 training samples; 5 independent replicates for variance estimation. Attributions are additive: the sum of all 9,005 SHAP values equals f(x) − E[f(x)]. *Used in: Sections 2.2–2.3, 3, 4, 6, 7.2, 9.5–9.8.*
+1. **Joint DeepSHAP** (blue bracket, input layer): Varies all rank-0 ORF inputs simultaneously — both sequence windows and structural features — as a single 18,005-dimensional vector (9×1000 + 9×1000 + 5). Computes per-position, per-channel attributions through the full model to the output logit. Background: 500 training samples; 5 independent replicates for variance estimation. Attributions are additive: the sum of all 18,005 SHAP values equals f(x) − E[f(x)]. *Used in: Sections 2.2–2.3, 3, 4, 6, 7.2, 9.5–9.8.*
 
 2. **KernelSHAP — branch decomposition** (red bracket, fusion layer): Treats the three 32-dim sub-embeddings (ATG CNN output, stop CNN output, structural FC output) as three "players" in a cooperative game. Evaluates all 2³ = 8 coalitions of present/absent branches, integrating over background embeddings for absent branches. Produces exact Shapley values with zero residual. This gives the coarse branch-level attribution (e.g., structural 61%, stop 29%, ATG 10% for NMD transcripts). *Used in: Sections 2.1, 7.3.*
 
-3. **DeepSHAP — structural features** (structural slice of Joint DeepSHAP): The last 5 values of the 9,005-dim joint attribution vector, corresponding to the structural features. These tell us which structural properties (e.g., downstream EJC count, CDS identity) shift the prediction and in which direction. *Used in: Sections 2.2, 7.2.*
+3. **DeepSHAP — structural features** (structural slice of Joint DeepSHAP): The last 5 values of the 18,005-dim joint attribution vector, corresponding to the structural features. These tell us which structural properties (e.g., downstream EJC count, CDS identity) shift the prediction and in which direction. *Used in: Sections 2.2, 7.2.*
 
 4. **Attention weights** (purple label, aggregator): The softmax-normalized scores over K ORFs, summing to 1 per transcript. Deterministic given the input — no stochastic background sampling. *Used in: Sections 5, 9.9.*
 
@@ -739,7 +757,7 @@ render_dt(ks_branch %>% mutate(mean_abs_shap = round(mean_abs_shap, 4)),
 
 ## 2.2 Structural Feature Importance {#sec2-structural}
 
-Within the structural branch (60.7% of total attribution; see §2.1), the 5 ORF features are ranked by per-feature DeepSHAP (marginal, 500 background, 5 replicates, all test samples):
+Within the structural branch (`r if(has_kernel_shap) sprintf("%.1f%%", ks_branch$pct[ks_branch$branch=="Structural"]) else "see §2.1"` of total attribution; see §2.1), the 5 ORF features are ranked by per-feature DeepSHAP (marginal, 500 background, 5 replicates, all test samples):
 
 ```{r fig2b-structural-importance, eval=has_kernel_shap, fig.width=8, fig.height=4}
 # Within-structural breakdown from marginal DeepSHAP (per-feature detail)
@@ -829,7 +847,7 @@ save_fig(p_stop_zoom, "fig2d_stop_zoom", width = 10, height = 4)
 
 **Question:** What does the model learn from the sequence context around the ATG start codon?
 
-**Metrics:** Section 3 uses DeepSHAP on the ATG branch (500bp window, all test samples, joint DeepSHAP averaged across 5 replicates). Subgroup-specific start codon analyses are in Section 9.7.
+**Metrics:** Section 3 uses DeepSHAP on the ATG branch (1000bp window, all test samples, joint DeepSHAP averaged across 5 replicates). Subgroup-specific start codon analyses are in Section 9.7.
 
 ```{r sec3-stability-note, eval=has_stability, results='asis'}
 nuc_cv <- shap_stability %>%
@@ -870,7 +888,7 @@ save_fig(p_atg_full, "fig3_atg_importance_profile", width = 10, height = 4)
 
 **Variable definitions:**
 
-- **Total nucleotide |SHAP|:** Sum of mean |SHAP| across the 4 nucleotide channels (A, C, G, T) at each position within the 500bp ATG window. Higher values indicate positions where the model attends more strongly to nucleotide identity for NMD prediction.
+- **Total nucleotide |SHAP|:** Sum of mean |SHAP| across the 4 nucleotide channels (A, C, G, T) at each position within the 1000bp ATG window. Higher values indicate positions where the model attends more strongly to nucleotide identity for NMD prediction.
 - **Loess smooth (span=0.1):** Local polynomial regression revealing position-dependent trends. Ribbon = 95% CI.
 
 **Observations:**
@@ -1010,7 +1028,7 @@ kz_G_m1_ctrl <- kz_val(-2, "G", "ctrl")
 
 **Question:** What does the model learn from the sequence context around and downstream of the stop codon?
 
-**Metric:** DeepSHAP on the stop branch (500-position window centered on the rank-0 ORF's stop codon, capturing ~250bp of 3'UTR). Same population as Section 3.
+**Metric:** DeepSHAP on the stop branch (1000-position window centered on the rank-0 ORF's stop codon, capturing ~500bp of 3'UTR). Same population as Section 3.
 
 ```{r fig4-stop-importance-profile, eval=has_shap_profiles, fig.width=10, fig.height=4}
 # ── Data provenance ──
@@ -1042,13 +1060,13 @@ save_fig(p_stop_full, "fig4_stop_importance_profile", width = 10, height = 4)
 
 **Variable definitions:**
 
-- **Total nucleotide |SHAP|:** Sum of mean |SHAP| across the 4 nucleotide channels (A, C, G, T) at each position within the 500bp stop window.
+- **Total nucleotide |SHAP|:** Sum of mean |SHAP| across the 4 nucleotide channels (A, C, G, T) at each position within the 1000bp stop window.
 - **Loess smooth (span=0.1):** Local polynomial regression revealing position-dependent trends. Ribbon = 95% CI.
 
 **Observations:**
 
 - **(Data)** Importance peaks sharply at the stop codon itself, with most attribution concentrated in the ~50nt preceding the stop site (final codons of the ORF) and falling off into the 3'UTR. NMD transcripts have ~30% higher overall |SHAP| than Controls in the stop branch (NMD/Control ratio ≈ 1.3x). Although the relative NMD/Control gap is larger in the ATG branch (≈ 2x), the stop branch carries the highest absolute attribution and contributes the largest share to predictions (consistent with the branch decomposition in Section 2.1).
-- **(Data)** Modest elevation at the very edges of the window (positions ±230 to ±250) reflects a CNN boundary effect (Section 0); the first/last ~25bp should be interpreted with that caveat.
+- **(Data)** Modest elevation at the very edges of the window (positions ±480 to ±500) reflects a CNN boundary effect (Section 0); the first/last ~25bp should be interpreted with that caveat.
 
 ## 4.1 Stop Codon Identity {#sec4-stop-codon}
 
