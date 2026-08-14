@@ -82,6 +82,18 @@ save_fig <- function(p, name, width = 8, height = 5) {
 # tree that has no 1000/1000 files. Two halves of one setting must not name different runs.
 results_dir <- Sys.getenv("NMD_RESULTS_DIR", unset = "results_deposit_h5_2026-08-04")
 cat(sprintf("[results-dir] %s\n", normalizePath(results_dir, mustWork = FALSE)))
+
+# THE SWEEP LIVES IN ITS OWN TREE, and it is not results_dir. Section 1 describes the window
+# sweep; every other section describes the ONE selected model. Those are different runs in
+# different directories, and pointing both at one variable is what made Section 1 unrenderable
+# on this chain -- results_deposit_h5_2026-08-04 trains a single configuration and holds none of
+# the twelve.
+#
+# DEPOSIT-NATIVE, 2026-08-04: 12 configurations x 5 paired seeds, scored on val_clean. It
+# replaces the published 2026-04 sweep, which scored all twelve cells on test_clean -- the leak
+# D67 records. Pete's instruction, 2026-08-14.
+sweep_dir <- Sys.getenv("NMD_SWEEP_DIR", unset = "results_sweep_dn_2026-08-04")
+cat(sprintf("[sweep-dir]   %s\n", normalizePath(sweep_dir, mustWork = FALSE)))
 ```
 
 # 0. Data Loading and Model Overview {#sec0-data}
@@ -108,36 +120,73 @@ cat(sprintf("[results-dir] %s\n", normalizePath(results_dir, mustWork = FALSE)))
 # ---------------------------------------------------------------------------
 best_atg  <- 1000
 best_stop <- 1000
+best_seed <- 42
 best_tag  <- paste0("atg", best_atg, "_stop", best_stop)
 cat("Best model:", best_tag, "\n")
 ```
 
 ```{r load-all-metrics}
 # ── Data provenance ──
-# Source: metrics_atg{A}_stop{S}.json — produced by evaluate.py
-# Population: 12 models (3 ATG × 4 STOP window sizes)
+# Source: metrics_atg{A}_stop{S}_seed{N}_val_clean.json, in sweep_dir — produced by evaluate.py
+# Population: 60 runs = 12 configurations (3 ATG × 4 STOP) × 5 paired seeds. Each run is scored
+#   on val_clean, n = 4,356 (927 NMD). NOT the test split, and the distinction is load-bearing:
+#   the published sweep scored all twelve cells on test_clean, which is the leak D67 records, and
+#   a heatmap labelled "Test" over val_clean numbers would be the same defect wearing the old
+#   caption.
+#
+# FIVE SEEDS PER CELL IS NEW. The published sweep had one run per cell, so a cell was a number;
+# here it is a distribution, and the sd is what makes the ranking below readable as noise rather
+# than as a result. Aggregating without carrying the spread would hide exactly the finding.
 
 atg_sizes  <- c(100, 500, 1000)
 stop_sizes <- c(100, 500, 1000, 2000)
+sweep_seeds <- c(100, 200, 300, 400, 500)
 
-metrics_list <- list()
+sweep_runs <- list()
 for (a in atg_sizes) {
   for (s in stop_sizes) {
-    tag <- paste0("atg", a, "_stop", s)
-    path <- file.path(results_dir, paste0("metrics_", tag, ".json"))
-    if (file.exists(path)) {
-      m <- fromJSON(path)
-      metrics_list[[tag]] <- data.frame(
-        tag = tag, atg_window = a, stop_window = s,
-        auc = m$auc, auprc = m$auprc,
-        n_test = m$n_test, n_nmd = m$n_nmd,
-        best_epoch = m$best_epoch,
-        stringsAsFactors = FALSE
-      )
+    for (sd_seed in sweep_seeds) {
+      tag  <- paste0("atg", a, "_stop", s)
+      path <- file.path(sweep_dir,
+                        sprintf("metrics_%s_seed%d_val_clean.json", tag, sd_seed))
+      if (file.exists(path)) {
+        m <- fromJSON(path)
+        sweep_runs[[length(sweep_runs) + 1L]] <- data.frame(
+          tag = tag, atg_window = a, stop_window = s, member_seed = sd_seed,
+          auc = m$auc, auprc = m$auprc,
+          n_eval = m$n_eval, n_nmd = m$n_nmd,
+          best_epoch = m$best_epoch,
+          stringsAsFactors = FALSE
+        )
+      }
     }
   }
 }
-all_metrics <- bind_rows(metrics_list) %>% arrange(desc(auprc))
+sweep_all <- bind_rows(sweep_runs)
+
+# GUARD, not decoration. A partial sweep silently produces a smaller heatmap and a ranking that
+# looks identical in kind, so the failure is invisible in the output. Fail here instead.
+stopifnot(nrow(sweep_all) == 60L,
+          length(unique(sweep_all$tag)) == 12L,
+          length(unique(sweep_all$n_eval)) == 1L,
+          length(unique(sweep_all$n_nmd)) == 1L)
+
+sweep_n_eval  <- unique(sweep_all$n_eval)
+sweep_n_nmd   <- unique(sweep_all$n_nmd)
+sweep_nmd_pct <- round(100 * sweep_n_nmd / sweep_n_eval, 1)
+
+all_metrics <- sweep_all %>%
+  group_by(tag, atg_window, stop_window) %>%
+  summarise(n_runs         = dplyr::n(),
+            auc_sd         = sd(auc),
+            auprc_sd       = sd(auprc),
+            auc            = mean(auc),
+            auprc          = mean(auprc),
+            best_epoch_med = median(best_epoch),
+            .groups        = "drop") %>%
+  arrange(desc(auprc))
+
+stopifnot(nrow(all_metrics) == 12L, all(all_metrics$n_runs == 5L))
 ```
 
 ```{r load-best-model}
@@ -491,22 +540,25 @@ We use four complementary methods, each operating at a different layer of the mo
 
 **Question:** Which combination of ATG and stop codon window sizes yields the best NMD prediction?
 
-**Population:** `r format(n_test, big.mark = ",")` test transcripts (`r format(n_nmd, big.mark = ",")` NMD, `r nmd_pct`% prevalence). Test set is identical across all models. Methods: see METHODS.md § "Model Training and Window Size Sweep."
+**Population:** `r format(sweep_n_eval, big.mark = ",")` **validation** transcripts (`r format(sweep_n_nmd, big.mark = ",")` NMD, `r sweep_nmd_pct`% prevalence), the `val_clean` split, identical across all 60 runs. **This is not the test set**, and the section below is the only one in this report that is not about the deposited model: the held-out test numbers quoted everywhere else come from a single configuration scored once. Methods: the paper's Supplemental Methods, "Deep Learning Model".
 
 ```{r fig1a-auprc-heatmap, fig.width=7, fig.height=5}
 # ── Data provenance ──
-# Source: metrics_atg{A}_stop{S}.json — produced by evaluate.py
-# Population: 12 models tested on the same holdout set
+# Source: metrics_atg{A}_stop{S}_seed{N}_val_clean.json — produced by evaluate.py
+# Population: 12 configurations x 5 seeds, all scored on the same val_clean split
+# Each tile is the MEAN over 5 seeds; the sd is printed beneath it, because the spread is the
+# finding and a bare mean would present twelve indistinguishable cells as a ranking.
 
 p_auprc <- all_metrics %>%
   ggplot(aes(x = factor(stop_window), y = factor(atg_window), fill = auprc)) +
   geom_tile(color = "white", linewidth = 1) +
-  geom_text(aes(label = sprintf("%.4f", auprc)), size = 4, fontface = "bold") +
+  geom_text(aes(label = sprintf("%.4f\n±%.4f", auprc, auprc_sd)), size = 3.4, fontface = "bold") +
   scale_fill_gradient2(low = "#67a9cf", mid = "#f7f7f7", high = "#ef8a62",
-                       midpoint = median(all_metrics$auprc), name = "Test AUPRC") +
-  labs(title = sprintf("Test AUPRC by Window Size (3x4 sweep, n=%s)", format(n_test, big.mark = ",")),
-       subtitle = sprintf("AUPRC: area under precision-recall curve. Higher = better. %s NMD (%s%% prevalence).",
-                          format(n_nmd, big.mark = ","), nmd_pct),
+                       midpoint = median(all_metrics$auprc), name = "Val AUPRC") +
+  labs(title = sprintf("Validation AUPRC by Window Size (3x4 sweep, 5 seeds, n=%s)",
+                       format(sweep_n_eval, big.mark = ",")),
+       subtitle = sprintf("Mean ± sd over 5 seeds, val_clean split. %s NMD (%s%% prevalence). Seed spread is larger than the gap between the top cells.",
+                          format(sweep_n_nmd, big.mark = ","), sweep_nmd_pct),
        x = "Stop codon window (bp)", y = "ATG window (bp)") +
   coord_equal()
 
@@ -515,20 +567,22 @@ save_fig(p_auprc, "fig1a_auprc_heatmap", width = 7, height = 5)
 
 ```{r fig1b-auc-heatmap, fig.width=7, fig.height=5}
 # ── Data provenance ──
-# Source: metrics_atg{A}_stop{S}.json — produced by evaluate.py
-# Population: 12 models tested on the same holdout set
+# Source: metrics_atg{A}_stop{S}_seed{N}_val_clean.json — produced by evaluate.py
+# Population: 12 configurations x 5 seeds, all scored on the same val_clean split
+# Mean ± sd over seeds, for the same reason as the AUPRC panel above.
 
 p_auc <- all_metrics %>%
   ggplot(aes(x = factor(stop_window), y = factor(atg_window), fill = auc)) +
   geom_tile(color = "white", linewidth = 1) +
-  geom_text(aes(label = sprintf("%.4f", auc)), size = 4, fontface = "bold") +
+  geom_text(aes(label = sprintf("%.4f\n±%.4f", auc, auc_sd)), size = 3.4, fontface = "bold") +
   scale_fill_gradient2(low = "#67a9cf", mid = "#f7f7f7", high = "#ef8a62",
-                       midpoint = median(all_metrics$auc), name = "Test AUC",
+                       midpoint = median(all_metrics$auc), name = "Val AUC",
                        breaks = scales::pretty_breaks(n = 3),
                        labels = function(x) sprintf("%.3f", x)) +
-  labs(title = sprintf("Test AUC by Window Size (3x4 sweep, n=%s)", format(n_test, big.mark = ",")),
-       subtitle = sprintf("AUC: area under ROC curve. Higher = better. %s NMD (%s%% prevalence).",
-                          format(n_nmd, big.mark = ","), nmd_pct),
+  labs(title = sprintf("Validation AUC by Window Size (3x4 sweep, 5 seeds, n=%s)",
+                       format(sweep_n_eval, big.mark = ",")),
+       subtitle = sprintf("Mean ± sd over 5 seeds, val_clean split. %s NMD (%s%% prevalence). Seed spread is larger than the gap between the top cells.",
+                          format(sweep_n_nmd, big.mark = ","), sweep_nmd_pct),
        x = "Stop codon window (bp)", y = "ATG window (bp)") +
   coord_equal()
 
@@ -545,11 +599,19 @@ save_fig(p_auc, "fig1b_auc_heatmap", width = 7, height = 5)
 <details><summary>Table 1: All model metrics</summary>
 
 ```{r table1}
-# Source: all_metrics (loaded in Section 0 from evaluate.py JSON files)
+# Source: all_metrics — 12 configurations x 5 seeds, val_clean. Columns changed with the sweep:
+# n_test/n_nmd are gone because they are constant across all 60 runs and are stated in the
+# caption instead of repeated down twelve rows; best_epoch is a median because it varies by seed.
 render_dt(all_metrics %>%
-            mutate(auc = round(auc, 4), auprc = round(auprc, 4)) %>%
-            select(tag, atg_window, stop_window, auc, auprc, best_epoch, n_test, n_nmd),
-          caption = "Table 1: All models ranked by AUPRC")
+            mutate(auc   = round(auc, 4),   auc_sd   = round(auc_sd, 4),
+                   auprc = round(auprc, 4), auprc_sd = round(auprc_sd, 4)) %>%
+            select(tag, atg_window, stop_window, n_runs,
+                   auc, auc_sd, auprc, auprc_sd, best_epoch_med),
+          caption = sprintf(paste("Table 1: All 12 configurations ranked by mean AUPRC.",
+                                  "Each row is %d seeds scored on val_clean (n = %s; %s NMD,",
+                                  "%s%%). sd is the seed-to-seed spread within a configuration."),
+                            5L, format(sweep_n_eval, big.mark = ","),
+                            format(sweep_n_nmd, big.mark = ","), sweep_nmd_pct))
 ```
 </details>
 
@@ -592,7 +654,20 @@ if (file.exists(log_path)) {
 # Population: test set (chr 1,3,5,7, paralog-free)
 roc_obj <- roc(preds$label, preds$prob, quiet = TRUE)
 best_auc <- round(auc(roc_obj), 4)
-best_auprc <- round(all_metrics$auprc[all_metrics$tag == best_tag], 4)
+
+# best_auprc COMES FROM THE DEPOSITED MODEL'S OWN test_clean METRICS, NOT FROM all_metrics.
+# It used to read all_metrics, which was correct while all_metrics WAS a test-scored sweep. It is
+# no longer: the sweep now scores val_clean over five seeds. Reading best_auprc from there while
+# best_auc above comes from the test-set ROC would print a test AUC and a validation AUPRC in one
+# title as though they described one evaluation -- two quantities with the same name over
+# different sets, which is this project's defining defect. The repointing of Section 1 is exactly
+# the kind of change that creates it silently, so the guard below is not optional.
+best_metrics <- fromJSON(file.path(
+  results_dir, sprintf("metrics_%s_seed%d_test_clean.json", best_tag, best_seed)))
+stopifnot(best_metrics$split == "test_clean",
+          best_metrics$n_eval == n_test,
+          best_metrics$n_nmd  == n_nmd)
+best_auprc <- round(best_metrics$auprc, 4)
 
 p_roc <- ggroc(roc_obj, linewidth = 0.8) +
   labs(title = sprintf("ROC Curve — %s (AUC = %s, AUPRC = %s)", best_tag, best_auc, best_auprc),
@@ -609,15 +684,35 @@ save_fig(p_roc, "fig1d_roc_curve")
 **Key observations (data):**
 
 ```{r sec1-summary-stats, include=FALSE}
-# Source: all_metrics (loaded in Section 0 from evaluate.py JSON files)
-auc_stop2000 <- all_metrics$auc[all_metrics$tag == "atg500_stop2000"]
-auprc_100_500 <- all_metrics$auprc[all_metrics$tag == "atg500_stop500"] -
-                 all_metrics$auprc[all_metrics$tag == "atg500_stop100"]
+# Source: all_metrics — the 60-run deposit-native sweep, aggregated in Section 0.
+# EVERY NUMBER BELOW IS DERIVED. The previous version of this block hardcoded a winner and two
+# comparisons; when the sweep was repointed those sentences stayed true-looking and became false.
+rank_auc   <- all_metrics %>% arrange(desc(auc))
+rank_auprc <- all_metrics %>% arrange(desc(auprc))
+
+auc_leader     <- rank_auc$tag[1]
+auprc_leader   <- rank_auprc$tag[1]
+sel_auc_rank   <- which(rank_auc$tag   == best_tag)
+sel_auprc_rank <- which(rank_auprc$tag == best_tag)
+
+# The comparison that decides whether this sweep says anything: the gap between the best two
+# cells, against the seed-to-seed spread within a cell.
+auc_top2_gap    <- rank_auc$auc[1]     - rank_auc$auc[2]
+auprc_top2_gap  <- rank_auprc$auprc[1] - rank_auprc$auprc[2]
+auc_typ_sd      <- median(all_metrics$auc_sd)
+auprc_typ_sd    <- median(all_metrics$auprc_sd)
+
+# The one negative result that IS separated: every 100 nt start window is at the bottom.
+atg100_worst_auc   <- all(tail(rank_auc$atg_window,   4) == 100)
+atg100_worst_auprc <- all(tail(rank_auprc$atg_window, 4) == 100)
 ```
 
-- **STOP=500 is optimal by AUC** (AUC = `r best_auc`, AUPRC = `r best_auprc`). **(Data)** Performance declines at larger stop windows (STOP=2000 AUC = `r round(auc_stop2000, 3)`), suggesting the v5 architecture saturates its use of downstream context at ~500bp.
-- **(Data)** **Stop window matters more than ATG window.** AUC peaks at STOP=500 for every ATG size. AUPRC also peaks at STOP=500 for ATG=100 and ATG=1000, though within the ATG=500 row STOP=1000 has marginally higher AUPRC (0.839 vs 0.833). ATG=100 and ATG=500 perform similarly at STOP=500 (AUPRC difference 0.004).
-- **(Data)** The AUPRC gain from STOP=100→500 is +`r round(auprc_100_500, 3)`, confirming that extending the stop window from 100bp captures additional informative sequence context (particularly downstream splice junctions).
+- **(Data) This sweep does not identify a best window, and that is the finding.** The top two configurations differ by `r sprintf("%.5f", auc_top2_gap)` on AUC and `r sprintf("%.5f", auprc_top2_gap)` on AUPRC, against a typical seed-to-seed spread within a single configuration of `r sprintf("%.5f", auc_typ_sd)` and `r sprintf("%.5f", auprc_typ_sd)`. **The gap between the best two cells is smaller than the noise inside one cell**, so the ranking below the top few places is not interpretable as a performance ordering.
+- **(Data) The two metrics disagree about the leader.** AUC is led by `r auc_leader`, AUPRC by `r auprc_leader`. A sweep with a real optimum does not usually swap its winner when the metric changes; two disagreeing leaders separated by less than one seed's spread is what statistical equivalence looks like.
+- **(Data) The deposited configuration is `r best_tag`, ranked `r sel_auc_rank` of 12 on AUC and `r sel_auprc_rank` of 12 on AUPRC.** It was chosen as a defensible option among statistically equivalent ones — top performers on both metrics, with symmetric windows so the two heads see equal extents — and not as a measured optimum. The rationale is Pete's, recorded in `config_dn.yaml`'s `selected:` block.
+- **(Data) The only clearly separated result is negative: a 100 nt start window is genuinely worse.** All four `atg100_*` configurations occupy the bottom four places on AUC (`r atg100_worst_auc`) and on AUPRC (`r atg100_worst_auprc`). This is the one comparison in the sweep where the difference exceeds the seed spread.
+
+> **This section replaced conclusions drawn from the superseded 2026-04 sweep, and they inverted.** That sweep reported *"STOP=500 is optimal by AUC"* and *"AUC peaks at STOP=500 for every ATG size."* Neither survives here: the STOP=500 configurations rank 7th, 8th and 9th of 12 on AUC, and the AUC leader carries STOP=2000. **The two sweeps are not comparable and the difference is not a change in the model.** The published one scored all twelve cells on `test_clean` — selecting a configuration on the held-out set, which is the leak D67 records — while this one scores on `val_clean` and repeats each cell across five seeds. A single-run ranking on a leaked split will look decisive; a five-seed ranking on a development split shows the same architecture with its noise floor visible. Recorded rather than quietly replaced, because the earlier claim appears in older renders and a reader meeting both needs to know which is which.
 
 ---
 
