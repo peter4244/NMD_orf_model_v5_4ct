@@ -447,7 +447,7 @@ data_status <- list(
   list(flag = has_sg_profiles,    what = "By-subgroup positional SHAP (Section 9.6)",     file = sprintf("shap_profile_{atg,stop}_subgroup_joint_%s.tsv", best_tag)),
   list(flag = has_atg_sg,         what = "By-subgroup ATG motif logo (Section 9.7)",      file = sprintf("motif_logo_atg_subgroup_joint_%s.tsv", best_tag)),
   list(flag = has_stop_sg,        what = "By-subgroup stop motif logo (Section 9.8)",     file = sprintf("motif_logo_stop_subgroup_joint_%s.tsv", best_tag)),
-  list(flag = has_all_orfs,       what = "Per-ORF (rank 1-4) joint DeepSHAP (Section 9.11)", file = sprintf("deepshap_all_orfs_summary_%s.tsv", best_tag))
+  list(flag = has_all_orfs,       what = "Per-ORF (rank 1-4) joint DeepSHAP (Section 9.11)", file = sprintf("deepshap_all_orfs_summary_%s.tsv", best_member))
 )
 missing <- Filter(function(x) !x$flag, data_status)
 if (length(missing) == 0) {
@@ -534,7 +534,7 @@ We use four complementary methods, each operating at a different layer of the mo
 
 1. **Joint DeepSHAP** (blue bracket, input layer): Varies all rank-0 ORF inputs simultaneously — both sequence windows and structural features — as a single 18,005-dimensional vector (9×1000 + 9×1000 + 5). Computes per-position, per-channel attributions through the full model to the output logit. Background: 500 training samples; 5 independent replicates for variance estimation. Attributions are additive: the sum of all 18,005 SHAP values equals f(x) − E[f(x)]. *Used in: Sections 2.2–2.3, 3, 4, 6, 7.2, 9.5–9.8.*
 
-2. **KernelSHAP — branch decomposition** (red bracket, fusion layer): Treats the three 32-dim sub-embeddings (ATG CNN output, stop CNN output, structural FC output) as three "players" in a cooperative game. Evaluates all 2³ = 8 coalitions of present/absent branches, integrating over background embeddings for absent branches. Produces exact Shapley values with zero residual. This gives the coarse branch-level attribution (e.g., structural 61%, stop 29%, ATG 10% for NMD transcripts). *Used in: Sections 2.1, 7.3.*
+2. **KernelSHAP — branch decomposition** (red bracket, fusion layer): Treats the three 32-dim sub-embeddings (ATG CNN output, stop CNN output, structural FC output) as three "players" in a cooperative game. Evaluates all 2³ = 8 coalitions of present/absent branches, integrating over background embeddings for absent branches. Produces exact Shapley values with zero residual. This gives the coarse branch-level attribution across the three streams. **The split is not restated here** — Section 2.1 computes it, and this sentence carried `structural 61%, stop 29%, ATG 10%` as frozen text while that section rendered a different set from the deposited model. *Used in: Sections 2.1, 7.3.*
 
 3. **DeepSHAP — structural features** (structural slice of Joint DeepSHAP): The last 5 values of the 18,005-dim joint attribution vector, corresponding to the structural features. These tell us which structural properties (e.g., downstream EJC count, CDS identity) shift the prediction and in which direction. *Used in: Sections 2.2, 7.2.*
 
@@ -605,7 +605,7 @@ save_fig(p_auc, "fig1b_auc_heatmap", width = 7, height = 5)
 
 - **ATG window:** Sequence context (bp) extracted around each ORF's start codon, encoded with 9 channels (4 nucleotide one-hot + splice junction + rolling GC + 3 reading-frame one-hot).
 - **Stop window:** Same 9-channel encoding around each ORF's stop codon.
-- **AUPRC:** Area under the precision-recall curve. More informative than AUC for imbalanced classes (NMD prevalence = `r nmd_pct`%).
+- **AUPRC:** Area under the precision-recall curve. More informative than AUC for imbalanced classes (NMD prevalence = `r sweep_nmd_pct`% in this section's `val_clean` population; `r nmd_pct`% in the held-out test set used everywhere else).
 - **AUC:** Area under the ROC curve.
 
 <details><summary>Table 1: All model metrics</summary>
@@ -1107,7 +1107,11 @@ render_dt(kozak_range %>% mutate(across(where(is.numeric), ~round(., 6))),
 kz_val <- function(pos, ch, class = "nmd") {
   col <- if (class == "nmd") "nmd_mean_contrib" else "ctrl_mean_contrib"
   v <- kozak_range[[col]][kozak_range$relative_position == pos & kozak_range$channel == ch]
-  if (length(v) == 1) round(v, 3) else NA
+  # FOUR DECIMALS, NOT THREE. These attributions run 0.001-0.003, so round(v, 3) sent everything
+  # below 0.0005 to a bare "0" -- the rendered text read "the canonical C contributes a small
+  # negative signal in Controls (0)", which states a sign the printed value cannot show and a
+  # magnitude it does not have. Kept numeric rather than formatted here because kz_p4_* sums these.
+  if (length(v) == 1) round(v, 4) else NA
 }
 # Kozak -3 (relative_position = -4)
 kz_A_m3_nmd <- kz_val(-4, "A", "nmd")
@@ -1133,7 +1137,7 @@ kz_G_m1_ctrl <- kz_val(-2, "G", "ctrl")
 **Observations:**
 
 - **(Data)** At the canonical Kozak landmark positions, model attribution concentrates in the consensus residues. **G at positions -3 and +4** carries comparable, dominant positive signals (G(-3): `r kz_G_m3_nmd` NMD / `r kz_G_m3_ctrl` Control; G(+4): `r kz_G_p4_nmd` NMD / `r kz_G_p4_ctrl` Control). Non-purine residues at -3 and non-G residues at +4 contribute small, predominantly negative signals (e.g., A at -3: `r kz_A_m3_nmd` in NMD).
-- **(Data)** At position -1, the canonical C contributes a small negative signal in Controls (`r kz_C_m1_ctrl`) and is near-zero in NMD (`r kz_C_m1_nmd`), while G contributes a small positive signal in NMD (`r kz_G_m1_nmd`). Signals at -1 are weaker than at -3 or +4.
+- **(Data)** At position -1 the canonical C contributes `r sprintf("%+.4f", kz_C_m1_ctrl)` in Controls and `r sprintf("%+.4f", kz_C_m1_nmd)` in NMD, while G contributes `r sprintf("%+.4f", kz_G_m1_nmd)` in NMD — signs shown explicitly, because the claim here is about direction and these magnitudes round to zero at three decimals. Signals at -1 are weaker than at -3 or +4.
 - **(Data)** At positions -3 and +4 (the strongest Kozak landmarks), the magnitude of the G signal is several-fold larger in NMD than Control (NMD/Control ratios of approximately 4x). The model recognizes Kozak-consensus residues in both classes but assigns higher attribution to those features when classifying NMD.
 - **(Hypothesis)** The amplified Kozak-consensus signal in NMD may reflect the model leveraging strong Kozak context to identify genuine start codons among candidate-ORF ATGs — a signal especially relevant for NMD subtypes that depend on alternative start codon usage (see Section 9.7).
 
@@ -1566,8 +1570,9 @@ fmt_p <- function(x) if (x < 1e-4) sprintf("%.0e", x) else sprintf("%.2f", x)
 
 **Observations:**
 
-- **(Data)** The median max attention weight is `r round(median(max_attn_per_iso$max_weight[max_attn_per_iso$class == "NMD"]), 3)` for NMD and `r round(median(max_attn_per_iso$max_weight[max_attn_per_iso$class == "Control"]), 3)` for Control. Both classes show strong single-ORF dominance, with most isoforms concentrating >50% of attention on one ORF.
-- **(Data)** NMD isoforms have slightly lower median max attention weights than Controls (`r sprintf("%.2f", med_max_attn("NMD"))` vs `r sprintf("%.2f", med_max_attn("Control"))`) and slightly higher median attention entropy (`r sprintf("%.2f", ent_stat("NMD","median_entropy"))` vs `r sprintf("%.2f", ent_stat("Control","median_entropy"))` bits) — marginally more diffuse attention by both metrics. The mean entropy direction is opposite (Table 5a: NMD `r sprintf("%.2f", ent_stat("NMD","mean_entropy"))` vs Ctrl `r sprintf("%.2f", ent_stat("Control","mean_entropy"))`) because Control has heavier upper-tail outliers; the central-tendency test is non-significant (Mann-Whitney p=`r fmt_p(ent_mw_p)`), while a Kolmogorov–Smirnov test detects a distributional shape difference (p=`r fmt_p(ent_ks_p)`).
+- **(Data)** The median max attention weight is `r sprintf("%.3f", med_max_attn("NMD"))` for NMD and `r sprintf("%.3f", med_max_attn("Control"))` for Control. Both classes show strong single-ORF dominance, with most isoforms concentrating >50% of attention on one ORF.
+- **(Data)** NMD isoforms have lower median max attention weights than Controls (`r sprintf("%.3f", med_max_attn("NMD"))` vs `r sprintf("%.3f", med_max_attn("Control"))`) and higher median attention entropy (`r sprintf("%.2f", ent_stat("NMD","median_entropy"))` vs `r sprintf("%.2f", ent_stat("Control","median_entropy"))` bits) — more diffuse attention by both metrics. **The mean agrees with the median on the deposited model** (Table 5a: NMD `r sprintf("%.2f", ent_stat("NMD","mean_entropy"))` vs Ctrl `r sprintf("%.2f", ent_stat("Control","mean_entropy"))`), and both tests are highly significant: Mann-Whitney p=`r fmt_p(ent_mw_p)`, Kolmogorov–Smirnov p=`r fmt_p(ent_ks_p)`.
+- **(Data)** **THIS PARAGRAPH PREVIOUSLY SAID THE OPPOSITE, AND BOTH HALVES WERE FROZEN TEXT FROM THE SUPERSEDED 500/500 MODEL.** It read that the mean entropy direction was *opposite* to the median "because Control has heavier upper-tail outliers", and that the central-tendency test was *non-significant* at p=0.68. On the deposited model the mean and median agree, and the Mann-Whitney p is `r fmt_p(ent_mw_p)` — so the conclusion reverses from "no central-tendency difference" to a clear one. Recorded rather than quietly swapped, because the old reading appears in earlier renders.
 
 <details><summary>Table 5b: ORF composition by rank and NMD status</summary>
 
@@ -3259,11 +3264,20 @@ orf_frac <- all_orfs_sg %>%
 render_dt(orf_frac, caption = "Table 6e: Fraction of total |SHAP| by ORF rank and subgroup (NMD only)")
 ```
 
-**Observations:**
-
-- **(Data)** ORF 0 (the priority CDS ORF) accounts for the vast majority of total |SHAP| across all subgroups. Secondary ORFs (ranks 1–4) contribute modestly, with diminishing importance at higher ranks.
-- **(Data)** The NMD vs Control gap is concentrated in ORF 0: NMD transcripts show substantially higher |SHAP| at rank 0, while secondary ORFs show similar |SHAP| between classes.
-- **(Data)** PTC- subgroups show relatively higher fractional contribution from secondary ORFs compared to PTC+, consistent with the higher attention entropy and more distributed prediction strategy observed in Sections 9.9–9.10.
+```{r sec9-11-obs, eval=has_all_orfs, results='asis'}
+# CONDITIONAL, BECAUSE THE SECTION ABOVE MAY NOT HAVE RUN. These three observations were bare
+# markdown: the chunks that produce the figure and table are eval=has_all_orfs and skip when the
+# input is absent, but markdown renders unconditionally. So the report printed "Section
+# intentionally not generated for the 4ct retrain" and then made three (Data) claims about the
+# analysis it had just said it did not run -- findings with no output behind them, in the reader's
+# copy. deepshap_all_orfs_summary has never been produced by anything in this repo, so this has
+# been true of every render.
+cat("**Observations:**\n\n",
+    "- **(Data)** ORF 0 (the priority CDS ORF) accounts for the vast majority of total |SHAP| across all subgroups. Secondary ORFs (ranks 1–4) contribute modestly, with diminishing importance at higher ranks.\n",
+    "- **(Data)** The NMD vs Control gap is concentrated in ORF 0: NMD transcripts show substantially higher |SHAP| at rank 0, while secondary ORFs show similar |SHAP| between classes.\n",
+    "- **(Data)** PTC- subgroups show relatively higher fractional contribution from secondary ORFs compared to PTC+, consistent with the higher attention entropy and more distributed prediction strategy observed in Sections 9.9–9.10.\n",
+    sep = "")
+```
 
 ## 9.12 Subgroup Analysis Summary {#sec9-subgroup-summary}
 
