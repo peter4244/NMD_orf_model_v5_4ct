@@ -22,13 +22,19 @@ PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 [ -x "$PY" ] || { echo "FATAL: no python found. Set PY to one with torch and shap installed "\
                        "(see environment-model.yml)." >&2; exit 1; }
 RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
+# THE SWEEP IS A SECOND TREE. Section 1 describes the window sweep, every other section describes
+# the ONE selected model, and they live in different directories -- results_deposit_h5_2026-08-04
+# trains a single configuration and holds none of the twelve. Passed explicitly rather than left to
+# the report's default, so the dependency is visible in the job log.
+SWEEP_DIR="${SWEEP_DIR:-results_sweep_dn_2026-08-04}"
 # The window and tag come from the config, never from literals here.
 TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || { echo "cannot read selected tag" >&2; exit 1; }
 ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
-echo "=== node $(hostname) | tag=$TAG (atg=$ATG stop=$STOP) | results=$RESULTS_DIR ==="
+echo "=== node $(hostname) | tag=$TAG (atg=$ATG stop=$STOP) | results=$RESULTS_DIR | sweep=$SWEEP_DIR ==="
+[ -d "$SWEEP_DIR" ] || echo "WARNING: sweep dir $SWEEP_DIR not found -- Section 1 will fail its guard"
 
 # rmarkdown::render() does not pass arguments through; NMD_RESULTS_DIR is the override.
-NMD_RESULTS_DIR="$RESULTS_DIR" Rscript -e 'rmarkdown::render("orf_model_report_v5.Rmd", knit_root_dir = normalizePath("."))'
+NMD_RESULTS_DIR="$RESULTS_DIR" NMD_SWEEP_DIR="$SWEEP_DIR" Rscript -e 'rmarkdown::render("orf_model_report_v5.Rmd", knit_root_dir = normalizePath("."))'
 rc=$?; echo "=== render exit: $rc ==="; exit $rc
 
 echo "=== done ==="
