@@ -935,7 +935,7 @@ save_fig(p_stop_zoom, "fig2d_stop_zoom", width = 10, height = 4)
 **Observations:**
 
 - **(Data)** The **stop codon itself** (Panel B) shows a clear SHAP spike — the highest per-position attribution in either window. The U at position -1 drops (invariant, no information), while the variable positions (0 and +1) show elevated G attribution, consistent with TGA preference.
-- **(Data)** The **ATG branch** (Panel A) shows **strong period-3 periodicity** in the G channel both upstream and downstream of the ATG. This reflects the model learning codon usage bias — G at the 3rd codon position (GC3) is a hallmark of vertebrate coding sequences. The lag-3 autocorrelation for G is 0.86 in the NMD ORF body and 0.92 in Control, with most FFT power concentrated near period 3. The model detects reading frame composition from raw nucleotide sequence, in addition to the explicit frame-position encoding channels.
+- **(Data)** The **ATG branch** (Panel A) shows **strong period-3 periodicity** in the G channel both upstream and downstream of the ATG. This reflects the model learning codon usage bias — G at the 3rd codon position (GC3) is a hallmark of vertebrate coding sequences. The periodicity is visible in Panel A; no autocorrelation or spectral statistic is quoted for it, because none is computed in this report and "the ORF body" is not a range this report defines. The model detects reading frame composition from raw nucleotide sequence, in addition to the explicit frame-position encoding channels.
 
 ---
 
@@ -1740,7 +1740,7 @@ save_fig(p_d, "fig4d_gc_raw_stop", width = 10, height = 5)
 **Observations:**
 
 - **(Data)** At the ATG boundary (Panels A–B), both GC SHAP fraction and raw GC content rise after the start codon, reflecting the transition from AT-rich 5'UTR into GC-rich coding sequence. The model's attribution pattern mirrors the underlying composition shift.
-- **(Data)** At the stop boundary (Panels C–D), both GC SHAP fraction and raw GC content drop after the stop codon, reflecting the coding → 3'UTR transition. In controls, the drop is pronounced (~50% just upstream of the stop → ~40% in the downstream window). In NMD transcripts, the drop is attenuated (~50% → ~47%).
+- **(Data)** At the stop boundary (Panels C–D), both GC SHAP fraction and raw GC content drop after the stop codon, reflecting the coding → 3'UTR transition. The drop is pronounced in Controls and attenuated in NMD transcripts — read the magnitudes off Panels C–D rather than from prose. The figures previously quoted were frozen text: this report defines neither "just upstream" nor "the downstream window", and the sentence names two different quantities (GC SHAP fraction and raw GC content) while giving one pair of numbers, so there was no way to tell which had been measured over what.
 - **(Hypothesis)** The attenuated GC drop in NMD transcripts at the stop codon is consistent with "UTR-ization" — when a PTC truncates the reading frame, the sequence between PTC and normal stop is structurally coding (GC-rich) but functionally 3'UTR. Both the raw composition (Panel D) and the model attribution (Panel C) capture this anomaly, confirming the model learned the coding/UTR compositional boundary as a discriminative signal.
 - **(Data)** The correspondence between SHAP-based panels (A, C) and raw-sequence panels (B, D) confirms the model is responding to nucleotide composition rather than specific motifs at these scales.
 
