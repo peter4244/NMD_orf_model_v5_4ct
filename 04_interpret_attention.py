@@ -20,6 +20,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import entropy, mannwhitneyu, spearmanr
 
+from utils import member_tag
+
 
 def load_attention_and_predictions(results_dir, tag):
     attn = pd.read_csv(results_dir / f"attention_weights_{tag}.tsv", sep="\t")
@@ -276,16 +278,33 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--results-dir", type=Path, required=True)
     parser.add_argument("--tag", default="atg20_stop500")
+    # THE INPUT NAME AND THE OUTPUT NAME ARE NOT THE SAME STRING, and conflating them is why this
+    # script produced nothing against the deposit-native tree. evaluate.py writes
+    # f"{member_tag(tag, seed)}_{split}" -- e.g. attention_weights_atg1000_stop1000_seed42_test_clean.tsv
+    # -- while `--tag` alone builds attention_weights_atg1000_stop1000.tsv, which nobody writes. The
+    # wrapper passed the seedless tag from paths_config.py --selected-tag and this script looked for a
+    # file that has never existed. Measured 2026-08-14 against results_deposit_h5_2026-08-04.
+    #
+    # Outputs stay on member_tag WITHOUT the split, matching deepshap.py's otag, so an artifact is
+    # named for the model that produced it rather than for the split it was read from.
+    parser.add_argument("--member-seed", type=int, default=None,
+                        help="Ensemble member, by training seed. Omitted reproduces the legacy "
+                             "un-seeded name, so existing artifacts still resolve.")
+    parser.add_argument("--split", default=None,
+                        help="Split component of the INPUT filenames, e.g. test_clean. Omitted "
+                             "reproduces the legacy name with no split component.")
     args = parser.parse_args()
 
     results_dir = args.results_dir
-    tag = args.tag
+    tag = member_tag(args.tag, args.member_seed)
+    in_stem = tag if not args.split else f"{tag}_{args.split}"
 
     print(f"Attention analysis for model: {tag}")
+    print(f"Reading inputs named: {in_stem}")
     print(f"Results dir: {results_dir}")
 
     # Load data
-    attn, preds = load_attention_and_predictions(results_dir, tag)
+    attn, preds = load_attention_and_predictions(results_dir, in_stem)
     orf_features = load_orf_features_with_rank(results_dir)
 
     # Merge attention with predictions

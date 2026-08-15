@@ -26,13 +26,22 @@ RESULTS_DIR="${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 # The window and tag come from the config, never from literals here.
 TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || { echo "cannot read selected tag" >&2; exit 1; }
 ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
+# The deposited member, and the split its inputs were scored on. paths_config.py
+# --selected-tag deliberately returns the tag WITHOUT the seed, so the seed is named here.
+MEMBER_SEED="${MEMBER_SEED:-42}"
+SPLIT="${SPLIT:-test_clean}"
 echo "=== node $(hostname) | tag=$TAG (atg=$ATG stop=$STOP) | results=$RESULTS_DIR ==="
 
 overall=0
-$PY 04_interpret_attention.py --results-dir "$RESULTS_DIR" --tag "$TAG"
+# --member-seed AND --split, because evaluate.py wrote {tag}_seed42_{split}. Passing --tag alone
+# made 04 look for attention_weights_atg1000_stop1000.tsv, which nobody has ever written, so all
+# four of its outputs were silently absent from the tree (W426).
+$PY 04_interpret_attention.py --results-dir "$RESULTS_DIR" --tag "$TAG" \
+    --member-seed "$MEMBER_SEED" --split "$SPLIT"
 rc=$?; echo "=== 04 exit: $rc ==="; [ $rc -ne 0 ] && overall=$rc
 $PY 05_interpret_structural.py --config config_dn.yaml --tag "$TAG" \
-    --results-dir "$RESULTS_DIR" --atg-window "$ATG" --stop-window "$STOP"
+    --results-dir "$RESULTS_DIR" --atg-window "$ATG" --stop-window "$STOP" \
+    --member-seed "$MEMBER_SEED"
 rc=$?; echo "=== 05 exit: $rc ==="; [ $rc -ne 0 ] && overall=$rc
 exit $overall
 

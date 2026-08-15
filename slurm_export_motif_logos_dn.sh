@@ -27,8 +27,10 @@ TAG=$($PY paths_config.py --selected-tag --config config_dn.yaml) || { echo "can
 ATG=${TAG#atg}; ATG=${ATG%%_*}; STOP=${TAG##*stop}
 echo "=== node $(hostname) | tag=$TAG (atg=$ATG stop=$STOP) | results=$RESULTS_DIR ==="
 
+# --member-seed, because deepshap.py names its NPZs with member_tag. Without it this script
+# looked for deepshap_joint_atg1000_stop1000_run1.npz and exited "Joint NPZ missing" (W426).
 $PY scripts/export_joint_motif_logos.py --results-dir "$RESULTS_DIR" \
-    --atg "$ATG" --stop "$STOP" --n-runs 5
+    --atg "$ATG" --stop "$STOP" --n-runs 5 --member-seed "${MEMBER_SEED:-42}"
 rc=$?; echo "=== motif logos exit: $rc ==="; exit $rc
 
 echo "=== done ==="

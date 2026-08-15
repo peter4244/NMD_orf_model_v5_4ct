@@ -40,6 +40,15 @@ import sys
 import numpy as np
 import pandas as pd
 
+# member_tag is IMPORTED, not restated. Its own docstring makes the argument: "a naming rule
+# restated at seven call sites is a rule that will be seven different rules within a month." This
+# script was effectively an eighth site -- it built the stem inline, seedlessly, and looked for
+# deepshap_joint_atg1000_stop1000_run1.npz while deepshap.py had written
+# deepshap_joint_atg1000_stop1000_seed42_run1.npz. scripts/ had no import-from-root pattern, so
+# this establishes one rather than copying the rule in.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils import member_tag  # noqa: E402
+
 
 def load_run(npz_path):
     d = np.load(npz_path)
@@ -102,10 +111,13 @@ def main():
     ap.add_argument("--atg", type=int, default=500)
     ap.add_argument("--stop", type=int, default=500)
     ap.add_argument("--n-runs", type=int, default=5)
+    ap.add_argument("--member-seed", type=int, default=None,
+                    help="Ensemble member, by training seed. Omitted reproduces the legacy "
+                         "un-seeded name so already-deposited artifacts still resolve.")
     args = ap.parse_args()
 
     results = Path(args.results_dir)
-    tag = f"atg{args.atg}_stop{args.stop}"
+    tag = member_tag(f"atg{args.atg}_stop{args.stop}", args.member_seed)
 
     runs = []
     for r in range(1, args.n_runs + 1):
