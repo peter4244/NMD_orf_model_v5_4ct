@@ -47,6 +47,13 @@ import pandas as pd
 # deepshap_joint_atg1000_stop1000_seed42_run1.npz. scripts/ had no import-from-root pattern, so
 # this establishes one rather than copying the rule in.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# THIS PULLS IN torch, AND THAT IS DELIBERATE RATHER THAN AN OVERSIGHT. utils.py imports torch
+# at module level, so importing member_tag costs this npz reader a torch import -- measured at
+# ~59 s on an Explorer login node. The alternative was restating `{tag}_seed{N}` inline, and
+# member_tag's own docstring is the argument against that: seven call sites restating one naming
+# rule become seven different rules within a month, which is how the published run got five
+# 'members' that were one checkpoint written five times. If the import cost ever matters, the fix
+# is to split member_tag into a torch-free module, not to copy it here.
 from utils import member_tag  # noqa: E402
 
 
