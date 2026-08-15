@@ -715,14 +715,21 @@ auc_typ_sd      <- median(all_metrics$auc_sd)
 auprc_typ_sd    <- median(all_metrics$auprc_sd)
 
 # The one negative result that IS separated: every 100 nt start window is at the bottom.
-atg100_worst_auc   <- all(tail(rank_auc$atg_window,   4) == 100)
-atg100_worst_auprc <- all(tail(rank_auprc$atg_window, 4) == 100)
+# ASSERTED, NOT PRINTED. These were rendered into the prose as `r atg100_worst_auc`, which put a
+# bare R logical into an English sentence -- the first render read "occupy the bottom four places
+# on AUC (TRUE) and on AUPRC (TRUE)". Worse than ugly: had either gone FALSE, the sentence would
+# have asserted the claim and printed its own refutation beside it. A claim the report makes in
+# prose belongs in a guard, so a render either states it truthfully or stops.
+stopifnot(
+  "atg100 no longer occupies the bottom four on AUC"   = all(tail(rank_auc$atg_window,   4) == 100),
+  "atg100 no longer occupies the bottom four on AUPRC" = all(tail(rank_auprc$atg_window, 4) == 100)
+)
 ```
 
 - **(Data) This sweep does not identify a best window, and that is the finding.** The top two configurations differ by `r sprintf("%.5f", auc_top2_gap)` on AUC and `r sprintf("%.5f", auprc_top2_gap)` on AUPRC, against a typical seed-to-seed spread within a single configuration of `r sprintf("%.5f", auc_typ_sd)` and `r sprintf("%.5f", auprc_typ_sd)`. **The gap between the best two cells is smaller than the noise inside one cell**, so the ranking below the top few places is not interpretable as a performance ordering.
 - **(Data) The two metrics disagree about the leader.** AUC is led by `r auc_leader`, AUPRC by `r auprc_leader`. A sweep with a real optimum does not usually swap its winner when the metric changes; two disagreeing leaders separated by less than one seed's spread is what statistical equivalence looks like.
 - **(Data) The deposited configuration is `r best_tag`, ranked `r sel_auc_rank` of 12 on AUC and `r sel_auprc_rank` of 12 on AUPRC.** It was chosen as a defensible option among statistically equivalent ones — top performers on both metrics, with symmetric windows so the two heads see equal extents — and not as a measured optimum. The rationale is Pete's, recorded in `config_dn.yaml`'s `selected:` block.
-- **(Data) The only clearly separated result is negative: a 100 nt start window is genuinely worse.** All four `atg100_*` configurations occupy the bottom four places on AUC (`r atg100_worst_auc`) and on AUPRC (`r atg100_worst_auprc`). This is the one comparison in the sweep where the difference exceeds the seed spread.
+- **(Data) The only clearly separated result is negative: a 100 nt start window is genuinely worse.** All four `atg100_*` configurations occupy the bottom four places on both AUC and AUPRC — asserted in the chunk above, so this sentence cannot render while being false. This is the one comparison in the sweep where the difference exceeds the seed spread.
 
 > **This section replaced conclusions drawn from the superseded 2026-04 sweep, and they inverted.** That sweep reported *"STOP=500 is optimal by AUC"* and *"AUC peaks at STOP=500 for every ATG size."* Neither survives here: the STOP=500 configurations rank 7th, 8th and 9th of 12 on AUC, and the AUC leader carries STOP=2000. **The two sweeps are not comparable and the difference is not a change in the model.** The published one scored all twelve cells on `test_clean` — selecting a configuration on the held-out set, which is the leak D67 records — while this one scores on `val_clean` and repeats each cell across five seeds. A single-run ranking on a leaked split will look decisive; a five-seed ranking on a development split shows the same architecture with its noise floor visible. Recorded rather than quietly replaced, because the earlier claim appears in older renders and a reader meeting both needs to know which is which.
 
