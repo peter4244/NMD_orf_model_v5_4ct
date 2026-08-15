@@ -2185,6 +2185,19 @@ This section contains analyses that complement the main results but are not dire
 
 junc_sub <- motif_stop_multi %>% filter(landmark == "first_3utr_junction")
 
+# JUNCTION BASE FREQUENCIES FOR THE PROSE BELOW. The variable-definitions block restated four of
+# them as fixed text (~65%/~54% for A at -1, ~79%/~76% for G at 0). The audit recorded these as
+# "computed nowhere", which was true of the REPORT and not of the DATA: export_joint_motif_logos.py
+# writes nmd_freq and ctrl_freq per relative_position per channel, so the four numbers are a lookup
+# with no analysis choices in it -- no region to pick, nothing to detrend.
+junc_freq <- function(pos, ch, cls) {
+  v <- junc_sub[[if (cls == "NMD") "nmd_freq" else "ctrl_freq"]][
+    junc_sub$relative_position == pos & junc_sub$channel == ch]
+  if (length(v) != 1L) NA_real_ else 100 * v
+}
+has_junc_freq <- all(c("nmd_freq", "ctrl_freq") %in% names(junc_sub)) &&
+                 !is.na(junc_freq(-1, "A", "NMD"))
+
 if (nrow(junc_sub) > 0) {
   junc_positions <- sort(unique(junc_sub$relative_position))
 
@@ -2261,7 +2274,7 @@ if (nrow(junc_sub) > 0) {
 }
 ```
 
-**Variable definitions:** Each sample contributes its own first 3'UTR junction location, aligned to position 0. In the processed mRNA (which is what the model sees), the junction is the ligation point between exons after intron removal. The dominant pattern is **...A | G(G)...**: position -1 = A (~65% freq in NMD, ~54% in Control; last base of upstream exon), position 0 = G (~79% in NMD, ~76% in Control; first base of downstream exon). After intron removal, the mRNA junction reflects the exonic bases flanking the splice site. The A at position -1 and G at position +1 are the terminal/initial exon bases, consistent with the preference for these nucleotides at mammalian exon boundaries. n varies because not all transcripts have junctions within the visible stop window.
+**Variable definitions:** Each sample contributes its own first 3'UTR junction location, aligned to position 0. In the processed mRNA (which is what the model sees), the junction is the ligation point between exons after intron removal. The dominant pattern is **...A | G(G)...**: position −1 = A (`r if (has_motif_marginal && has_junc_freq) sprintf("%.0f%%", junc_freq(-1,"A","NMD")) else "see the logo"` freq in NMD, `r if (has_motif_marginal && has_junc_freq) sprintf("%.0f%%", junc_freq(-1,"A","Control")) else "see the logo"` in Control; last base of upstream exon), position 0 = G (`r if (has_motif_marginal && has_junc_freq) sprintf("%.0f%%", junc_freq(0,"G","NMD")) else "see the logo"` in NMD, `r if (has_motif_marginal && has_junc_freq) sprintf("%.0f%%", junc_freq(0,"G","Control")) else "see the logo"` in Control; first base of downstream exon). After intron removal, the mRNA junction reflects the exonic bases flanking the splice site. The A at position -1 and G at position +1 are the terminal/initial exon bases, consistent with the preference for these nucleotides at mammalian exon boundaries. n varies because not all transcripts have junctions within the visible stop window.
 
 ## 9.2 EJC Dose-Response and Ordinal Importance {#sec9-ejc}
 
