@@ -210,18 +210,25 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ws_atg = args.atg_window or config["data"]["window_size_atg"]
     ws_stop = args.stop_window or config["data"]["window_size_stop"]
-    # OUTPUTS CARRY THE MEMBER, matching deepshap.py's otag and 04_interpret_attention.py. This
-    # script already loads ONE member's checkpoint via --member-seed, so a seedless output name
-    # claims to describe the configuration when it describes one member of it -- and would collide
-    # if a second member were ever exported. The tree it writes into is 76 seeded files to 6
-    # seedless (measured 2026-08-14, results_deposit_h5_2026-08-04), so seeded is the convention
-    # here, not a new one. member_tag(tag, None) == tag, so the seedless call is unchanged.
-    tag = member_tag(args.tag if args.tag else selected_tag(config), args.member_seed)
+    # TWO NAMES, BECAUSE THEY ARE TWO THINGS -- and collapsing them cost job 9192869.
+    #
+    # `tag` is the SEEDLESS configuration key. resolve_checkpoint(results_dir, tag, seed) applies
+    # member_tag ITSELF, so handing it an already-seeded tag asks for
+    # best_model_atg1000_stop1000_seed42_seed42.pt. That is exactly what happened: I seeded `tag`
+    # here, resolve_checkpoint seeded it again, and 05 died with FileNotFoundError while 04 in the
+    # same wrapper succeeded.
+    #
+    # `out_tag` is the OUTPUT key and does carry the member, matching deepshap.py's otag and
+    # 04_interpret_attention.py: this script loads ONE member's checkpoint, so a seedless output
+    # name would claim to describe the configuration when it describes one member of it. The tree
+    # is 76 seeded files to 6 seedless, so seeded is the convention here, not a new one.
+    tag = args.tag if args.tag else selected_tag(config)
+    out_tag = member_tag(tag, args.member_seed)
     results_dir = Path(args.results_dir)
     print(f"[results-dir] {results_dir}")
     h5_path = config["data"]["hdf5_path"]
 
-    print(f"Structural feature importance for model: {tag}")
+    print(f"Structural feature importance for model: {out_tag}")
 
     # Load feature names from HDF5
     with h5py.File(h5_path, "r") as f:
@@ -260,11 +267,11 @@ def main():
 
     # Summarize
     print("\n=== ORF feature importance ===")
-    summarize_orf_features(orf_gxi, labels, masks, orf_feat_names, results_dir, tag)
+    summarize_orf_features(orf_gxi, labels, masks, orf_feat_names, results_dir, out_tag)
 
     print("\n=== Importance by ORF rank and CDS status (NMD only) ===")
     summarize_by_rank_and_cds(orf_gxi, labels, masks, orf_feat_names,
-                               orf_features_raw, results_dir, tag)
+                               orf_features_raw, results_dir, out_tag)
 
     print("\n=== Structural importance analysis complete ===")
 
