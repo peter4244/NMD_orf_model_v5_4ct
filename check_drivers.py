@@ -70,11 +70,20 @@ EXEMPT_FILES = {
 # Single lines exempt, keyed by (filename, exact stripped text). A literal here names something
 # that is deliberately NOT the current selection, so following the selection would be wrong.
 EXEMPT_LINES = {
+    # RETARGETED 2026-08-15. The slurm_uorf_dn.sh entry exempted a cmp against
+    # results_4ct/best_model_atg500_stop500.pt that COULD NOT FIRE -- a 1000/1000 seeded
+    # checkpoint is never byte-identical to a 500/500 unseeded one -- so the exemption protected a
+    # guard that only ever printed OK. That line is gone; the replacement names the published and
+    # deprecated trees to refuse them, which is still deliberately-not-the-selection.
+    #
+    # The slurm_train_cpu_dn.sh entry had become worse than stale: after OUT gained an override the
+    # exact text "OUT=results_4ct_dn_cpu" survived only inside a COMMENT explaining the old form, so
+    # the exemption matched prose and guarded nothing.
     ("slurm_uorf_dn.sh",
-     'if cmp -s "$CKPT" results_4ct/best_model_atg500_stop500.pt; then'):
-        "compares the new checkpoint against the PUBLISHED one; naming it is the entire point",
-    ("slurm_train_cpu_dn.sh", "OUT=results_4ct_dn_cpu"):
-        "a separate CPU-only smoke tree, not the deprecated results_4ct_dn",
+     '  results_4ct|results_4ct_dn|results_4ct_dn_cpu)'):
+        "names the published and deprecated trees in order to REFUSE them, not to read them",
+    ("slurm_train_cpu_dn.sh", 'OUT="${OUT:-results_4ct_dn_cpu}"'):
+        "a separate CPU-only smoke tree, not the deprecated results_4ct_dn; overridable since 2026-08-15",
 }
 
 PATTERNS = [

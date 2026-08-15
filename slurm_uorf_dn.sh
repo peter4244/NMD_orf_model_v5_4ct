@@ -41,10 +41,19 @@ echo "=== node $(hostname) ==="
 nvidia-smi --query-gpu=name --format=csv,noheader || true
 CKPT=${RESULTS_DIR:-results_deposit_h5_2026-08-04}/best_model_${TAG}_seed42.pt
 test -e "$CKPT" || { echo "FATAL: $CKPT missing"; exit 1; }
-if cmp -s "$CKPT" results_4ct/best_model_atg500_stop500.pt; then
-  echo "FATAL: dn checkpoint is byte-identical to the published one -- wrong tree"; exit 1
-fi
-echo "checkpoint present and differs from published: OK"
+# THIS GUARD COULD NOT FIRE, AND SAID "OK" ANYWAY. It compared $CKPT -- which is
+# best_model_${TAG}_seed42.pt, a 1000/1000 SEEDED checkpoint -- against
+# results_4ct/best_model_atg500_stop500.pt, a 500/500 UNSEEDED one. Two different models, never
+# byte-identical, so cmp always differed and the script printed "differs from published: OK" as
+# false assurance. The wrong-tree case it meant to catch is already caught one line up: point
+# RESULTS_DIR at results_4ct and $CKPT does not exist there, so `test -e` fails first.
+#
+# What it should test is the tree itself, which CAN be wrong and can be checked.
+case "$(basename "${RESULTS_DIR:-results_deposit_h5_2026-08-04}")" in
+  results_4ct|results_4ct_dn|results_4ct_dn_cpu)
+    echo "FATAL: RESULTS_DIR is the published or deprecated tree -- refusing to run"; exit 1 ;;
+esac
+echo "checkpoint present and results tree is deposit-native: OK"
 NMD_RESULTS_DIR=${RESULTS_DIR:-results_deposit_h5_2026-08-04} $PY infer_uorf_attention.py --config config_dn.yaml --results-dir ${RESULTS_DIR:-results_deposit_h5_2026-08-04} --member-seed 42
 rc=$?
 echo "=== infer_uorf_attention exit: $rc ==="
