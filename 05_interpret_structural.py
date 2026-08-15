@@ -23,7 +23,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from model import build_model
-from utils import (NMDDataset, load_config, resolve_checkpoint, selected_tag,
+from utils import (NMDDataset, load_config, member_tag, resolve_checkpoint, selected_tag,
                    set_seed)
 
 
@@ -210,7 +210,13 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ws_atg = args.atg_window or config["data"]["window_size_atg"]
     ws_stop = args.stop_window or config["data"]["window_size_stop"]
-    tag = args.tag if args.tag else selected_tag(config)
+    # OUTPUTS CARRY THE MEMBER, matching deepshap.py's otag and 04_interpret_attention.py. This
+    # script already loads ONE member's checkpoint via --member-seed, so a seedless output name
+    # claims to describe the configuration when it describes one member of it -- and would collide
+    # if a second member were ever exported. The tree it writes into is 76 seeded files to 6
+    # seedless (measured 2026-08-14, results_deposit_h5_2026-08-04), so seeded is the convention
+    # here, not a new one. member_tag(tag, None) == tag, so the seedless call is unchanged.
+    tag = member_tag(args.tag if args.tag else selected_tag(config), args.member_seed)
     results_dir = Path(args.results_dir)
     print(f"[results-dir] {results_dir}")
     h5_path = config["data"]["hdf5_path"]

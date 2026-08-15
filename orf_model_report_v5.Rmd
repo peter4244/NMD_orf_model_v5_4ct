@@ -122,6 +122,13 @@ best_atg  <- 1000
 best_stop <- 1000
 best_seed <- 42
 best_tag  <- paste0("atg", best_atg, "_stop", best_stop)
+# THE R MIRROR OF utils.member_tag(tag, seed). Every producer names member-specific artifacts
+# {tag}_seed{N}: evaluate.py writes {member}_{split}, deepshap.py {member}{orf}{run}, and after
+# 2026-08-14 so do 04_interpret_attention.py and 05_interpret_structural.py. The tree is 76 seeded
+# files to 6 seedless. best_tag stays SEEDLESS so it still means what paths_config.py
+# --selected-tag returns, which is what every SLURM driver passes; best_member is what filenames
+# are built from. Two names because they are two things -- conflating them is W426.
+best_member <- paste0(best_tag, "_seed", best_seed)
 cat("Best model:", best_tag, "\n")
 ```
 
@@ -197,7 +204,7 @@ stopifnot(nrow(all_metrics) == 12L, all(all_metrics$n_runs == 5L))
 # Training/validation used remaining chromosomes.
 
 # Predictions (one row per test transcript)
-preds <- read.delim(file.path(results_dir, paste0("predictions_", best_tag, ".tsv")))
+preds <- read.delim(file.path(results_dir, paste0("predictions_", best_member, "_test_clean.tsv")))
 
 # Add outcome classification (used by multiple sections downstream)
 preds <- preds %>%
@@ -211,29 +218,29 @@ preds <- preds %>%
 
 # Attention weights (one row per ORF per transcript)
 attn_weights <- read.delim(file.path(results_dir,
-                                      paste0("attention_weights_", best_tag, ".tsv")))
+                                      paste0("attention_weights_", best_member, "_test_clean.tsv")))
 
 # Attention entropy (one row per transcript)
 attn_entropy <- read.delim(file.path(results_dir,
-                                      paste0("attention_entropy_", best_tag, ".tsv")))
+                                      paste0("attention_entropy_", best_member, ".tsv")))
 
 # Attention by ORF type (summary statistics)
 attn_by_type <- read.delim(file.path(results_dir,
-                                      paste0("attention_by_orf_type_", best_tag, ".tsv")))
+                                      paste0("attention_by_orf_type_", best_member, ".tsv")))
 
 # Attention vs ORF feature correlations
 attn_vs_feat <- read.delim(file.path(results_dir,
-                                      paste0("attention_vs_features_", best_tag, ".tsv")))
+                                      paste0("attention_vs_features_", best_member, ".tsv")))
 
 # v5: ORF structural feature importance only (no TX bypass)
 imp_orf <- read.delim(file.path(results_dir,
-                                 paste0("structural_importance_orf_", best_tag, ".tsv")))
+                                 paste0("structural_importance_orf_", best_member, ".tsv")))
 imp_rank <- read.delim(file.path(results_dir,
-                                  paste0("structural_importance_by_rank_", best_tag, ".tsv")))
+                                  paste0("structural_importance_by_rank_", best_member, ".tsv")))
 
 # No-PTC NMD analysis (all NMD test transcripts with ORF-level detail)
 noptc_all <- read.delim(file.path(results_dir,
-                                   paste0("attention_noptc_analysis_", best_tag, ".tsv")))
+                                   paste0("attention_noptc_analysis_", best_member, ".tsv")))
 noptc <- noptc_all %>% filter(any_orf_has_ejc == 0)
 
 # Selected ORFs (full dataset — filtered to test set below)
@@ -266,11 +273,11 @@ td2_features <- read.delim(file.path(results_dir, "td2_features.tsv"))
 # flow feeding sections 3.1, 4.1, 7.2, 9.4 and 9.6-9.8.
 shap_mode <- "joint"
 shap_run_files <- sort(Sys.glob(file.path(results_dir,
-                                           paste0("deepshap_summary_", best_tag, "_",
+                                           paste0("deepshap_summary_", best_member, "_",
                                                   shap_mode, "_run*.tsv"))))
 if (length(shap_run_files) == 0) {
   legacy_shap_files <- sort(Sys.glob(file.path(results_dir,
-                                                paste0("deepshap_summary_", best_tag, "_run*.tsv"))))
+                                                paste0("deepshap_summary_", best_member, "_run*.tsv"))))
   if (length(legacy_shap_files) > 0) {
     warning(sprintf(paste0("Falling back to %d LEGACY mode-less deepshap_summary file(s). ",
                            "These predate the W52 mode suffix, so joint and structural-only ",
@@ -290,7 +297,7 @@ if (has_shap) {
 }
 
 # DeepSHAP positional TSVs (from run 1, exported by 06_export_deepshap_tsv.py)
-shap_run_tag <- paste0(best_tag, "_run1")
+shap_run_tag <- paste0(best_member, "_run1")
 shap_atg_pos_path <- file.path(results_dir, paste0("deepshap_atg_positional_", shap_run_tag, ".tsv"))
 has_shap_tsv <- file.exists(shap_atg_pos_path)
 if (has_shap_tsv) {
@@ -307,8 +314,8 @@ if (has_shap_tsv) {
 
 # Motif landmark logos (from 07_motif_analysis.py)
 # Prefer joint SHAP logos (all test samples) if available; fall back to marginal run 1
-motif_atg_joint_path <- file.path(results_dir, paste0("motif_logo_atg_joint_", best_tag, ".tsv"))
-motif_stop_joint_path <- file.path(results_dir, paste0("motif_logo_stop_joint_", best_tag, ".tsv"))
+motif_atg_joint_path <- file.path(results_dir, paste0("motif_logo_atg_joint_", best_member, ".tsv"))
+motif_stop_joint_path <- file.path(results_dir, paste0("motif_logo_stop_joint_", best_member, ".tsv"))
 motif_stop_path <- file.path(results_dir, paste0("motif_logos_stop_", shap_run_tag, ".tsv"))
 motif_atg_path  <- file.path(results_dir, paste0("motif_logo_atg_", shap_run_tag, ".tsv"))
 
@@ -346,7 +353,7 @@ motif_logo_subtitle_tag <- switch(motif_logo_source,
   none     = "Source: motif logo TSV not found.")
 
 # Additional analysis TSVs
-gc_path <- file.path(results_dir, paste0("gc_content_across_stop_window_", best_tag, ".tsv"))
+gc_path <- file.path(results_dir, paste0("gc_content_across_stop_window_", best_member, ".tsv"))
 has_gc <- file.exists(gc_path)
 if (has_gc) gc_data <- read.delim(gc_path)
 
@@ -361,12 +368,17 @@ if (has_junc_ord) {
 }
 
 # DeepSHAP stability
-shap_stab_path <- file.path(results_dir, paste0("deepshap_stability_", best_tag, ".tsv"))
+shap_stab_path <- file.path(results_dir, paste0("deepshap_stability_", best_member, ".tsv"))
 has_stability <- file.exists(shap_stab_path)
 if (has_stability) shap_stability <- read.delim(shap_stab_path)
 
 # Subgroup-specific DeepSHAP TSVs (from 08_export_subgroup_deepshap_tsv.py)
 # Methods: METHODS.md § "Subgroup-Specific DeepSHAP Analysis"
+  # THE SIX subgroup_* FILES ARE SEEDLESS, AND THEY ARE THE ONLY SEEDLESS FILES IN THE TREE.
+  # 08_export_subgroup_deepshap_tsv.py names them {tag} where everything else is {tag}_seed42:
+  # measured 2026-08-14, 76 seeded files against exactly these 6. They read best_tag, not
+  # best_member. I moved them to best_member with the other 43 and the path check caught it --
+  # they were the one group that was already WORKING, and the sweep would have broken them.
 sg_kozak_path <- file.path(results_dir, paste0("subgroup_kozak_shap_", best_tag, ".tsv"))
 has_subgroup_shap <- file.exists(sg_kozak_path)
 if (has_subgroup_shap) {
@@ -409,15 +421,15 @@ cat(sprintf("DeepSHAP subset: 2,000 samples (~%d NMD, ~%d Control) per replicate
 ```{r data-status-flags, include=FALSE}
 # Pre-compute every file-existence flag the data-status panel needs,
 # in advance of the later chunks that also (re)define some of these.
-has_kernel_shap <- file.exists(file.path(results_dir, paste0("kernel_shap_branch_", best_tag, ".tsv")))
-has_shap_profiles <- file.exists(file.path(results_dir, paste0("shap_profile_atg_joint_", best_tag, ".tsv"))) &&
-                     file.exists(file.path(results_dir, paste0("shap_profile_stop_joint_", best_tag, ".tsv")))
-has_pa_sqanti <- file.exists(file.path(results_dir, paste0("polya_sqanti_test_", best_tag, ".tsv")))
-has_sg_profiles <- file.exists(file.path(results_dir, paste0("shap_profile_atg_subgroup_joint_", best_tag, ".tsv"))) &&
-                   file.exists(file.path(results_dir, paste0("shap_profile_stop_subgroup_joint_", best_tag, ".tsv")))
-has_atg_sg  <- file.exists(file.path(results_dir, paste0("motif_logo_atg_subgroup_joint_", best_tag, ".tsv")))
-has_stop_sg <- file.exists(file.path(results_dir, paste0("motif_logo_stop_subgroup_joint_", best_tag, ".tsv")))
-has_all_orfs <- file.exists(file.path(results_dir, paste0("deepshap_all_orfs_summary_", best_tag, ".tsv")))
+has_kernel_shap <- file.exists(file.path(results_dir, paste0("kernel_shap_branch_", best_member, "_all.tsv")))
+has_shap_profiles <- file.exists(file.path(results_dir, paste0("shap_profile_atg_joint_", best_member, ".tsv"))) &&
+                     file.exists(file.path(results_dir, paste0("shap_profile_stop_joint_", best_member, ".tsv")))
+has_pa_sqanti <- file.exists(file.path(results_dir, paste0("polya_sqanti_test_", best_member, ".tsv")))
+has_sg_profiles <- file.exists(file.path(results_dir, paste0("shap_profile_atg_subgroup_joint_", best_member, ".tsv"))) &&
+                   file.exists(file.path(results_dir, paste0("shap_profile_stop_subgroup_joint_", best_member, ".tsv")))
+has_atg_sg  <- file.exists(file.path(results_dir, paste0("motif_logo_atg_subgroup_joint_", best_member, ".tsv")))
+has_stop_sg <- file.exists(file.path(results_dir, paste0("motif_logo_stop_subgroup_joint_", best_member, ".tsv")))
+has_all_orfs <- file.exists(file.path(results_dir, paste0("deepshap_all_orfs_summary_", best_member, ".tsv")))
 ```
 
 ```{r data-status, results='asis'}
@@ -619,7 +631,7 @@ render_dt(all_metrics %>%
 # ── Data provenance ──
 # Source: training_log_{best_tag}.csv — epoch-level train/val metrics from 03_train.py
 
-log_path <- file.path(results_dir, paste0("training_log_", best_tag, ".csv"))
+log_path <- file.path(results_dir, paste0("training_log_", best_member, ".csv"))
 if (file.exists(log_path)) {
   log_df <- read.csv(log_path)
 
@@ -724,7 +736,7 @@ atg100_worst_auprc <- all(tail(rank_auprc$atg_window, 4) == 100)
 
 ```{r sec2-load-kernel-shap, include=FALSE}
 # Load KernelSHAP branch decomposition
-ks_path <- file.path(results_dir, paste0("kernel_shap_branch_", best_tag, ".tsv"))
+ks_path <- file.path(results_dir, paste0("kernel_shap_branch_", best_member, "_all.tsv"))
 has_kernel_shap <- file.exists(ks_path)
 if (has_kernel_shap) {
   ks <- read.delim(ks_path)
@@ -733,8 +745,8 @@ if (has_kernel_shap) {
 }
 
 # Load SHAP profiles for sequence windows
-atg_profile_path <- file.path(results_dir, paste0("shap_profile_atg_joint_", best_tag, ".tsv"))
-stop_profile_path <- file.path(results_dir, paste0("shap_profile_stop_joint_", best_tag, ".tsv"))
+atg_profile_path <- file.path(results_dir, paste0("shap_profile_atg_joint_", best_member, ".tsv"))
+stop_profile_path <- file.path(results_dir, paste0("shap_profile_stop_joint_", best_member, ".tsv"))
 has_shap_profiles <- file.exists(atg_profile_path) && file.exists(stop_profile_path)
 if (has_shap_profiles) {
   atg_profile <- read.delim(atg_profile_path)
@@ -1874,13 +1886,13 @@ render_dt(subgroup_counts, caption = "Table 6a: Test set isoform subgroups")
 
 The model uses different ORF-level features for different subgroups, as measured by per-sample DeepSHAP attribution of the 5 ORF structural features (frac_start, frac_stop, is_ref_cds, is_sqanti_cds, n_downstream_ejc). SHAP values were computed for all `r format(n_test, big.mark = ",")` test transcripts using 500 background samples, averaged across 5 replicates with different background random seeds.
 
-```{r fig6c-attribution-by-subgroup, fig.width=10, fig.height=7, eval=file.exists(file.path(results_dir, paste0("sample_shap_structural_", best_tag, ".tsv")))}
+```{r fig6c-attribution-by-subgroup, fig.width=10, fig.height=7, eval=file.exists(file.path(results_dir, paste0("sample_shap_structural_", best_member, ".tsv")))}
 # ── Data provenance ──
 # Source: sample_shap_structural_{tag}.tsv — produced by 09b_export_subgroup_profiles.py
 #   from deepshap_joint_{tag}_run{1..5}.npz (per-sample 5-feature SHAP, 5-run averaged).
 # Population: all test transcripts across 4 subgroups (NMD only after filter).
 
-shap_orf_samples <- read.delim(file.path(results_dir, paste0("sample_shap_structural_", best_tag, ".tsv")))
+shap_orf_samples <- read.delim(file.path(results_dir, paste0("sample_shap_structural_", best_member, ".tsv")))
 
 # Join subgroup assignments
 shap_with_subgroup <- shap_orf_samples %>%
@@ -2385,7 +2397,7 @@ save_fig(p_dose / p_shap_ord, "fig4c_ejc_analysis", width = 10, height = 9)
 # See METHODS.md § "Poly(A) Signal" (if documented) or SQANTI3 documentation
 # Population: all test transcripts
 
-pa_sqanti_path <- file.path(results_dir, paste0("polya_sqanti_test_", best_tag, ".tsv"))
+pa_sqanti_path <- file.path(results_dir, paste0("polya_sqanti_test_", best_member, ".tsv"))
 has_pa_sqanti <- file.exists(pa_sqanti_path)
 
 if (has_pa_sqanti) {
@@ -2641,12 +2653,12 @@ utr5_medians <- sec8_utr5 %>%
 
 This section shows how the model's reliance on each input type varies across NMD subgroups: structural ORF features, ATG branch sequence, and stop branch sequence.
 
-```{r fig6-struct-by-subgroup, fig.width=10, fig.height=5, eval=file.exists(file.path(results_dir, paste0("sample_shap_structural_", best_tag, ".tsv")))}
+```{r fig6-struct-by-subgroup, fig.width=10, fig.height=5, eval=file.exists(file.path(results_dir, paste0("sample_shap_structural_", best_member, ".tsv")))}
 # ── Data provenance ──
 # Source: sample_shap_structural_{tag}.tsv — per-sample DeepSHAP (5 ORF features)
 # Population: all test transcripts across 4 subgroups
 
-shap_struct_sg <- read.delim(file.path(results_dir, paste0("sample_shap_structural_", best_tag, ".tsv"))) %>%
+shap_struct_sg <- read.delim(file.path(results_dir, paste0("sample_shap_structural_", best_member, ".tsv"))) %>%
   inner_join(sec8_data %>% select(isoform_id, subgroup), by = "isoform_id") %>%
   filter(label > 0.5, subgroup != "NMD other")
 
@@ -2687,8 +2699,8 @@ save_fig(p_struct_sg, "fig6_struct_by_subgroup", width = 10, height = 5)
 # Window center (relative_position = 0) = the rank-0 ATG. For PTC-ref-ATG-retained, PTC+, and
 # Control, rank-0 = reference CDS start. For PTC-ref-ATG-lost, rank-0 falls back to TD2/SQANTI start.
 
-atg_sg_profile_path <- file.path(results_dir, paste0("shap_profile_atg_subgroup_joint_", best_tag, ".tsv"))
-stop_sg_profile_path <- file.path(results_dir, paste0("shap_profile_stop_subgroup_joint_", best_tag, ".tsv"))
+atg_sg_profile_path <- file.path(results_dir, paste0("shap_profile_atg_subgroup_joint_", best_member, ".tsv"))
+stop_sg_profile_path <- file.path(results_dir, paste0("shap_profile_stop_subgroup_joint_", best_member, ".tsv"))
 has_sg_profiles <- file.exists(atg_sg_profile_path) && file.exists(stop_sg_profile_path)
 
 if (has_sg_profiles) {
@@ -2744,7 +2756,7 @@ save_fig(p_stop_sg, "fig6_stop_profile_subgroup", width = 10, height = 5)
 # Source: motif_logo_atg_subgroup_joint_{tag}.tsv — joint DeepSHAP, all test, 5-run avg
 # Population: all test transcripts stratified by subgroup
 
-atg_sg_path <- file.path(results_dir, paste0("motif_logo_atg_subgroup_joint_", best_tag, ".tsv"))
+atg_sg_path <- file.path(results_dir, paste0("motif_logo_atg_subgroup_joint_", best_member, ".tsv"))
 has_atg_sg <- file.exists(atg_sg_path)
 
 if (has_atg_sg) {
@@ -2815,7 +2827,7 @@ if (has_atg_sg) {
 # ── Data provenance ──
 # Source: motif_logo_stop_subgroup_joint_{tag}.tsv — joint DeepSHAP, all test, 5-run avg
 
-stop_sg_path <- file.path(results_dir, paste0("motif_logo_stop_subgroup_joint_", best_tag, ".tsv"))
+stop_sg_path <- file.path(results_dir, paste0("motif_logo_stop_subgroup_joint_", best_member, ".tsv"))
 has_stop_sg <- file.exists(stop_sg_path)
 
 if (has_stop_sg) {
@@ -3142,7 +3154,7 @@ render_dt(q_summary %>%
 # Aggregator over deepshap_joint_{tag}[_orf{1-4}]_run{1..5}.npz files (5-run pooled if generated).
 # Population: all test transcripts, 500 background. Currently absent — see §9.11 skip-note below.
 
-all_orfs_path <- file.path(results_dir, paste0("deepshap_all_orfs_summary_", best_tag, ".tsv"))
+all_orfs_path <- file.path(results_dir, paste0("deepshap_all_orfs_summary_", best_member, ".tsv"))
 has_all_orfs <- file.exists(all_orfs_path)
 ```
 
