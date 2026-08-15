@@ -84,7 +84,11 @@ out_dir <- local({
   v <- if (length(eq)) sub("^--results-dir=", "", eq[1])
        else if (length(i) && length(a) > i[1]) a[i[1] + 1L]
        else Sys.getenv("NMD_RESULTS_DIR", unset = "")
-  if (!nzchar(v)) v <- "results_4ct"          # nzchar guard: an exported-but-empty var
+  # THE FALLBACK IS THE DEPOSIT-NATIVE TREE, NOT THE PUBLISHED ONE. This read
+  # `v <- "results_4ct"`, so a caller that passed no --results-dir and exported no
+  # NMD_RESULTS_DIR silently produced PUBLISHED-run outputs while every visible flag looked
+  # deposit-native. The nzchar guard stays: an exported-but-empty variable is not an override.
+  if (!nzchar(v)) v <- "results_deposit_h5_2026-08-04"          # nzchar guard: an exported-but-empty var
   v <- path.expand(v)                          # is not an override
   script_dir <- dirname(sub("^--file=", "",
                             grep("^--file=", commandArgs(FALSE), value = TRUE)[1]))

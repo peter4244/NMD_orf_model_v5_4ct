@@ -113,8 +113,14 @@ def eval_epoch(model, loader, criterion, device, use_amp):
     return metrics
 
 
+# results_dir HAS NO DEFAULT. It was "results_4ct" -- the PUBLISHED run -- so any caller
+# that omitted it trained/scored against the old universe and exited 0. The CLI below always
+# passes it, so this default was reachable only by a direct import, which is exactly the
+# caller with no wrapper to correct it. None + a loud check beats a silent wrong tree.
 def train(config_path, atg_window=None, stop_window=None,
-          results_dir="results_4ct", seed=None):
+          results_dir=None, seed=None):
+    if not results_dir:
+        raise ValueError("train() needs an explicit results_dir; there is no default tree.")
     config = load_config(config_path)
     # SEED IS RESOLVED ONCE, HERE, AND THEN NAMES EVERY ARTIFACT THIS RUN WRITES (2026-07-29).
     # It used to come from config only, which is why five array tasks all wrote one checkpoint.

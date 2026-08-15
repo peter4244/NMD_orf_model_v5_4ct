@@ -17,7 +17,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tag", required=True)
     parser.add_argument("--results-dir", required=True)
-    parser.add_argument("--hdf5-path", default="results_4ct/nmd_orf_data.h5")
+    # DERIVED FROM --results-dir, NOT DEFAULTED TO A TREE. This was
+    # default="results_4ct/nmd_orf_data.h5" -- the PUBLISHED run -- so a caller that passed
+    # --results-dir correctly still read the old HDF5, which is worse than a wrong default
+    # because every visible flag looks right. Requiring it instead would break
+    # slurm_export_importance_dn.sh, which passes --results-dir and not --hdf5-path; deriving
+    # it keeps that caller working and makes the two impossible to disagree.
+    parser.add_argument("--hdf5-path", default=None,
+                        help="Defaults to <results-dir>/nmd_orf_data.h5.")
     args = parser.parse_args()
 
     results_dir = Path(args.results_dir)
@@ -30,7 +37,9 @@ def main():
     labels = d["labels"]
 
     # Load feature names from HDF5 metadata
-    with h5py.File(args.hdf5_path, "r") as f:
+    hdf5_path = args.hdf5_path or str(Path(args.results_dir) / "nmd_orf_data.h5")
+    print(f"[hdf5] {hdf5_path}")
+    with h5py.File(hdf5_path, "r") as f:
         orf_names = json.loads(f.attrs["orf_feature_cols"])
 
     print(f"  orf_gxi shape: {orf_gxi.shape}")

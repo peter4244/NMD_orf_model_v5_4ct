@@ -114,8 +114,14 @@ def enforce_split_gate(parser, args):
                      f"split. Drop it.")
 
 
+# results_dir HAS NO DEFAULT. It was "results_4ct" -- the PUBLISHED run -- so any caller
+# that omitted it trained/scored against the old universe and exited 0. The CLI below always
+# passes it, so this default was reachable only by a direct import, which is exactly the
+# caller with no wrapper to correct it. None + a loud check beats a silent wrong tree.
 def evaluate(config_path, atg_window=None, stop_window=None,
-             results_dir="results_4ct", member_seed=None, split=None):
+             results_dir=None, member_seed=None, split=None):
+    if not results_dir:
+        raise ValueError("evaluate() needs an explicit results_dir; there is no default tree.")
     config = load_config(config_path)
     set_seed(config["training"]["seed"])
 

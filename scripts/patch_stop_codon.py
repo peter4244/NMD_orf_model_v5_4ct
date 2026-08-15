@@ -48,7 +48,12 @@ def decode_stop_codon(stop_window_orf):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--results-dir", default="results_4ct")
+    # NO DEFAULT RESULTS TREE. It was "results_4ct" -- the PUBLISHED run -- so a bare call
+    # silently read the old universe and exited 0. Every wrapper already passes
+    # --results-dir, so requiring it costs nothing and removes the one path that could
+    # produce published-tree numbers while looking deposit-native. Same reasoning as
+    # deepshap.py's --split: a default of any value is how the wrong population goes invisible.
+    ap.add_argument("--results-dir", required=True)
     ap.add_argument("--in-place", action="store_true",
                     help="Overwrite selected_orfs.tsv. Otherwise writes selected_orfs_fixed.tsv.")
     ap.add_argument("--filter-to-h5", action="store_true",

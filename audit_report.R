@@ -11,7 +11,14 @@ suppressPackageStartupMessages({
   library(yaml)
 })
 
-results_dir <- "results_4ct"
+# THE RESULTS TREE IS READ, NOT RESTATED -- the same argument the comment below makes about the
+# TAG, which this line did not honour. It was `results_dir <- "results_4ct"`, the PUBLISHED run,
+# hardcoded with no override: an audit script that verifies the report against the published tree
+# while the report renders the deposit-native one would pass on both and compare neither. It has
+# no --results-dir, so the env override the rest of the R side uses is the whole mechanism
+# (export_rds.R:86, compute_uorf_attention_metrics.R:49, orf_model_report_v5.Rmd:83).
+results_dir <- Sys.getenv("NMD_RESULTS_DIR", unset = "results_deposit_h5_2026-08-04")
+cat(sprintf("[results-dir] %s\n", results_dir))
 
 # THE SELECTED WINDOW CONFIGURATION IS READ, NOT RESTATED (2026-07-29, D-B3.6).
 # `best_tag <- "atg500_stop500"` was a literal here, and it builds six input paths below. An

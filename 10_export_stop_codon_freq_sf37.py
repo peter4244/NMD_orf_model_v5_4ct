@@ -39,10 +39,16 @@ and typed into prose has no producer. ALL THREE codons are tested, so quoting UG
 visibly a choice rather than the only thing that was measured.
 
 Usage (on Explorer):
-    cd /home/p.castaldi/cc/nmd_orf_model_v5_4ct
+    cd /home/p.castaldi/cc/NMD_orf_model_v5_4ct
     python 10_export_stop_codon_freq_sf37.py \
-        --config config_dn.yaml --results-dir results_4ct_dn \
+        --config config_dn.yaml --results-dir results_deposit_h5_2026-08-04 \
         --member-seed 42 --split all
+
+    The example named results_4ct_dn until 2026-08-15. That tree is DEPRECATED -- it holds an
+    HDF5 built from Channing inputs and is segregated under deprecated_ -- so a reader copying
+    the usage line ran the script against the wrong universe while passing every flag correctly.
+    The deposit-native tree is results_deposit_h5_2026-08-04. The `cd` path was also the lowercase
+    spelling, which resolves only through a symlink made 2026-08-09.
 
 It reads `predictions_{tag}_seed{N}_{split}.tsv`, so evaluate.py must have been run
 for that split first — `--split all` additionally requires `--full-cohort` there,
@@ -63,9 +69,14 @@ from paths_config import load_config, selected_tag
 from utils import member_tag
 
 HERE = Path(__file__).resolve().parent
-RESULTS = HERE / "results_4ct"
+# NO MODULE-LEVEL RESULTS TREE. This was `RESULTS = HERE / "results_4ct"` -- the PUBLISHED run --
+# and SELECTED and OUT_TSV were built from it at import time. main() declares them global and
+# rebuilds all three from --results-dir before any read, so the values never reached an output;
+# but anything importing this module rather than running it got the published tree, and a reader
+# scanning the header saw results_4ct as the default of a deposit-native script. PREDS was already
+# None for exactly this reason (2026-08-04); the other two are now joined to it.
 
-SELECTED = RESULTS / "selected_orfs.tsv"
+SELECTED = None
 # Derived, not a literal: this path silently pinned the script to atg500_stop500 even when
 # --tag named a different configuration (2026-07-29).
 # MODULE-LEVEL DEFAULT REMOVED 2026-08-04. This read config.yaml (Channing) at import
@@ -73,7 +84,7 @@ SELECTED = RESULTS / "selected_orfs.tsv"
 # the caller's config. Kept as None so a stale reference fails loudly instead of
 # silently naming a Channing-derived file.
 PREDS    = None
-OUT_TSV  = RESULTS / "stop_codon_freq_by_class_sf37.tsv"
+OUT_TSV  = None
 
 # Map DNA → RNA notation for display (T → U in the stop codon).
 DNA2RNA = str.maketrans({"T": "U"})

@@ -45,7 +45,18 @@ PY="${PY:-/home/p.castaldi/.conda/envs/nmd_model/bin/python}"
 [ -x "$PY" ] || { echo "FATAL: no python found. Set PY to one with torch and shap installed "\
                        "(see environment-model.yml)." >&2; exit 1; }
 
-OUT=results_4ct_dn_cpu
+# OVERRIDABLE, AND DELIBERATELY *NOT* THE DEPOSIT-NATIVE TREE. This was a bare
+# `OUT=results_4ct_dn_cpu` with no override, which the 2026-08-13 audit flagged with the other
+# hardcoded trees. The fix is NOT to repoint it at results_deposit_h5_2026-08-04: this script
+# TRAINS, so its output landing in the deposit-native tree would let a CPU smoke-test overwrite
+# best_model_atg1000_stop1000_seed42.pt -- the deposited checkpoint every section 5 number rests
+# on. A separate tree is correct here; the defect was that it could not be moved.
+#
+# The name follows the deprecated results_4ct_dn family and is kept only so existing logs still
+# resolve. #SBATCH --output above names the same directory and CANNOT read this variable, because
+# SBATCH directives are parsed before the shell runs -- so if you override OUT, the job log still
+# lands in results_4ct_dn_cpu/.
+OUT="${OUT:-results_4ct_dn_cpu}"
 mkdir -p "$OUT"
 
 SEED=$((SLURM_ARRAY_TASK_ID * 100))

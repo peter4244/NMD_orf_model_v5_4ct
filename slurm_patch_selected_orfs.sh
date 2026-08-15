@@ -17,7 +17,10 @@ eval "$(conda shell.bash hook)"
 conda activate nmd_model
 
 echo "=== Patching selected_orfs.tsv stop_codon column from HDF5 ==="
-python scripts/patch_stop_codon.py
+# --results-dir IS PASSED, because patch_stop_codon.py no longer defaults to results_4ct.
+# It defaulted to the PUBLISHED tree and this wrapper passed nothing, so the patch was
+# applied to the published selected_orfs.tsv regardless of which run was being built.
+python scripts/patch_stop_codon.py --results-dir "${RESULTS_DIR:-results_deposit_h5_2026-08-04}"
 
 echo ""
 echo "=== Done ==="

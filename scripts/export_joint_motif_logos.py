@@ -107,7 +107,12 @@ def export_logo(shap_block, input_block, labels, channels, out_path,
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--results-dir", default="results_4ct")
+    # NO DEFAULT RESULTS TREE. It was "results_4ct" -- the PUBLISHED run -- so a bare call
+    # silently read the old universe and exited 0. Every wrapper already passes
+    # --results-dir, so requiring it costs nothing and removes the one path that could
+    # produce published-tree numbers while looking deposit-native. Same reasoning as
+    # deepshap.py's --split: a default of any value is how the wrong population goes invisible.
+    ap.add_argument("--results-dir", required=True)
     ap.add_argument("--atg", type=int, default=500)
     ap.add_argument("--stop", type=int, default=500)
     ap.add_argument("--n-runs", type=int, default=5)
