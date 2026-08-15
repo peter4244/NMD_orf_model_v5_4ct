@@ -1152,6 +1152,14 @@ p_stop_full <- stop_total %>%
   theme(legend.position = "top")
 
 save_fig(p_stop_full, "fig4_stop_importance_profile", width = 10, height = 4)
+
+# NMD/Control |SHAP| RATIO PER BRANCH, for the prose below. It read "~30% higher ... (NMD/Control
+# ratio ~ 1.3x)" and "(~ 2x)" for the ATG branch as fixed text. Both are computable from the very
+# profiles this section plots -- and "~30% higher" and "1.3x" are THE SAME QUANTITY stated twice in
+# one sentence, so the paragraph could contradict itself without either profile changing.
+branch_ratio <- function(df) sum(df$nmd_abs_shap) / sum(df$ctrl_abs_shap)
+stop_nmd_ctrl_ratio <- branch_ratio(stop_profile)
+atg_nmd_ctrl_ratio  <- branch_ratio(atg_profile)
 ```
 
 **Variable definitions:**
@@ -1161,7 +1169,7 @@ save_fig(p_stop_full, "fig4_stop_importance_profile", width = 10, height = 4)
 
 **Observations:**
 
-- **(Data)** Importance peaks sharply at the stop codon itself, with most attribution concentrated in the ~50nt preceding the stop site (final codons of the ORF) and falling off into the 3'UTR. NMD transcripts have ~30% higher overall |SHAP| than Controls in the stop branch (NMD/Control ratio ≈ 1.3x). Although the relative NMD/Control gap is larger in the ATG branch (≈ 2x), the stop branch carries the highest absolute attribution and contributes the largest share to predictions (consistent with the branch decomposition in Section 2.1).
+- **(Data)** Importance peaks sharply at the stop codon itself, with most attribution concentrated in the ~50nt preceding the stop site (final codons of the ORF) and falling off into the 3'UTR. NMD transcripts carry a higher overall |SHAP| than Controls in the stop branch — NMD/Control ratio `r if (has_shap_profiles) sprintf("%.2fx", stop_nmd_ctrl_ratio) else "see the profile figure"`. Although the relative NMD/Control gap is larger in the ATG branch (`r if (has_shap_profiles) sprintf("%.2fx", atg_nmd_ctrl_ratio) else "see the profile figure"`), the stop branch carries the highest absolute attribution and contributes the largest share to predictions (consistent with the branch decomposition in Section 2.1).
 - **(Data)** Modest elevation at the very edges of the window (positions ±480 to ±500) reflects a CNN boundary effect (Section 0); the first/last ~25bp should be interpreted with that caveat.
 
 ## 4.1 Stop Codon Identity {#sec4-stop-codon}
@@ -1345,13 +1353,23 @@ tag_nmd_pct  <- get_pct("NMD",     "TAG"); tag_ctrl_pct <- get_pct("Control", "T
 # Section 6 (fig6a-subgroup-counts) and that moves with the results tree. Aggregating
 # across all NMD subgroups dilutes the signal because PTC- subgroups have weak
 # stop-codon attribution (see Section 7.3 branch decomposition).
-get_shap_ptcpos <- function(sc) {
-  sg_stop_cd$mean_signed_shap_mean[
-    sg_stop_cd$subgroup == "NMD PTC+" & sg_stop_cd$stop_codon == sc]
+get_shap <- function(sg, sc) {
+  v <- sg_stop_cd$mean_signed_shap_mean[
+    sg_stop_cd$subgroup == sg & sg_stop_cd$stop_codon == sc]
+  stopifnot(length(v) == 1L)
+  v
 }
+get_shap_ptcpos <- function(sc) get_shap("NMD PTC+", sc)
 tga_shap_ptcpos <- get_shap_ptcpos("TGA")
 taa_shap_ptcpos <- get_shap_ptcpos("TAA")
 tag_shap_ptcpos <- get_shap_ptcpos("TAG")
+
+# CONTROL'S TGA, AND THE RATIO, FOR THE SECTION 7.2 PROSE. It read "(~+0.010, ratio 1.3x vs
+# Control's ~+0.008)" as fixed text while both terms were computable from this same table -- and
+# the ratio was a THIRD frozen number derived from the other two, so a re-render could have
+# disagreed with itself three ways in one parenthesis.
+tga_shap_ctrl  <- get_shap("Control", "TGA")
+tga_shap_ratio <- tga_shap_ptcpos / tga_shap_ctrl
 ```
 
 ```{r sec4-stop-obs, eval=has_subgroup_shap, results='asis'}
@@ -1408,7 +1426,7 @@ render_dt(
 
 **Observations:**
 
-- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. The canonical NMD PTC+ subgroup carries the largest TGA contribution (≈+0.010, ratio 1.3x vs Control's ≈+0.008); the PTC- subgroups have weaker stop-codon attribution. The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism. Frequency analysis (Section 4.1) confirms the same direction at the population level: TGA is enriched in NMD (`r if (has_subgroup_shap) sprintf("%.1f%%", 100*tga_nmd_pct) else "see §4.1"` vs `r if (has_subgroup_shap) sprintf("%.1f%%", 100*tga_ctrl_pct) else "see §4.1"` in Control) — computed in that section, not restated here.
+- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. The canonical NMD PTC+ subgroup carries the largest TGA contribution (`r if (has_subgroup_shap) sprintf("%+.4f", tga_shap_ptcpos) else "see §4.1"`, ratio `r if (has_subgroup_shap) sprintf("%.1fx", tga_shap_ratio) else "see §4.1"` vs Control's `r if (has_subgroup_shap) sprintf("%+.4f", tga_shap_ctrl) else "see §4.1"`); the PTC- subgroups have weaker stop-codon attribution. The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism. Frequency analysis (Section 4.1) confirms the same direction at the population level: TGA is enriched in NMD (`r if (has_subgroup_shap) sprintf("%.1f%%", 100*tga_nmd_pct) else "see §4.1"` vs `r if (has_subgroup_shap) sprintf("%.1f%%", 100*tga_ctrl_pct) else "see §4.1"` in Control) — computed in that section, not restated here.
 - **(Data)** The TGA-positive / TAA,TAG-negative pattern is sign-consistent across all 5 DeepSHAP replicates.
 
 ---
