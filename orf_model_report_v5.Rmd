@@ -1297,15 +1297,6 @@ sc_freq <- sc_data %>%
   ungroup() %>%
   mutate(stop_codon = factor(stop_codon, levels = c("TGA", "TAA", "TAG")))
 
-# EXPOSED FOR THE PROSE, so Section 7 can cite these instead of restating them. Section 7.2 read
-# "TGA is enriched in NMD (55.9% vs 48.1% in Control)" as fixed text while this chunk computed the
-# same two numbers 120 lines above it. On a re-render the two sentences disagree and both look
-# authoritative -- the report's highest-risk defect class, because nothing throws.
-tga_pct <- function(cls) 100 * sc_freq$pct[sc_freq$class == cls & sc_freq$stop_codon == "TGA"]
-tga_nmd_pct  <- tga_pct("NMD")
-tga_ctrl_pct <- tga_pct("Control")
-stopifnot(length(tga_nmd_pct) == 1L, length(tga_ctrl_pct) == 1L)
-
 sc_annot <- data.frame(
   stop_codon = factor(c("TGA", "TAA", "TAG"), levels = c("TGA", "TAA", "TAG")),
   y = c(max(sc_freq$pct[sc_freq$stop_codon == "TGA"]),
@@ -1338,14 +1329,20 @@ save_fig(p_sc, "fig4a_stop_codon", width = 7, height = 6)
 
 ```{r sec4-stop-codon-shap, eval=has_subgroup_shap, include=FALSE}
 # Per-class within-class frequencies (from corrected selected_orfs.tsv, fig4a chunk).
+# RETURNS A FRACTION, not a percentage -- every caller multiplies by 100. Stated because a
+# second helper returning percentages under these same names was briefly added above on
+# 2026-08-14 and would have rendered 0.6% where the prose means 55.9%: one name, two units,
+# which is the defect this section is being cleaned of.
 get_pct <- function(cls, sc) sc_freq$pct[sc_freq$class == cls & sc_freq$stop_codon == sc]
 tga_nmd_pct  <- get_pct("NMD",     "TGA"); tga_ctrl_pct <- get_pct("Control", "TGA")
 taa_nmd_pct  <- get_pct("NMD",     "TAA"); taa_ctrl_pct <- get_pct("Control", "TAA")
 tag_nmd_pct  <- get_pct("NMD",     "TAG"); tag_ctrl_pct <- get_pct("Control", "TAG")
 
 # Mean signed SHAP at stop codon, taken from the NMD PTC+ subgroup specifically.
-# PTC+ is where the canonical EJC-dependent NMD mechanism dominates (n=1,798);
-# SHAP signals here best reflect the model's TGA-positive bias. Aggregating
+# PTC+ is where the canonical EJC-dependent NMD mechanism dominates; SHAP signals
+# here best reflect the model's TGA-positive bias. THE SUBGROUP SIZE IS NOT RESTATED
+# HERE -- it was `n=1,798`, frozen text for a count that `subgroup_counts` computes in
+# Section 6 (fig6a-subgroup-counts) and that moves with the results tree. Aggregating
 # across all NMD subgroups dilutes the signal because PTC- subgroups have weak
 # stop-codon attribution (see Section 7.3 branch decomposition).
 get_shap_ptcpos <- function(sc) {
@@ -1373,9 +1370,11 @@ cat(sprintf("- **(Data)** TGA is enriched in NMD (%.1f%% vs %.1f%% in Control); 
 # Population: 5-run pooled DeepSHAP at the stop codon's variable positions.
 # Shown by subgroup to avoid the aggregation pitfall: PTC+ dominates the NMD
 # signal because the canonical PTC+EJC mechanism is where the stop branch
-# expresses its strongest opinion. Aggregating across NMD subgroups (which
-# are highly imbalanced — n=1798/194/276) dilutes the PTC+ signal with the
-# small PTC- subgroups.
+# expresses its strongest opinion. Aggregating across the NMD subgroups, which are
+# highly imbalanced, dilutes the PTC+ signal with the small PTC- ones. THE COUNTS ARE
+# NOT RESTATED HERE -- this comment carried `n=1798/194/276`, a THIRD frozen copy of
+# what `subgroup_counts` computes in Section 6. The audit's Category E listed two; a
+# sweep for the literal found this one.
 
 sg_subgroup_levels <- c("Control", "NMD PTC+",
                         "NMD PTC-, ref ATG retained", "NMD PTC-, ref ATG lost")
@@ -1409,7 +1408,7 @@ render_dt(
 
 **Observations:**
 
-- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. The canonical NMD PTC+ subgroup carries the largest TGA contribution (≈+0.010, ratio 1.3x vs Control's ≈+0.008); the PTC- subgroups have weaker stop-codon attribution. The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism. Frequency analysis (Section 4.1) confirms the same direction at the population level: TGA is enriched in NMD (`r sprintf("%.1f%%", tga_nmd_pct)` vs `r sprintf("%.1f%%", tga_ctrl_pct)` in Control) — computed in that section, not restated here.
+- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. The canonical NMD PTC+ subgroup carries the largest TGA contribution (≈+0.010, ratio 1.3x vs Control's ≈+0.008); the PTC- subgroups have weaker stop-codon attribution. The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism. Frequency analysis (Section 4.1) confirms the same direction at the population level: TGA is enriched in NMD (`r if (has_subgroup_shap) sprintf("%.1f%%", 100*tga_nmd_pct) else "see §4.1"` vs `r if (has_subgroup_shap) sprintf("%.1f%%", 100*tga_ctrl_pct) else "see §4.1"` in Control) — computed in that section, not restated here.
 - **(Data)** The TGA-positive / TAA,TAG-negative pattern is sign-consistent across all 5 DeepSHAP replicates.
 
 ---
@@ -2428,9 +2427,11 @@ render_dt(shap_stability %>%
 ```{r fig4f-junction-nmd-ctrl, eval=has_subgroup_shap, fig.width=9, fig.height=5}
 # ── Data provenance ──
 # Source: subgroup_junction_downstream_shap_{tag}.tsv (08_export_subgroup_deepshap_tsv.py).
-# Shown by subgroup to avoid the unweighted-aggregation pitfall: PTC+ (n=1,798)
-# carries the dominant junction signal; aggregating across imbalanced NMD
-# subgroups (1798/194/276) dilutes the signal with the small PTC- subgroups.
+# Shown by subgroup to avoid the unweighted-aggregation pitfall: PTC+ carries the
+# dominant junction signal, and aggregating across the imbalanced NMD subgroups
+# dilutes it with the much smaller PTC- ones. SIZES ARE NOT RESTATED HERE -- they were
+# `n=1,798` and `1798/194/276`, frozen copies of what `subgroup_counts` computes in
+# Section 6. The imbalance is the point; the exact counts are read from that table.
 
 sg_junc_subgroup <- sg_junc %>%
   mutate(subgroup = factor(subgroup,
@@ -2942,9 +2943,9 @@ att_med <- function(sg) max_attn$median_max_attn[max_attn$subgroup == sg]
 
 **Observations:**
 
-- **(Data)** **PTC+** shows the most focused attention: rank-0 is dominant in `r sprintf("%.1f%%", att_dom("NMD PTC+"))` of transcripts, with median max-attention `r sprintf("%.3f", att_med("NMD PTC+"))`. The model is highly confident about which ORF to evaluate.
-- **(Data)** **PTC- ref ATG retained** has strikingly diffuse attention: rank-0 is dominant in only `r sprintf("%.1f%%", att_dom("NMD PTC-, ref ATG retained"))` of transcripts (median max-attention `r sprintf("%.3f", att_med("NMD PTC-, ref ATG retained"))`). Attention "leaks" substantially to ranks 1-4, indicating the model searches across multiple ORFs for signals. This is the hardest subgroup — the model is genuinely uncertain which ORF explains NMD status.
-- **(Data)** **PTC- ref ATG lost** is similarly diffuse (`r sprintf("%.1f%%", att_dom("NMD PTC-, ref ATG lost"))` rank-0 dominant, median max-attention `r sprintf("%.3f", att_med("NMD PTC-, ref ATG lost"))`), with attention shifting toward SQANTI/TD2 CDS ORFs when ref CDS is unavailable.
+- **(Data)** **PTC+** shows the most focused attention: rank-0 is dominant in `r if (has_subgroup_shap) sprintf("%.1f%%", att_dom("NMD PTC+")) else "see Table 6c"` of transcripts, with median max-attention `r if (has_subgroup_shap) sprintf("%.3f", att_med("NMD PTC+")) else "see Table 6c"`. The model is highly confident about which ORF to evaluate.
+- **(Data)** **PTC- ref ATG retained** has strikingly diffuse attention: rank-0 is dominant in only `r if (has_subgroup_shap) sprintf("%.1f%%", att_dom("NMD PTC-, ref ATG retained")) else "see Table 6c"` of transcripts (median max-attention `r if (has_subgroup_shap) sprintf("%.3f", att_med("NMD PTC-, ref ATG retained")) else "see Table 6c"`). Attention "leaks" substantially to ranks 1-4, indicating the model searches across multiple ORFs for signals. This is the hardest subgroup — the model is genuinely uncertain which ORF explains NMD status.
+- **(Data)** **PTC- ref ATG lost** is similarly diffuse (`r if (has_subgroup_shap) sprintf("%.1f%%", att_dom("NMD PTC-, ref ATG lost")) else "see Table 6c"` rank-0 dominant, median max-attention `r if (has_subgroup_shap) sprintf("%.3f", att_med("NMD PTC-, ref ATG lost")) else "see Table 6c"`), with attention shifting toward SQANTI/TD2 CDS ORFs when ref CDS is unavailable.
 - **(Interpretation)** The attention mechanism reveals three distinct decision strategies: (1) PTC+: lock onto ref CDS with strong Kozak, check for downstream EJC; (2) PTC- ATG lost: shift to TD2/SQANTI CDS as fallback anchor; (3) PTC- ATG retained: distribute attention across multiple ORFs, searching for alternative explanations (upstream ORFs, out-of-frame ORFs). This is consistent with the subgroup-specific sequence-level findings in Section 9.6.
 
 ```{r fig6-shap-start-site, fig.width=10, fig.height=6}
