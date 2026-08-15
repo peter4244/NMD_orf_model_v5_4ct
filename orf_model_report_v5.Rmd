@@ -532,7 +532,7 @@ We use four complementary methods, each operating at a different layer of the mo
 
 **What they cannot tell us:** (1) Interaction effects between branches (e.g., whether Kozak strength modulates the EJC signal) — each method conditions on one layer. (2) Codon-level dependencies — per-nucleotide SHAP captures positional composition, not triplet identity. (3) Causal relationships — all metrics measure association with the model's output, not biological causation.
 
-**Note on edge artifacts:** CNN-based DeepSHAP values can be elevated at the boundaries of sequence windows due to the CNN's receptive field extending beyond the window edge. The SHAP profile plots in Section 2.3 show modest elevation at both edges of the stop window (positions ±230–250), consistent with a boundary effect. The first and last ~25bp of each window should be interpreted with this caveat.
+**Note on edge artifacts:** CNN-based DeepSHAP values can be elevated at the boundaries of sequence windows due to the CNN's receptive field extending beyond the window edge. The SHAP profile plots in Section 2.3 show modest elevation at both edges of the stop window, consistent with a boundary effect. The first and last ~25bp of each window should be interpreted with this caveat — a width set by the CNN's receptive field, not by the window size, so it does not scale with the window. The position range is deliberately not restated here: the edges are wherever the window ends, and a literal range is what went stale when the window moved from 500 to 1000.
 
 ---
 
@@ -1264,7 +1264,10 @@ save_fig(p_sc_nmd / p_sc_ctrl, "fig4a_stop_logo", width = 12, height = 8)
 # this column; the column was patched on 2026-04-30 from the HDF5 one-hot
 # encoding (see scripts/patch_stop_codon.py).
 # Population: full test set rank-0 ORFs with canonical TGA/TAA/TAG (effectively
-# all test transcripts; n_test=10,131).
+# all test transcripts). THE SIZE IS NOT RESTATED HERE. It was `n_test=10,131`, which is
+# the PUBLISHED run's test set; the deposited model's is 10,522 -- a different population,
+# not a rounding or a geometry artifact, and it sat in a provenance comment where nothing
+# recomputes it. `n_test` is computed from `preds` in Section 0 and is what the prose uses.
 
 sc_data <- preds %>%
   inner_join(all_orfs %>% filter(orf_rank == 0) %>% select(isoform_id, stop_codon),
@@ -1293,6 +1296,15 @@ sc_freq <- sc_data %>%
   mutate(pct = n / sum(n)) %>%
   ungroup() %>%
   mutate(stop_codon = factor(stop_codon, levels = c("TGA", "TAA", "TAG")))
+
+# EXPOSED FOR THE PROSE, so Section 7 can cite these instead of restating them. Section 7.2 read
+# "TGA is enriched in NMD (55.9% vs 48.1% in Control)" as fixed text while this chunk computed the
+# same two numbers 120 lines above it. On a re-render the two sentences disagree and both look
+# authoritative -- the report's highest-risk defect class, because nothing throws.
+tga_pct <- function(cls) 100 * sc_freq$pct[sc_freq$class == cls & sc_freq$stop_codon == "TGA"]
+tga_nmd_pct  <- tga_pct("NMD")
+tga_ctrl_pct <- tga_pct("Control")
+stopifnot(length(tga_nmd_pct) == 1L, length(tga_ctrl_pct) == 1L)
 
 sc_annot <- data.frame(
   stop_codon = factor(c("TGA", "TAA", "TAG"), levels = c("TGA", "TAA", "TAG")),
@@ -1397,7 +1409,7 @@ render_dt(
 
 **Observations:**
 
-- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. The canonical NMD PTC+ subgroup carries the largest TGA contribution (≈+0.010, ratio 1.3x vs Control's ≈+0.008); the PTC- subgroups have weaker stop-codon attribution. The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism. Frequency analysis (Section 4.1) confirms the same direction at the population level: TGA is enriched in NMD (55.9% vs 48.1% in Control).
+- **(Data)** TGA has positive signed SHAP in both NMD and Control; TAA and TAG both have negative SHAP. The canonical NMD PTC+ subgroup carries the largest TGA contribution (≈+0.010, ratio 1.3x vs Control's ≈+0.008); the PTC- subgroups have weaker stop-codon attribution. The pattern is consistent with the model learning that TGA — the stop codon with the highest readthrough rate — is associated with NMD, particularly the canonical PTC+EJC mechanism. Frequency analysis (Section 4.1) confirms the same direction at the population level: TGA is enriched in NMD (`r sprintf("%.1f%%", tga_nmd_pct)` vs `r sprintf("%.1f%%", tga_ctrl_pct)` in Control) — computed in that section, not restated here.
 - **(Data)** The TGA-positive / TAA,TAG-negative pattern is sign-consistent across all 5 DeepSHAP replicates.
 
 ---
@@ -2855,6 +2867,13 @@ max_attn <- attn_sg %>%
   ungroup() %>%
   group_by(subgroup) %>%
   summarise(pct_rank0_dom = round(100 * mean(orf_rank == 0), 1),
+            # THE MEDIAN OF THE MAXIMUM, which is what the prose below calls
+            # "median max-attention". It is NOT median_rank0_attn in the table chunk, which is the
+            # median attention ON rank-0. The two nearly coincide for PTC+ (rank-0 is the argmax
+            # ~93% of the time) and diverge for the diffuse subgroups, where rank-0 is the argmax
+            # about half the time -- so citing one under the other's name would be the same-name-
+            # different-set defect this report is being cleaned of.
+            median_max_attn = round(median(attn_weight), 3),
             n_tx = n(), .groups = "drop")
 
 p_rank0_dom <- ggplot(max_attn, aes(x = subgroup, y = pct_rank0_dom, fill = subgroup)) +
@@ -2903,6 +2922,12 @@ orf_type_attn <- attn_sg %>%
   )
 render_dt(orf_type_attn,
           caption = "Table 6c: Attention on rank-0 ORF by subgroup and CDS type")
+
+# EXPOSED FOR THE PROSE BELOW, which restated ~93% / 0.87 / ~51% / 0.73 / ~50% / 0.59 as fixed text
+# while this section computed every one of them. att_dom() reads the argmax table, att_med() the
+# median-of-maximum in the same table -- deliberately the same source, so the pair cannot drift.
+att_dom <- function(sg) max_attn$pct_rank0_dom[max_attn$subgroup == sg]
+att_med <- function(sg) max_attn$median_max_attn[max_attn$subgroup == sg]
 ```
 
 <details><summary>**Variable definitions** (click to expand)</summary>
@@ -2917,9 +2942,9 @@ render_dt(orf_type_attn,
 
 **Observations:**
 
-- **(Data)** **PTC+** shows the most focused attention: rank-0 is dominant in ~93% of transcripts, with median max-attention ≈ 0.87. The model is highly confident about which ORF to evaluate.
-- **(Data)** **PTC- ref ATG retained** has strikingly diffuse attention: rank-0 is dominant in only ~51% of transcripts (median max-attention 0.73). Attention "leaks" substantially to ranks 1-4, indicating the model searches across multiple ORFs for signals. This is the hardest subgroup — the model is genuinely uncertain which ORF explains NMD status.
-- **(Data)** **PTC- ref ATG lost** is similarly diffuse (~50% rank-0 dominant, median max-attention 0.59), with attention shifting toward SQANTI/TD2 CDS ORFs when ref CDS is unavailable.
+- **(Data)** **PTC+** shows the most focused attention: rank-0 is dominant in `r sprintf("%.1f%%", att_dom("NMD PTC+"))` of transcripts, with median max-attention `r sprintf("%.3f", att_med("NMD PTC+"))`. The model is highly confident about which ORF to evaluate.
+- **(Data)** **PTC- ref ATG retained** has strikingly diffuse attention: rank-0 is dominant in only `r sprintf("%.1f%%", att_dom("NMD PTC-, ref ATG retained"))` of transcripts (median max-attention `r sprintf("%.3f", att_med("NMD PTC-, ref ATG retained"))`). Attention "leaks" substantially to ranks 1-4, indicating the model searches across multiple ORFs for signals. This is the hardest subgroup — the model is genuinely uncertain which ORF explains NMD status.
+- **(Data)** **PTC- ref ATG lost** is similarly diffuse (`r sprintf("%.1f%%", att_dom("NMD PTC-, ref ATG lost"))` rank-0 dominant, median max-attention `r sprintf("%.3f", att_med("NMD PTC-, ref ATG lost"))`), with attention shifting toward SQANTI/TD2 CDS ORFs when ref CDS is unavailable.
 - **(Interpretation)** The attention mechanism reveals three distinct decision strategies: (1) PTC+: lock onto ref CDS with strong Kozak, check for downstream EJC; (2) PTC- ATG lost: shift to TD2/SQANTI CDS as fallback anchor; (3) PTC- ATG retained: distribute attention across multiple ORFs, searching for alternative explanations (upstream ORFs, out-of-frame ORFs). This is consistent with the subgroup-specific sequence-level findings in Section 9.6.
 
 ```{r fig6-shap-start-site, fig.width=10, fig.height=6}
