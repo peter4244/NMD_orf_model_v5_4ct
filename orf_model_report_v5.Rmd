@@ -1525,6 +1525,20 @@ p_max_attn <- max_attn_per_iso %>%
        x = "Max attention weight", y = "Density", fill = NULL)
 
 save_fig(p_max_attn, "fig5c_max_attn_density")
+
+# THE FIVE NUMBERS SECTION 5's PROSE RESTATED. Three were already computed a few chunks up
+# (ent_stats' mean and median entropy) or right here (max_weight per isoform); the two p-values
+# were frozen text. Both tests are named explicitly by the prose -- Mann-Whitney on attention
+# entropy by class, and a Kolmogorov-Smirnov on the same two distributions -- so computing them
+# restates nothing and invents nothing. The report already uses wilcox.test in Section 8.
+med_max_attn <- function(cls) median(max_attn_per_iso$max_weight[max_attn_per_iso$class == cls])
+ent_stat <- function(cls, what) ent_stats[[what]][ent_stats$class == cls]
+
+.ent_nmd  <- entropy_summary$attn_entropy[entropy_summary$class == "NMD"]
+.ent_ctrl <- entropy_summary$attn_entropy[entropy_summary$class == "Control"]
+ent_mw_p <- suppressWarnings(wilcox.test(.ent_nmd, .ent_ctrl)$p.value)
+ent_ks_p <- suppressWarnings(ks.test(.ent_nmd, .ent_ctrl)$p.value)
+fmt_p <- function(x) if (x < 1e-4) sprintf("%.0e", x) else sprintf("%.2f", x)
 ```
 
 **Variable definitions:**
@@ -1534,7 +1548,7 @@ save_fig(p_max_attn, "fig5c_max_attn_density")
 **Observations:**
 
 - **(Data)** The median max attention weight is `r round(median(max_attn_per_iso$max_weight[max_attn_per_iso$class == "NMD"]), 3)` for NMD and `r round(median(max_attn_per_iso$max_weight[max_attn_per_iso$class == "Control"]), 3)` for Control. Both classes show strong single-ORF dominance, with most isoforms concentrating >50% of attention on one ORF.
-- **(Data)** NMD isoforms have slightly lower median max attention weights than Controls (0.84 vs 0.86) and slightly higher median attention entropy (0.84 vs 0.78 bits) — marginally more diffuse attention by both metrics. The mean entropy direction is opposite (Table 5a: NMD 0.91 vs Ctrl 0.95) because Control has heavier upper-tail outliers; formal central-tendency tests are non-significant (Mann-Whitney p=0.68), while a Kolmogorov–Smirnov test detects a distributional shape difference (p<10⁻¹⁴).
+- **(Data)** NMD isoforms have slightly lower median max attention weights than Controls (`r sprintf("%.2f", med_max_attn("NMD"))` vs `r sprintf("%.2f", med_max_attn("Control"))`) and slightly higher median attention entropy (`r sprintf("%.2f", ent_stat("NMD","median_entropy"))` vs `r sprintf("%.2f", ent_stat("Control","median_entropy"))` bits) — marginally more diffuse attention by both metrics. The mean entropy direction is opposite (Table 5a: NMD `r sprintf("%.2f", ent_stat("NMD","mean_entropy"))` vs Ctrl `r sprintf("%.2f", ent_stat("Control","mean_entropy"))`) because Control has heavier upper-tail outliers; the central-tendency test is non-significant (Mann-Whitney p=`r fmt_p(ent_mw_p)`), while a Kolmogorov–Smirnov test detects a distributional shape difference (p=`r fmt_p(ent_ks_p)`).
 
 <details><summary>Table 5b: ORF composition by rank and NMD status</summary>
 
@@ -1791,6 +1805,15 @@ subgroup_order <- c("Control", "NMD PTC+", "NMD PTC-, ref ATG retained",
                     "NMD PTC-, ref ATG lost")
 sec8_data$subgroup <- factor(sec8_data$subgroup, levels = subgroup_order)
 stopifnot("Unclassified transcripts detected" = !any(is.na(sec8_data$subgroup)))
+
+# THE RECLASSIFIED SHARE, for the prose below. It read "~47% of the original ref-ATG-lost group",
+# frozen text for a fraction the case_when above defines exactly: among NMD transcripts whose
+# category is one of the ref-ATG-lost set, the ones the TD2 frame gives a downstream EJC are
+# promoted to PTC+. Nothing to choose -- the rule IS the definition, ten lines up.
+.lost_cats <- c("ref_atg_lost", "no_ref_isoform", "not_atg_in_target", "no_stop_in_target")
+.lost_all  <- sec8_data[sec8_data$label == 1 & sec8_data$category %in% .lost_cats, ]
+pct_lost_reclassified <- if (nrow(.lost_all) == 0) NA_real_ else
+  100 * mean(!is.na(.lost_all$td2_downstream_ejc) & .lost_all$td2_downstream_ejc > 0)
 ```
 
 ```{r sec6-derived-vars, include=FALSE}
@@ -1839,7 +1862,7 @@ save_fig(p_subgroups, "fig6a_subgroup_counts", width = 9, height = 4)
 | **NMD PTC-, ref ATG retained** | Ref ATG available but reading frame terminates without downstream EJCs (`no_downstream_ejc`, `truncated_no_ejc`). |
 | **NMD PTC-, ref ATG lost** | Ref ATG unavailable AND TD2 CDS also shows 0 downstream EJCs. PTC-negative by both reading frame definitions. |
 
-- **PTC status** is defined by the best available CDS: first by the reference CDS frame (`ref_downstream_ejc > 0`), then by the TD2 CDS frame (`td2_downstream_ejc > 0`) for transcripts where the reference ATG is lost. This reclassifies ~47% of the original ref-ATG-lost group as PTC+ (they have PTCs from the TD2 reading frame).
+- **PTC status** is defined by the best available CDS: first by the reference CDS frame (`ref_downstream_ejc > 0`), then by the TD2 CDS frame (`td2_downstream_ejc > 0`) for transcripts where the reference ATG is lost. This reclassifies `r if (is.na(pct_lost_reclassified)) "a share" else sprintf("%.0f%%", pct_lost_reclassified)` of the original ref-ATG-lost group as PTC+ (they have PTCs from the TD2 reading frame).
 - The **ref ATG lost, PTC-** group has zero-filled ref-CDS features but valid TD2 features. These transcripts lack PTCs by both reading frame definitions and represent the most clearly non-canonical NMD subpopulation.
 
 <details><summary>Table 6a: Subgroup counts</summary>
@@ -2464,6 +2487,16 @@ render_dt(shap_stability %>%
 # `n=1,798` and `1798/194/276`, frozen copies of what `subgroup_counts` computes in
 # Section 6. The imbalance is the point; the exact counts are read from that table.
 
+# THE PTC+/CONTROL JUNCTION RATIO, for the prose below. It read "~10x smaller than PTC+" as fixed
+# text -- a ratio of two values in this very table, so it could have disagreed with the figure
+# beside it. abs() because the claim is about magnitude; a sign flip would make "smaller" the wrong
+# word and is worth seeing rather than hiding inside a ratio.
+junc_shap <- function(sg) {
+  v <- sg_junc$mean_junction_shap_mean[sg_junc$subgroup == sg]
+  if (length(v) != 1L) NA_real_ else v
+}
+junc_ptcpos_over_ctrl <- abs(junc_shap("NMD PTC+")) / abs(junc_shap("Control"))
+
 sg_junc_subgroup <- sg_junc %>%
   mutate(subgroup = factor(subgroup,
                            levels = c("Control", "NMD PTC+",
@@ -2488,7 +2521,7 @@ save_fig(p_junc_class, "fig4f_junction_subgroup", width = 9, height = 5)
 
 **Observations:**
 
-- **(Data)** The NMD PTC+ subgroup carries the dominant downstream junction SHAP signal; Control transcripts show a small positive signal (~10× smaller than PTC+); the PTC- subgroups are near-zero. The junction channel is the primary sequence-level EJC signature in the stop branch and operates almost entirely through the canonical PTC+EJC mechanism.
+- **(Data)** The NMD PTC+ subgroup carries the dominant downstream junction SHAP signal; Control transcripts show a small positive signal (`r if (has_subgroup_shap && !is.na(junc_ptcpos_over_ctrl)) sprintf("%.0f×", junc_ptcpos_over_ctrl) else "several-fold"` smaller than PTC+ in magnitude); the PTC- subgroups are near-zero. The junction channel is the primary sequence-level EJC signature in the stop branch and operates almost entirely through the canonical PTC+EJC mechanism.
 - **(Data)** The NMD PTC+ junction signal reflects exon-exon junctions downstream of the stop codon, which are the physical basis for canonical NMD (EJC-mediated recognition of premature termination).
 
 ---
