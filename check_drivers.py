@@ -69,6 +69,18 @@ EXEMPT_FILES = {
 
 # Single lines exempt, keyed by (filename, exact stripped text). A literal here names something
 # that is deliberately NOT the current selection, so following the selection would be wrong.
+# EXEMPTIONS THAT MATCH NOTHING ARE A FAILURE, NOT A NO-OP. EXEMPT_LINES is keyed by exact
+# stripped text, so the moment the line it names is edited the key stops matching and the
+# exemption silently stops applying -- it FAILS OPEN, and a reader of this file still sees an
+# entry and believes it is active. Both entries below had rotted that way by 2026-08-15: one
+# exempted a cmp guard that could not fire, and the other matched a COMMENT about the old form
+# after the code it named gained an override. Neither was detectable by running this checker.
+# USED_EXEMPTIONS closes that: main() fails on any key never hit during the scan, so the
+# discrepancy surfaces on the first run after the code moves rather than when someone looks.
+# Same argument this file already makes about EXEMPT_FILES: an exemption nobody can see is how
+# the last set accumulated. Mechanism proposed by the paper-validation window, 2026-08-15.
+USED_EXEMPTIONS = set()
+
 EXEMPT_LINES = {
     # RETARGETED 2026-08-15. The slurm_uorf_dn.sh entry exempted a cmp against
     # results_4ct/best_model_atg500_stop500.pt that COULD NOT FIRE -- a 1000/1000 seeded
@@ -79,8 +91,12 @@ EXEMPT_LINES = {
     # The slurm_train_cpu_dn.sh entry had become worse than stale: after OUT gained an override the
     # exact text "OUT=results_4ct_dn_cpu" survived only inside a COMMENT explaining the old form, so
     # the exemption matched prose and guarded nothing.
+    # KEYED ON THE STRIPPED TEXT. This entry was written with the source line's leading
+    # indentation and therefore never matched, because the scanner compares line.strip(). It was
+    # dead from the moment it was added, one hour before the dead-exemption check below caught it
+    # -- which is the check earning its keep on its first run, against its own author.
     ("slurm_uorf_dn.sh",
-     '  results_4ct|results_4ct_dn|results_4ct_dn_cpu)'):
+     'results_4ct|results_4ct_dn|results_4ct_dn_cpu)'):
         "names the published and deprecated trees in order to REFUSE them, not to read them",
     ("slurm_train_cpu_dn.sh", 'OUT="${OUT:-results_4ct_dn_cpu}"'):
         "a separate CPU-only smoke tree, not the deprecated results_4ct_dn; overridable since 2026-08-15",
@@ -104,6 +120,7 @@ def offending_lines(path: Path):
         if stripped.startswith("#") or stripped.startswith("//"):
             continue
         if (path.name, stripped) in EXEMPT_LINES:
+            USED_EXEMPTIONS.add((path.name, stripped))
             continue
         for rx, why in PATTERNS:
             if rx.search(line):
@@ -155,6 +172,16 @@ def main() -> int:
             bad.setdefault(p.name, []).extend(hits)
 
     print(f"checked {len(drivers)} deposit-native driver(s) and {len(pyfiles)} python file(s)")
+
+    dead = set(EXEMPT_LINES) - USED_EXEMPTIONS
+    if dead:
+        print(f"\n{len(dead)} EXEMPT_LINES entr(ies) matched nothing. The line named was edited or "
+              f"deleted, so the exemption guards nothing and this check has been passing on trust:\n")
+        for fname, text in sorted(dead):
+            print(f"  {fname}\n    {text}")
+        print("\nRetarget each to the line as it now reads, or delete it if the literal is gone.")
+        return 1
+
     if not bad:
         print("OK — no deposit-native driver names a window, tag or results tree by literal, "
               "and no script resolves config.yaml behind its caller")

@@ -1183,6 +1183,20 @@ save_fig(p_stop_full, "fig4_stop_importance_profile", width = 10, height = 4)
 branch_ratio <- function(df) sum(df$nmd_abs_shap) / sum(df$ctrl_abs_shap)
 stop_nmd_ctrl_ratio <- branch_ratio(stop_profile)
 atg_nmd_ctrl_ratio  <- branch_ratio(atg_profile)
+
+# THE AGGREGATE REVERSES WITH WINDOW EXTENT, SO THE EXTENT IS PART OF THE NUMBER. Summing all
+# 1000 positions x 9 channels weights every position equally, and diffuse distal background
+# outnumbers the focused near-stop signal by two orders of magnitude in row count. Measured on
+# the deposited profile: 0.905 over the full window, 0.913 excluding 50 nt at each edge (so this
+# is NOT the CNN receptive-field artifact), 1.005 over the central 200 nt and 1.028 within 50 nt
+# of the stop. A bare "0.90x" is a true statement about total mass and reads as "the model
+# attends less to NMD stop context", which is false where the biology is. Found by the
+# paper-validation window, 2026-08-15, and reproduced here.
+near_stop <- function(df, k) df[abs(df$relative_position) <= k, ]
+stop_ratio_near <- branch_ratio(near_stop(stop_profile, 50))
+# The junction channel is the one that runs the other way at every extent -- 1.19 over the window,
+# 1.40 over the central 200 nt -- which is where EJC-dependent NMD lives.
+stop_ratio_junction <- branch_ratio(stop_profile[stop_profile$channel == "junction", ])
 ```
 
 **Variable definitions:**
@@ -1192,7 +1206,7 @@ atg_nmd_ctrl_ratio  <- branch_ratio(atg_profile)
 
 **Observations:**
 
-- **(Data)** Importance peaks sharply at the stop codon itself, with most attribution concentrated in the ~50nt preceding the stop site (final codons of the ORF) and falling off into the 3'UTR. The NMD/Control ratio of total |SHAP| is `r if (has_shap_profiles) sprintf("%.2fx", stop_nmd_ctrl_ratio) else "see the profile figure"` in the stop branch and `r if (has_shap_profiles) sprintf("%.2fx", atg_nmd_ctrl_ratio) else "see the profile figure"` in the ATG branch — so the NMD/Control gap is larger in the ATG branch, and in the stop branch NMD transcripts carry slightly **less** total |SHAP| than Controls. **THIS SENTENCE PREVIOUSLY READ "~30% higher … ratio ≈ 1.3x" FOR THE STOP BRANCH AND "≈ 2x" FOR THE ATG BRANCH, AND BOTH WERE FROZEN TEXT FROM THE SUPERSEDED 500/500 MODEL.** Recomputed against the deposited model the stop-branch ratio is below 1, so the direction reverses rather than merely shifting — kept visible because a reader meeting the old figure elsewhere needs to know which model it described. Note this is a RATIO, not an absolute: the stop branch still carries the highest absolute attribution and contributes the largest share to predictions (consistent with the branch decomposition in Section 2.1).
+- **(Data)** Importance peaks sharply at the stop codon itself, with most attribution concentrated in the ~50nt preceding the stop site (final codons of the ORF) and falling off into the 3'UTR. The NMD/Control ratio of total |SHAP| **summed over the whole 1000 nt window** is `r if (has_shap_profiles) sprintf("%.2fx", stop_nmd_ctrl_ratio) else "see the profile figure"` in the stop branch — but **that aggregate reverses as the window narrows**: `r if (has_shap_profiles) sprintf("%.2fx", stop_ratio_near) else "see the figure"` within 50 nt of the stop codon, and `r if (has_shap_profiles) sprintf("%.2fx", stop_ratio_junction) else "see the figure"` in the junction channel across the window. The full-window figure is dominated by diffuse distal positions, which outnumber the near-stop signal by two orders of magnitude, so it describes total attribution mass and **not** how the model treats stop context. It is robust to excluding the window edges, so it is not the CNN boundary artifact. The ATG branch is `r if (has_shap_profiles) sprintf("%.2fx", atg_nmd_ctrl_ratio) else "see the profile figure"` in the ATG branch — so the NMD/Control gap is larger in the ATG branch, and in the stop branch NMD transcripts carry slightly **less** total |SHAP| than Controls. **THIS SENTENCE PREVIOUSLY READ "~30% higher … ratio ≈ 1.3x" FOR THE STOP BRANCH AND "≈ 2x" FOR THE ATG BRANCH, AND BOTH WERE FROZEN TEXT FROM THE SUPERSEDED 500/500 MODEL.** Recomputed against the deposited model the stop-branch ratio is below 1, so the direction reverses rather than merely shifting — kept visible because a reader meeting the old figure elsewhere needs to know which model it described. Note this is a RATIO, not an absolute: the stop branch still carries the highest absolute attribution and contributes the largest share to predictions (consistent with the branch decomposition in Section 2.1).
 - **(Data)** Modest elevation at the very edges of the window (positions ±480 to ±500) reflects a CNN boundary effect (Section 0); the first/last ~25bp should be interpreted with that caveat.
 
 ## 4.1 Stop Codon Identity {#sec4-stop-codon}
