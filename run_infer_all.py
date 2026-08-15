@@ -51,7 +51,9 @@ def main():
     p.add_argument("--atg-window", type=int, default=None)
     p.add_argument("--stop-window", type=int, default=None)
     p.add_argument("--results-dir", required=True,
-                   help="override; default reads config['data']['results_dir'] or results_4ct")
+                   help="results tree to read and write; REQUIRED. The help here used to say it "
+                        "defaulted to config['data']['results_dir'] or results_4ct -- it does not, "
+                        "the flag is required, and results_4ct is the published run.")
     p.add_argument("--split", default="all",
                    help="NMDDataset split (default: 'all')")
     p.add_argument("--member-seed", type=int, default=None, help="Ensemble member to load, by training seed. Omitted = the legacy un-seeded checkpoint. Never silently guesses a member; see utils.resolve_checkpoint.")

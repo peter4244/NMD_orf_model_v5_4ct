@@ -1,4 +1,15 @@
 #!/usr/bin/env Rscript
+# =============================================================================
+# RETIRED (D18). THIS IS NOT A BUILD STEP AND MUST NOT BE REINSTATED.
+#
+# tx_summary.tsv is written by export_rds.R, which is its sole writer. This script relabelled it
+# afterwards, which is how two writers of one artifact got created. The repository CLAUDE.md has
+# recorded it as retired since D18; the FILE said nothing, so anyone finding it by name would
+# have run it -- and it resolves results_4ct, the PUBLISHED tree, hardcoded.
+#
+# Kept rather than deleted so the decision is not re-derived, per the same convention that keeps
+# a wrong value beside its correction. Marked 2026-08-15, found by sweeping Category A.
+# =============================================================================
 #
 # Relabel tx_summary.tsv using new 4-cell-type mashr results (AT, DD, FB, MV).
 #

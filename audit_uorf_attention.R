@@ -19,7 +19,12 @@ REPO <- local({
 })
 # Was a hardcoded absolute path to one machine's checkout.
 PROJ <- REPO
-RES  <- file.path(PROJ, "results_4ct")
+# THE RESULTS TREE IS OVERRIDABLE. It was file.path(PROJ, "results_4ct") -- the PUBLISHED run --
+# hardcoded with no override, so this script read the old universe whatever was being built.
+# Same defect and same fix as audit_report.R; the 2026-08-13 audit listed neither this file
+# nor compute_uorf_attention_metrics_pathB.R, both found by sweeping after Category A closed.
+RES  <- Sys.getenv("NMD_RESULTS_DIR", unset = "")
+RES  <- if (nzchar(RES)) RES else file.path(PROJ, "results_deposit_h5_2026-08-04")
 
 pass <- 0L; warn <- 0L; fail <- 0L
 check <- function(name, claimed, computed, tol = 0.005) {

@@ -52,7 +52,12 @@ REPO <- local({
 # Derived from this script's own location. Was a hardcoded Explorer path with a hardcoded
 # Mac fallback -- two machines' absolute paths in tracked code, and wrong on any third.
 PROJ <- REPO
-RES  <- file.path(PROJ, "results_4ct")
+# THE RESULTS TREE IS OVERRIDABLE. It was file.path(PROJ, "results_4ct") -- the PUBLISHED run --
+# hardcoded with no override, so this script read the old universe whatever was being built.
+# Same defect and same fix as audit_report.R; the 2026-08-13 audit listed neither this file
+# nor compute_uorf_attention_metrics_pathB.R, both found by sweeping after Category A closed.
+RES  <- Sys.getenv("NMD_RESULTS_DIR", unset = "")
+RES  <- if (nzchar(RES)) RES else file.path(PROJ, "results_deposit_h5_2026-08-04")
 
 # ── Path B-strict structural thresholds ─────────────────────────────────
 MAX_UORF_LEN  <- 200L     # nt; below the GENCODE annotated CDS floor (270 nt)
